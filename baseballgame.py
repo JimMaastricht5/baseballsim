@@ -10,36 +10,35 @@ class TeamBoxScore:
 
 
 class Team:
-    def __init__(self, teamname, baseball_data):
-        self.teamname = teamname
+    def __init__(self, team_name, baseball_data):
+        self.team_name = team_name
         self.baseball_data = baseball_data
-        self.pitchers = baseball_data.pitching_data[baseball_data.pitching_data["Team"] == teamname]
-        self.pos_players = baseball_data.batting_data[baseball_data.batting_data["Team"] == teamname]
+        self.pitchers = baseball_data.pitching_data[baseball_data.pitching_data["Team"] == team_name]
+        self.pos_players = baseball_data.batting_data[baseball_data.batting_data["Team"] == team_name]
 
         self.lineup = None
         self.team_box_score = None
         return
 
     def set_lineup(self):
-        self.lineup = None  # dictionary: order, playername, position [1..10]
+        self.lineup = None  # dictionary: order, player_name, position [1..10]
         self.team_box_score = TeamBoxScore(self.lineup)
         return
 
 
 class Game:
-    def __init__(self, hometeamname, awayteamname, seasons=[2022]):
+    def __init__(self, home_team_name, away_team_name, seasons=[2022]):
         self.seasons = seasons
-        self.hometeamname = hometeamname
-        self.awayteamname = awayteamname
-        self.teams = [self.awayteamname, self.hometeamname]
+        self.teams = [away_team_name, home_team_name]
         self.baseball_data = baseball_stats.BaseballData(seasons=self.seasons)
         print(f'Getting data...')
         self.baseball_data.get_seasons()
 
-        print(f'Setting home team as {hometeamname}')
-        self.home = Team(hometeamname, self.baseball_data)
-        print(f'Setting away team as {awayteamname}')
-        self.away = Team(awayteamname, self.baseball_data)
+        print(f'Setting away team as {self.teams[0]}')
+        self.away = Team(self.teams[0], self.baseball_data)
+        print(f'Setting home team as {self.teams[1]}')
+        self.home = Team(self.teams[1], self.baseball_data)
+
         self.score = [0, 0]
         self.inning = [1, 1]
         self.batting_num = [1, 1]
@@ -64,7 +63,7 @@ class Game:
         # half inning over
         top_or_bottom = 'top' if self.top_bottom == 0 else 'bottom'
         print(f'Completed {top_or_bottom} half inning: {self.inning[self.top_bottom]}')
-        print(f'The score is {self.awayteamname} {self.score[0]} to {self.hometeamname} {self.score[1]}')
+        print(f'The score is {self.teams[0]} {self.score[0]} to {self.teams[1]} {self.score[1]}')
         self.inning[self.top_bottom] += 1
         self.top_bottom = 0 if self.top_bottom == 1 else 1
         self.outs = 0
@@ -84,7 +83,7 @@ class Game:
 
 
 if __name__ == '__main__':
-    hometeam = 'MIL'
-    awayteam = 'CHI'
-    game = Game(hometeamname=hometeam, awayteamname=awayteam)
+    home_team = 'MIL'
+    away_team = 'CHI'
+    game = Game(home_team_name=home_team, away_team_name=away_team)
     _ = game.sim_game()

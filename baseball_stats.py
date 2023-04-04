@@ -41,11 +41,11 @@ if __name__ == '__main__':
     # home_pitcher = Pitchers(baseball_data.pitching_data)
 
     # print(type(baseball_data.pitching_data))
-    print(baseball_data.pitching_data.shape)
-    print(baseball_data.pitching_data.columns)
-    print(baseball_data.pitching_data.head)
+    # print(baseball_data.pitching_data.shape)
+    print(*baseball_data.pitching_data.columns)
+    # print(baseball_data.pitching_data.head)
     # home_pitcher.set_team("MIL")
 
-    print(baseball_data.batting_data.shape)
-    print(baseball_data.batting_data.columns)
-    print(baseball_data.batting_data.head)
+    # print(baseball_data.batting_data.shape)
+    print(*baseball_data.batting_data.columns)
+    # print(baseball_data.batting_data.head)

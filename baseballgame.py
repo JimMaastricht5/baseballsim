@@ -10,10 +10,16 @@ class TeamBoxScore:
 
 
 class Team:
+
     def __init__(self, team_name, baseball_data):
         self.team_name = team_name
         self.baseball_data = baseball_data
+        # IDfg Season Name Team Age W L WAR ERA G GS CG ShO SV BS IP TBF H R ER HR BB IBB HBP WP BK SO GB FB LD
+        # IFFB Balls Strikes Pitches RS IFH BU BUH
         self.pitchers = baseball_data.pitching_data[baseball_data.pitching_data["Team"] == team_name]
+
+        # IDfg Season Name Team Age G AB PA H 1B 2B 3B HR R RBI BB IBB SO HBP SF SH GDP SB CS AVG GB FB LD IFFB
+        # Pitches Balls Strikes IFH BU BUH BB% K% BB/K OBP SLG OPS ISO BABIP GB/FB
         self.pos_players = baseball_data.batting_data[baseball_data.batting_data["Team"] == team_name]
 
         self.lineup = None

@@ -1,4 +1,5 @@
 import baseball_stats
+import numpy as np
 
 
 class TeamBoxScore:
@@ -50,19 +51,55 @@ class Game:
         self.inning = [1, 1]
         self.batting_num = [1, 1]
         self.outs = 0
+        self.baserunners = np.zeros(4)  # 4 bases, all empty, homeplate is a run scored
         self.top_bottom = 0  # zero is top offset, 1 is bottom offset
+        self.league_batting_obp = .4
+        self.league_pitching_obp = .375
+
+        self.rng = np.random.default_rng()  # random number generator between 0 and 1
         return
 
+    # odds ratio is odds of the hitter * odds of the pitcher over the odds of the league or enviroment
+    # the ratio only works for 2 outcomes, e.g., on base or note on base.
+    # additional outcomes need to be chained, e.g., on base was it a hit?
+    # example odds ratio.  Hitter with an obp of .400 odds ratio would be .400/(1-.400)
+    # hitter with an OBP of .400 in a league of .300 facing a pitcher with an OBP of .250 in a league of .350, and
+    # they are both playing in a league ( or park) where the OBP is expected to be .380 for the league average player.
+    # Odds(matchup)(.400 / .600) * (.250 / .750)
+    # ——————- =————————————-
+    # (.380 / .620)(.300 / .700) * (.350 / .650)
+    # Odds(matchup) = .590
+    # Matchup
+    # OBP = .590 / 1.590 = .371
+    def odds_ratio(self, hitter_stat, pitcher_stat, league_hitter_stat, league_pitcher_stat):
+        odds_ratio = (hitter_stat / (1 - hitter_stat) * pitcher_stat / (1 - pitcher_stat)) / \
+                     (league_hitter_stat / (1 - league_hitter_stat) * league_pitcher_stat / (1 - league_pitcher_stat))
+        return odds_ratio
+
     def ab_outcome(self, pitching, batting):
-        result = ['out', 'K']  # ob, out sub types ob: 1b, 2b, 3b, hr, hbp, e, w; out: k, ...
+        # ?? hbp is missing, total batters faced is missing
+        odds_onbase = self.odds_ratio(batting.OBP, ((pitching.H + pitching.BB) / (pitching.WHIP * pitching.IP + pitching.IP * 3)), self.league_batting_obp, self.league_pitching_obp)
+        dice_roll = self.rng.random()
+        if dice_roll <= odds_onbase:
+            result = ['OB', 'H']  # everything is a hit for now, need to split out bb, hbp, and h and sub divide hit types
+        else:
+            result = ['OUT', 'K']  # ob, out sub types ob: 1b, 2b, 3b, hr, hbp, e, w; out: k, ...
         return result
 
     def sim_ab(self):
         pitching = self.teams[self.top_bottom].pitching.iloc[0]
         batting = self.teams[self.top_bottom].lineup.iloc[self.batting_num[self.top_bottom]-1]
         outcome = self.ab_outcome(pitching, batting)
-        if outcome[0] == 'out':
+        if outcome[0] == 'OUT':
             self.outs += 1
+        elif outcome[0] == 'OB':
+            print('handle base runner.....')
+            np.roll(self.baserunners, 1)  # advance runners and make room at first
+            self.baserunners[1-1] = 1
+            if self.baserunners[4-1]:
+                print('run scored')
+                self.baserunners[4-1] = 0
+
         return pitching, batting, outcome
 
     def sim_half_inning(self):

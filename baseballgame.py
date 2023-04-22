@@ -1,4 +1,5 @@
 import baseball_stats
+import numpy as np
 
 
 class TeamBoxScore:
@@ -53,10 +54,31 @@ class Game:
         return
 
     def sim_ab(self):
+        # batting: obp
+        # pitching: tbf = total batters faced, h+w+hbp+bb (includes ibb)
+        # pitcher_ratio =
         outcome = ['out', 'K']  # ob, out sub types ob: 1b, 2b, 3b, hr, hbp, e, w; out: k, ...
         if outcome[0] == 'out':
             self.outs += 1
         return outcome
+
+    # odds ratio is odds of the hitter * odds of the pitcher over the odds of the league or enviroment
+    # the ratio only works for 2 outcomes, e.g., on base or note on base.
+    # additional outcomes need to be chained, e.g., on base was it a hit?
+    # example odds ratio.  Hitter with an obp of .400 odds ratio would be .400/(1-.400)
+    # hitter with an OBP of .400 in a league of .300 facing a pitcher with an OBP of .250 in a league of .350, and
+    # they are both playing in a league ( or park) where the OBP is expected to be .380 for the league average player.
+    # Odds(matchup)(.400 / .600) * (.250 / .750)
+    # ——————- =————————————-
+    # (.380 / .620)(.300 / .700) * (.350 / .650)
+    # Odds(matchup) = .590
+    # Matchup
+    # OBP = .590 / 1.590 = .371
+    def odds_ratio(self, hitter_stat, pitcher_stat, league_hitter_stat, league_pitcher_stat):
+        odds_ratio = (hitter_stat/(1-hitter_stat) * pitcher_stat/(1-pitcher_stat)) / \
+                     (league_hitter_stat/(1-league_hitter_stat) * league_pitcher_stat/(1-league_pitcher_stat))
+        print(odds_ratio)
+        return odds_ratio
 
     def sim_half_inning(self):
         while self.outs < 3:

@@ -2,6 +2,27 @@ import baseball_stats
 import numpy as np
 
 
+class Bases:
+    def __init__(self):
+        self.baserunners = np.zeros(5)  # 0th position is the batter, 4 bases, all empty, home plate (4) is a run scored
+        self.runs_scored = 0
+        return
+
+    def advance_runners(self):
+        self.baserunners = np.roll(self.baserunners, 1)  # advance runners
+        self.runs_scored = self.baserunners[4]  # run crossed home
+        return
+
+    def new_ab(self):
+        self.baserunners[0] = 1  # put a player ab
+        self.runs_scored = 0
+        return
+
+    def clear_bases(self):
+        self.baserunners = np.zeros(5)
+        return
+
+
 class TeamBoxScore:
     def __init__(self, lineup):
         self.hitting = None  # add lineup and box options for each pos or pitcher
@@ -51,12 +72,12 @@ class Game:
         self.inning = [1, 1]
         self.batting_num = [1, 1]
         self.outs = 0
-        self.baserunners = np.zeros(4)  # 4 bases, all empty, homeplate is a run scored
         self.top_bottom = 0  # zero is top offset, 1 is bottom offset
         self.league_batting_obp = .4
         self.league_pitching_obp = .375
 
         self.rng = np.random.default_rng()  # random number generator between 0 and 1
+        self.bases = Bases()
         return
 
     # odds ratio is odds of the hitter * odds of the pitcher over the odds of the league or enviroment
@@ -77,43 +98,48 @@ class Game:
         return odds_ratio
 
     def ab_outcome(self, pitching, batting):
+        # outcome: on base or out pos 0, how in pos 1, rbis in pos 2
         # ?? hbp is missing, total batters faced is missing
-        odds_onbase = self.odds_ratio(batting.OBP, ((pitching.H + pitching.BB) / (pitching.WHIP * pitching.IP + pitching.IP * 3)), self.league_batting_obp, self.league_pitching_obp)
+        odds_onbase = self.odds_ratio(batting.OBP, ((pitching.H + pitching.BB) /
+                                                    (pitching.WHIP * pitching.IP + pitching.IP * 3)),
+                                      self.league_batting_obp, self.league_pitching_obp)
         dice_roll = self.rng.random()
+        # print(dice_roll, odds_onbase)
         if dice_roll <= odds_onbase:
-            result = ['OB', 'H']  # everything is a hit for now, need to split out bb, hbp, and h and sub divide hit types
+            result = ['OB', 'H', 0]  # need to split out bb, hbp, and h and subdivide hit types
         else:
-            result = ['OUT', 'K']  # ob, out sub types ob: 1b, 2b, 3b, hr, hbp, e, w; out: k, ...
+            result = ['OUT', 'K', 0]  # ob, out sub types ob: 1b, 2b, 3b, hr, hbp, e, w; out: k, ...
         return result
 
     def sim_ab(self):
         pitching = self.teams[self.top_bottom].pitching.iloc[0]
         batting = self.teams[self.top_bottom].lineup.iloc[self.batting_num[self.top_bottom]-1]
+        self.bases.new_ab()
         outcome = self.ab_outcome(pitching, batting)
         if outcome[0] == 'OUT':
             self.outs += 1
         elif outcome[0] == 'OB':
-            print('handle base runner.....')
-            np.roll(self.baserunners, 1)  # advance runners and make room at first
-            self.baserunners[1-1] = 1
-            if self.baserunners[4-1]:
-                print('run scored')
-                self.baserunners[4-1] = 0
-
+            self.bases.advance_runners()
+            self.score[self.top_bottom] += self.bases.runs_scored  # return rbis and clears runners across home
+            if self.bases.runs_scored > 0:
+                print(f'scored... {self.score}')
         return pitching, batting, outcome
 
     def sim_half_inning(self):
         while self.outs < 3:
             pitching, batting, outcome = self.sim_ab()  # assuming an out for now...
-            print(f'Pitching: {pitching.Player} against '
+            print(f'Pitcher: {pitching.Player} against '
                   f'{self.team_names[self.top_bottom]} batter #'
                   f'{self.batting_num[self.top_bottom]}. {batting.Player} '
                   f' {outcome[1]}, {self.outs} Outs')
+            if self.bases.runs_scored >= 1:  # leave out the batter to check for runner
+                print(f'Runners on {self.bases.baserunners[1:]}')
             self.batting_num[self.top_bottom] = self.batting_num[self.top_bottom] + 1 \
                 if self.batting_num[self.top_bottom] <= 9 else 1
 
         # half inning over
         top_or_bottom = 'top' if self.top_bottom == 0 else 'bottom'
+        self.bases.clear_bases()
         print(f'Completed {top_or_bottom} half inning: {self.inning[self.top_bottom]}')
         print(f'The score is {self.team_names[0]} {self.score[0]} to {self.team_names[1]} {self.score[1]}')
         self.inning[self.top_bottom] += 1

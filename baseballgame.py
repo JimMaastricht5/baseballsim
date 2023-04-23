@@ -6,11 +6,13 @@ class Bases:
     def __init__(self):
         self.baserunners = np.zeros(5)  # 0th position is the batter, 4 bases, all empty, home plate (4) is a run scored
         self.runs_scored = 0
+        self.num_runners = 0
         return
 
     def advance_runners(self):
         self.baserunners = np.roll(self.baserunners, 1)  # advance runners
         self.runs_scored = self.baserunners[4]  # run crossed home
+        self.num_runners = np.sum(self.baserunners)
         return
 
     def new_ab(self):
@@ -20,7 +22,20 @@ class Bases:
 
     def clear_bases(self):
         self.baserunners = np.zeros(5)
+        self.num_runners = 0
         return
+
+    def describe_runners(self):
+        desc = ''
+        base_names = ['AB', '1st', '2nd', '3rd', 'home']  # leave this here to keep sort order between batters
+        base_names_zip = set(zip(base_names, self.baserunners))
+        base_names_with_runners = list(filter(lambda base_name_zip: base_name_zip[1] > 0 and base_name_zip[0]!='AB' and
+                                                                    base_name_zip[0]!='home', base_names_zip))
+        base_names_with_runners.sort()
+        for base_name in base_names_with_runners:
+            desc = base_name[0] if desc == '' else desc + ', ' + base_name[0]
+        prefix = 'Runner on ' if self.num_runners == 1 else 'Runners on '
+        return prefix + desc
 
 
 class TeamBoxScore:
@@ -112,7 +127,7 @@ class Game:
         return result
 
     def sim_ab(self):
-        pitching = self.teams[self.top_bottom].pitching.iloc[0]
+        pitching = self.teams[(self.top_bottom + 1) % 2].pitching.iloc[0]
         batting = self.teams[self.top_bottom].lineup.iloc[self.batting_num[self.top_bottom]-1]
         self.bases.new_ab()
         outcome = self.ab_outcome(pitching, batting)
@@ -126,22 +141,23 @@ class Game:
         return pitching, batting, outcome
 
     def sim_half_inning(self):
+        top_or_bottom = 'top' if self.top_bottom == 0 else 'bottom'
+        print(f'Starting the {top_or_bottom} of inning {self.inning[self.top_bottom]}.')
         while self.outs < 3:
             pitching, batting, outcome = self.sim_ab()  # assuming an out for now...
             print(f'Pitcher: {pitching.Player} against '
                   f'{self.team_names[self.top_bottom]} batter #'
-                  f'{self.batting_num[self.top_bottom]}. {batting.Player} '
-                  f' {outcome[1]}, {self.outs} Outs')
-            if self.bases.runs_scored >= 1:  # leave out the batter to check for runner
-                print(f'Runners on {self.bases.baserunners[1:]}')
+                  f'{self.batting_num[self.top_bottom]}. {batting.Player} \n'
+                  f'\t {outcome[1]}, {self.outs} Outs')
+            if self.bases.num_runners >= 1 and self.outs < 3:  # leave out the batter to check for runner
+                print(f'\t{self.bases.describe_runners()}')
             self.batting_num[self.top_bottom] = self.batting_num[self.top_bottom] + 1 \
                 if self.batting_num[self.top_bottom] <= 9 else 1
 
         # half inning over
-        top_or_bottom = 'top' if self.top_bottom == 0 else 'bottom'
         self.bases.clear_bases()
-        print(f'Completed {top_or_bottom} half inning: {self.inning[self.top_bottom]}')
-        print(f'The score is {self.team_names[0]} {self.score[0]} to {self.team_names[1]} {self.score[1]}')
+        print(f'\nCompleted {top_or_bottom} half of inning {self.inning[self.top_bottom]}.')
+        print(f'The score is {self.team_names[0]} {self.score[0]} to {self.team_names[1]} {self.score[1]}\n')
         self.inning[self.top_bottom] += 1
         self.top_bottom = 0 if self.top_bottom == 1 else 1
         self.outs = 0
@@ -150,7 +166,9 @@ class Game:
     def sim_game(self):
         game_end = False
         while game_end is False:
-            if self.inning[1] < 9:  # home team has played less than nine innings
+            if self.score[0] == self.score[1]:  # tie game play on no matter what
+                self.sim_half_inning()
+            elif self.inning[1] <= 9:  # played less than 9 complete if the active inning is 9
                 self.sim_half_inning()
             elif self.inning[1] == 9 and self.score[0] >= self.score[1]:  # home team is tied or losing, play bot 9
                 self.sim_half_inning()

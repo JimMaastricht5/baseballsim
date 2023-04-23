@@ -89,6 +89,10 @@ class Game:
         self.top_bottom = 0  # zero is top offset, 1 is bottom offset
         self.league_batting_obp = self.baseball_data.batting_data['OBP'].mean()  # ?? incorrect, lazy, fine for now
         self.league_pitching_obp = self.baseball_data.pitching_data['OBP'].mean() # ?? incorrect, lazy, fine for now
+        self.league_batting_Total_OB = int(self.baseball_data.batting_data['H'].sum() + self.baseball_data.batting_data['BB'].sum() + self.baseball_data.batting_data['HBP'].sum())
+        self.league_pitching_Total_OB = int(self.baseball_data.pitching_data['H'].sum() + self.baseball_data.pitching_data['BB'].sum()) # + self.baseball_data.pitching_data['HBP']
+        self.league_batting_Total_BB = int(self.baseball_data.batting_data['BB'].sum())
+        self.league_pitching_Total_BB = int(self.baseball_data.pitching_data['BB'].sum())
 
         self.rng = np.random.default_rng()  # random number generator between 0 and 1
         self.bases = Bases()
@@ -109,16 +113,21 @@ class Game:
                      ((league_hitter_stat / (1 - league_hitter_stat)) * (league_pitcher_stat / (1 - league_pitcher_stat)))
         return odds_ratio / (1 + odds_ratio)
 
-    # did the batter reach base, true or false?
     def onbase(self, pitching, batting):
-        return self.rng.random() < self.odds_ratio(batting.OBP, pitching.OBP,
-                                                   self.league_batting_obp, self.league_pitching_obp)
+        return self.rng.random() < self.odds_ratio(batting.OBP, pitching.OBP, self.league_batting_obp, self.league_pitching_obp)
+
+    def bb(self, pitching, batting):
+        return self.rng.random() < self.odds_ratio((batting.BB / batting.Total_OB), (pitching.BB / pitching.Total_OB),
+                                                   (self.league_pitching_Total_BB / self.league_batting_Total_OB),
+                                                   (self.league_pitching_Total_BB / self.league_pitching_Total_OB))
     def ab_outcome(self, pitching, batting):
         # outcome: on base or out pos 0, how in pos 1, rbis in pos 2
         # ?? hbp is missing, total batters faced is missing, should calc or get pitcher obp
         if self.onbase(pitching, batting):
-            # if self.bb(pitching, batting):
-            result = ['OB', 'H', 0]  # need to split out bb, hbp, and h and subdivide hit types
+            if self.bb(pitching, batting):
+                result = ['OB', 'BB', 0]  # need to split out bb, hbp, and h and subdivide hit types
+            else:  # hit, but what kind?
+                result = ['OB', 'H', 0]  # need to split out bb, hbp, and h and subdivide hit types
         else:
             result = ['OUT', 'K', 0]  # ob, out sub types ob: 1b, 2b, 3b, hr, hbp, e, w; out: k, ...
         return result
@@ -139,7 +148,7 @@ class Game:
         top_or_bottom = 'top' if self.top_bottom == 0 else 'bottom'
         print(f'Starting the {top_or_bottom} of inning {self.inning[self.top_bottom]}.')
         while self.outs < 3:
-            pitching, batting, outcome = self.sim_ab()  # assuming an out for now...
+            pitching, batting, outcome = self.sim_ab()
             print(f'Pitcher: {pitching.Player} against '
                   f'{self.team_names[self.top_bottom]} batter #'
                   f'{self.batting_num[self.top_bottom]}. {batting.Player} \n'

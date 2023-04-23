@@ -4,7 +4,7 @@ import numpy as np
 
 class Bases:
     def __init__(self):
-        self.baserunners = [0, 0, 0, 0, 0, 0, 0, 0, 0]  # 0th position is the batter, 4 bases, all empty, home plate (4-7) are runs scored
+        self.baserunners = [0, 0, 0, 0, 0, 0, 0, 0, 0]  # 0th position is batter, 4 bases, all empty, (4-7) runs scored
         self.runs_scored = 0
         self.num_runners = 0
         return
@@ -29,8 +29,8 @@ class Bases:
         desc = ''
         base_names = ['AB', '1st', '2nd', '3rd', 'home']  # leave this here to keep sort order between batters
         base_names_zip = set(zip(base_names, self.baserunners))
-        base_names_with_runners = list(filter(lambda base_name_zip: base_name_zip[1] > 0 and base_name_zip[0]!='AB' and
-                                                                    base_name_zip[0]!='home', base_names_zip))
+        base_names_with_runners = list(filter(lambda base_name_zip: base_name_zip[1] > 0 and base_name_zip[0] != 'AB'
+                                              and base_name_zip[0] != 'home', base_names_zip))
         base_names_with_runners.sort()
         for base_name in base_names_with_runners:
             desc = base_name[0] if desc == '' else desc + ', ' + base_name[0]
@@ -47,7 +47,6 @@ class TeamBoxScore:
 
 
 class Team:
-
     def __init__(self, team_name, baseball_data):
         self.team_name = team_name
         self.baseball_data = baseball_data
@@ -88,8 +87,8 @@ class Game:
         self.batting_num = [1, 1]
         self.outs = 0
         self.top_bottom = 0  # zero is top offset, 1 is bottom offset
-        self.league_batting_obp = .4
-        self.league_pitching_obp = .375
+        self.league_batting_obp = self.baseball_data.batting_data['OBP'].mean()  # ?? incorrect, lazy, fine for now
+        self.league_pitching_obp = self.baseball_data.pitching_data['OBP'].mean() # ?? incorrect, lazy, fine for now
 
         self.rng = np.random.default_rng()  # random number generator between 0 and 1
         self.bases = Bases()
@@ -104,23 +103,21 @@ class Game:
     # Odds(matchup)(.400 / .600) * (.250 / .750)
     # ——————- =————————————-
     # (.380 / .620)(.300 / .700) * (.350 / .650)
-    # Odds(matchup) = .590
-    # Matchup
-    # OBP = .590 / 1.590 = .371
+    # Odds(matchup) = .590 -> Matchup OBP = .590 / 1.590 = .371
     def odds_ratio(self, hitter_stat, pitcher_stat, league_hitter_stat, league_pitcher_stat):
-        odds_ratio = (hitter_stat / (1 - hitter_stat) * pitcher_stat / (1 - pitcher_stat)) / \
-                     (league_hitter_stat / (1 - league_hitter_stat) * league_pitcher_stat / (1 - league_pitcher_stat))
-        return odds_ratio
+        odds_ratio = ((hitter_stat / (1 - hitter_stat)) * (pitcher_stat / (1 - pitcher_stat))) / \
+                     ((league_hitter_stat / (1 - league_hitter_stat)) * (league_pitcher_stat / (1 - league_pitcher_stat)))
+        return odds_ratio / (1 + odds_ratio)
 
+    # did the batter reach base, true or false?
+    def onbase(self, pitching, batting):
+        return self.rng.random() < self.odds_ratio(batting.OBP, pitching.OBP,
+                                                   self.league_batting_obp, self.league_pitching_obp)
     def ab_outcome(self, pitching, batting):
         # outcome: on base or out pos 0, how in pos 1, rbis in pos 2
-        # ?? hbp is missing, total batters faced is missing
-        odds_onbase = self.odds_ratio(batting.OBP, ((pitching.H + pitching.BB) /
-                                                    (pitching.WHIP * pitching.IP + pitching.IP * 3)),
-                                      self.league_batting_obp, self.league_pitching_obp)
-        dice_roll = self.rng.random()
-        # print(dice_roll, odds_onbase)
-        if dice_roll <= odds_onbase:
+        # ?? hbp is missing, total batters faced is missing, should calc or get pitcher obp
+        if self.onbase(pitching, batting):
+            # if self.bb(pitching, batting):
             result = ['OB', 'H', 0]  # need to split out bb, hbp, and h and subdivide hit types
         else:
             result = ['OUT', 'K', 0]  # ob, out sub types ob: 1b, 2b, 3b, hr, hbp, e, w; out: k, ...

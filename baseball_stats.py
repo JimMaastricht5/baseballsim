@@ -13,6 +13,7 @@ class BaseballData:
         for season in self.seasons:
             pitching_data = pd.read_csv(str(season) + " player-stats-Pitching.csv")
             pitching_data['Season'] = str(season)
+            pitching_data['OBP'] = pitching_data['WHIP'] / (3 + pitching_data['WHIP'])  # batters reached / number faced
             batting_data = pd.read_csv(str(season) + " player-stats-Batters.csv")
             batting_data['Season'] = str(season)
             if self.pitching_data is None:

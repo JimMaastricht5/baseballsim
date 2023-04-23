@@ -4,13 +4,13 @@ import numpy as np
 
 class Bases:
     def __init__(self):
-        self.baserunners = np.zeros(5)  # 0th position is the batter, 4 bases, all empty, home plate (4) is a run scored
+        self.baserunners = [0, 0, 0, 0, 0, 0, 0, 0, 0]  # 0th position is the batter, 4 bases, all empty, home plate (4-7) are runs scored
         self.runs_scored = 0
         self.num_runners = 0
         return
 
     def advance_runners(self):
-        self.baserunners = np.roll(self.baserunners, 1)  # advance runners
+        self.baserunners = list(np.roll(self.baserunners, 1))  # advance runners
         self.runs_scored = self.baserunners[4]  # run crossed home
         self.num_runners = np.sum(self.baserunners)
         return
@@ -21,7 +21,7 @@ class Bases:
         return
 
     def clear_bases(self):
-        self.baserunners = np.zeros(5)
+        self.baserunners = [0, 0, 0, 0, 0, 0, 0, 0, 0]
         self.num_runners = 0
         return
 
@@ -136,8 +136,6 @@ class Game:
         elif outcome[0] == 'OB':
             self.bases.advance_runners()
             self.score[self.top_bottom] += self.bases.runs_scored  # return rbis and clears runners across home
-            if self.bases.runs_scored > 0:
-                print(f'scored... {self.score}')
         return pitching, batting, outcome
 
     def sim_half_inning(self):
@@ -149,6 +147,9 @@ class Game:
                   f'{self.team_names[self.top_bottom]} batter #'
                   f'{self.batting_num[self.top_bottom]}. {batting.Player} \n'
                   f'\t {outcome[1]}, {self.outs} Outs')
+            if self.bases.runs_scored > 0:
+                print(f'\tScored!  The score is {self.team_names[0]} {self.score[0]} to '
+                      f'{self.team_names[1]} {self.score[1]}')
             if self.bases.num_runners >= 1 and self.outs < 3:  # leave out the batter to check for runner
                 print(f'\t{self.bases.describe_runners()}')
             self.batting_num[self.top_bottom] = self.batting_num[self.top_bottom] + 1 \

@@ -1,12 +1,23 @@
-import pandas as pd
 import numpy as np
 
 
 class SimAB:
-    def __init__(self):
+    def __init__(self, baseball_data):
         self.rng = np.random.default_rng()  # random number generator between 0 and 1
         self.pitching = None
         self.batting = None
+        self.baseball_data = baseball_data
+
+        self.league_batting_obp = self.baseball_data.batting_data['OBP'].mean()  # ?? incorrect, lazy, fine for now
+        self.league_pitching_obp = self.baseball_data.pitching_data['OBP'].mean()  # ?? incorrect, lazy, fine for now
+        self.league_batting_Total_OB = int(
+            self.baseball_data.batting_data['H'].sum() + self.baseball_data.batting_data['BB'].sum() +
+            self.baseball_data.batting_data['HBP'].sum())
+        self.league_pitching_Total_OB = int(
+            self.baseball_data.pitching_data['H'].sum() + self.baseball_data.pitching_data[
+                'BB'].sum())  # + self.baseball_data.pitching_data['HBP']
+        self.league_batting_Total_BB = int(self.baseball_data.batting_data['BB'].sum())
+        self.league_pitching_Total_BB = int(self.baseball_data.pitching_data['BB'].sum())
         return
 
     # odds ratio is odds of the hitter * odds of the pitcher over the odds of the league or enviroment
@@ -25,37 +36,50 @@ class SimAB:
                       (league_pitcher_stat / (1 - league_pitcher_stat)))
         return odds_ratio / (1 + odds_ratio)
 
-    def onbase(self, pitching, batting):
-        return self.rng.random() < self.odds_ratio(batting.OBP, pitching.OBP, self.league_batting_obp,
+    def onbase(self):
+        return self.rng.random() < self.odds_ratio(self.batting.OBP, self.pitching.OBP, self.league_batting_obp,
                                                    self.league_pitching_obp)
 
-    def bb(self, pitching, batting):
-        return self.rng.random() < self.odds_ratio((batting.BB / batting.Total_OB), (pitching.BB / pitching.Total_OB),
+    def h(self):
+        return self.rng.random() < self.odds_ratio((self.batting.BB / self.batting.Total_OB),
+                                                   (self.pitching.BB / self.pitching.Total_OB),
                                                    (self.league_pitching_Total_BB / self.league_batting_Total_OB),
                                                    (self.league_pitching_Total_BB / self.league_pitching_Total_OB))
 
-    def ab_outcome(self, pitching, batting):
+    def hr(self):
+        return self.rng.random() < self.odds_ratio((self.batting.BB / self.batting.Total_OB), (self.pitching.BB / self.pitching.Total_OB),
+                                                   (self.league_pitching_Total_BB / self.league_batting_Total_OB),
+                                                   (self.league_pitching_Total_BB / self.league_pitching_Total_OB))
+
+    def triple(self):
+        return self.rng.random() < self.odds_ratio((self.batting.BB / self.batting.Total_OB), (self.pitching.BB / self.pitching.Total_OB),
+                                                   (self.league_pitching_Total_BB / self.league_batting_Total_OB),
+                                                   (self.league_pitching_Total_BB / self.league_pitching_Total_OB))
+
+    def double(self):
+        return self.rng.random() < self.odds_ratio((self.batting.BB / self.batting.Total_OB), (self.pitching.BB / self.pitching.Total_OB),
+                                                   (self.league_pitching_Total_BB / self.league_batting_Total_OB),
+                                                   (self.league_pitching_Total_BB / self.league_pitching_Total_OB))
+
+    def outcome(self, pitching, batting):
+        # tree of the various odds of an event, each event is yes/no.  Onbase? Yes -> BB? no -> Hit yes (stop)
         # outcome: on base or out pos 0, how in pos 1, rbis in pos 2
         # ?? hbp is missing, total batters faced is missing, should calc or get pitcher obp
         self.pitching = pitching
         self.batting = batting
-        if self.onbase(pitching, batting):
-            if self.bb(pitching, batting):
-                result = ['OB', 'BB', 0]  # need to split out bb, hbp, and h and subdivide hit types
-            else:  # hit, but what kind?
-                result = ['OB', 'H', 0]  # need to split out bb, hbp, and h and subdivide hit types
-        else:
+        result = ['OB', '', 0]
+        if self.onbase():
+            if self.h():
+                result[1] = 'H'
+            elif self.hr():
+                result[1] = 'HR'
+            elif self.triple():
+                result[1] = '3B'
+            elif self.double():
+                result[1] = '2B'
+            else:
+                result[1] = 'BB'
+        else:  # handle outs
             result = ['OUT', 'K', 0]  # ob, out sub types ob: 1b, 2b, 3b, hr, hbp, e, w; out: k, ...
         return result
 
-    def sim_ab(self):
-        pitching = self.teams[(self.top_bottom + 1) % 2].pitching.iloc[0]
-        batting = self.teams[self.top_bottom].lineup.iloc[self.batting_num[self.top_bottom] - 1]
-        self.bases.new_ab()
-        outcome = self.ab_outcome(pitching, batting)
-        if outcome[0] == 'OUT':
-            self.outs += 1
-        elif outcome[0] == 'OB':
-            self.bases.advance_runners()
-            self.score[self.top_bottom] += self.bases.runs_scored  # return rbis and clears runners across home
-        return pitching, batting, outcome

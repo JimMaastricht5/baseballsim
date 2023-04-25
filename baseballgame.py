@@ -1,4 +1,5 @@
 import baseball_stats
+import at_bat
 import numpy as np
 
 
@@ -96,6 +97,7 @@ class Game:
 
         self.rng = np.random.default_rng()  # random number generator between 0 and 1
         self.bases = Bases()
+        self.at_bat = SimAB()
         return
 
     # odds ratio is odds of the hitter * odds of the pitcher over the odds of the league or enviroment

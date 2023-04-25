@@ -3,7 +3,6 @@ import pandas as pd
 
 class BaseballData:
     def __init__(self, seasons=[2022]):
-        # pybaseball_cache.enable()
         self.seasons = seasons
         self.pitching_data = None
         self.batting_data = None

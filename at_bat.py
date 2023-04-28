@@ -24,8 +24,8 @@ class SimAB:
                                  self.baseball_data.batting_data['HBP'].sum()
         self.league_K_rate_per_AB = self.baseball_data.batting_data['SO'].sum() / self.league_Total_outs  # strike out or inplay
         self.league_GB = .429  # ground ball rate for season
-        self.league_FB = .372 # fly ball rate for season
-        self.league_LD = .199 # line drive rate for the season
+        self.league_FB = .372  # fly ball rate for season
+        self.league_LD = .199  # line drive rate for the season
 
         return
 
@@ -71,6 +71,17 @@ class SimAB:
         return self.rng.random() < self.odds_ratio((self.batting['SO'] / self.batting.Total_Outs),
                                                    (self.pitching['K'] / self.pitching.Total_Outs),
                                                    self.league_K_rate_per_AB)
+
+    def gb_fb_lo(self, result):
+        dice_roll = self.rng.random()
+        if dice_roll <= self.league_GB:  # ground out
+            result[1] = 'GB'
+        elif dice_roll <= (self.league_FB + self.league_GB):  # fly ball
+            result[1] = 'FB'
+        else:
+            result[1] = 'LD'  # line drive
+        return result
+
     def outcome(self, pitching, batting):
         # tree of the various odds of an event, each event is yes/no.  Onbase? Yes -> BB? no -> Hit yes (stop)
         # outcome: on base or out pos 0, how in pos 1, bases to advance in pos 2
@@ -93,5 +104,8 @@ class SimAB:
             else:
                 result[1] = 'H'  # one base is default
         else:  # handle outs
-            result = ['OUT', 'K', 0]  # ob, out sub types ob: 1b, 2b, 3b, hr, hbp, e, w; out: k, ...
+            if self.k():
+                result = ['OUT', 'K', 0]  # ob, out sub types ob: 1b, 2b, 3b, hr, hbp, e, w; out: k, ...
+            else:
+                result = self.gb_fb_lo(result)  # not a strike out, fb, go, or lo
         return result

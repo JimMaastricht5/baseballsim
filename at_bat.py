@@ -17,7 +17,9 @@ class SimAB:
             self.baseball_data.pitching_data['H'].sum() + self.baseball_data.pitching_data[
                 'BB'].sum())  # + self.baseball_data.pitching_data['HBP']
         self.league_batting_Total_BB = int(self.baseball_data.batting_data['BB'].sum())
-        self.league_pitching_Total_BB = int(self.baseball_data.pitching_data['BB'].sum())
+        self.league_batting_Total_HR = int(self.baseball_data.batting_data['HR'].sum())
+        self.league_batting_Total_3B = int(self.baseball_data.batting_data['3B'].sum())
+        self.league_batting_Total_2B = int(self.baseball_data.batting_data['2B'].sum())
         return
 
     # odds ratio is odds of the hitter * odds of the pitcher over the odds of the league or enviroment
@@ -30,56 +32,55 @@ class SimAB:
     # ——————- =————————————-
     # (.380 / .620)(.300 / .700) * (.350 / .650)
     # Odds(matchup) = .590 -> Matchup OBP = .590 / 1.590 = .371
-    def odds_ratio(self, hitter_stat, pitcher_stat, league_hitter_stat, league_pitcher_stat):
+    #
+    def odds_ratio(self, hitter_stat, pitcher_stat, league_stat):
         odds_ratio = ((hitter_stat / (1 - hitter_stat)) * (pitcher_stat / (1 - pitcher_stat))) / \
-                     ((league_hitter_stat / (1 - league_hitter_stat)) *
-                      (league_pitcher_stat / (1 - league_pitcher_stat)))
+                     (league_stat / (1 - league_stat))
         return odds_ratio / (1 + odds_ratio)
 
     def onbase(self):
-        return self.rng.random() < self.odds_ratio(self.batting.OBP, self.pitching.OBP, self.league_batting_obp,
-                                                   self.league_pitching_obp)
+        return self.rng.random() < self.odds_ratio(self.batting.OBP, self.pitching.OBP, self.league_batting_obp)
 
-    def h(self):
+    def bb(self):
         return self.rng.random() < self.odds_ratio((self.batting.BB / self.batting.Total_OB),
                                                    (self.pitching.BB / self.pitching.Total_OB),
-                                                   (self.league_pitching_Total_BB / self.league_batting_Total_OB),
-                                                   (self.league_pitching_Total_BB / self.league_pitching_Total_OB))
+                                                   (self.league_batting_Total_BB / self.league_batting_Total_OB))
 
     def hr(self):
-        return self.rng.random() < self.odds_ratio((self.batting.BB / self.batting.Total_OB), (self.pitching.BB / self.pitching.Total_OB),
-                                                   (self.league_pitching_Total_BB / self.league_batting_Total_OB),
-                                                   (self.league_pitching_Total_BB / self.league_pitching_Total_OB))
+        return self.rng.random() < self.odds_ratio(self.batting.HR, self.pitching.HR,
+                                                   (self.league_batting_Total_HR / self.league_batting_Total_OB))
 
     def triple(self):
-        return self.rng.random() < self.odds_ratio((self.batting.BB / self.batting.Total_OB), (self.pitching.BB / self.pitching.Total_OB),
-                                                   (self.league_pitching_Total_BB / self.league_batting_Total_OB),
-                                                   (self.league_pitching_Total_BB / self.league_pitching_Total_OB))
+        # do not have league pitching total for 3b so push it to zero and make it a neutral factor
+        return self.rng.random() < self.odds_ratio((self.batting['3B'] / self.batting.Total_OB), (.1),
+                                                   (self.league_batting_Total_3B / self.league_batting_Total_OB))
 
     def double(self):
-        return self.rng.random() < self.odds_ratio((self.batting.BB / self.batting.Total_OB), (self.pitching.BB / self.pitching.Total_OB),
-                                                   (self.league_pitching_Total_BB / self.league_batting_Total_OB),
-                                                   (self.league_pitching_Total_BB / self.league_pitching_Total_OB))
+        # do not have league pitching total for 2b so push it to zero and make it a neutral factor
+        return self.rng.random() < self.odds_ratio((self.batting['2B'] / self.batting.Total_OB), (.200),
+                                                   (self.league_batting_Total_2B / self.league_batting_Total_OB))
 
     def outcome(self, pitching, batting):
         # tree of the various odds of an event, each event is yes/no.  Onbase? Yes -> BB? no -> Hit yes (stop)
-        # outcome: on base or out pos 0, how in pos 1, rbis in pos 2
+        # outcome: on base or out pos 0, how in pos 1, bases to advance in pos 2
         # ?? hbp is missing, total batters faced is missing, should calc or get pitcher obp
         self.pitching = pitching
         self.batting = batting
-        result = ['OB', '', 0]
+        result = ['OB', '', 1]
         if self.onbase():
-            if self.h():
-                result[1] = 'H'
-            elif self.hr():
-                result[1] = 'HR'
-            elif self.triple():
-                result[1] = '3B'
+            if self.bb():
+                result[1] = 'BB'
             elif self.double():
                 result[1] = '2B'
+                result[2] = 2
+            elif self.triple():
+                result[1] = '3B'
+                result[2] = 3
+            elif self.hr():
+                result[1] = 'HR'
+                result[2] = 4
             else:
-                result[1] = 'BB'
+                result[1] = 'H'  # one base is default
         else:  # handle outs
             result = ['OUT', 'K', 0]  # ob, out sub types ob: 1b, 2b, 3b, hr, hbp, e, w; out: k, ...
         return result
-

@@ -20,9 +20,11 @@ class SimAB:
         self.league_batting_Total_HR = int(self.baseball_data.batting_data['HR'].sum())
         self.league_batting_Total_3B = int(self.baseball_data.batting_data['3B'].sum())
         self.league_batting_Total_2B = int(self.baseball_data.batting_data['2B'].sum())
-        self.league_Total_outs = self.baseball_data.batting_data['AB'].sum() - self.baseball_data.batting_data['H'] - \
-                                 self.baseball_data.batting_data['HBP'].sum()
-        self.league_K_rate_per_AB = self.baseball_data.batting_data['SO'].sum() / self.league_Total_outs  # strike out or inplay
+        self.league_Total_outs = int(self.baseball_data.batting_data['AB'].sum() -
+                                     self.baseball_data.batting_data['H'].sum() - \
+                                 self.baseball_data.batting_data['HBP'].sum() )
+        self.league_K_rate_per_AB = float(self.baseball_data.batting_data['SO'].sum() /
+                                          self.league_Total_outs)  # strike out or in play
         self.league_GB = .429  # ground ball rate for season
         self.league_FB = .372  # fly ball rate for season
         self.league_LD = .199  # line drive rate for the season
@@ -107,5 +109,5 @@ class SimAB:
             if self.k():
                 result = ['OUT', 'K', 0]  # ob, out sub types ob: 1b, 2b, 3b, hr, hbp, e, w; out: k, ...
             else:
-                result = self.gb_fb_lo(result)  # not a strike out, fb, go, or lo
+                result = self.gb_fb_lo(['OUT', '', 0])  # not a strike out, fb, go, or lo
         return result

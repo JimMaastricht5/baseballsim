@@ -146,8 +146,10 @@ class Game:
         while game_end is False:
             if self.score[0] == self.score[1]:  # tie game play on no matter what
                 self.sim_half_inning()
-            elif self.inning[1] == 9 and self.score[0] >= self.score[1]:  # home team is tied or losing, play bot 9
+            elif self.top_bottom == 0:  # always play top half an inning
                 self.sim_half_inning()
+            elif self.inning[1] == 9 and self.score[0] < self.score[1]:  # home team is winning don't play bot 9
+                game_end = True  # end game
             elif self.inning[1] <= 9:  # played less than 9 complete if the active inning is 9
                 self.sim_half_inning()
             else:

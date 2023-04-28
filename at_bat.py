@@ -20,6 +20,13 @@ class SimAB:
         self.league_batting_Total_HR = int(self.baseball_data.batting_data['HR'].sum())
         self.league_batting_Total_3B = int(self.baseball_data.batting_data['3B'].sum())
         self.league_batting_Total_2B = int(self.baseball_data.batting_data['2B'].sum())
+        self.league_Total_outs = self.baseball_data.batting_data['AB'].sum() - self.baseball_data.batting_data['H'] - \
+                                 self.baseball_data.batting_data['HBP'].sum()
+        self.league_K_rate_per_AB = self.baseball_data.batting_data['SO'].sum() / self.league_Total_outs  # strike out or inplay
+        self.league_GB = .429  # ground ball rate for season
+        self.league_FB = .372 # fly ball rate for season
+        self.league_LD = .199 # line drive rate for the season
+
         return
 
     # odds ratio is odds of the hitter * odds of the pitcher over the odds of the league or enviroment
@@ -60,6 +67,10 @@ class SimAB:
         return self.rng.random() < self.odds_ratio((self.batting['2B'] / self.batting.Total_OB), (.200),
                                                    (self.league_batting_Total_2B / self.league_batting_Total_OB))
 
+    def k(self):
+        return self.rng.random() < self.odds_ratio((self.batting['SO'] / self.batting.Total_Outs),
+                                                   (self.pitching['K'] / self.pitching.Total_Outs),
+                                                   self.league_K_rate_per_AB)
     def outcome(self, pitching, batting):
         # tree of the various odds of an event, each event is yes/no.  Onbase? Yes -> BB? no -> Hit yes (stop)
         # outcome: on base or out pos 0, how in pos 1, bases to advance in pos 2

@@ -141,25 +141,21 @@ class Game:
         self.outs = 0
         return
 
+    def game_end(self):
+        return False if self.inning[0] <= 9 or self.inning[1] <= 8 or\
+                        (self.inning[0] != self.inning[1] and self.score[0] >= self.score[1])\
+                        or self.score[0] == self.score[1] else True
+
     def sim_game(self):
-        game_end = False
-        while game_end is False:
-            if self.score[0] == self.score[1]:  # tie game play on no matter what
-                self.sim_half_inning()
-            elif self.top_bottom == 0:  # always play top half an inning
-                self.sim_half_inning()
-            elif self.inning[1] == 9 and self.score[0] < self.score[1]:  # home team is winning don't play bot 9
-                game_end = True  # end game
-            elif self.inning[1] <= 9:  # played less than 9 complete if the active inning is 9
-                self.sim_half_inning()
-            else:
-                game_end = True  # end game
-                # report final score for standings
-        return game_end
+        while self.game_end() is False:
+            self.sim_half_inning()
+        return self.score, self.inning
 
 
 if __name__ == '__main__':
     home_team = 'MIL'
     away_team = 'MIN'
     game = Game(home_team_name=home_team, away_team_name=away_team)
-    _ = game.sim_game()
+    # inning = [0,0]
+    # while inning[1] < 10:
+    score, inning = game.sim_game()

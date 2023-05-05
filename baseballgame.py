@@ -49,10 +49,24 @@ class Bases:
 
 
 class TeamBoxScore:
-    def __init__(self, lineup):
-        self.hitting = None  # add lineup and box options for each pos or pitcher
-        self.pitching = None  # pitcher plus box options for pitching
-        self.box = lineup
+    def __init__(self, lineup, pitching):
+
+        self.box_pitching = pitching.copy()
+        self.box_pitching[['G', 'GS']] = 1
+        self.box_pitching[['CG', 'SHO', 'IP', 'H', 'ER', 'K', 'BB', 'HR', 'W', 'L', 'SV', 'BS', 'HLD', 'ERA', 'WHIP', 'OBP', 'SLG', 'OPS']] = 0
+        self.box_pitching.drop(['Season', 'Total_OB', 'Total_Outs'], axis=1, inplace=True)
+        # print(self.box_pitching)
+        self.box_batting = lineup.copy()
+        self.box_batting[['G']] = 1
+        self.box_batting[['AB', 'R', 'H', '2B', '3B', 'HR', 'RBI', 'SB', 'CS', 'BB', 'SO', 'SO', 'SH', 'SF', 'HBP', 'AVG', 'OBP', 'SLG', 'OPS']] = 0
+        self.box_batting.drop(['Season', 'Total_OB', 'Total_Outs'], axis=1, inplace=True)
+        # print(self.box_batting)
+        return
+
+    def pitching_result(self, pitcher_num, result):
+        return
+
+    def batting_result(self, batter_num, result):
         return
 
 
@@ -71,7 +85,7 @@ class Team:
     def set_lineup(self):
         self.lineup = self.pos_players.head(10)  # assumes DH
         self.pitching = self.pitchers.head(1)
-        self.team_box_score = TeamBoxScore(self.lineup)
+        self.team_box_score = TeamBoxScore(self.lineup, self.pitching)
         return
 
 
@@ -113,6 +127,8 @@ class Game:
         elif outcome[0] == 'OB':
             self.bases.advance_runners(bases_to_advance=outcome[2])  # outcome 2 is number of bases to advance
             self.score[self.top_bottom] += self.bases.runs_scored
+        self.teams[(self.top_bottom + 1) % 2].team_box_score.pitching_result(0, outcome)  # pitcher # zero
+        self.teams[self.top_bottom].team_box_score.batting_result(self.batting_num[self.top_bottom]-1, outcome)  # batter number
         return pitching, batting, outcome
 
     def sim_half_inning(self):

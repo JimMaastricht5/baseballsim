@@ -55,11 +55,13 @@ class TeamBoxScore:
         self.box_pitching[['G', 'GS']] = 1
         self.box_pitching[['CG', 'SHO', 'IP', 'H', 'ER', 'K', 'BB', 'HR', 'W', 'L', 'SV', 'BS', 'HLD', 'ERA', 'WHIP', 'OBP', 'SLG', 'OPS']] = 0
         self.box_pitching.drop(['Season', 'Total_OB', 'Total_Outs'], axis=1, inplace=True)
+        self.box_pitching = self.box_pitching.reset_index()
         # print(self.box_pitching)
         self.box_batting = lineup.copy()
         self.box_batting[['G']] = 1
         self.box_batting[['AB', 'R', 'H', '2B', '3B', 'HR', 'RBI', 'SB', 'CS', 'BB', 'SO', 'SH', 'SF', 'HBP', 'AVG', 'OBP', 'SLG', 'OPS']] = 0
         self.box_batting.drop(['Season', 'Total_OB', 'Total_Outs'], axis=1, inplace=True)
+        self.box_batting = self.box_batting.reset_index()
         # print(self.box_batting)
         return
 
@@ -67,19 +69,19 @@ class TeamBoxScore:
         return
 
     def batting_result(self, batter_num, outcome):
-        print(self.box_batting)
-        print(outcome)
-        print(batter_num)
-        print(self.box_batting.iloc[batter_num])
+        # print(self.box_batting)
+        # print(outcome)
+        # print(batter_num)
+        # print(self.box_batting.loc[batter_num])
         outcome[1] = 'K' if outcome[1] == 'SO' else outcome[1]  # handle stat translation from pitcher SO to batter K
         if outcome[0] != 'BB':  # handle walks
-            self.box_batting.iloc[batter_num, 'AB'] = self.box_batting.iloc[batter_num, 'AB'] + 1
+            self.box_batting.loc[batter_num, ['AB']] = self.box_batting.loc[batter_num, ['AB']] + 1
             return
         if outcome[1] in ['H', '2B', '3B', 'HR', 'SO', 'HBP']:  # handle plate appearance
-            self.box_batting.iloc[batter_num][outcome[1]] += 1
+            self.box_batting.loc[batter_num, [outcome[1]]] += 1
 
         # increment hit count if OB, not a walk, and not a single
-        self.box_batting.loc[batter_num]['H'] = self.box_batting.iloc[batter_num]['H'] + 1 if outcome[1] != 'H' and outcome[0] == 'OB' else self.box_batting.iloc[batter_num]['H']
+        self.box_batting.loc[batter_num,['H']] = self.box_batting.loc[batter_num,['H']] + 1 if outcome[1] != 'H' and outcome[0] == 'OB' else self.box_batting.iloc[batter_num,['H']]
 
         return
 
@@ -134,6 +136,7 @@ class Game:
     def sim_ab(self):
         pitching = self.teams[(self.top_bottom + 1) % 2].pitching.iloc[0]
         batting = self.teams[self.top_bottom].lineup.iloc[self.batting_num[self.top_bottom]-1]
+        # print(batting)
         self.bases.new_ab()
         outcome = self.at_bat.outcome(pitching, batting)
         if outcome[0] == 'OUT':
@@ -179,13 +182,16 @@ class Game:
     def sim_game(self):
         while self.game_end() is False:
             self.sim_half_inning()
+        print(self.teams[0].team_box_score.box_batting.to_string(index=False, justify='center'))
         return self.score, self.inning
 
 
 if __name__ == '__main__':
     home_team = 'MIL'
     away_team = 'MIN'
-    game = Game(home_team_name=home_team, away_team_name=away_team)
-    # inning = [0,0]
-    # while inning[1] < 10:
-    score, inning = game.sim_game()
+    # game = Game(home_team_name=home_team, away_team_name=away_team)
+    for game_num in range(1, 2):
+        print(game_num)
+        game = Game(home_team_name=home_team, away_team_name=away_team)
+        score, inning = game.sim_game()
+        print(score)

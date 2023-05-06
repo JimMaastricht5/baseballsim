@@ -58,15 +58,29 @@ class TeamBoxScore:
         # print(self.box_pitching)
         self.box_batting = lineup.copy()
         self.box_batting[['G']] = 1
-        self.box_batting[['AB', 'R', 'H', '2B', '3B', 'HR', 'RBI', 'SB', 'CS', 'BB', 'SO', 'SO', 'SH', 'SF', 'HBP', 'AVG', 'OBP', 'SLG', 'OPS']] = 0
+        self.box_batting[['AB', 'R', 'H', '2B', '3B', 'HR', 'RBI', 'SB', 'CS', 'BB', 'SO', 'SH', 'SF', 'HBP', 'AVG', 'OBP', 'SLG', 'OPS']] = 0
         self.box_batting.drop(['Season', 'Total_OB', 'Total_Outs'], axis=1, inplace=True)
         # print(self.box_batting)
         return
 
-    def pitching_result(self, pitcher_num, result):
+    def pitching_result(self, pitcher_num, outcome):
         return
 
-    def batting_result(self, batter_num, result):
+    def batting_result(self, batter_num, outcome):
+        print(self.box_batting)
+        print(outcome)
+        print(batter_num)
+        print(self.box_batting.iloc[batter_num])
+        outcome[1] = 'K' if outcome[1] == 'SO' else outcome[1]  # handle stat translation from pitcher SO to batter K
+        if outcome[0] != 'BB':  # handle walks
+            self.box_batting.iloc[batter_num, 'AB'] = self.box_batting.iloc[batter_num, 'AB'] + 1
+            return
+        if outcome[1] in ['H', '2B', '3B', 'HR', 'SO', 'HBP']:  # handle plate appearance
+            self.box_batting.iloc[batter_num][outcome[1]] += 1
+
+        # increment hit count if OB, not a walk, and not a single
+        self.box_batting.loc[batter_num]['H'] = self.box_batting.iloc[batter_num]['H'] + 1 if outcome[1] != 'H' and outcome[0] == 'OB' else self.box_batting.iloc[batter_num]['H']
+
         return
 
 
@@ -128,7 +142,7 @@ class Game:
             self.bases.advance_runners(bases_to_advance=outcome[2])  # outcome 2 is number of bases to advance
             self.score[self.top_bottom] += self.bases.runs_scored
         self.teams[(self.top_bottom + 1) % 2].team_box_score.pitching_result(0, outcome)  # pitcher # zero
-        self.teams[self.top_bottom].team_box_score.batting_result(self.batting_num[self.top_bottom]-1, outcome)  # batter number
+        self.teams[self.top_bottom].team_box_score.batting_result(self.batting_num[self.top_bottom]-1, outcome)  # batter number, stat result
         return pitching, batting, outcome
 
     def sim_half_inning(self):

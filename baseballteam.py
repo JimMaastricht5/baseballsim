@@ -21,14 +21,24 @@ class TeamBoxScore:
         return
 
     def pitching_result(self, pitcher_num, outcome):
+        outcome[1] = 'K' if outcome[1] == 'SO' else outcome[1]  # handle stat translation from pitcher SO to batter K
+        if outcome[0] == 'OUT':  # handle walks
+            self.box_pitching.loc[pitcher_num, ['IP']] = self.box_pitching.loc[pitcher_num, ['IP']] + .333333
+
+        if outcome[1] in ['H', 'HR', 'K', 'BB', 'HBP']:  # handle plate appearance
+            self.box_pitching.loc[pitcher_num, [outcome[1]]] = self.box_pitching.loc[pitcher_num, [outcome[1]]] + 1
+
+            # increment hit count if OB, not a walk, and not a single
+        self.box_pitching.loc[pitcher_num, ['H']] = self.box_pitching.loc[pitcher_num, ['H']] + 1 \
+            if outcome[1] != 'H' and outcome[0] == 'OB' else self.box_pitching.loc[pitcher_num, ['H']]
         return
 
     def batting_result(self, batter_num, outcome):
-        outcome[1] = 'K' if outcome[1] == 'SO' else outcome[1]  # handle stat translation from pitcher SO to batter K
+        outcome[1] = 'SO' if outcome[1] == 'K' else outcome[1]  # handle stat translation from pitcher SO to batter K
         if outcome[1] != 'BB':  # handle walks
             self.box_batting.loc[batter_num, ['AB']] = self.box_batting.loc[batter_num, ['AB']] + 1
 
-        if outcome[1] in ['H', '2B', '3B', 'HR', 'SO', 'HBP']:  # handle plate appearance
+        if outcome[1] in ['H', '2B', '3B', 'HR', 'BB', 'SO', 'HBP']:  # handle plate appearance
             self.box_batting.loc[batter_num, [outcome[1]]] = self.box_batting.loc[batter_num, [outcome[1]]] + 1
 
         # increment hit count if OB, not a walk, and not a single
@@ -43,11 +53,22 @@ class TeamBoxScore:
         self.team_box_batting['G'] = 1
         self.team_box_batting['Age'] = ''
         self.team_box_batting['Pos'] = ''
-        # self.team_box_batting = self.team_box_batting.to_frame().transpose()  # set up for horizontal printing
         # self.box_batting = pd.concat([self.box_batting, self.team_box_batting], ignore_index=True)
         self.box_batting = self.box_batting.append(self.team_box_batting, ignore_index=True)
+
+        self.team_box_pitching = self.box_pitching[['GS', 'CG', 'SHO', 'IP', 'H', 'ER', 'K', 'BB', 'HR', 'W', 'L', 'SV', 'BS', 'HLD', 'ERA', 'WHIP']].sum()
+        self.team_box_pitching['Player'] = 'Team Totals'
+        self.team_box_pitching['Team'] = self.team_name
+        self.team_box_pitching['G'] = 1
+        self.team_box_pitching['Age'] = ''
+        self.box_pitching = self.box_pitching.append(self.team_box_pitching, ignore_index=True)
         return
 
+    def print(self):
+        print(self.box_batting.to_string(index=False, justify='center'))
+        print('')
+        print(self.box_pitching.to_string(index=False, justify='center'))
+        return
 
 class Team:
     def __init__(self, team_name, baseball_data):

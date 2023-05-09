@@ -128,8 +128,8 @@ class Game:
         while self.game_end() is False:
             self.sim_half_inning()
         self.teams[0].team_box_score.totals()
-        print(self.teams[0].team_box_score.box_batting.to_string(index=False, justify='center'))
-        # print(self.teams[0].team_box_score.team_box_batting.to_string(index=False, justify='center'))
+        self.teams[0].team_box_score.print()
+        # print(self.teams[0].team_box_score.box_batting.to_string(index=False, justify='center'))
         return self.score, self.inning
 
 

@@ -138,9 +138,9 @@ class Game:
 if __name__ == '__main__':
     home_team = 'MIL'
     away_team = 'MIN'
-    # game = Game(home_team_name=home_team, away_team_name=away_team)
+    season_length = 162
     team0_season_df = None
-    for game_num in range(1, 9 + 1):
+    for game_num in range(1, season_length + 1):
         print(game_num)
         game = Game(home_team_name=home_team, away_team_name=away_team)
         score, inning = game.sim_game()
@@ -157,4 +157,14 @@ if __name__ == '__main__':
             team0_season_df['Pos'] = game.teams[0].team_box_score.box_batting['Pos']
         print(score)
 
+    team0_season_df['AVG'] = team0_season_df['H'] / team0_season_df['AB']
+    team0_season_df['OBP'] = (team0_season_df['H'] + team0_season_df['BB'] +
+                               team0_season_df['HBP']) / (
+                                      team0_season_df['AB'] + team0_season_df['BB'] +
+                                      team0_season_df['HBP'])
+    team0_season_df['SLG'] = ((team0_season_df['H'] - team0_season_df['2B'] -
+                                team0_season_df['3B'] - team0_season_df['HR']) +
+                               team0_season_df['2B'] * 2 + team0_season_df['3B'] * 3 +
+                               team0_season_df['HR'] * 4) / team0_season_df['AB']
+    team0_season_df['OPS'] = team0_season_df['OBP'] + team0_season_df['SLG']
     print(team0_season_df.to_string(index=False, justify='center'))

@@ -140,7 +140,7 @@ if __name__ == '__main__':
     away_team = 'MIN'
     # game = Game(home_team_name=home_team, away_team_name=away_team)
     team0_season_df = None
-    for game_num in range(1, 162 + 1):
+    for game_num in range(1, 9 + 1):
         print(game_num)
         game = Game(home_team_name=home_team, away_team_name=away_team)
         score, inning = game.sim_game()

@@ -129,7 +129,9 @@ class Game:
             self.sim_half_inning()
         self.teams[0].team_box_score.totals()
         self.teams[0].team_box_score.print()
-        # print(self.teams[0].team_box_score.box_batting.to_string(index=False, justify='center'))
+
+        self.teams[1].team_box_score.totals()
+        self.teams[1].team_box_score.print()
         return self.score, self.inning
 
 
@@ -137,8 +139,22 @@ if __name__ == '__main__':
     home_team = 'MIL'
     away_team = 'MIN'
     # game = Game(home_team_name=home_team, away_team_name=away_team)
-    for game_num in range(1, 2):
+    team0_season_df = None
+    for game_num in range(1, 162 + 1):
         print(game_num)
         game = Game(home_team_name=home_team, away_team_name=away_team)
         score, inning = game.sim_game()
+        if team0_season_df is None:
+            team0_season_df = game.teams[0].team_box_score.box_batting
+        else:
+            # print(team0_season_df.to_string(index=False, justify='center'))
+            # print(game.teams[0].team_box_score.box_batting.to_string(index=False, justify='center'))
+
+            col_list = ['G', 'AB', 'R', 'H', '2B', '3B', 'HR', 'RBI', 'SB', 'CS', 'BB', 'SO', 'SH', 'SF', 'HBP']
+            team0_season_df = team0_season_df[col_list].add(game.teams[0].team_box_score.box_batting[col_list])
+            team0_season_df['Player'] = game.teams[0].team_box_score.box_batting['Player']
+            team0_season_df['Team'] = game.teams[0].team_box_score.box_batting['Team']
+            team0_season_df['Pos'] = game.teams[0].team_box_score.box_batting['Pos']
         print(score)
+
+    print(team0_season_df.to_string(index=False, justify='center'))

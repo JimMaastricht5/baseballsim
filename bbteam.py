@@ -45,6 +45,8 @@ class TeamBoxScore:
         self.box_batting.loc[batter_num, ['H']] = self.box_batting.loc[batter_num, ['H']] + 1 \
             if outcome[1] != 'BB' and outcome[1] != 'H' and outcome[0] == 'OB' \
             else self.box_batting.loc[batter_num, ['H']]
+
+        self.box_batting.loc[batter_num, ['RBI']] = self.box_batting.loc[batter_num, ['RBI']] + outcome[3]  # add rbis
         return
 
     def team_batting_stats(self, df):
@@ -97,5 +99,4 @@ class Team:
         self.lineup = self.pos_players.head(10)  # assumes DH
         self.pitching = self.pitchers.head(1)
         self.team_box_score = TeamBoxScore(self.lineup, self.pitching, self.team_name)
-        # print(self.team_box_score.team_batting_stats(pd.DataFrame(self.lineup)).to_string(index=False, justify='center'))
         return

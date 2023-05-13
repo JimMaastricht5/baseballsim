@@ -46,7 +46,7 @@ class SimAB:
     def odds_ratio(self, hitter_stat, pitcher_stat, league_stat):
         odds_ratio = ((hitter_stat / (1 - hitter_stat)) * (pitcher_stat / (1 - pitcher_stat))) / \
                      (league_stat / (1 - league_stat))
-        print(str(odds_ratio / (1 + odds_ratio)))
+        # print(str(odds_ratio / (1 + odds_ratio)))
         return odds_ratio / (1 + odds_ratio)
 
     def onbase(self):
@@ -90,13 +90,13 @@ class SimAB:
 
     def outcome(self, pitching, batting):
         # tree of the various odds of an event, each event is yes/no.  Onbase? Yes -> BB? no -> Hit yes (stop)
-        # outcome: on base or out pos 0, how in pos 1, bases to advance in pos 2
+        # outcome: on base or out pos 0, how in pos 1, bases to advance in pos 2, rbis in pos 3
         # ?? hbp is missing, total batters faced is missing, should calc or get pitcher obp
         self.pitching = pitching
         self.batting = batting
-        result = ['OB', '', 1]
+        result = ['OB', '', 1, 0]  # ob or out, type, base to advance runners, rbis
         if self.onbase():
-            print('on base')
+            # print('on base')
             if self.bb():
                 result[1] = 'BB'
             elif self.double():
@@ -112,7 +112,7 @@ class SimAB:
                 result[1] = 'H'  # one base is default
         else:  # handle outs
             if self.k():
-                result = ['OUT', 'K', 0]  # ob, out sub types ob: 1b, 2b, 3b, hr, hbp, e, w; out: k, ...
+                result = ['OUT', 'K', 0, 0]  # ob, out sub types ob: 1b, 2b, 3b, hr, hbp, e, w; out: k, ...
             else:
-                result = self.gb_fb_lo(['OUT', '', 0])  # not a strike out, fb, go, or lo
+                result = self.gb_fb_lo(['OUT', '', 0, 0])  # not a strike out, fb, go, or lo
         return result

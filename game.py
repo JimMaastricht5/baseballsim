@@ -39,7 +39,7 @@ class Bases:
         base_names_with_runners = list(filter(lambda base_name_zip: base_name_zip[1] > 0 and base_name_zip[0] != 'AB'
                                               and base_name_zip[0] != 'home', base_names_zip))
         base_names_with_runners.sort()
-        for base_name in base_names_with_runners:  # ?? not handling triples ??
+        for base_name in base_names_with_runners:
             desc = base_name[0] if desc == '' else desc + ', ' + base_name[0]
         prefix = 'Runner on ' if self.num_runners == 1 else 'Runners on '
         return prefix + desc
@@ -77,7 +77,6 @@ class Game:
     def sim_ab(self):
         pitching = self.teams[(self.top_bottom + 1) % 2].pitching.iloc[0]
         batting = self.teams[self.top_bottom].lineup.iloc[self.batting_num[self.top_bottom]-1]
-        # print(batting)
         self.bases.new_ab()
         outcome = self.at_bat.outcome(pitching, batting)
         if outcome[0] == 'OUT':
@@ -85,31 +84,36 @@ class Game:
         elif outcome[0] == 'OB':
             self.bases.advance_runners(bases_to_advance=outcome[2])  # outcome 2 is number of bases to advance
             self.score[self.top_bottom] += self.bases.runs_scored
+            outcome[3] = self.bases.runs_scored  # rbis for batter
         self.teams[(self.top_bottom + 1) % 2].team_box_score.pitching_result(0, outcome)  # pitcher # zero
         self.teams[self.top_bottom].team_box_score.batting_result(self.batting_num[self.top_bottom]-1, outcome)
         return pitching, batting, outcome
 
-    def sim_half_inning(self):
+    def sim_half_inning(self, chatty=True):
         top_or_bottom = 'top' if self.top_bottom == 0 else 'bottom'
-        print(f'Starting the {top_or_bottom} of inning {self.inning[self.top_bottom]}.')
+        if chatty:
+            print(f'\nStarting the {top_or_bottom} of inning {self.inning[self.top_bottom]}.')
         while self.outs < 3:
             pitching, batting, outcome = self.sim_ab()
-            print(f'Pitcher: {pitching.Player} against '
-                  f'{self.team_names[self.top_bottom]} batter #'
-                  f'{self.batting_num[self.top_bottom]}. {batting.Player} \n'
-                  f'\t {outcome[1]}, {self.outs} Outs')
-            if self.bases.runs_scored > 0:
+            if chatty:
+                print(f'Pitcher: {pitching.Player} against '
+                      f'{self.team_names[self.top_bottom]} batter #'
+                      f'{self.batting_num[self.top_bottom]}. {batting.Player} \n'
+                      f'\t {outcome[1]}, {self.outs} Outs')
+            if self.bases.runs_scored > 0 and chatty:
                 print(f'\tScored {self.bases.runs_scored} run(s)!  The score is {self.team_names[0]} {self.score[0]} to'
                       f' {self.team_names[1]} {self.score[1]}')  # ?? need to handle walk offs...
-            if self.bases.num_runners >= 1 and self.outs < 3:  # leave out the batter to check for runner
+            if self.bases.num_runners >= 1 and self.outs < 3 and chatty:  # leave out the batter to check for runner
                 print(f'\t{self.bases.describe_runners()}')
             self.batting_num[self.top_bottom] = self.batting_num[self.top_bottom] + 1 \
                 if self.batting_num[self.top_bottom] <= 9 else 1
 
         # half inning over
         self.bases.clear_bases()
-        print(f'\nCompleted {top_or_bottom} half of inning {self.inning[self.top_bottom]}.')
-        print(f'The score is {self.team_names[0]} {self.score[0]} to {self.team_names[1]} {self.score[1]}\n')
+        if chatty:
+            print('')  # add a blank line for verbose output
+        print(f'Completed {top_or_bottom} half of inning {self.inning[self.top_bottom]}. '
+              f'The score is {self.team_names[0]} {self.score[0]} to {self.team_names[1]} {self.score[1]}')
         self.inning[self.top_bottom] += 1
         self.top_bottom = 0 if self.top_bottom == 1 else 1
         self.outs = 0
@@ -128,7 +132,7 @@ class Game:
 
     def sim_game(self):
         while self.game_end() is False:
-            self.sim_half_inning()
+            self.sim_half_inning(chatty=False)
 
         self.win_loss_record()
         self.teams[0].team_box_score.totals()
@@ -143,7 +147,7 @@ class Game:
 if __name__ == '__main__':
     home_team = 'MIL'
     away_team = 'MIN'
-    season_length = 1
+    season_length = 10
     season_win_loss = [[0, 0], [0, 0]]  # away record pos 0, home pos 1
     team0_season_df = None
     for game_num in range(1, season_length + 1):
@@ -175,5 +179,4 @@ if __name__ == '__main__':
                                team0_season_df['HR'] * 4) / team0_season_df['AB']
     team0_season_df['OPS'] = team0_season_df['OBP'] + team0_season_df['SLG']
     print(team0_season_df.to_string(index=False, justify='center'))
-
-    print(game.teams[0].team_box_score.team_batting_stats(pd.DataFrame(game.teams[0].team_box_score.lineup)).to_string(index=False, justify='center'))
+    # end season

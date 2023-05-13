@@ -1,7 +1,8 @@
-import baseball_stats
-import baseballteam
+import stats
+import bbteam
 import at_bat
 import numpy as np
+import pandas as pd
 
 
 class Bases:
@@ -13,16 +14,10 @@ class Bases:
         return
 
     def advance_runners(self, bases_to_advance=1):
-        # if bases_to_advance > 1:
-        #     print('pre roll' + str(self.baserunners))
         self.baserunners = list(np.roll(self.baserunners, bases_to_advance))  # advance runners
-        # if bases_to_advance > 1:
-        #     print('post roll' + str(self.baserunners))
-        #     print('scored?' + str(self.baserunners[-4:]))
         self.runs_scored = np.sum(self.baserunners[-4:])  # 0 ab 1, 2, 3 are bases. 4-7 run crossed home hence length 4
         self.baserunners[-4] = 0  # send the runners that score back to the dug out
         self.baserunners = [baserunner if i <= 3 else 0 for i, baserunner in enumerate(self.baserunners)]
-        # print('runners back to dug out?' + str(self.baserunners))
         self.num_runners = np.sum(self.baserunners[1:3])  # add the number of people on base 1st, 2b, and 3rd
         return
 
@@ -54,17 +49,17 @@ class Game:
     def __init__(self, home_team_name, away_team_name, seasons=[2022]):
         self.seasons = seasons
         self.team_names = [away_team_name, home_team_name]
-        self.baseball_data = baseball_stats.BaseballData(seasons=self.seasons)
+        self.baseball_data = stats.BaseballStats(seasons=self.seasons)
         print(f'Getting data...')
         self.baseball_data.get_seasons()
 
         print(f'Setting away team as {self.team_names[0]}')
         self.teams = []
-        self.teams.insert(0, baseballteam.Team(self.team_names[0], self.baseball_data))  # away team
+        self.teams.insert(0, bbteam.Team(self.team_names[0], self.baseball_data))  # away team
         self.teams[0].set_lineup()
 
         print(f'Setting home team as {self.team_names[1]}')
-        self.teams.insert(1, baseballteam.Team(self.team_names[1], self.baseball_data))  # home team
+        self.teams.insert(1, bbteam.Team(self.team_names[1], self.baseball_data))  # home team
         self.teams[1].set_lineup()
 
         self.win_loss = []
@@ -144,10 +139,11 @@ class Game:
         return self.score, self.inning, self.win_loss
 
 
+# test a number of games
 if __name__ == '__main__':
     home_team = 'MIL'
     away_team = 'MIN'
-    season_length = 5
+    season_length = 1
     season_win_loss = [[0, 0], [0, 0]]  # away record pos 0, home pos 1
     team0_season_df = None
     for game_num in range(1, season_length + 1):
@@ -159,9 +155,6 @@ if __name__ == '__main__':
         if team0_season_df is None:
             team0_season_df = game.teams[0].team_box_score.box_batting
         else:
-            # print(team0_season_df.to_string(index=False, justify='center'))
-            # print(game.teams[0].team_box_score.box_batting.to_string(index=False, justify='center'))
-
             col_list = ['G', 'AB', 'R', 'H', '2B', '3B', 'HR', 'RBI', 'SB', 'CS', 'BB', 'SO', 'SH', 'SF', 'HBP']
             team0_season_df = team0_season_df[col_list].add(game.teams[0].team_box_score.box_batting[col_list])
             team0_season_df['Player'] = game.teams[0].team_box_score.box_batting['Player']
@@ -182,3 +175,5 @@ if __name__ == '__main__':
                                team0_season_df['HR'] * 4) / team0_season_df['AB']
     team0_season_df['OPS'] = team0_season_df['OBP'] + team0_season_df['SLG']
     print(team0_season_df.to_string(index=False, justify='center'))
+
+    print(game.teams[0].team_box_score.team_batting_stats(pd.DataFrame(game.teams[0].team_box_score.lineup)).to_string(index=False, justify='center'))

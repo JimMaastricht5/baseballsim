@@ -4,6 +4,7 @@ import numpy as np
 class SimAB:
     def __init__(self, baseball_data):
         self.rng = lambda: np.random.default_rng().uniform(low=0.0, high=1.001)  # random generator between 0 and 1
+        self.dice_roll = None
         self.pitching = None
         self.batting = None
         self.baseball_data = baseball_data
@@ -78,10 +79,10 @@ class SimAB:
                                                    self.league_K_rate_per_AB)
 
     def gb_fb_lo(self, result):
-        dice_roll = self.rng()
-        if dice_roll <= self.league_GB:  # ground out
+        self.dice_roll = self.rng()
+        if self.dice_roll <= self.league_GB:  # ground out
             result[1] = 'GB'
-        elif dice_roll <= (self.league_FB + self.league_GB):  # fly ball
+        elif self.dice_roll <= (self.league_FB + self.league_GB):  # fly ball
             result[1] = 'FB'
         else:
             result[1] = 'LD'  # line drive

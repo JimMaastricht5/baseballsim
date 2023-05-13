@@ -38,36 +38,36 @@ class TeamBoxScore:
         if outcome[1] != 'BB':  # handle walks
             self.box_batting.loc[batter_num, ['AB']] = self.box_batting.loc[batter_num, ['AB']] + 1
 
-        if outcome[1] in ['H', '2B', '3B', 'HR', 'BB', 'SO', 'HBP']:  # handle plate appearance
+        if outcome[1] in ['H', '2B', '3B', 'HR', 'BB', 'SO', 'HBP']:  # record result of plate appearance
             self.box_batting.loc[batter_num, [outcome[1]]] = self.box_batting.loc[batter_num, [outcome[1]]] + 1
 
         # increment hit count if OB, not a walk, and not a single
         self.box_batting.loc[batter_num, ['H']] = self.box_batting.loc[batter_num, ['H']] + 1 \
-            if outcome[1] != 'H' and outcome[0] == 'OB' else self.box_batting.loc[batter_num, ['H']]
+            if outcome[1] != 'BB' and outcome[1] != 'H' and outcome[0] == 'OB' \
+            else self.box_batting.loc[batter_num, ['H']]
         return
 
+    def team_batting_stats(self, df):
+        df['AVG'] = df['H'] / df['AB']
+        df['OBP'] = (df['H'] + df['BB'] + df['HBP']) / (df['AB'] + df['BB'] + df['HBP'])
+        df['SLG'] = ((df['H'] - df['2B'] - df['3B'] - df['HR']) + df['2B'] * 2 + df['3B'] * 3 + df['HR'] * 4) / df['AB']
+        df['OPS'] = df['OBP'] + df['SLG'] + df['SLG']
+        return df
+
+
     def totals(self):
-        self.team_box_batting = self.box_batting[['AB', 'R', 'H', '2B', '3B', 'HR', 'RBI', 'SB', 'CS', 'BB', 'SO', 'SH', 'SF', 'HBP']].sum()
+        self.team_box_batting = self.box_batting[['AB', 'R', 'H', '2B', '3B', 'HR', 'RBI', 'SB', 'CS', 'BB',
+                                                  'SO', 'SH', 'SF', 'HBP']].sum()
         self.team_box_batting['Player'] = 'Team Totals'
         self.team_box_batting['Team'] = self.team_name
         self.team_box_batting['G'] = 1
         self.team_box_batting['Age'] = ''
         self.team_box_batting['Pos'] = ''
-
-        # self.box_batting = pd.concat([self.box_batting, self.team_box_batting], ignore_index=True)
         self.box_batting = self.box_batting.append(self.team_box_batting, ignore_index=True)  # combine totals + indiv
-        self.box_batting['AVG'] = self.box_batting['H'] / self.box_batting['AB']
-        self.box_batting['OBP'] = (self.box_batting['H'] + self.box_batting['BB'] +
-                                        self.box_batting['HBP']) / (
-                                                   self.box_batting['AB'] + self.box_batting['BB'] +
-                                                   self.box_batting['HBP'])
-        self.box_batting['SLG'] = ((self.box_batting['H'] - self.box_batting['2B'] -
-                                         self.box_batting['3B'] - self.box_batting['HR']) +
-                                        self.box_batting['2B'] * 2 + self.box_batting['3B'] * 3 +
-                                        self.box_batting['HR'] * 4) / self.box_batting['AB']
-        self.box_batting['OPS'] = self.box_batting['OBP'] + self.box_batting['SLG']
+        self.box_batting = self.team_batting_stats(self.box_batting)
 
-        self.team_box_pitching = self.box_pitching[['GS', 'CG', 'SHO', 'IP', 'H', 'ER', 'K', 'BB', 'HR', 'W', 'L', 'SV', 'BS', 'HLD', 'ERA', 'WHIP']].sum()
+        self.team_box_pitching = self.box_pitching[['GS', 'CG', 'SHO', 'IP', 'H', 'ER', 'K', 'BB', 'HR', 'W', 'L',
+                                                    'SV', 'BS', 'HLD', 'ERA', 'WHIP']].sum()
         self.team_box_pitching['Player'] = 'Team Totals'
         self.team_box_pitching['Team'] = self.team_name
         self.team_box_pitching['G'] = 1
@@ -97,4 +97,5 @@ class Team:
         self.lineup = self.pos_players.head(10)  # assumes DH
         self.pitching = self.pitchers.head(1)
         self.team_box_score = TeamBoxScore(self.lineup, self.pitching, self.team_name)
+        # print(self.team_box_score.team_batting_stats(pd.DataFrame(self.lineup)).to_string(index=False, justify='center'))
         return

@@ -1,7 +1,7 @@
 import pandas as pd
 
 
-class BaseballData:
+class BaseballStats:
     def __init__(self, seasons=[2022]):
         self.seasons = seasons
         self.pitching_data = None
@@ -31,7 +31,7 @@ class BaseballData:
 
 
 if __name__ == '__main__':
-    baseball_data = BaseballData(seasons=[2022])
+    baseball_data = BaseballStats(seasons=[2022])
     baseball_data.get_seasons()
 
     print(*baseball_data.pitching_data.columns)

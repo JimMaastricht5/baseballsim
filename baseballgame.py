@@ -67,6 +67,7 @@ class Game:
         self.teams.insert(1, baseballteam.Team(self.team_names[1], self.baseball_data))  # home team
         self.teams[1].set_lineup()
 
+        self.win_loss = []
         self.score = [0, 0]
         self.inning = [1, 1]
         self.batting_num = [1, 1]
@@ -124,26 +125,37 @@ class Game:
                         (self.inning[0] != self.inning[1] and self.score[0] >= self.score[1])\
                         or self.score[0] == self.score[1] else True
 
+    def win_loss_record(self):
+        home_win = 0 if self.score[0] > self.score[1] else 1
+        self.win_loss.append([abs(home_win - 1), home_win])  # if home win away team is 0, 1
+        self.win_loss.append([home_win, abs(home_win - 1)])  # if home win home team is  1, 0
+        return
+
     def sim_game(self):
         while self.game_end() is False:
             self.sim_half_inning()
+
+        self.win_loss_record()
         self.teams[0].team_box_score.totals()
         self.teams[0].team_box_score.print()
 
         self.teams[1].team_box_score.totals()
         self.teams[1].team_box_score.print()
-        return self.score, self.inning
+        return self.score, self.inning, self.win_loss
 
 
 if __name__ == '__main__':
     home_team = 'MIL'
     away_team = 'MIN'
-    season_length = 162
+    season_length = 5
+    season_win_loss = [[0, 0], [0, 0]]  # away record pos 0, home pos 1
     team0_season_df = None
     for game_num in range(1, season_length + 1):
         print(game_num)
         game = Game(home_team_name=home_team, away_team_name=away_team)
-        score, inning = game.sim_game()
+        score, inning, win_loss = game.sim_game()
+        season_win_loss[0] = list(np.add(np.array(season_win_loss[0]), np.array(win_loss[0])))
+        season_win_loss[1] = list(np.add(np.array(season_win_loss[1]), np.array(win_loss[1])))
         if team0_season_df is None:
             team0_season_df = game.teams[0].team_box_score.box_batting
         else:
@@ -155,7 +167,9 @@ if __name__ == '__main__':
             team0_season_df['Player'] = game.teams[0].team_box_score.box_batting['Player']
             team0_season_df['Team'] = game.teams[0].team_box_score.box_batting['Team']
             team0_season_df['Pos'] = game.teams[0].team_box_score.box_batting['Pos']
-        print(score)
+        print(f'Score was: {score[0]} to {score[1]}')
+        print(f'{away_team} season : {season_win_loss[0][0]} W and {season_win_loss[0][1]} L')
+        print(f'{home_team} season : {season_win_loss[1][0]} W and {season_win_loss[1][1]} L')
 
     team0_season_df['AVG'] = team0_season_df['H'] / team0_season_df['AB']
     team0_season_df['OBP'] = (team0_season_df['H'] + team0_season_df['BB'] +

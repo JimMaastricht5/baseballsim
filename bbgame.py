@@ -46,19 +46,20 @@ class Bases:
 
 
 class Game:
-    def __init__(self, home_team_name, away_team_name, seasons=[2022]):
-        self.seasons = seasons
+    def __init__(self, away_team_name, home_team_name, baseball_data=None):
         self.team_names = [away_team_name, home_team_name]
-        self.baseball_data = bbstats.BaseballStats(seasons=self.seasons)
-        print(f'Getting data...')
-        self.baseball_data.get_seasons()
+        if baseball_data is None:  # else passed in from season sim
+            self.baseball_data = bbstats.BaseballStats()
+            # self.baseball_data.get_seasons()
+        else:
+            self.baseball_data = baseball_data
 
-        print(f'Setting away team as {self.team_names[0]}')
+        # print(f'Setting away team as {self.team_names[0]}')
         self.teams = []
         self.teams.insert(0, bbteam.Team(self.team_names[0], self.baseball_data))  # away team
         self.teams[0].set_lineup()
 
-        print(f'Setting home team as {self.team_names[1]}')
+        # print(f'Setting home team as {self.team_names[1]}')
         self.teams.insert(1, bbteam.Team(self.team_names[1], self.baseball_data))  # home team
         self.teams[1].set_lineup()
 
@@ -112,8 +113,8 @@ class Game:
         self.bases.clear_bases()
         if chatty:
             print('')  # add a blank line for verbose output
-        print(f'Completed {top_or_bottom} half of inning {self.inning[self.top_bottom]}. '
-              f'The score is {self.team_names[0]} {self.score[0]} to {self.team_names[1]} {self.score[1]}')
+            print(f'Completed {top_or_bottom} half of inning {self.inning[self.top_bottom]}. '
+                  f'The score is {self.team_names[0]} {self.score[0]} to {self.team_names[1]} {self.score[1]}')
         self.inning[self.top_bottom] += 1
         self.top_bottom = 0 if self.top_bottom == 1 else 1
         self.outs = 0
@@ -130,9 +131,9 @@ class Game:
         self.win_loss.append([home_win, abs(home_win - 1)])  # if home win home team is  1, 0
         return
 
-    def sim_game(self):
+    def sim_game(self, chatty=True):
         while self.game_end() is False:
-            self.sim_half_inning(chatty=False)
+            self.sim_half_inning(chatty=chatty)
 
         self.win_loss_record()
         self.teams[0].team_box_score.totals()
@@ -147,13 +148,13 @@ class Game:
 if __name__ == '__main__':
     home_team = 'MIL'
     away_team = 'MIN'
-    season_length = 2
+    season_length = 1
     season_win_loss = [[0, 0], [0, 0]]  # away record pos 0, home pos 1
     team0_season_df = None
     for game_num in range(1, season_length + 1):
         print(game_num)
         game = Game(home_team_name=home_team, away_team_name=away_team)
-        score, inning, win_loss = game.sim_game()
+        score, inning, win_loss = game.sim_game(chatty=True)
         season_win_loss[0] = list(np.add(np.array(season_win_loss[0]), np.array(win_loss[0])))
         season_win_loss[1] = list(np.add(np.array(season_win_loss[1]), np.array(win_loss[1])))
         if team0_season_df is None:
@@ -168,6 +169,6 @@ if __name__ == '__main__':
         print(f'{away_team} season : {season_win_loss[0][0]} W and {season_win_loss[0][1]} L')
         print(f'{home_team} season : {season_win_loss[1][0]} W and {season_win_loss[1][1]} L')
 
-    team0_season_df = bbstats.team_batting_stats(team0_season_df)
-    print(team0_season_df.to_string(index=False, justify='center'))
+    # team0_season_df = bbstats.team_batting_stats(team0_season_df)
+    # print(team0_season_df.to_string(index=False, justify='center'))
     # end season

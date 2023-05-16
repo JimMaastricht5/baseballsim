@@ -1,4 +1,4 @@
-import stats
+import bbstats
 import bbteam
 import at_bat
 import numpy as np
@@ -49,7 +49,7 @@ class Game:
     def __init__(self, home_team_name, away_team_name, seasons=[2022]):
         self.seasons = seasons
         self.team_names = [away_team_name, home_team_name]
-        self.baseball_data = stats.BaseballStats(seasons=self.seasons)
+        self.baseball_data = bbstats.BaseballStats(seasons=self.seasons)
         print(f'Getting data...')
         self.baseball_data.get_seasons()
 
@@ -147,7 +147,7 @@ class Game:
 if __name__ == '__main__':
     home_team = 'MIL'
     away_team = 'MIN'
-    season_length = 10
+    season_length = 2
     season_win_loss = [[0, 0], [0, 0]]  # away record pos 0, home pos 1
     team0_season_df = None
     for game_num in range(1, season_length + 1):
@@ -168,15 +168,6 @@ if __name__ == '__main__':
         print(f'{away_team} season : {season_win_loss[0][0]} W and {season_win_loss[0][1]} L')
         print(f'{home_team} season : {season_win_loss[1][0]} W and {season_win_loss[1][1]} L')
 
-    team0_season_df['AVG'] = team0_season_df['H'] / team0_season_df['AB']
-    team0_season_df['OBP'] = (team0_season_df['H'] + team0_season_df['BB'] +
-                               team0_season_df['HBP']) / (
-                                      team0_season_df['AB'] + team0_season_df['BB'] +
-                                      team0_season_df['HBP'])
-    team0_season_df['SLG'] = ((team0_season_df['H'] - team0_season_df['2B'] -
-                                team0_season_df['3B'] - team0_season_df['HR']) +
-                               team0_season_df['2B'] * 2 + team0_season_df['3B'] * 3 +
-                               team0_season_df['HR'] * 4) / team0_season_df['AB']
-    team0_season_df['OPS'] = team0_season_df['OBP'] + team0_season_df['SLG']
+    team0_season_df = bbstats.team_batting_stats(team0_season_df)
     print(team0_season_df.to_string(index=False, justify='center'))
     # end season

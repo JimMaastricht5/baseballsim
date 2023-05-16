@@ -1,4 +1,7 @@
 import pandas as pd
+import bbstats
+
+
 class TeamBoxScore:
     def __init__(self, lineup, pitching, team_name):
         self.box_pitching = pitching.copy()
@@ -22,15 +25,16 @@ class TeamBoxScore:
 
     def pitching_result(self, pitcher_num, outcome):
         outcome[1] = 'K' if outcome[1] == 'SO' else outcome[1]  # handle stat translation from pitcher SO to batter K
-        if outcome[0] == 'OUT':  # handle walks
+        if outcome[0] == 'OUT':
             self.box_pitching.loc[pitcher_num, ['IP']] = self.box_pitching.loc[pitcher_num, ['IP']] + .333333
 
         if outcome[1] in ['H', 'HR', 'K', 'BB', 'HBP']:  # handle plate appearance
             self.box_pitching.loc[pitcher_num, [outcome[1]]] = self.box_pitching.loc[pitcher_num, [outcome[1]]] + 1
 
-            # increment hit count if OB, not a walk, and not a single
+        # increment hit count if OB, not a walk, and not a single
         self.box_pitching.loc[pitcher_num, ['H']] = self.box_pitching.loc[pitcher_num, ['H']] + 1 \
-            if outcome[1] != 'H' and outcome[0] == 'OB' else self.box_pitching.loc[pitcher_num, ['H']]
+            if outcome[1] != 'BB' and outcome[1] != 'H' and outcome[0] == 'OB' \
+            else self.box_pitching.loc[pitcher_num, ['H']]
         return
 
     def batting_result(self, batter_num, outcome):
@@ -49,14 +53,6 @@ class TeamBoxScore:
         self.box_batting.loc[batter_num, ['RBI']] = self.box_batting.loc[batter_num, ['RBI']] + outcome[3]  # add rbis
         return
 
-    def team_batting_stats(self, df):
-        df['AVG'] = df['H'] / df['AB']
-        df['OBP'] = (df['H'] + df['BB'] + df['HBP']) / (df['AB'] + df['BB'] + df['HBP'])
-        df['SLG'] = ((df['H'] - df['2B'] - df['3B'] - df['HR']) + df['2B'] * 2 + df['3B'] * 3 + df['HR'] * 4) / df['AB']
-        df['OPS'] = df['OBP'] + df['SLG'] + df['SLG']
-        return df
-
-
     def totals(self):
         self.team_box_batting = self.box_batting[['AB', 'R', 'H', '2B', '3B', 'HR', 'RBI', 'SB', 'CS', 'BB',
                                                   'SO', 'SH', 'SF', 'HBP']].sum()
@@ -66,7 +62,7 @@ class TeamBoxScore:
         self.team_box_batting['Age'] = ''
         self.team_box_batting['Pos'] = ''
         self.box_batting = self.box_batting.append(self.team_box_batting, ignore_index=True)  # combine totals + indiv
-        self.box_batting = self.team_batting_stats(self.box_batting)
+        self.box_batting = bbstats.team_batting_stats(self.box_batting)
 
         self.team_box_pitching = self.box_pitching[['GS', 'CG', 'SHO', 'IP', 'H', 'ER', 'K', 'BB', 'HR', 'W', 'L',
                                                     'SV', 'BS', 'HLD', 'ERA', 'WHIP']].sum()
@@ -75,6 +71,7 @@ class TeamBoxScore:
         self.team_box_pitching['G'] = 1
         self.team_box_pitching['Age'] = ''
         self.box_pitching = self.box_pitching.append(self.team_box_pitching, ignore_index=True)
+        self.box_pitching = bbstats.team_pitching_stats(self.box_pitching)
         return
 
     def print(self):
@@ -82,6 +79,7 @@ class TeamBoxScore:
         print('')
         print(self.box_pitching.to_string(index=False, justify='center'))
         return
+
 
 class Team:
     def __init__(self, team_name, baseball_data):

@@ -89,5 +89,5 @@ class BaseballSeason:
 if __name__ == '__main__':
     seasons = [2022]
     teams = ['CHC', 'CIN', 'COL', 'MIL', 'PIT', 'STL']  # included COL for balance in scheduling
-    bbseason23 = BaseballSeason(season_list=seasons, team_list=teams, season_length_limit=1)  # mult of teams
+    bbseason23 = BaseballSeason(season_list=seasons, team_list=teams, season_length_limit=10)  # mult of teams
     bbseason23.sim_season(chatty=False)

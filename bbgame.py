@@ -2,60 +2,20 @@ import bbstats
 import bbteam
 import at_bat
 import numpy as np
+import bbbaserunners
 import pandas as pd
-
-
-class Bases:
-    def __init__(self):
-        self.baserunners = None
-        self.clear_bases()  # initialize bases to no runners
-        self.runs_scored = 0
-        self.num_runners = 0
-        return
-
-    def advance_runners(self, bases_to_advance=1):
-        self.baserunners = list(np.roll(self.baserunners, bases_to_advance))  # advance runners
-        self.runs_scored = np.sum(self.baserunners[-4:])  # 0 ab 1, 2, 3 are bases. 4-7 run crossed home hence length 4
-        self.baserunners[-4] = 0  # send the runners that score back to the dug out
-        self.baserunners = [baserunner if i <= 3 else 0 for i, baserunner in enumerate(self.baserunners)]
-        self.num_runners = np.sum(self.baserunners[1:3])  # add the number of people on base 1st, 2b, and 3rd
-        return
-
-    def new_ab(self):
-        self.baserunners[0] = 1  # put a player ab
-        self.runs_scored = 0
-        return
-
-    def clear_bases(self):
-        # index 0 is ab, 1st = 1, 2nd =2 , 3rd=3, 4th=home, pos 5-7 scored
-        self.baserunners = [0, 0, 0, 0, 0, 0, 0, 0]
-        self.num_runners = 0
-        return
-
-    def describe_runners(self):
-        desc = ''
-        base_names = ['AB', '1st', '2nd', '3rd', 'home', 'scored', 'scored', 'scored']  # leave this for sort order
-        base_names_zip = set(zip(base_names, self.baserunners))
-        base_names_with_runners = list(filter(lambda base_name_zip: base_name_zip[1] > 0 and base_name_zip[0] != 'AB'
-                                              and base_name_zip[0] != 'home', base_names_zip))
-        base_names_with_runners.sort()
-        for base_name in base_names_with_runners:
-            desc = base_name[0] if desc == '' else desc + ', ' + base_name[0]
-        prefix = 'Runner on ' if self.num_runners == 1 else 'Runners on '
-        return prefix + desc
 
 
 class Game:
     def __init__(self, away_team_name, home_team_name, baseball_data=None):
         self.team_names = [away_team_name, home_team_name]
-        if baseball_data is None:  # else passed in from season sim
-            self.baseball_data = bbstats.BaseballStats()
-            # self.baseball_data.get_seasons()
-        else:
-            self.baseball_data = baseball_data
-
+        self.baseball_data = bbstats.BaseballStats() if baseball_data is None else baseball_data
+        # if baseball_data is None:  # else passed in from season sim
+        #     self.baseball_data = bbstats.BaseballStats()
+        # else:
+        #     self.baseball_data = baseball_data
         # print(f'Setting away team as {self.team_names[0]}')
-        self.teams = []
+        self.teams = []  # keep track of away in pos 0 and home team in pos 1
         self.teams.insert(0, bbteam.Team(self.team_names[0], self.baseball_data))  # away team
         self.teams[0].set_lineup()
 
@@ -67,17 +27,21 @@ class Game:
         self.score = [0, 0]
         self.inning = [1, 1]
         self.batting_num = [1, 1]
+        self.pitching_num = [0, 0]
         self.outs = 0
         self.top_bottom = 0  # zero is top offset, 1 is bottom offset
 
         self.rng = np.random.default_rng()  # random number generator between 0 and 1
-        self.bases = Bases()
+        self.bases = bbbaserunners.Bases()
         self.at_bat = at_bat.SimAB(self.baseball_data)
         return
 
     def sim_ab(self):
-        pitching = self.teams[(self.top_bottom + 1) % 2].pitching.iloc[0]
-        batting = self.teams[self.top_bottom].lineup.iloc[self.batting_num[self.top_bottom]-1]
+        cur_pitching_index = self.teams[(self.top_bottom + 1) % 2].cur_pitcher_index
+        pitching = self.teams[(self.top_bottom + 1) % 2].pitching.iloc[cur_pitching_index]  # data for pitcher
+
+        cur_batter_index = self.teams[self.top_bottom].??
+        batting = self.teams[self.top_bottom].lineup.iloc[self.batting_num[self.top_bottom]-1]  # data for batter
         self.bases.new_ab()
         outcome = self.at_bat.outcome(pitching, batting)
         if outcome[0] == 'OUT':
@@ -86,7 +50,7 @@ class Game:
             self.bases.advance_runners(bases_to_advance=outcome[2])  # outcome 2 is number of bases to advance
             self.score[self.top_bottom] += self.bases.runs_scored
             outcome[3] = self.bases.runs_scored  # rbis for batter
-        self.teams[(self.top_bottom + 1) % 2].team_box_score.pitching_result(0, outcome)  # pitcher # zero
+        self.teams[(self.top_bottom + 1) % 2].team_box_score.pitching_result(cur_pitching_index, outcome)
         self.teams[self.top_bottom].team_box_score.batting_result(self.batting_num[self.top_bottom]-1, outcome)
         return pitching, batting, outcome
 

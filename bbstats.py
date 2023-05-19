@@ -53,14 +53,16 @@ class BaseballStats:
         self.new_season_batting_data = self.new_season_batting_data.applymap(zero_out_numbers)
         self.new_season_batting_data['Season'] = str(self.new_season)
         self.new_season_batting_data.fillna(0)
+        print(self.new_season_batting_data.to_string())
         return
 
     def update_current_season(self, batting_box_score, pitching_box_score):
-        print(batting_box_score)
+        print(batting_box_score.to_string())
+        print(self.new_season_batting_data.to_string())
         df_sum = self.new_season_batting_data[self.numeric_batting_cols] + batting_box_score[self.numeric_batting_cols]
-        print(df_sum)
+        print(df_sum.to_string())
         self.new_season_batting_data = pd.concat([self.new_season_batting_data.drop(self.numeric_batting_cols, axis=1), df_sum], axis=1)
-        print(self.new_season_batting_data)
+        print(self.new_season_batting_data.to_string())
 
         df_sum = self.new_season_pitching_data[self.numeric_pitching_cols] + pitching_box_score[self.numeric_pitching_cols]
         self.new_season_pitching_data = pd.concat(

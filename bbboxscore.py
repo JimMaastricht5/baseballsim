@@ -144,7 +144,6 @@ class TeamBoxScore:
         self.team_box_batting['G'] = 1
         self.team_box_batting['Age'] = ''
         self.team_box_batting['Pos'] = ''
-        print(self.team_box_batting)
         self.box_batting = self.box_batting.append(self.team_box_batting, ignore_index=True)
         self.box_batting = bbstats.team_batting_stats(self.box_batting)
 

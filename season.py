@@ -6,15 +6,16 @@ import numpy as np
 
 
 class BaseballSeason:
-    def __init__(self, season_list, team_list, season_length_limit=0):
+    def __init__(self, load_seasons, new_season, team_list, season_length_limit=0):
         self.season_length_limit = season_length_limit
         self.team_season_df = None
         self.team_season_pitching_df = None
-        self.seasons = season_list  # pull base data across for what seasons
+        self.load_seasons = load_seasons  # pull base data across for what seasons
+        self.new_season = new_season
         self.teams = team_list
         self.schedule = []
         self.create_schedule()  # set schedule
-        self.baseball_data = bbstats.BaseballStats(seasons=self.seasons)
+        self.baseball_data = bbstats.BaseballStats(load_seasons=self.load_seasons, new_season=new_season)
         self.team_win_loss = {}
         for team in self.teams:
             self.team_win_loss.update({team: [0, 0]})  # set team win loss to 0, 0
@@ -89,5 +90,5 @@ class BaseballSeason:
 if __name__ == '__main__':
     seasons = [2022]
     teams = ['CHC', 'CIN', 'COL', 'MIL', 'PIT', 'STL']  # included COL for balance in scheduling
-    bbseason23 = BaseballSeason(season_list=seasons, team_list=teams, season_length_limit=10)  # mult of teams
+    bbseason23 = BaseballSeason(load_seasons=seasons, new_season=2023, team_list=teams, season_length_limit=10)
     bbseason23.sim_season(chatty=False)

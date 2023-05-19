@@ -9,12 +9,8 @@ import pandas as pd
 class Game:
     def __init__(self, away_team_name, home_team_name, baseball_data=None):
         self.team_names = [away_team_name, home_team_name]
-        self.baseball_data = bbstats.BaseballStats() if baseball_data is None else baseball_data
-        # if baseball_data is None:  # else passed in from season sim
-        #     self.baseball_data = bbstats.BaseballStats()
-        # else:
-        #     self.baseball_data = baseball_data
-        # print(f'Setting away team as {self.team_names[0]}')
+        self.baseball_data = bbstats.BaseballStats(load_seasons=[2022], new_season=2023) if baseball_data is None\
+            else baseball_data
         self.teams = []  # keep track of away in pos 0 and home team in pos 1
         self.teams.insert(0, bbteam.Team(self.team_names[0], self.baseball_data))  # away team
         self.teams[0].set_lineup()

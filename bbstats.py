@@ -12,9 +12,10 @@ class BaseballStats:
         self.get_seasons()
         self.create_new_season_from_existing()
 
-        self.numeric_batting_cols = ['AB', 'R', 'H', '2B', '3B', 'HR', 'RBI', 'SB', 'CS', 'BB', 'SO', 'SH', 'SF', 'HBP']
+        self.numeric_batting_cols = ['G', 'AB', 'R', 'H', '2B', '3B', 'HR', 'RBI', 'SB', 'CS', 'BB', 'SO', 'SH', 'SF',
+                                     'HBP']
         self.numeric_pitching_cols = ['GS', 'CG', 'SHO', 'IP', 'H', 'ER', 'K', 'BB', 'HR', 'W', 'L',
-                                                    'SV', 'BS', 'HLD', 'ERA', 'WHIP']
+                                      'SV', 'BS', 'HLD', 'ERA', 'WHIP']
         return
 
     def get_seasons(self):
@@ -38,6 +39,7 @@ class BaseballStats:
                     self.pitching_data = pd.concat([self.pitching_data, pitching_data])
                     self.batting_data = pd.concat([self.batting_data, batting_data])
         return
+
     def create_new_season_from_existing(self):
         if self.pitching_data is None or self.batting_data is None:
             raise Exception('load at least one season of pitching and batting')
@@ -53,19 +55,36 @@ class BaseballStats:
         self.new_season_batting_data.fillna(0)
         return
 
-    def update_current_season(self, team_name, batting_box_score, pitching_box_score):
+    def update_current_season(self, batting_box_score, pitching_box_score):
+        print(batting_box_score)
         df_sum = self.new_season_batting_data[self.numeric_batting_cols] + batting_box_score[self.numeric_batting_cols]
+        print(df_sum)
         self.new_season_batting_data = pd.concat([self.new_season_batting_data.drop(self.numeric_batting_cols, axis=1), df_sum], axis=1)
-        print (self.new_season_batting_data)
+        print(self.new_season_batting_data)
 
-        # self.new_season_pitching_data = self.new_season_pitching_data + pitching_box_score
+        df_sum = self.new_season_pitching_data[self.numeric_pitching_cols] + pitching_box_score[self.numeric_pitching_cols]
+        self.new_season_pitching_data = pd.concat(
+            [self.new_season_pitching_data.drop(self.numeric_pitching_cols, axis=1), df_sum], axis=1)
         return
+
+    def print_season(self, season, team):
+        if season == self.new_season:
+            dfb = self.new_season_batting_data
+            dfp = self.new_season_pitching_data
+        else:
+            dfb = self.batting_data
+            dfp = self.pitching_data
+
+        print(dfb[dfb.Team == team].to_string(justify='center'))
+        return
+
 
 # static function start
 def zero_out_numbers(x):
     if pd.api.types.is_numeric_dtype(x):
         return 0
     return x
+
 
 def trunc_col(df_n, d):
     return (df_n*10**d).astype(int)/10**d

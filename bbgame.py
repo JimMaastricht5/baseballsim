@@ -38,10 +38,11 @@ class Game:
 
     def sim_ab(self):
         cur_pitching_index = self.teams[(self.top_bottom + 1) % 2].cur_pitcher_index
-        pitching = self.teams[(self.top_bottom + 1) % 2].pitching.iloc[cur_pitching_index]  # data for pitcher
+        pitching = self.teams[(self.top_bottom + 1) % 2].pitching.iloc[0] #.iloc[cur_pitching_index]  # data for pitcher
 
-        cur_batter_index = self.teams[self.top_bottom].??
+        cur_batter_index = self.teams[self.top_bottom].cur_lineup_index[self.batting_num[self.top_bottom]-1]
         batting = self.teams[self.top_bottom].lineup.iloc[self.batting_num[self.top_bottom]-1]  # data for batter
+
         self.bases.new_ab()
         outcome = self.at_bat.outcome(pitching, batting)
         if outcome[0] == 'OUT':
@@ -51,7 +52,8 @@ class Game:
             self.score[self.top_bottom] += self.bases.runs_scored
             outcome[3] = self.bases.runs_scored  # rbis for batter
         self.teams[(self.top_bottom + 1) % 2].team_box_score.pitching_result(cur_pitching_index, outcome)
-        self.teams[self.top_bottom].team_box_score.batting_result(self.batting_num[self.top_bottom]-1, outcome)
+        self.teams[self.top_bottom].team_box_score.batting_result(cur_batter_index, outcome)
+        # self.teams[self.top_bottom].team_box_score.batting_result(self.batting_num[self.top_bottom] - 1, outcome)
         return pitching, batting, outcome
 
     def sim_half_inning(self, chatty=True):

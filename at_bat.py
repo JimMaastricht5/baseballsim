@@ -82,8 +82,8 @@ class SimAB:
         self.dice_roll = self.rng()
         if self.dice_roll <= self.league_GB:  # ground out
             result[1] = 'GB'
-        elif self.dice_roll <= (self.league_FB + self.league_GB):  # fly ball
-            result[1] = 'FB'
+        elif self.dice_roll <= (self.league_FB + self.league_GB):  # fly out ball
+            result[1] = 'FO'
         else:
             result[1] = 'LD'  # line drive
         return result

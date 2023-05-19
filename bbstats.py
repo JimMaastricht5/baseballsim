@@ -7,7 +7,14 @@ class BaseballStats:
         self.new_season = new_season
         self.pitching_data = None
         self.batting_data = None
+        self.new_season_pitching_data = None
+        self.new_season_batting_data = None
         self.get_seasons()
+        self.create_new_season_from_existing()
+
+        self.numeric_batting_cols = ['AB', 'R', 'H', '2B', '3B', 'HR', 'RBI', 'SB', 'CS', 'BB', 'SO', 'SH', 'SF', 'HBP']
+        self.numeric_pitching_cols = ['GS', 'CG', 'SHO', 'IP', 'H', 'ER', 'K', 'BB', 'HR', 'W', 'L',
+                                                    'SV', 'BS', 'HLD', 'ERA', 'WHIP']
         return
 
     def get_seasons(self):
@@ -38,12 +45,21 @@ class BaseballStats:
         self.new_season_pitching_data = self.pitching_data.copy()
         self.new_season_pitching_data = self.new_season_pitching_data.applymap(zero_out_numbers)
         self.new_season_pitching_data['Season'] = str(self.new_season)
+        self.new_season_pitching_data.fillna(0)
 
         self.new_season_batting_data = self.batting_data.copy()
         self.new_season_batting_data = self.new_season_batting_data.applymap(zero_out_numbers)
         self.new_season_batting_data['Season'] = str(self.new_season)
+        self.new_season_batting_data.fillna(0)
         return
 
+    def update_current_season(self, team_name, batting_box_score, pitching_box_score):
+        df_sum = self.new_season_batting_data[self.numeric_batting_cols] + batting_box_score[self.numeric_batting_cols]
+        self.new_season_batting_data = pd.concat([self.new_season_batting_data.drop(self.numeric_batting_cols, axis=1), df_sum], axis=1)
+        print (self.new_season_batting_data)
+
+        # self.new_season_pitching_data = self.new_season_pitching_data + pitching_box_score
+        return
 
 # static function start
 def zero_out_numbers(x):

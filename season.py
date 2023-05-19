@@ -52,6 +52,10 @@ class BaseballSeason:
                 score, inning, win_loss_list = game.sim_game(chatty=chatty)
                 self.update_win_loss(away_team_name=match_up[0], home_team_name=match_up[1], win_loss=win_loss_list)
                 print(f'Score was: {match_up[0]} {score[0]} {match_up[1]} {score[1]}')
+
+                self.baseball_data.update_current_season(team_name=match_up[0],
+                                                         batting_box_score=game.teams[0].team_box_score.box_batting,
+                                                         pitching_box_score=game.teams[0].team_box_score.box_pitching)
                 # end of game
 
             # end of all games for one day

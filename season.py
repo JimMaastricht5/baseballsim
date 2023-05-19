@@ -53,8 +53,8 @@ class BaseballSeason:
                 self.update_win_loss(away_team_name=match_up[0], home_team_name=match_up[1], win_loss=win_loss_list)
                 print(f'Score was: {match_up[0]} {score[0]} {match_up[1]} {score[1]}')
 
-                self.baseball_data.update_current_season(batting_box_score=game.teams[0].team_box_score.box_batting,
-                                                         pitching_box_score=game.teams[0].team_box_score.box_pitching)
+                self.baseball_data.update_current_season(batting_box_score=game.teams[0].team_box_score.game_batting_stats,
+                                                         pitching_box_score=game.teams[0].team_box_score.game_pitching_stats)
                 # end of game
 
             # end of all games for one day

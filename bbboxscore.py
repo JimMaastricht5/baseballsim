@@ -8,16 +8,16 @@ class TeamBoxScore:
         self.box_pitching[['CG', 'SHO', 'IP', 'H', 'ER', 'K', 'BB', 'HR', 'W', 'L', 'SV', 'BS', 'HLD', 'ERA', 'WHIP',
                            'OBP', 'SLG', 'OPS']] = 0
         self.box_pitching.drop(['Season', 'Total_OB', 'Total_Outs'], axis=1, inplace=True)
-        # self.box_pitching = self.box_pitching.reset_index()
         self.team_box_pitching = None
+        self.game_pitching_stats = None
 
         self.box_batting = lineup.copy()
         self.box_batting[['G']] = 1
         self.box_batting[['AB', 'R', 'H', '2B', '3B', 'HR', 'RBI', 'SB', 'CS', 'BB', 'SO', 'SH', 'SF', 'HBP', 'AVG',
                           'OBP', 'SLG', 'OPS']] = 0
         self.box_batting.drop(['Season', 'Total_OB', 'Total_Outs'], axis=1, inplace=True)
-        # self.box_batting = self.box_batting.reset_index()
         self.team_box_batting = None
+        self.game_batting_stats = None
 
         self.team_name = team_name
         return
@@ -134,6 +134,9 @@ class TeamBoxScore:
         return
 
     def totals(self):
+        self.game_batting_stats = self.box_batting.copy()
+        self.game_pitching_stats = self.box_pitching.copy()
+
         self.team_box_batting = self.box_batting[['AB', 'R', 'H', '2B', '3B', 'HR', 'RBI', 'SB', 'CS', 'BB',
                                                   'SO', 'SH', 'SF', 'HBP']].sum()
         self.team_box_batting['Player'] = 'Team Totals'
@@ -141,7 +144,8 @@ class TeamBoxScore:
         self.team_box_batting['G'] = 1
         self.team_box_batting['Age'] = ''
         self.team_box_batting['Pos'] = ''
-        self.box_batting = self.box_batting.append(self.team_box_batting, ignore_index=True)  # combine totals + indiv
+        print(self.team_box_batting)
+        self.box_batting = self.box_batting.append(self.team_box_batting, ignore_index=True)
         self.box_batting = bbstats.team_batting_stats(self.box_batting)
 
         self.team_box_pitching = self.box_pitching[['GS', 'CG', 'SHO', 'IP', 'H', 'ER', 'K', 'BB', 'HR', 'W', 'L',

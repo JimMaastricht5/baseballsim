@@ -120,7 +120,7 @@ if __name__ == '__main__':
         season_win_loss[0] = list(np.add(np.array(season_win_loss[0]), np.array(win_loss[0])))
         season_win_loss[1] = list(np.add(np.array(season_win_loss[1]), np.array(win_loss[1])))
         if team0_season_df is None:
-            team0_season_df = game.teams[0].team_box_score.box_batting
+            team0_season_df = game.teams[0].team_box_score.team_box_batting
         else:
             col_list = ['G', 'AB', 'R', 'H', '2B', '3B', 'HR', 'RBI', 'SB', 'CS', 'BB', 'SO', 'SH', 'SF', 'HBP']
             team0_season_df = team0_season_df[col_list].add(game.teams[0].team_box_score.box_batting[col_list])

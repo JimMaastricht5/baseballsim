@@ -12,7 +12,7 @@ class Team:
         self.pitching = None
         self.cur_pitcher_index = None
         self.cur_lineup_index = []
-        self.team_box_score = None
+        self.box_score = None
         return
 
     def set_lineup(self):
@@ -23,5 +23,5 @@ class Team:
         self.pitching = self.pitchers.head(1)
         self.cur_pitcher_index = self.pitching.index[0]
 
-        self.team_box_score = bbboxscore.TeamBoxScore(self.lineup, self.pitching, self.team_name)
+        self.box_score = bbboxscore.TeamBoxScore(self.lineup, self.pitching, self.team_name)
         return

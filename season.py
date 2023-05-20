@@ -22,13 +22,13 @@ class BaseballSeason:
         return
 
     def create_schedule(self):
+        # day schedule in format  ([['MIL', 'COL'], ['PIT', 'CIN'], ['CHC', 'STL']])  # test schedule
         for game_day in range(0, len(self.teams)-1):  # each team must play all other teams one time
             random.shuffle(self.teams)  # randomize team match ups. may repeat, deal with it
             day_schedule = []
             for ii in range(0, len(teams), 2):  # select home and away without repeating a team
                 day_schedule.append([teams[ii], teams[ii+1]])
             self.schedule.append(day_schedule)  # add day schedule to full schedule
-        # self.schedule.append([['MIL', 'COL'], ['PIT', 'CIN'], ['CHC', 'STL']])  # test schedule
         return
 
     def update_win_loss(self, away_team_name, home_team_name, win_loss):
@@ -52,40 +52,13 @@ class BaseballSeason:
                 score, inning, win_loss_list = game.sim_game(chatty=chatty)
                 self.update_win_loss(away_team_name=match_up[0], home_team_name=match_up[1], win_loss=win_loss_list)
                 print(f'Score was: {match_up[0]} {score[0]} {match_up[1]} {score[1]}')
-
-                self.baseball_data.update_current_season(batting_box_score=game.teams[0].team_box_score.game_batting_stats,
-                                                         pitching_box_score=game.teams[0].team_box_score.game_pitching_stats)
+                self.baseball_data.update_current_season(batting_box_score=game.teams[0].box_score.game_batting_stats,
+                                                         pitching_box_score=game.teams[0].box_score.game_pitching_stats)
                 # end of game
 
             # end of all games for one day
             print(f'Win Loss records after day {season_day_num + 1}: {self.team_win_loss}')
-            self.baseball_data.print_season(self.new_season, team='MIL')
-            # if self.team_season_df is None:
-            #     self.team_season_df = game.teams[0].team_box_score.box_batting
-            #     self.team_season_pitching_df = game.teams[0].team_box_score.box_pitching
-            # else:
-            #     col_list = ['G', 'AB', 'R', 'H', '2B', '3B', 'HR', 'RBI', 'SB', 'CS', 'BB', 'SO', 'SH', 'SF', 'HBP']
-            #     self.team_season_df = self.team_season_df[col_list].add(game.teams[0].
-            #                                                               team_box_score.box_batting[col_list])
-            #     self.team_season_df['Player'] = game.teams[0].team_box_score.box_batting['Player']
-            #     self.team_season_df['Team'] = game.teams[0].team_box_score.box_batting['Team']
-            #     self.team_season_df['Pos'] = game.teams[0].team_box_score.box_batting['Pos']
-            #
-            #     col_list = ['G', 'GS', 'CG', 'SHO', 'IP', 'H', 'ER', 'K', 'BB', 'HR', 'W', 'L', 'SV', 'BS', 'HLD']
-            #     self.team_season_pitching_df = self.team0_season_pitching_df[col_list].add(
-            #         game.teams[0].team_box_score.box_pitching[col_list])
-            #     self.team_season_pitching_df['Player'] = game.teams[0].team_box_score.box_pitching['Player']
-            #     self.team_season_pitching_df['Team'] = game.teams[0].team_box_score.box_pitching['Team']
-
-            # print(f'{self.away_team} season : {self.season_win_loss[0][0]} W and {self.season_win_loss[0][1]} L')
-            # print(f'{self.home_team} season : {self.season_win_loss[1][0]} W and {self.season_win_loss[1][1]} L')
-
-        # end of season
-        # team0_season_df = bbstats.team_batting_stats(self.team0_season_df)
-        # print(team0_season_df.to_string(index=False, justify='center'))
-        # print('')
-        # team0_season_pitching_df = bbstats.team_pitching_stats(self.team0_season_pitching_df)
-
+            self.baseball_data.print_current_season(team='MIL')  # running totals
         # end season
         return
 

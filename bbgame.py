@@ -47,8 +47,8 @@ class Game:
             self.bases.advance_runners(bases_to_advance=outcome[2])  # outcome 2 is number of bases to advance
             self.score[self.top_bottom] += self.bases.runs_scored
             outcome[3] = self.bases.runs_scored  # rbis for batter
-        self.teams[(self.top_bottom + 1) % 2].team_box_score.pitching_result(cur_pitching_index, outcome)
-        self.teams[self.top_bottom].team_box_score.batting_result(cur_batter_index, outcome)
+        self.teams[(self.top_bottom + 1) % 2].box_score.pitching_result(cur_pitching_index, outcome)
+        self.teams[self.top_bottom].box_score.batting_result(cur_batter_index, outcome)
         # self.teams[self.top_bottom].team_box_score.batting_result(self.batting_num[self.top_bottom] - 1, outcome)
         return pitching, batting, outcome
 
@@ -98,11 +98,11 @@ class Game:
             self.sim_half_inning(chatty=chatty)
 
         self.win_loss_record()
-        self.teams[0].team_box_score.totals()
-        self.teams[0].team_box_score.print()
+        self.teams[0].box_score.totals()
+        self.teams[0].box_score.print()
 
-        self.teams[1].team_box_score.totals()
-        self.teams[1].team_box_score.print()
+        self.teams[1].box_score.totals()
+        self.teams[1].box_score.print()
         return self.score, self.inning, self.win_loss
 
 
@@ -120,13 +120,13 @@ if __name__ == '__main__':
         season_win_loss[0] = list(np.add(np.array(season_win_loss[0]), np.array(win_loss[0])))
         season_win_loss[1] = list(np.add(np.array(season_win_loss[1]), np.array(win_loss[1])))
         if team0_season_df is None:
-            team0_season_df = game.teams[0].team_box_score.team_box_batting
+            team0_season_df = game.teams[0].box_score.team_box_batting
         else:
             col_list = ['G', 'AB', 'R', 'H', '2B', '3B', 'HR', 'RBI', 'SB', 'CS', 'BB', 'SO', 'SH', 'SF', 'HBP']
-            team0_season_df = team0_season_df[col_list].add(game.teams[0].team_box_score.box_batting[col_list])
-            team0_season_df['Player'] = game.teams[0].team_box_score.box_batting['Player']
-            team0_season_df['Team'] = game.teams[0].team_box_score.box_batting['Team']
-            team0_season_df['Pos'] = game.teams[0].team_box_score.box_batting['Pos']
+            team0_season_df = team0_season_df[col_list].add(game.teams[0].box_score.box_batting[col_list])
+            team0_season_df['Player'] = game.teams[0].box_score.box_batting['Player']
+            team0_season_df['Team'] = game.teams[0].box_score.box_batting['Team']
+            team0_season_df['Pos'] = game.teams[0].box_score.box_batting['Pos']
         print(f'Score was: {score[0]} to {score[1]}')
         print(f'{away_team} season : {season_win_loss[0][0]} W and {season_win_loss[0][1]} L')
         print(f'{home_team} season : {season_win_loss[1][0]} W and {season_win_loss[1][1]} L')

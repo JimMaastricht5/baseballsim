@@ -63,7 +63,7 @@ class BaseballStats:
         for index, row in batting_box_score.iterrows():
             new_row = batting_box_score.loc[index][numeric_cols] + self.new_season_batting_data.loc[index][numeric_cols]
             self.new_season_batting_data.loc[index, numeric_cols] = new_row
-            print(self.new_season_batting_data.loc[index].to_string())
+            # print(self.new_season_batting_data.loc[index].to_string())
         numeric_cols = self.numeric_pcols
         for index, row in pitching_box_score.iterrows():
             new_row = pitching_box_score.loc[index][numeric_cols] + \

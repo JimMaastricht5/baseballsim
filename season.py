@@ -58,8 +58,8 @@ class BaseballSeason:
 
             # end of all games for one day
             print(f'Win Loss records after day {season_day_num + 1}: {self.team_win_loss}')
-            self.baseball_data.print_current_season(team='MIL')  # running totals
         # end season
+        self.baseball_data.print_current_season(team='MIL')  # running totals
         return
 
 
@@ -67,5 +67,5 @@ class BaseballSeason:
 if __name__ == '__main__':
     seasons = [2022]
     teams = ['CHC', 'CIN', 'COL', 'MIL', 'PIT', 'STL']  # included COL for balance in scheduling
-    bbseason23 = BaseballSeason(load_seasons=seasons, new_season=2023, team_list=teams, season_length_limit=1)
+    bbseason23 = BaseballSeason(load_seasons=seasons, new_season=2023, team_list=teams, season_length_limit=0)
     bbseason23.sim_season(chatty=False)

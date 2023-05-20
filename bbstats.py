@@ -48,18 +48,20 @@ class BaseballStats:
         self.new_season_pitching_data = self.pitching_data.copy()
         self.new_season_pitching_data[self.numeric_pcols] = 0
         self.new_season_pitching_data[['OBP', 'Total_OB', 'Total_Outs']] = 0  # zero out calculated fields
+        self.new_season_pitching_data.drop(['Total_OB', 'Total_Outs'], axis=1)
         self.new_season_pitching_data['Season'] = str(self.new_season)
         self.new_season_pitching_data.fillna(0)
 
         self.new_season_batting_data = self.batting_data.copy()
         self.new_season_batting_data[self.numeric_bcols] = 0
         self.new_season_batting_data[['Total_OB', 'Total_Outs']] = 0  # zero out calculated fields
+        self.new_season_batting_data.drop(['Total_OB', 'Total_Outs'], axis=1)
         self.new_season_batting_data['Season'] = str(self.new_season)
         self.new_season_batting_data = self.new_season_batting_data.fillna(0)
         # print(self.new_season_batting_data.to_string())
         return
 
-    def update_current_season(self, batting_box_score, pitching_box_score):
+    def game_results_to_season(self, batting_box_score, pitching_box_score):
         numeric_cols = self.numeric_bcols
         for index, row in batting_box_score.iterrows():
             new_row = batting_box_score.loc[index][numeric_cols] + self.new_season_batting_data.loc[index][numeric_cols]
@@ -72,6 +74,11 @@ class BaseballStats:
             self.new_season_pitching_data.loc[index, numeric_cols] = new_row
         return
 
+    def update_season_stats(self):
+        print(self.new_season_pitching_data.to_string())
+        self.new_season_pitching_data = team_pitching_stats(self.new_season_pitching_data[self.new_season_pitching_data['IP'] > 0].fillna(0))
+        self.new_season_batting_data = team_batting_stats(self.new_season_batting_data[self.new_season_batting_data['AB'] > 0].fillna(0))
+
     def print_current_season(self, team):
         print(self.new_season_batting_data[self.new_season_batting_data.Team == team].to_string(justify='center'))
         print('')
@@ -81,7 +88,11 @@ class BaseballStats:
 
 # static function start
 def trunc_col(df_n, d):
-    return (df_n*10**d).astype(int)/10**d
+    # try:
+    return (df_n * 10 ** d).astype(int) / 10 ** d
+    # except:
+    #     return 0
+
 
 
 def team_batting_stats(df):

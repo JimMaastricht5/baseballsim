@@ -52,13 +52,15 @@ class BaseballSeason:
                 score, inning, win_loss_list = game.sim_game(chatty=chatty)
                 self.update_win_loss(away_team_name=match_up[0], home_team_name=match_up[1], win_loss=win_loss_list)
                 print(f'Score was: {match_up[0]} {score[0]} {match_up[1]} {score[1]}')
-                self.baseball_data.update_current_season(batting_box_score=game.teams[0].box_score.game_batting_stats,
+                self.baseball_data.game_results_to_season(batting_box_score=game.teams[0].box_score.game_batting_stats,
                                                          pitching_box_score=game.teams[0].box_score.game_pitching_stats)
+                self.baseball_data.game_results_to_season(batting_box_score=game.teams[1].box_score.game_batting_stats,
+                                                         pitching_box_score=game.teams[1].box_score.game_pitching_stats)
                 # end of game
-
             # end of all games for one day
             print(f'Win Loss records after day {season_day_num + 1}: {self.team_win_loss}')
         # end season
+        self.baseball_data.update_season_stats()
         print(f'\n\n****** End of {self.new_season} season ******')
         print(f'{self.new_season} season Win Loss records: {self.team_win_loss}')
 
@@ -71,5 +73,5 @@ class BaseballSeason:
 if __name__ == '__main__':
     seasons = [2022]
     teams = ['CHC', 'CIN', 'COL', 'MIL', 'PIT', 'STL']  # included COL for balance in scheduling
-    bbseason23 = BaseballSeason(load_seasons=seasons, new_season=2023, team_list=teams, season_length_limit=0)
+    bbseason23 = BaseballSeason(load_seasons=seasons, new_season=2023, team_list=teams, season_length_limit=1)
     bbseason23.sim_season(chatty=False)

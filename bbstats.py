@@ -41,6 +41,7 @@ class BaseballStats:
         return
 
     def create_new_season_from_existing(self):
+        print('creating new season of data....')
         if self.pitching_data is None or self.batting_data is None:
             raise Exception('load at least one season of pitching and batting')
 
@@ -73,6 +74,7 @@ class BaseballStats:
 
     def print_current_season(self, team):
         print(self.new_season_batting_data[self.new_season_batting_data.Team == team].to_string(justify='center'))
+        print('')
         print(self.new_season_pitching_data[self.new_season_pitching_data.Team == team].to_string(justify='center'))
         return
 

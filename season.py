@@ -59,6 +59,10 @@ class BaseballSeason:
             # end of all games for one day
             print(f'Win Loss records after day {season_day_num + 1}: {self.team_win_loss}')
         # end season
+        print(f'\n\n****** End of {self.new_season} season ******')
+        print(f'{self.new_season} season Win Loss records: {self.team_win_loss}')
+
+        print('\nMilwaukee Season Sample...')
         self.baseball_data.print_current_season(team='MIL')  # running totals
         return
 

@@ -1,5 +1,4 @@
 import random
-
 import bbgame
 import bbstats
 import numpy as np

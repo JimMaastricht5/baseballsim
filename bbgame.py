@@ -38,8 +38,7 @@ class Game:
 
         cur_batter_index = self.teams[self.top_bottom].cur_lineup_index[self.batting_num[self.top_bottom]-1]
         batting = self.teams[self.top_bottom].lineup.iloc[self.batting_num[self.top_bottom]-1]  # data for batter
-
-        self.bases.new_ab()
+        self.bases.new_ab(batter_num=cur_batter_index, player_name=batting.Player)
         outcome = self.at_bat.outcome(pitching, batting)
         if outcome[0] == 'OUT':
             self.outs += 1
@@ -64,6 +63,7 @@ class Game:
                       f'{self.batting_num[self.top_bottom]}. {batting.Player} \n'
                       f'\t {outcome[1]}, {self.outs} Outs')
             if self.bases.runs_scored > 0 and chatty:
+                print(f'{self.bases.player_scored} scored!')
                 print(f'\tScored {self.bases.runs_scored} run(s)!  The score is {self.team_names[0]} {self.score[0]} to'
                       f' {self.team_names[1]} {self.score[1]}')  # ?? need to handle walk offs...
             if self.bases.num_runners >= 1 and self.outs < 3 and chatty:  # leave out the batter to check for runner

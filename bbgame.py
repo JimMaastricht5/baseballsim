@@ -63,8 +63,12 @@ class Game:
                       f'{self.batting_num[self.top_bottom]}. {batting.Player} \n'
                       f'\t {outcome[1]}, {self.outs} Outs')
             if self.bases.runs_scored > 0 and chatty:
-                print(f'{self.bases.player_scored} scored!')
-                print(f'\tScored {self.bases.runs_scored} run(s)!  The score is {self.team_names[0]} {self.score[0]} to'
+                players = ''
+                for player_id in self.bases.player_scored.keys():
+                    players = players + ', ' + self.bases.player_scored[player_id] if players != '' else self.bases.player_scored[player_id]
+                # print(f'{self.bases.player_scored} scored!')
+                print(f'\tScored {self.bases.runs_scored} run(s)!  ({players})\n'
+                      f'\tThe score is {self.team_names[0]} {self.score[0]} to'
                       f' {self.team_names[1]} {self.score[1]}')  # ?? need to handle walk offs...
             if self.bases.num_runners >= 1 and self.outs < 3 and chatty:  # leave out the batter to check for runner
                 print(f'\t{self.bases.describe_runners()}')

@@ -56,7 +56,7 @@ class TeamBoxScore:
 
         self.box_batting.loc[batter_index, ['RBI']] = self.box_batting.loc[batter_index, ['RBI']] + outcome[3]  # rbis
 
-        print(players_scored_list)
+        # print(players_scored_list)
         for scored_index in players_scored_list.keys():
             self.box_batting.loc[scored_index, ['R']] = self.box_batting.loc[scored_index, ['R']] + 1
         return

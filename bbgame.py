@@ -47,7 +47,7 @@ class Game:
             self.score[self.top_bottom] += self.bases.runs_scored
             outcome[3] = self.bases.runs_scored  # rbis for batter
         self.teams[(self.top_bottom + 1) % 2].box_score.pitching_result(cur_pitching_index, outcome)
-        self.teams[self.top_bottom].box_score.batting_result(cur_batter_index, outcome)
+        self.teams[self.top_bottom].box_score.batting_result(cur_batter_index, outcome, self.bases.player_scored)
         # self.teams[self.top_bottom].team_box_score.batting_result(self.batting_num[self.top_bottom] - 1, outcome)
         return pitching, batting, outcome
 

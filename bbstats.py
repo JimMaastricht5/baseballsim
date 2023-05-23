@@ -86,7 +86,7 @@ class BaseballStats:
 
 
 # static function start
-def trunc_col(df_n, d):
+def trunc_col(df_n, d=3):
     # try:
     return (df_n * 10 ** d).astype(int) / 10 ** d
     # except:
@@ -111,6 +111,7 @@ def team_pitching_stats(df):
     df['OBP'] = trunc_col((df['H'] + df['BB'] + 0) / (df_ab + df['BB'] + 0), 3)
     df['SLG'] = trunc_col(((df['H'] - 0 - 0 - df['HR']) + 0 * 2 + 0 * 3 + df['HR'] * 4) / df_ab, 3)
     df['OPS'] = trunc_col(df['OBP'] + df['SLG'] + df['SLG'], 3)
+    df['WHIP'] = trunc_col((df['BB'] + df['H']) / df['IP'], 3)
     return df
 
 

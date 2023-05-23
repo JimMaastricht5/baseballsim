@@ -14,7 +14,7 @@ class Bases:
         self.baserunners = list(np.roll(self.baserunners, bases_to_advance))  # advance runners
         self.runs_scored = np.count_nonzero(self.baserunners[-4:])  # 0 ab 1, 2, 3 are bases. 4-7 run crossed home=len 4
         for player_num in self.baserunners[-4:]:  # get player ids that scored
-            if len(self.baserunners_names[player_num]) > 0:
+            if len(self.baserunners_names[player_num]) > 0:  # base runner names is a lookup and does not need reset
                 self.player_scored[player_num] = self.baserunners_names[player_num]
         self.baserunners[-4] = 0  # send the runners that score back to the dug out
         self.baserunners = [baserunner if i <= 3 else 0 for i, baserunner in enumerate(self.baserunners)]  # reset bases
@@ -23,15 +23,15 @@ class Bases:
 
     def new_ab(self, batter_num=1, player_name=''):
         self.baserunners[0] = batter_num # put a player ab
-        self.baserunners_names[batter_num] = player_name
-        self.player_scored = {}
+        self.baserunners_names[batter_num] = player_name  # add player name to lookup table
+        self.player_scored = {}  # key to not double counting runs
         self.runs_scored = 0
         return
 
     def clear_bases(self):
         # index 0 is ab, 1st = 1, 2nd =2 , 3rd=3, 4th=home, pos 5-7 scored
         self.baserunners = [0, 0, 0, 0, 0, 0, 0, 0]
-        self.baserunners_names = {}
+        self.baserunners_names = {}  # names doesn't need to be cleared, but just to be safe every half inning
         self.baserunners_names[0] = ''
         self.player_scored = {}
         self.num_runners = 0

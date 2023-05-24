@@ -23,7 +23,9 @@ class Game:
 
         self.win_loss = []
         self.total_score = [0, 0]  # total score
-        self.inning_score = []  # contains two lists of away scores, home scores, index + 1 is inning #
+        self.inning_score = pd.DataFrame({'Inning':[1,2,3,4,5,6,7,8,9,10],
+                                          away_team_name:['', '', '', '', '', '', '', '', '', ''],
+                                          home_team_name:['', '', '', '', '', '', '', '', '', '']})
         self.inning = [1, 1]
         self.batting_num = [1, 1]
         self.pitching_num = [0, 0]
@@ -33,6 +35,17 @@ class Game:
         self.rng = np.random.default_rng()  # random number generator between 0 and 1
         self.bases = bbbaserunners.Bases()
         self.at_bat = at_bat.SimAB(self.baseball_data)
+        return
+
+    def update_inning_score(self):
+        if self.inning[self.top_bottom] <= 10:  # accumulate first 10 innings
+            self.inning_score.iloc[self.inning[self.top_bottom]-1, self.top_bottom + 1] = self.total_score[self.top_bottom]
+        return
+
+    def print_inning_score(self):
+        for column_name in self.inning_score.columns:
+            column_values = self.inning_score[column_name].tolist()
+            print(f'{column_name} {column_values}')
         return
 
     def sim_ab(self):
@@ -79,7 +92,7 @@ class Game:
                 if self.batting_num[self.top_bottom] <= 9 else 1
 
         # half inning over
-        # self.inning_score[top_or_bottom] = self.inning_score[top_or_bottom].append(self.total_score[top_or_bottom])
+        self.update_inning_score()
         self.bases.clear_bases()
         if chatty:
             print('')  # add a blank line for verbose output
@@ -111,8 +124,7 @@ class Game:
 
         self.teams[1].box_score.totals()
         self.teams[1].box_score.print()
-        print(self.inning_score[0])
-        print(self.inning_score[1])
+        self.print_inning_score()
         return self.total_score, self.inning, self.win_loss
 
 

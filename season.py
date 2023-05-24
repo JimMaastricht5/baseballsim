@@ -1,14 +1,19 @@
 import random
+
+import pandas as pd
+
 import bbgame
 import bbstats
 import numpy as np
 
 
 class BaseballSeason:
-    def __init__(self, load_seasons, new_season, team_list, season_length_limit=0, min_games=0, series_length=1):
+    def __init__(self, load_seasons, new_season, team_list, season_length_limit=0, min_games=0, series_length=1,
+                 rotation_len=5):
         self.season_length_limit = season_length_limit
         self.min_games = min_games
         self.series_length = series_length
+        self.rotation_len = rotation_len
         self.team_season_df = None
         self.team_season_pitching_df = None
         self.load_seasons = load_seasons  # pull base data across for what seasons
@@ -46,10 +51,15 @@ class BaseballSeason:
         return
 
     def print_standings(self):
-        print(f'Team\tW\tL')
+        teaml, winl, lossl =[], [], []
         for team in self.team_win_loss:
             win_loss = self.team_win_loss[team]
-            print(f'{team}\t\t{win_loss[0]}\t{win_loss[1]}')
+            teaml.append(team)
+            winl.append(win_loss[0])
+            lossl.append(win_loss[1])
+        df = pd.DataFrame({'Team': teaml, 'Win': winl, 'Loss': lossl})
+        print(df.sort_values('Win', ascending=False).to_string(index=False, justify='center'))
+        print('')
         return
 
     def update_win_loss(self, away_team_name, home_team_name, win_loss):
@@ -70,7 +80,7 @@ class BaseballSeason:
             for match_up in todays_games:
                 print(f'Playing: {match_up[0]} away against {match_up[1]}')
                 game = bbgame.Game(away_team_name=match_up[0], home_team_name=match_up[1],
-                                   baseball_data=self.baseball_data)
+                                   baseball_data=self.baseball_data, game_num=season_day_num, rotation_len=5)
                 score, inning, win_loss_list = game.sim_game(chatty=chatty)
                 self.update_win_loss(away_team_name=match_up[0], home_team_name=match_up[1], win_loss=win_loss_list)
                 print(f'Score was: {match_up[0]} {score[0]} {match_up[1]} {score[1]}')
@@ -81,12 +91,13 @@ class BaseballSeason:
                 print('')
                 # end of game
             # end of all games for one day
-            print(f'Win Loss records after day {season_day_num + 1}: {self.team_win_loss}')
+            print(f'Standings for Day {season_day_num + 1}:')
             self.print_standings()
         # end season
         self.baseball_data.update_season_stats()
         print(f'\n\n****** End of {self.new_season} season ******')
-        print(f'{self.new_season} season Win Loss records: {self.team_win_loss}')
+        print(f'{self.new_season} Season Standings:')
+        self.print_standings()
 
         print(f'\n{self.new_season} Season Stats')
         self.baseball_data.print_current_season(teams=self.teams)  # season totals
@@ -98,5 +109,5 @@ if __name__ == '__main__':
     seasons = [2022]
     teams = ['CHC', 'CIN', 'COL', 'MIL', 'PIT', 'STL']  # included COL for balance in scheduling
     bbseason23 = BaseballSeason(load_seasons=seasons, new_season=2023, team_list=teams, season_length_limit=0,
-                                min_games=50, series_length=3)
+                                min_games=10, series_length=1, rotation_len=5)
     bbseason23.sim_season(chatty=False)

@@ -123,5 +123,5 @@ if __name__ == '__main__':
     print(*baseball_data.pitching_data.columns)
     print(*baseball_data.batting_data.columns)
     print(baseball_data.batting_data[baseball_data.batting_data.Team == "MIN"].to_string(justify='center'))
-    print(baseball_data.pitching_data[baseball_data.pitching_data.Team == "MIN"].to_string(justify='center'))
+    print(baseball_data.pitching_data[baseball_data.pitching_data.Team == "MIN"].sort_values('GS', ascending=False).head(5).to_string(justify='center'))
     print(baseball_data.batting_data.Team.unique())

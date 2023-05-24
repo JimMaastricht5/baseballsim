@@ -7,20 +7,23 @@ import pandas as pd
 
 
 class Game:
-    def __init__(self, away_team_name, home_team_name, baseball_data=None):
+    def __init__(self, away_team_name, home_team_name, baseball_data=None, game_num=1, rotation_len=5):
         self.team_names = [away_team_name, home_team_name]
         self.baseball_data = bbstats.BaseballStats(load_seasons=[2022], new_season=2023) if baseball_data is None\
             else baseball_data
+        self.game_num = game_num  # number of games into season
+        self.rotation_len = rotation_len  # number of startin pitchers to rotate thru
         self.teams = []  # keep track of away in pos 0 and home team in pos 1
-        self.teams.insert(0, bbteam.Team(self.team_names[0], self.baseball_data))  # away team
+        self.teams.insert(0, bbteam.Team(self.team_names[0], self.baseball_data, self.game_num, self.rotation_len))  # away team
         self.teams[0].set_lineup()
 
         # print(f'Setting home team as {self.team_names[1]}')
-        self.teams.insert(1, bbteam.Team(self.team_names[1], self.baseball_data))  # home team
+        self.teams.insert(1, bbteam.Team(self.team_names[1], self.baseball_data, self.game_num, self.rotation_len))  # home team
         self.teams[1].set_lineup()
 
         self.win_loss = []
-        self.score = [0, 0]
+        self.total_score = [0, 0]  # total score
+        self.inning_score = []  # contains two lists of away scores, home scores, index + 1 is inning #
         self.inning = [1, 1]
         self.batting_num = [1, 1]
         self.pitching_num = [0, 0]
@@ -44,7 +47,7 @@ class Game:
             self.outs += 1
         elif outcome[0] == 'OB':
             self.bases.advance_runners(bases_to_advance=outcome[2])  # outcome 2 is number of bases to advance
-            self.score[self.top_bottom] += self.bases.runs_scored
+            self.total_score[self.top_bottom] += self.bases.runs_scored
             outcome[3] = self.bases.runs_scored  # rbis for batter
         self.teams[(self.top_bottom + 1) % 2].box_score.pitching_result(cur_pitching_index, outcome)
         self.teams[self.top_bottom].box_score.batting_result(cur_batter_index, outcome, self.bases.player_scored)
@@ -68,31 +71,32 @@ class Game:
                     players = players + ', ' + self.bases.player_scored[player_id] if players != '' else self.bases.player_scored[player_id]
                 # print(f'{self.bases.player_scored} scored!')
                 print(f'\tScored {self.bases.runs_scored} run(s)!  ({players})\n'
-                      f'\tThe score is {self.team_names[0]} {self.score[0]} to'
-                      f' {self.team_names[1]} {self.score[1]}')  # ?? need to handle walk offs...
+                      f'\tThe score is {self.team_names[0]} {self.total_score[0]} to'
+                      f' {self.team_names[1]} {self.total_score[1]}')  # ?? need to handle walk offs...
             if self.bases.num_runners >= 1 and self.outs < 3 and chatty:  # leave out the batter to check for runner
                 print(f'\t{self.bases.describe_runners()}')
             self.batting_num[self.top_bottom] = self.batting_num[self.top_bottom] + 1 \
                 if self.batting_num[self.top_bottom] <= 9 else 1
 
         # half inning over
+        # self.inning_score[top_or_bottom] = self.inning_score[top_or_bottom].append(self.total_score[top_or_bottom])
         self.bases.clear_bases()
         if chatty:
             print('')  # add a blank line for verbose output
             print(f'Completed {top_or_bottom} half of inning {self.inning[self.top_bottom]}. '
-                  f'The score is {self.team_names[0]} {self.score[0]} to {self.team_names[1]} {self.score[1]}')
+                  f'The score is {self.team_names[0]} {self.total_score[0]} to {self.team_names[1]} {self.total_score[1]}')
         self.inning[self.top_bottom] += 1
         self.top_bottom = 0 if self.top_bottom == 1 else 1
         self.outs = 0
         return
 
     def game_end(self):
-        return False if self.inning[0] <= 9 or self.inning[1] <= 8 or\
-                        (self.inning[0] != self.inning[1] and self.score[0] >= self.score[1])\
-                        or self.score[0] == self.score[1] else True
+        return False if self.inning[0] <= 9 or self.inning[1] <= 8 or \
+                        (self.inning[0] != self.inning[1] and self.total_score[0] >= self.total_score[1]) \
+                        or self.total_score[0] == self.total_score[1] else True
 
     def win_loss_record(self):
-        home_win = 0 if self.score[0] > self.score[1] else 1
+        home_win = 0 if self.total_score[0] > self.total_score[1] else 1
         self.win_loss.append([abs(home_win - 1), home_win])  # if home win away team is 0, 1
         self.win_loss.append([home_win, abs(home_win - 1)])  # if home win home team is  1, 0
         return
@@ -107,7 +111,9 @@ class Game:
 
         self.teams[1].box_score.totals()
         self.teams[1].box_score.print()
-        return self.score, self.inning, self.win_loss
+        print(self.inning_score[0])
+        print(self.inning_score[1])
+        return self.total_score, self.inning, self.win_loss
 
 
 # test a number of games

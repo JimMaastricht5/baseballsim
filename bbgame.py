@@ -110,6 +110,7 @@ class Game:
             print('')  # add a blank line for verbose output
             print(f'Completed {top_or_bottom} half of inning {self.inning[self.top_bottom]}. '
                   f'The score is {self.team_names[0]} {self.total_score[0]} to {self.team_names[1]} {self.total_score[1]}')
+            self.print_inning_score()
         self.inning[self.top_bottom] += 1
         self.top_bottom = 0 if self.top_bottom == 1 else 1
         self.outs = 0

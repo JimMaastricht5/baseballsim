@@ -83,7 +83,7 @@ class BaseballSeason:
                                    baseball_data=self.baseball_data, game_num=season_day_num, rotation_len=5)
                 score, inning, win_loss_list = game.sim_game(chatty=chatty)
                 self.update_win_loss(away_team_name=match_up[0], home_team_name=match_up[1], win_loss=win_loss_list)
-                print(f'Score was: {match_up[0]} {score[0]} {match_up[1]} {score[1]}')
+                # print(f'Final: {match_up[0]} {score[0]} {match_up[1]} {score[1]}')
                 self.baseball_data.game_results_to_season(batting_box_score=game.teams[0].box_score.game_batting_stats,
                                                          pitching_box_score=game.teams[0].box_score.game_pitching_stats)
                 self.baseball_data.game_results_to_season(batting_box_score=game.teams[1].box_score.game_batting_stats,

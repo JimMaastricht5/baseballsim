@@ -23,9 +23,10 @@ class Game:
 
         self.win_loss = []
         self.total_score = [0, 0]  # total score
-        self.inning_score = pd.DataFrame({'Inning':[1,2,3,4,5,6,7,8,9,10],
-                                          away_team_name:['', '', '', '', '', '', '', '', '', ''],
-                                          home_team_name:['', '', '', '', '', '', '', '', '', '']})
+        # self.inning_score = pd.DataFrame({'Inning':[1,2,3,4,5,6,7,8,9,10],
+        #                                   away_team_name:['', '', '', '', '', '', '', '', '', ''],
+        #                                   home_team_name:['', '', '', '', '', '', '', '', '', '']})
+        self.inning_score = [['Inning', away_team_name, home_team_name], [1, 0, 0]]
         self.inning = [1, 1]
         self.batting_num = [1, 1]
         self.pitching_num = [0, 0]
@@ -37,15 +38,29 @@ class Game:
         self.at_bat = at_bat.SimAB(self.baseball_data)
         return
 
-    def update_inning_score(self):
-        if self.inning[self.top_bottom] <= 10:  # accumulate first 10 innings
-            self.inning_score.iloc[self.inning[self.top_bottom]-1, self.top_bottom + 1] = self.total_score[self.top_bottom]
+    def update_inning_score(self, number_of_runs=0):
+        if len(self.inning_score) <= self.inning[self.top_bottom]:  # header rows + rows in score must = innings
+            self.inning_score.append([self.inning[self.top_bottom], '', ''])  # expand scores by new inning
+        print(len(self.inning_score))
+        print(self.inning_score)
+        print(self.inning[self.top_bottom])
+        print(self.top_bottom)
+        print(self.inning_score[self.inning[self.top_bottom]])
+        self.inning_score[self.inning[self.top_bottom]][self.top_bottom] = number_of_runs \
+            if self.inning_score[self.inning[self.top_bottom]][self.top_bottom] == '' \
+            else int(self.inning_score[self.inning[self.top_bottom]][self.top_bottom]) + number_of_runs
+
+        # if self.inning[self.top_bottom] <= 10:  # accumulate first 10 innings
+        #     self.inning_score.iloc[self.inning[self.top_bottom]-1, self.top_bottom + 1] = self.total_score[self.top_bottom]
         return
 
     def print_inning_score(self):
-        for column_name in self.inning_score.columns:
-            column_values = self.inning_score[column_name].tolist()
-            print(f'{column_name} {column_values}')
+        row_to_col = list(zip(*self.inning_score))
+        for ii in range(0, 3):
+            print(row_to_col[ii])
+        # for column_name in self.inning_score.columns:
+        #     column_values = self.inning_score[column_name].tolist()
+        #     print(f'{column_name} {column_values}')
         return
 
     def sim_ab(self):
@@ -149,7 +164,7 @@ if __name__ == '__main__':
             team0_season_df['Player'] = game.teams[0].box_score.box_batting['Player']
             team0_season_df['Team'] = game.teams[0].box_score.box_batting['Team']
             team0_season_df['Pos'] = game.teams[0].box_score.box_batting['Pos']
-        print(f'Score was: {score[0]} to {score[1]}')
+        print(f'Code to test inning box, Score was: {score[0]} to {score[1]}')
         print(f'{away_team} season : {season_win_loss[0][0]} W and {season_win_loss[0][1]} L')
         print(f'{home_team} season : {season_win_loss[1][0]} W and {season_win_loss[1][1]} L')
 

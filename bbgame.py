@@ -1,5 +1,5 @@
 import bbstats
-import bbteam
+import gameteam
 import at_bat
 import numpy as np
 import bbbaserunners
@@ -14,11 +14,11 @@ class Game:
         self.game_num = game_num  # number of games into season
         self.rotation_len = rotation_len  # number of startin pitchers to rotate thru
         self.teams = []  # keep track of away in pos 0 and home team in pos 1
-        self.teams.insert(0, bbteam.Team(self.team_names[0], self.baseball_data, self.game_num, self.rotation_len))  # away team
+        self.teams.insert(0, gameteam.Team(self.team_names[0], self.baseball_data, self.game_num, self.rotation_len))  # away team
         self.teams[0].set_lineup()
 
         # print(f'Setting home team as {self.team_names[1]}')
-        self.teams.insert(1, bbteam.Team(self.team_names[1], self.baseball_data, self.game_num, self.rotation_len))  # home team
+        self.teams.insert(1, gameteam.Team(self.team_names[1], self.baseball_data, self.game_num, self.rotation_len))  # home team
         self.teams[1].set_lineup()
 
         self.win_loss = []
@@ -47,10 +47,11 @@ class Game:
 
     def print_inning_score(self):
         print('')
-        self.inning_score.append(['R', self.total_score[0], self.total_score[1]])
-        self.inning_score.append(['H', 0, 0])
-        self.inning_score.append(['E', 0, 0])
-        row_to_col = list(zip(*self.inning_score))
+        print_inning_score = self.inning_score.copy()
+        print_inning_score.append(['R', self.total_score[0], self.total_score[1]])
+        print_inning_score.append(['H', 0, 0])
+        print_inning_score.append(['E', 0, 0])
+        row_to_col = list(zip(*print_inning_score))
         for ii in range(0, 3):  # print each row
             print_line = ''
             for jj in range(0, len(row_to_col[ii])):
@@ -149,7 +150,7 @@ if __name__ == '__main__':
     season_win_loss = [[0, 0], [0, 0]]  # away record pos 0, home pos 1
     team0_season_df = None
     for game_num in range(1, season_length + 1):
-        print(game_num)
+        print(f'Game number {game_num}: from bbgame.py test code')
         game = Game(home_team_name=home_team, away_team_name=away_team)
         score, inning, win_loss = game.sim_game(chatty=True)
         season_win_loss[0] = list(np.add(np.array(season_win_loss[0]), np.array(win_loss[0])))

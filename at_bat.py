@@ -1,5 +1,5 @@
 import numpy as np
-
+import warnings
 
 class SimAB:
     def __init__(self, baseball_data):
@@ -44,9 +44,19 @@ class SimAB:
     # Odds(matchup) = .590 -> Matchup OBP = .590 / 1.590 = .371
     #
     def odds_ratio(self, hitter_stat, pitcher_stat, league_stat):
-        odds_ratio = ((hitter_stat / (1 - hitter_stat)) * (pitcher_stat / (1 - pitcher_stat))) / \
-                     (league_stat / (1 - league_stat))
-        # print(str(odds_ratio / (1 + odds_ratio)))
+        odds_ratio = 0
+        with warnings.catch_warnings():
+            warnings.filterwarnings("error")
+            try:
+                odds_ratio = ((hitter_stat / (1 - hitter_stat)) * (pitcher_stat / (1 - pitcher_stat))) / \
+                             (league_stat / (1 - league_stat))
+            except ZeroDivisionError:
+                print(f'Exception in odds ratio calculation for hitter:{hitter_stat}, pitcher:{pitcher_stat}, '
+                      f'league: {league_stat}')
+            except Warning as warning:
+                print(f'Warning in odds ratio calculation for hitter:{hitter_stat}, pitcher:{pitcher_stat}, '
+                      f'league: {league_stat}')
+                print("Warning caught:", warning)
         return odds_ratio / (1 + odds_ratio)
 
     def onbase(self):

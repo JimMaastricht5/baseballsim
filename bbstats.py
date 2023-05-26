@@ -26,11 +26,13 @@ class BaseballStats:
                 pitching_data['OBP'] = pitching_data['WHIP'] / (3 + pitching_data['WHIP'])  # batters reached / number faced
                 pitching_data['Total_OB'] = pitching_data['H'] + pitching_data['BB']  # + pitching_data['HBP']
                 pitching_data['Total_Outs'] = pitching_data['IP'] * 3  # 3 outs per inning
+                pitching_data = pitching_data[pitching_data['IP'] >= 10]  # drop pitchers without enough innings
 
                 batting_data = pd.read_csv(str(season) + " player-stats-Batters.csv")
                 batting_data['Season'] = str(season)
                 batting_data['Total_OB'] = batting_data['H'] + batting_data['BB'] + batting_data['HBP']
                 batting_data['Total_Outs'] = batting_data['AB'] - batting_data['H'] + batting_data['HBP']
+                batting_data = batting_data[batting_data['AB'] >= 25]  # drop players without enough AB
 
                 if self.pitching_data is None:
                     self.pitching_data = pitching_data

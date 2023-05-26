@@ -39,8 +39,8 @@ class Team:
         ops_index = self.best_at_stat(pos_index_list, 'OPS', count=6, exclude=sb_index + slg_index)
 
         ops_index = self.insert_player_in_lineup(lineup_list=ops_index, player_index=sb_index[0], target_pos=1)  # 1spot
-        ops_index = self.insert_player_in_lineup(lineup_list=ops_index, player_index=slg_index[0], target_pos=4)  # 4spot
-        ops_index = self.insert_player_in_lineup(lineup_list=ops_index, player_index=slg_index[1], target_pos=5)  # 5spot
+        ops_index = self.insert_player_in_lineup(lineup_list=ops_index, player_index=slg_index[0], target_pos=4)  # 4th
+        ops_index = self.insert_player_in_lineup(lineup_list=ops_index, player_index=slg_index[1], target_pos=5)  # 5th
         self.lineup = self.pos_players.loc[ops_index]
         for row_num in range(0, len(self.lineup)):  # set up battering order in lineup card by index
             self.cur_lineup_index.append(self.lineup.index[row_num])
@@ -53,6 +53,7 @@ class Team:
         lineup_list.insert(target_pos - 1, player_index)
         # print(f'Inserted player: {player_index} into {target_pos - 1} with current lineup {lineup_list}')
         return lineup_list
+
     def move_player_in_lineup(self, lineup_list, player_index, target_pos):
         # target pos is position in line up not pos in life
         # note this will shift the lineup back at that pos

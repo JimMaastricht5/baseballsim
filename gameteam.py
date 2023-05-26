@@ -28,13 +28,11 @@ class Team:
         return
 
     def set_batting_order(self):
-        position_count = {'C': 1, '1B': 1, '2B': 1, '3B': 1, 'SS': 1, 'OF': 3, 'DH': 1}
+        position_list = ['C', '1B', '2B', '3B', 'SS', 'OF', 'OF', 'OF', 'DH']
         pos_index_list = []
-        for postion in position_count.keys():
-            pos_index = self.search_for_pos(position=postion, count=position_count[postion],
-                                            lineup_index_list=pos_index_list, stat_criteria='OPS')  # players
-            for row_index in list(pos_index):
-                pos_index_list.append(row_index)
+        for postion in position_list:
+            pos_index = self.search_for_pos(position=postion, lineup_index_list=pos_index_list, stat_criteria='OPS')
+            pos_index_list.append(pos_index)
 
         self.lineup = self.pos_players.loc[pos_index_list].sort_values('OPS', ascending=False)
         for row_num in range(0, len(self.lineup)):  # set up battering order in lineup card by index
@@ -47,14 +45,20 @@ class Team:
         self.cur_pitcher_index = self.pitching.index[0]  # pitcher rotates based on selection above
         return
 
-    def search_for_pos(self, position, count, lineup_index_list, stat_criteria='OPS'):
+    def search_for_pos(self, position, lineup_index_list, stat_criteria='OPS'):
         # find players not in lineup at specified position, sort by stat descending to find the best
-        # if pos is DH open up search to any position. For outfielders grab more than one at a time (count)
+        # if pos is DH open up search to any position.
         not_selected_criteria = ~self.pos_players.index.isin(lineup_index_list)
         pos_criteria = self.pos_players['Pos'] == position
         df_criteria = not_selected_criteria & pos_criteria if position != 'DH' else not_selected_criteria
-        pos_index = self.pos_players[df_criteria].sort_values(stat_criteria, ascending=False).head(count).index
-        return pos_index
+        pos_index = self.pos_players[df_criteria].sort_values(stat_criteria, ascending=False).head(1).index
+        return pos_index[0]  # tuple of index and dtype, just want index
+
+    def best_at_stat(self, lineup_index_list, stat_criteria='OPS', count=9):
+        # find players in lineup, sort by stat descending to find the best
+        df_criteria = self.pos_players.index.isin(lineup_index_list)
+        stat_index = self.pos_players[df_criteria].sort_values(stat_criteria, ascending=False).head(count).index
+        return list(stat_index)
 
     def print_starting_lineups(self):
         print(f'Starting lineup for {self.team_name}:')

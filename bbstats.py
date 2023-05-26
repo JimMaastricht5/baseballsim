@@ -87,10 +87,7 @@ class BaseballStats:
 
 # static function start
 def trunc_col(df_n, d=3):
-    # try:
     return (df_n * 10 ** d).astype(int) / 10 ** d
-    # except:
-    #     return 0
 
 
 

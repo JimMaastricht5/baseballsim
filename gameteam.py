@@ -49,17 +49,17 @@ class Team:
     def insert_player_in_lineup(self, lineup_list, player_index, target_pos):
         # target pos is position in line up not pos in life, works if you insert from front to back
         # so dont insert at pos 3 or pos 4 or it will shift pos 4 to pos 5
-        print(f'Insert player: {player_index} into {target_pos - 1} with current lineup {lineup_list}')
+        # print(f'Insert player: {player_index} into {target_pos - 1} with current lineup {lineup_list}')
         lineup_list.insert(target_pos - 1, player_index)
-        print(f'Inserted player: {player_index} into {target_pos - 1} with current lineup {lineup_list}')
+        # print(f'Inserted player: {player_index} into {target_pos - 1} with current lineup {lineup_list}')
         return lineup_list
     def move_player_in_lineup(self, lineup_list, player_index, target_pos):
         # target pos is position in line up not pos in life
         # note this will shift the lineup back at that pos
-        print(f'Move player: {player_index} into {target_pos - 1} with current lineup {lineup_list}')
+        # print(f'Move player: {player_index} into {target_pos - 1} with current lineup {lineup_list}')
         lineup_list.remove(player_index)
         lineup_list.insert(target_pos - 1, player_index)
-        print(f'Moved player: {player_index} into {target_pos - 1} with current lineup {lineup_list}')
+        # print(f'Moved player: {player_index} into {target_pos - 1} with current lineup {lineup_list}')
         return lineup_list
 
     def set_starting_rotation(self):
@@ -81,7 +81,7 @@ class Team:
         # find players in lineup, sort by stat descending to find the best
         df_criteria = self.pos_players.index.isin(lineup_index_list) & ~self.pos_players.index.isin(exclude)
         stat_index = self.pos_players[df_criteria].sort_values(stat_criteria, ascending=False).head(count).index
-        print(f'best at stat: {stat_criteria}, {stat_index}')
+        # print(f'best at stat: {stat_criteria}, {stat_index}')
         return list(stat_index)
 
     def print_starting_lineups(self):

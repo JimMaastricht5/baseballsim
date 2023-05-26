@@ -66,22 +66,25 @@ class TeamBoxScore:
         self.game_pitching_stats = self.box_pitching.copy()
 
         self.team_box_batting = self.box_batting[['AB', 'R', 'H', '2B', '3B', 'HR', 'RBI', 'SB', 'CS', 'BB',
-                                                  'SO', 'SH', 'SF', 'HBP']].sum()
+                                                  'SO', 'SH', 'SF', 'HBP']].sum().astype(int)
         self.team_box_batting['Player'] = 'Team Totals'
         self.team_box_batting['Team'] = self.team_name
         self.team_box_batting['G'] = 1
         self.team_box_batting['Age'] = ''
         self.team_box_batting['Pos'] = ''
-        self.box_batting = self.box_batting.append(self.team_box_batting, ignore_index=True)
+        self.box_batting = pd.concat([self.box_batting, self.team_box_batting.to_frame().T], ignore_index=True)
         self.box_batting = bbstats.team_batting_stats(self.box_batting)
 
         self.team_box_pitching = self.box_pitching[['GS', 'CG', 'SHO', 'IP', 'H', 'ER', 'K', 'BB', 'HR', 'W', 'L',
                                                     'SV', 'BS', 'HLD', 'ERA', 'WHIP']].sum()
+        cols_to_int = ['GS', 'CG', 'SHO', 'H', 'ER', 'K', 'BB', 'HR', 'W', 'L', 'SV', 'BS', 'HLD']
+        self.team_box_pitching[cols_to_int] = self.team_box_pitching[cols_to_int].astype(int)
         self.team_box_pitching['Player'] = 'Team Totals'
         self.team_box_pitching['Team'] = self.team_name
         self.team_box_pitching['G'] = 1
         self.team_box_pitching['Age'] = ''
-        self.box_pitching = self.box_pitching.append(self.team_box_pitching, ignore_index=True)
+
+        self.box_pitching = pd.concat([self.box_pitching, self.team_box_pitching.to_frame().T], ignore_index=True)
         self.box_pitching = bbstats.team_pitching_stats(self.box_pitching)
         return
 

@@ -34,10 +34,33 @@ class Team:
             pos_index = self.search_for_pos(position=postion, lineup_index_list=pos_index_list, stat_criteria='OPS')
             pos_index_list.append(pos_index)
 
-        self.lineup = self.pos_players.loc[pos_index_list].sort_values('OPS', ascending=False)
+        sb_index = self.best_at_stat(pos_index_list, 'SB', count=1)
+        slg_index = self.best_at_stat(pos_index_list, 'SLG', count=2, exclude=sb_index)  # exclude sb since 1st spot
+        ops_index = self.best_at_stat(pos_index_list, 'OPS', count=6, exclude=sb_index + slg_index)
+
+        ops_index = self.insert_player_in_lineup(lineup_list=ops_index, player_index=sb_index[0], target_pos=1)  # 1spot
+        ops_index = self.insert_player_in_lineup(lineup_list=ops_index, player_index=slg_index[0], target_pos=4)  # 4spot
+        ops_index = self.insert_player_in_lineup(lineup_list=ops_index, player_index=slg_index[1], target_pos=5)  # 5spot
+        self.lineup = self.pos_players.loc[ops_index]
         for row_num in range(0, len(self.lineup)):  # set up battering order in lineup card by index
             self.cur_lineup_index.append(self.lineup.index[row_num])
         return
+
+    def insert_player_in_lineup(self, lineup_list, player_index, target_pos):
+        # target pos is position in line up not pos in life, works if you insert from front to back
+        # so dont insert at pos 3 or pos 4 or it will shift pos 4 to pos 5
+        print(f'Insert player: {player_index} into {target_pos - 1} with current lineup {lineup_list}')
+        lineup_list.insert(target_pos - 1, player_index)
+        print(f'Inserted player: {player_index} into {target_pos - 1} with current lineup {lineup_list}')
+        return lineup_list
+    def move_player_in_lineup(self, lineup_list, player_index, target_pos):
+        # target pos is position in line up not pos in life
+        # note this will shift the lineup back at that pos
+        print(f'Move player: {player_index} into {target_pos - 1} with current lineup {lineup_list}')
+        lineup_list.remove(player_index)
+        lineup_list.insert(target_pos - 1, player_index)
+        print(f'Moved player: {player_index} into {target_pos - 1} with current lineup {lineup_list}')
+        return lineup_list
 
     def set_starting_rotation(self):
         self.starting_pitchers = self.pitchers.sort_values('GS', ascending=False).head(5)  # starting 5
@@ -54,15 +77,16 @@ class Team:
         pos_index = self.pos_players[df_criteria].sort_values(stat_criteria, ascending=False).head(1).index
         return pos_index[0]  # tuple of index and dtype, just want index
 
-    def best_at_stat(self, lineup_index_list, stat_criteria='OPS', count=9):
+    def best_at_stat(self, lineup_index_list, stat_criteria='OPS', count=9, exclude=[]):
         # find players in lineup, sort by stat descending to find the best
-        df_criteria = self.pos_players.index.isin(lineup_index_list)
+        df_criteria = self.pos_players.index.isin(lineup_index_list) & ~self.pos_players.index.isin(exclude)
         stat_index = self.pos_players[df_criteria].sort_values(stat_criteria, ascending=False).head(count).index
+        print(f'best at stat: {stat_criteria}, {stat_index}')
         return list(stat_index)
 
     def print_starting_lineups(self):
         print(f'Starting lineup for {self.team_name}:')
-        print(self.lineup.to_string(index=False, justify='center'))
+        print(self.lineup.to_string(index=True, justify='center'))
         print('')
         print(f'Pitching for {self.team_name}:')
         print(self.pitching.to_string(index=False, justify='center'))

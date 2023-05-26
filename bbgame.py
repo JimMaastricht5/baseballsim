@@ -15,15 +15,17 @@ class Game:
         self.rotation_len = rotation_len  # number of startin pitchers to rotate thru
         self.teams = []  # keep track of away in pos 0 and home team in pos 1
         self.teams.insert(0, gameteam.Team(self.team_names[0], self.baseball_data, self.game_num, self.rotation_len))  # away team
-        self.teams[0].set_lineup()
+        self.teams[0].set_lineup(show_lineup=True)
 
         # print(f'Setting home team as {self.team_names[1]}')
         self.teams.insert(1, gameteam.Team(self.team_names[1], self.baseball_data, self.game_num, self.rotation_len))  # home team
-        self.teams[1].set_lineup()
+        self.teams[1].set_lineup(show_lineup=True)
 
         self.win_loss = []
         self.total_score = [0, 0]  # total score
-        self.inning_score = [['   ', away_team_name, home_team_name], [1, 0, '']]  # inning 1, away, home score
+        self.inning_score = [['   ', away_team_name, home_team_name], [1, 0, ''], [2, '', ''],
+                             [3, '', ''], [4, '', ''], [5, '', ''], [6, '', ''], [7, '', ''], [8, '', ''],
+                             [9, '', '']]  # inning 1, away, home score
         self.inning = [1, 1]
         self.batting_num = [1, 1]
         self.pitching_num = [0, 0]
@@ -75,7 +77,6 @@ class Game:
             outcome[3] = self.bases.runs_scored  # rbis for batter
         self.teams[(self.top_bottom + 1) % 2].box_score.pitching_result(cur_pitching_index, outcome)
         self.teams[self.top_bottom].box_score.batting_result(cur_batter_index, outcome, self.bases.player_scored)
-        # self.teams[self.top_bottom].team_box_score.batting_result(self.batting_num[self.top_bottom] - 1, outcome)
         return pitching, batting, outcome
 
     def sim_half_inning(self, chatty=True):
@@ -102,7 +103,7 @@ class Game:
             if self.bases.num_runners >= 1 and self.outs < 3 and chatty:  # leave out the batter to check for runner
                 print(f'\t{self.bases.describe_runners()}')
             self.batting_num[self.top_bottom] = self.batting_num[self.top_bottom] + 1 \
-                if self.batting_num[self.top_bottom] <= 9 else 1
+                if (self.batting_num[self.top_bottom] + 1) <= 9 else 1
 
         # half inning over
         self.update_inning_score(number_of_runs=0)  # push a zero on the board if no runs score this half inning

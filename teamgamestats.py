@@ -1,7 +1,7 @@
 import pandas as pd
 import bbstats
 
-class TeamBoxScore:
+class TeamGameStatsBoxScore:
     def __init__(self, lineup, pitching, team_name):
         self.box_pitching = pitching.copy()
         self.box_pitching[['G', 'GS']] = 1

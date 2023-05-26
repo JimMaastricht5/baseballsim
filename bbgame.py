@@ -31,6 +31,8 @@ class Game:
         self.pitching_num = [0, 0]
         self.outs = 0
         self.top_bottom = 0  # zero is top offset, 1 is bottom offset
+        self.winning_pitcher = None
+        self.losing_pitcher = None
 
         self.rng = np.random.default_rng()  # random number generator between 0 and 1
         self.bases = bbbaserunners.Bases()
@@ -45,6 +47,14 @@ class Game:
         self.inning_score[self.inning[self.top_bottom]][self.top_bottom + 1] = number_of_runs \
             if self.inning_score[self.inning[self.top_bottom]][self.top_bottom + 1] == '' \
             else int(self.inning_score[self.inning[self.top_bottom]][self.top_bottom + 1]) + number_of_runs
+
+        # pitcher of record tracking, look for lead change
+        if self.total_score[self.top_bottom] <= self.total_score[(self.top_bottom + 1) % 2] and \
+           (self.total_score[self.top_bottom] + self.bases.runs_scored) > self.total_score[(self.top_bottom + 1) % 2]:
+            self.winning_pitcher = self.teams[self.top_bottom].pitching.index
+            self.losing_pitcher = self.teams[(self.top_bottom + 1) % 2].pitching.index
+
+        self.total_score[self.top_bottom] += self.bases.runs_scored  # update total score
         return
 
     def print_inning_score(self):
@@ -63,7 +73,7 @@ class Game:
 
     def sim_ab(self):
         cur_pitching_index = self.teams[(self.top_bottom + 1) % 2].cur_pitcher_index
-        pitching = self.teams[(self.top_bottom + 1) % 2].pitching.iloc[0] #.iloc[cur_pitching_index]  # data for pitcher
+        pitching = self.teams[(self.top_bottom + 1) % 2].pitching.iloc[0]  # data for pitcher
 
         cur_batter_index = self.teams[self.top_bottom].cur_lineup_index[self.batting_num[self.top_bottom]-1]
         batting = self.teams[self.top_bottom].lineup.iloc[self.batting_num[self.top_bottom]-1]  # data for batter
@@ -73,7 +83,7 @@ class Game:
             self.outs += 1
         elif outcome[0] == 'OB':
             self.bases.advance_runners(bases_to_advance=outcome[2])  # outcome 2 is number of bases to advance
-            self.total_score[self.top_bottom] += self.bases.runs_scored
+            # self.total_score[self.top_bottom] += self.bases.runs_scored  # moved to update innning score
             outcome[3] = self.bases.runs_scored  # rbis for batter
         self.teams[(self.top_bottom + 1) % 2].box_score.pitching_result(cur_pitching_index, outcome)
         self.teams[self.top_bottom].box_score.batting_result(cur_batter_index, outcome, self.bases.player_scored)

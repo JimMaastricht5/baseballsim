@@ -24,7 +24,7 @@ class Team:
         self.set_starting_rotation()
         if show_lineup:
             self.print_starting_lineups()
-        self.box_score = teamgamestats.TeamBoxScore(self.lineup, self.pitching, self.team_name)
+        self.box_score = teamgamestats.TeamGameStatsBoxScore(self.lineup, self.pitching, self.team_name)
         return
 
     def set_batting_order(self):

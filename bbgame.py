@@ -128,7 +128,7 @@ class Game:
         self.outs = 0
         return
 
-    def game_end(self):
+    def is_game_end(self):
         return False if self.inning[0] <= 9 or self.inning[1] <= 8 or \
                         (self.inning[0] != self.inning[1] and self.total_score[0] >= self.total_score[1]) \
                         or self.total_score[0] == self.total_score[1] else True
@@ -137,10 +137,18 @@ class Game:
         home_win = 0 if self.total_score[0] > self.total_score[1] else 1
         self.win_loss.append([abs(home_win - 1), home_win])  # if home win away team is 0, 1
         self.win_loss.append([home_win, abs(home_win - 1)])  # if home win home team is  1, 0
+
+        # assign winning and losing pitchers, if home team lost assing win to away and vice versa
+        if home_win == 0:
+            self.teams[0].box_score.pitching_win_loss(self.winning_pitcher, True)
+            self.teams[1].box_score.pitching_win_loss(self.losing_pitcher, False)
+        else:
+            self.teams[0].box_score.pitching_win_loss(self.losing_pitcher, False)
+            self.teams[1].box_score.pitching_win_loss(self.winning_pitcher, True)
         return
 
     def sim_game(self, chatty=True):
-        while self.game_end() is False:
+        while self.is_game_end() is False:
             self.sim_half_inning(chatty=chatty)
 
         self.win_loss_record()

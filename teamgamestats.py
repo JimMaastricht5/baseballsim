@@ -41,6 +41,13 @@ class TeamGameStatsBoxScore:
         self.box_pitching.loc[pitcher_index, ['ER']] = self.box_pitching.loc[pitcher_index, ['ER']] + outcome[3]  #rbis
         return
 
+    def pitching_win_loss(self, pitcher_index, bwin):
+        if bwin:
+            self.box_pitching.loc[pitcher_index, ['W']] = self.box_pitching.loc[pitcher_index, ['W']] + 1
+        else:
+            self.box_pitching.loc[pitcher_index, ['L']] = self.box_pitching.loc[pitcher_index, ['L']] + 1
+        return
+
     def batting_result(self, batter_index, outcome, players_scored_list):
         outcome[1] = 'SO' if outcome[1] == 'K' else outcome[1]  # handle stat translation from pitcher SO to batter K
         if outcome[1] != 'BB':  # handle walks

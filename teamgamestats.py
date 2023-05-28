@@ -99,4 +99,5 @@ class TeamGameStatsBoxScore:
         print(self.box_batting.to_string(index=False, justify='center'))
         print('')
         print(self.box_pitching.to_string(index=False, justify='center'))
+        print('')
         return

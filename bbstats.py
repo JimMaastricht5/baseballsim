@@ -1,8 +1,9 @@
 import pandas as pd
+import random
 
 
 class BaseballStats:
-    def __init__(self, load_seasons, new_season):
+    def __init__(self, load_seasons, new_season, random_data=False):
         self.numeric_bcols = ['G', 'AB', 'R', 'H', '2B', '3B', 'HR', 'RBI', 'SB', 'CS', 'BB', 'SO', 'SH', 'SF', 'HBP',
                               'AVG', 'OBP', 'SLG', 'OPS']
         self.numeric_pcols = ['G', 'GS', 'CG', 'SHO', 'IP', 'H', 'ER', 'K', 'BB', 'HR', 'W', 'L',
@@ -15,6 +16,8 @@ class BaseballStats:
         self.new_season_pitching_data = None
         self.new_season_batting_data = None
         self.get_seasons()
+        if random_data:
+            self.randomize_data()
         self.create_new_season_from_existing()
         return
 
@@ -40,6 +43,15 @@ class BaseballStats:
                 else:
                     self.pitching_data = pd.concat([self.pitching_data, pitching_data])
                     self.batting_data = pd.concat([self.batting_data, batting_data])
+        return
+
+    def randomize_data(self):
+        # change pitching_data and batting data names, team name, etc
+        df = pd.concat([self.batting_data.Player.str.split(pat=' ', n=1, expand=True),
+                        self.pitching_data.Player.str.split(pat=' ', n=1, expand=True)])
+        first_name = df[0].values.tolist()
+        last_name = df[1].values.tolist()
+
         return
 
     def create_new_season_from_existing(self):
@@ -111,13 +123,12 @@ def team_pitching_stats(df):
     df['SLG'] = trunc_col(((df['H'] - 0 - 0 - df['HR']) + 0 * 2 + 0 * 3 + df['HR'] * 4) / df_ab, 3)
     df['OPS'] = trunc_col(df['OBP'] + df['SLG'] + df['SLG'], 3)
     df['WHIP'] = trunc_col((df['BB'] + df['H']) / df['IP'], 3)
+    df['ERA'] = trunc_col((df['ER'] / df['IP']) * 9)
     return df
 
 
 if __name__ == '__main__':
-    baseball_data = BaseballStats(load_seasons=[2022], new_season=2023)
-    baseball_data.get_seasons()
-    baseball_data.create_new_season_from_existing()
+    baseball_data = BaseballStats(load_seasons=[2022], new_season=2023, random_data=True)
 
     print(*baseball_data.pitching_data.columns)
     print(*baseball_data.batting_data.columns)

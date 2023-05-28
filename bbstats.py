@@ -49,9 +49,12 @@ class BaseballStats:
         # change pitching_data and batting data names, team name, etc
         df = pd.concat([self.batting_data.Player.str.split(pat=' ', n=1, expand=True),
                         self.pitching_data.Player.str.split(pat=' ', n=1, expand=True)])
-        first_name = df[0].values.tolist()
-        last_name = df[1].values.tolist()
-
+        first_names = df[0].values.tolist()
+        last_names = df[1].values.tolist()
+        random_names = []
+        for ii in range(1, self.batting_data.shape[0]):
+            random_names.append(random.choice(first_names) + ' ' + random.choice(last_names))
+        print(random_names)
         return
 
     def create_new_season_from_existing(self):

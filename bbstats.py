@@ -52,9 +52,13 @@ class BaseballStats:
         first_names = df[0].values.tolist()
         last_names = df[1].values.tolist()
         random_names = []
-        for ii in range(1, self.batting_data.shape[0]):
+        for ii in range(1, df.shape[0]):
             random_names.append(random.choice(first_names) + ' ' + random.choice(last_names))
-        print(random_names)
+        random_names = random.sample(random_names, self.batting_data.shape[0])
+        df['Player'] = pd.DataFrame(random_names)
+        df.reset_index(inplace=True, drop=True)  # this clears up a duplicate index error, leave this alone!
+        self.batting_data.Player = df['Player'][0:self.batting_data.shape[0] - 1]
+        self.pitching_data['Player'] = df['Player'][0:self.pitching_data.shape[0] - 1]
         return
 
     def create_new_season_from_existing(self):

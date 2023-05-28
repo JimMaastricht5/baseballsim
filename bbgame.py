@@ -9,8 +9,8 @@ import pandas as pd
 class Game:
     def __init__(self, away_team_name, home_team_name, baseball_data=None, game_num=1, rotation_len=5):
         self.team_names = [away_team_name, home_team_name]
-        self.baseball_data = bbstats.BaseballStats(load_seasons=[2022], new_season=2023) if baseball_data is None\
-            else baseball_data
+        self.baseball_data = bbstats.BaseballStats(load_seasons=[2022], new_season=2023, random_data=True) \
+            if baseball_data is None else baseball_data
         self.game_num = game_num  # number of games into season
         self.rotation_len = rotation_len  # number of startin pitchers to rotate thru
         self.teams = []  # keep track of away in pos 0 and home team in pos 1

@@ -1,5 +1,6 @@
 import pandas as pd
 import random
+import city_names as city
 
 
 class BaseballStats:
@@ -46,19 +47,35 @@ class BaseballStats:
         return
 
     def randomize_data(self):
+        self.randomize_player_names()
+        self.randomize_city_names()
+        return
+
+    def randomize_city_names(self):
+        city.abbrev = [str(name[:3]).upper() for name in city.names]
+        city.name_abbrev = list(zip(city.names, city.abbrev))
+        current_team_names = self.batting_data.Team.unique()
+        new_team = random.sample(city.name_abbrev, len(current_team_names))
+        for ii, team in enumerate(current_team_names):
+          self.pitching_data.replace([team], [new_team[ii][1]], inplace=True)
+          self.batting_data.replace([team], [new_team[ii][1]], inplace=True)
+        return
+
+    def randomize_player_names(self):
         # change pitching_data and batting data names, team name, etc
         df = pd.concat([self.batting_data.Player.str.split(pat=' ', n=1, expand=True),
                         self.pitching_data.Player.str.split(pat=' ', n=1, expand=True)])
         first_names = df[0].values.tolist()
         last_names = df[1].values.tolist()
         random_names = []
-        for ii in range(1, df.shape[0]):
+        for ii in range(1, df.shape[0] * 2):  # generate twice as many random names as needed
             random_names.append(random.choice(first_names) + ' ' + random.choice(last_names))
-        random_names = random.sample(random_names, self.batting_data.shape[0])
+        random_names = list(set(random_names))  # drop non-unique names
+        random_names = random.sample(random_names, self.batting_data.shape[0] + self.pitching_data.shape[0])
         df['Player'] = pd.DataFrame(random_names)
-        df.reset_index(inplace=True, drop=True)  # this clears up a duplicate index error, leave this alone!
-        self.batting_data.Player = df['Player'][0:self.batting_data.shape[0] - 1]
-        self.pitching_data['Player'] = df['Player'][0:self.pitching_data.shape[0] - 1]
+        df.reset_index(inplace=True, drop=True)  # clear duplicate index error, should not happen but leave this alone!
+        self.batting_data.Player = df['Player'][0:self.batting_data.shape[0]]
+        self.pitching_data['Player'] = df['Player'][0:self.pitching_data.shape[0]]
         return
 
     def create_new_season_from_existing(self):
@@ -139,6 +156,6 @@ if __name__ == '__main__':
 
     print(*baseball_data.pitching_data.columns)
     print(*baseball_data.batting_data.columns)
-    print(baseball_data.batting_data[baseball_data.batting_data.Team == "MIN"].to_string(justify='center'))
-    print(baseball_data.pitching_data[baseball_data.pitching_data.Team == "MIN"].sort_values('GS', ascending=False).head(5).to_string(justify='center'))
+    print(baseball_data.batting_data[baseball_data.batting_data.Team == baseball_data.batting_data.Team.unique()[0]].to_string(justify='center'))
+    print(baseball_data.pitching_data[baseball_data.pitching_data.Team == baseball_data.batting_data.Team.unique()[0]].sort_values('GS', ascending=False).head(5).to_string(justify='center'))
     print(baseball_data.batting_data.Team.unique())

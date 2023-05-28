@@ -53,12 +53,17 @@ class BaseballStats:
 
     def randomize_city_names(self):
         city.abbrev = [str(name[:3]).upper() for name in city.names]
-        city.name_abbrev = list(zip(city.names, city.abbrev))
-        current_team_names = self.batting_data.Team.unique()
-        new_team = random.sample(city.name_abbrev, len(current_team_names))
+        city.name_abbrev = list(zip(city.abbrev, city.names))  # list of abbrev and city names
+        current_team_names = self.batting_data.Team.unique()  # get list of current team names
+        is_unique = False
+        while is_unique is False:  # ensure no team abbrev is repeated, not elegant, but hey...
+            new_team = random.sample(city.name_abbrev, len(current_team_names))
+            is_unique = len(new_team) == len(set(new_team))
         for ii, team in enumerate(current_team_names):
-          self.pitching_data.replace([team], [new_team[ii][1]], inplace=True)
-          self.batting_data.replace([team], [new_team[ii][1]], inplace=True)
+            self.pitching_data.replace([team], [new_team[ii][0]], inplace=True)
+            self.batting_data.replace([team], [new_team[ii][0]], inplace=True)
+        df_city_names = pd.DataFrame({'Team': city.abbrev, 'City': city.names})
+        self.pitching_data = pd.merge(self.pitching_data, df_city_names, on='Team')
         return
 
     def randomize_player_names(self):

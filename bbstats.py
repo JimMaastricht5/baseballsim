@@ -52,18 +52,19 @@ class BaseballStats:
         return
 
     def randomize_city_names(self):
-        city.abbrev = [str(name[:3]).upper() for name in city.names]
-        city.name_abbrev = list(zip(city.abbrev, city.names))  # list of abbrev and city names
         current_team_names = self.batting_data.Team.unique()  # get list of current team names
-        is_unique = False
-        while is_unique is False:  # ensure no team abbrev is repeated, not elegant, but hey...
-            new_team = random.sample(city.name_abbrev, len(current_team_names))
-            is_unique = len(new_team) == len(set(new_team))
+        city.abbrev = [str(name[:3]).upper() for name in city.names]
+        df_city_names = pd.DataFrame({'Team': city.abbrev, 'City': city.names}).drop_duplicates(subset='Team')
+        if not df_city_names['Team'].is_unique:
+            raise ValueError('Team abbrev must be unique for city join to work properly')
+
+        new_team = list(df_city_names['Team'].sample(len(current_team_names)))
         for ii, team in enumerate(current_team_names):
-            self.pitching_data.replace([team], [new_team[ii][0]], inplace=True)
-            self.batting_data.replace([team], [new_team[ii][0]], inplace=True)
+            self.pitching_data.replace([team], [new_team[ii]], inplace=True)
+            self.batting_data.replace([team], [new_team[ii]], inplace=True)
         df_city_names = pd.DataFrame({'Team': city.abbrev, 'City': city.names})
         self.pitching_data = pd.merge(self.pitching_data, df_city_names, on='Team')
+        self.batting_data = pd.merge(self.batting_data, df_city_names, on='Team')
         return
 
     def randomize_player_names(self):
@@ -164,3 +165,4 @@ if __name__ == '__main__':
     print(baseball_data.batting_data[baseball_data.batting_data.Team == baseball_data.batting_data.Team.unique()[0]].to_string(justify='center'))
     print(baseball_data.pitching_data[baseball_data.pitching_data.Team == baseball_data.batting_data.Team.unique()[0]].sort_values('GS', ascending=False).head(5).to_string(justify='center'))
     print(baseball_data.batting_data.Team.unique())
+    # print(baseball_data.)

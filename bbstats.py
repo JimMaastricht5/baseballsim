@@ -51,10 +51,18 @@ class BaseballStats:
         self.randomize_city_names()
         return
 
+    def randomize_mascots(self, length):
+        with open('animals.txt', 'r') as f:
+            animals = f.readlines()
+        animals = [animal.strip() for animal in animals]
+        mascots = random.sample(animals, length)
+        return mascots
+
     def randomize_city_names(self):
         current_team_names = self.batting_data.Team.unique()  # get list of current team names
         city.abbrev = [str(name[:3]).upper() for name in city.names]
         df_city_names = pd.DataFrame({'Team': city.abbrev, 'City': city.names}).drop_duplicates(subset='Team')
+        df_city_names['Mascot'] = self.randomize_mascots(df_city_names.shape[0])
         if not df_city_names['Team'].is_unique:
             raise ValueError('Team abbrev must be unique for city join to work properly')
 
@@ -62,7 +70,6 @@ class BaseballStats:
         for ii, team in enumerate(current_team_names):
             self.pitching_data.replace([team], [new_team[ii]], inplace=True)
             self.batting_data.replace([team], [new_team[ii]], inplace=True)
-        df_city_names = pd.DataFrame({'Team': city.abbrev, 'City': city.names})
         self.pitching_data = pd.merge(self.pitching_data, df_city_names, on='Team')
         self.batting_data = pd.merge(self.batting_data, df_city_names, on='Team')
         return

@@ -1,6 +1,7 @@
 import pandas as pd
 import random
 import city_names as city
+from itertools import combinations
 
 
 class BaseballStats:
@@ -49,6 +50,7 @@ class BaseballStats:
     def randomize_data(self):
         self.randomize_player_names()
         self.randomize_city_names()
+        self.create_leagues(league_num=2, team_num=6, minors=False)
         return
 
     def randomize_mascots(self, length):
@@ -110,6 +112,16 @@ class BaseballStats:
         self.new_season_batting_data['Season'] = str(self.new_season)
         self.new_season_batting_data = self.new_season_batting_data.fillna(0)
         # print(self.new_season_batting_data.to_string())
+        return
+
+    def create_leagues(self, league_num=2, team_num=8, minors=True):
+        league_names = ['ABC', 'NBL', 'SOL', 'NNL']  # Armchair Baseball and Nerd Baseball, Some Other League, No Name
+        team_names = list(self.batting_data['Team'].unique())  # get list of 3 character team names
+        if len(team_names) < league_num * team_num:
+            raise ValueError(f'Available # of teams {len(team_names)} must be <= then {league_num * team_num}')
+        league_teams = random.sample(team_names, (league_num * team_num))
+        for i in combinations(league_teams, league_num):
+            print(i)
         return
 
     def game_results_to_season(self, batting_box_score, pitching_box_score):

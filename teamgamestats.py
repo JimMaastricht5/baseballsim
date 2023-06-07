@@ -1,6 +1,7 @@
 import pandas as pd
 import bbstats
 
+
 class TeamGameStatsBoxScore:
     def __init__(self, lineup, pitching, team_name):
         self.box_pitching = pitching.copy()
@@ -38,7 +39,7 @@ class TeamGameStatsBoxScore:
             else self.box_pitching.loc[pitcher_index, ['H']]
 
         # add runs
-        self.box_pitching.loc[pitcher_index, ['ER']] = self.box_pitching.loc[pitcher_index, ['ER']] + outcome[3]  #rbis
+        self.box_pitching.loc[pitcher_index, ['ER']] = self.box_pitching.loc[pitcher_index, ['ER']] + outcome[3]  # rbis
         return
 
     def pitching_win_loss(self, pitcher_index, bwin):

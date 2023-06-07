@@ -14,11 +14,11 @@ class Game:
         self.game_num = game_num  # number of games into season
         self.rotation_len = rotation_len  # number of startin pitchers to rotate thru
         self.teams = []  # keep track of away in pos 0 and home team in pos 1
-        self.teams.insert(0, gameteam.Team(self.team_names[0], self.baseball_data, self.game_num, self.rotation_len))  # away team
+        self.teams.insert(0, gameteam.Team(self.team_names[0], self.baseball_data, self.game_num, self.rotation_len))
         self.teams[0].set_lineup(show_lineup=True)
 
         # print(f'Setting home team as {self.team_names[1]}')
-        self.teams.insert(1, gameteam.Team(self.team_names[1], self.baseball_data, self.game_num, self.rotation_len))  # home team
+        self.teams.insert(1, gameteam.Team(self.team_names[1], self.baseball_data, self.game_num, self.rotation_len))
         self.teams[1].set_lineup(show_lineup=True)
 
         self.win_loss = []
@@ -105,7 +105,8 @@ class Game:
             if self.bases.runs_scored > 0 and chatty:
                 players = ''
                 for player_id in self.bases.player_scored.keys():
-                    players = players + ', ' + self.bases.player_scored[player_id] if players != '' else self.bases.player_scored[player_id]
+                    players = players + ', ' + self.bases.player_scored[player_id] if players != '' \
+                        else self.bases.player_scored[player_id]
                 # print(f'{self.bases.player_scored} scored!')
                 print(f'\tScored {self.bases.runs_scored} run(s)!  ({players})\n'
                       f'\tThe score is {self.team_names[0]} {self.total_score[0]} to'
@@ -121,7 +122,8 @@ class Game:
         if chatty:
             print('')  # add a blank line for verbose output
             print(f'Completed {top_or_bottom} half of inning {self.inning[self.top_bottom]}. '
-                  f'The score is {self.team_names[0]} {self.total_score[0]} to {self.team_names[1]} {self.total_score[1]}')
+                  f'The score is {self.team_names[0]} {self.total_score[0]} to {self.team_names[1]} '
+                  f'{self.total_score[1]}')
             self.print_inning_score()
         self.inning[self.top_bottom] += 1
         self.top_bottom = 0 if self.top_bottom == 1 else 1

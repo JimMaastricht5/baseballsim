@@ -28,7 +28,7 @@ class BaseballStats:
             for season in self.load_seasons:
                 pitching_data = pd.read_csv(str(season) + " player-stats-Pitching.csv")
                 pitching_data['Season'] = str(season)
-                pitching_data['OBP'] = pitching_data['WHIP'] / (3 + pitching_data['WHIP'])  # batters reached / number faced
+                pitching_data['OBP'] = pitching_data['WHIP'] / (3 + pitching_data['WHIP'])  # bat reached / number faced
                 pitching_data['Total_OB'] = pitching_data['H'] + pitching_data['BB']  # + pitching_data['HBP']
                 pitching_data['Total_Outs'] = pitching_data['IP'] * 3  # 3 outs per inning
                 pitching_data = pitching_data[pitching_data['IP'] >= 10]  # drop pitchers without enough innings
@@ -138,13 +138,17 @@ class BaseballStats:
         return
 
     def update_season_stats(self):
-        self.new_season_pitching_data = team_pitching_stats(self.new_season_pitching_data[self.new_season_pitching_data['IP'] > 0].fillna(0))
-        self.new_season_batting_data = team_batting_stats(self.new_season_batting_data[self.new_season_batting_data['AB'] > 0].fillna(0))
+        self.new_season_pitching_data = \
+            team_pitching_stats(self.new_season_pitching_data[self.new_season_pitching_data['IP'] > 0].fillna(0))
+        self.new_season_batting_data = \
+            team_batting_stats(self.new_season_batting_data[self.new_season_batting_data['AB'] > 0].fillna(0))
 
     def print_current_season(self, teams=['MIL']):
-        print(self.new_season_batting_data[self.new_season_batting_data['Team'].isin(teams)].to_string(justify='center'))
+        print(self.new_season_batting_data[self.new_season_batting_data['Team'].isin(teams)].
+              to_string(justify='center'))
         print('')
-        print(self.new_season_pitching_data[self.new_season_pitching_data['Team'].isin(teams)].to_string(justify='center'))
+        print(self.new_season_pitching_data[self.new_season_pitching_data['Team'].isin(teams)].
+              to_string(justify='center'))
         return
 
 
@@ -153,11 +157,11 @@ def trunc_col(df_n, d=3):
     return (df_n * 10 ** d).astype(int) / 10 ** d
 
 
-
 def team_batting_stats(df):
     df['AVG'] = trunc_col(df['H'] / df['AB'], 3)
     df['OBP'] = trunc_col((df['H'] + df['BB'] + df['HBP']) / (df['AB'] + df['BB'] + df['HBP']), 3)
-    df['SLG'] = trunc_col(((df['H'] - df['2B'] - df['3B'] - df['HR']) + df['2B'] * 2 + df['3B'] * 3 + df['HR'] * 4) / df['AB'], 3)
+    df['SLG'] = trunc_col(((df['H'] - df['2B'] - df['3B'] - df['HR']) + df['2B'] * 2 + df['3B'] * 3 + df['HR'] * 4) /
+                          df['AB'], 3)
     df['OPS'] = trunc_col(df['OBP'] + df['SLG'] + df['SLG'], 3)
     return df
 
@@ -181,7 +185,9 @@ if __name__ == '__main__':
 
     print(*baseball_data.pitching_data.columns)
     print(*baseball_data.batting_data.columns)
-    print(baseball_data.batting_data[baseball_data.batting_data.Team == baseball_data.batting_data.Team.unique()[0]].to_string(justify='center'))
-    print(baseball_data.pitching_data[baseball_data.pitching_data.Team == baseball_data.batting_data.Team.unique()[0]].sort_values('GS', ascending=False).head(5).to_string(justify='center'))
+    print(baseball_data.batting_data[baseball_data.batting_data.Team == baseball_data.batting_data.Team.unique()[0]].
+          to_string(justify='center'))
+    print(baseball_data.pitching_data[baseball_data.pitching_data.Team == baseball_data.batting_data.Team.unique()[0]].
+          sort_values('GS', ascending=False).head(5).to_string(justify='center'))
     print(baseball_data.batting_data.Team.unique())
     # print(baseball_data.)

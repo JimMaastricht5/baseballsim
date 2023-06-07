@@ -52,7 +52,7 @@ class BaseballSeason:
         return
 
     def print_standings(self):
-        teaml, winl, lossl =[], [], []
+        teaml, winl, lossl = [], [], []
         for team in self.team_win_loss:
             win_loss = self.team_win_loss[team]
             teaml.append(team)

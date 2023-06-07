@@ -9,8 +9,10 @@ class Team:
         self.pitchers = baseball_data.pitching_data[baseball_data.pitching_data["Team"] == team_name]
         self.pos_players = baseball_data.batting_data[baseball_data.batting_data["Team"] == team_name]
 
-        self.lineup = None
-        self.pitching = None
+        self.lineup = None  # uses prior season stats
+        self.lineup_new_season = None  # new / current season stats for printing starting lineup
+        self.pitching = None  # uses prior season stats
+        self.pitching_new_season = None  # new / current season stats for printing starting lineup
         self.starting_pitchers = None
         self.cur_pitcher_index = None
         self.cur_lineup_index = []
@@ -42,6 +44,8 @@ class Team:
         ops_index = self.insert_player_in_lineup(lineup_list=ops_index, player_index=slg_index[0], target_pos=4)  # 4th
         ops_index = self.insert_player_in_lineup(lineup_list=ops_index, player_index=slg_index[1], target_pos=5)  # 5th
         self.lineup = self.pos_players.loc[ops_index]
+        self.lineup_new_season = self.baseball_data.new_season_batting_data.loc[ops_index]  # get the new season stats
+        self.lineup_new_season.drop(['Season', 'Total_OB', 'Total_Outs'], axis=1, inplace=True)
         for row_num in range(0, len(self.lineup)):  # set up battering order in lineup card by index
             self.cur_lineup_index.append(self.lineup.index[row_num])
         return
@@ -67,6 +71,8 @@ class Team:
         self.starting_pitchers = self.pitchers.sort_values('GS', ascending=False).head(5)  # starting 5
         self.pitching = self.starting_pitchers.iloc[[self.game_num % self.rotation_len]]  # grab the nth row dbl []-> df
         self.cur_pitcher_index = self.pitching.index[0]  # pitcher rotates based on selection above
+        self.pitching_new_season = self.baseball_data.new_season_pitching_data.loc[self.cur_pitcher_index].to_frame().T
+        self.pitching_new_season.drop(['Season', 'Total_OB', 'Total_Outs'], axis=1, inplace=True)
         return
 
     def search_for_pos(self, position, lineup_index_list, stat_criteria='OPS'):
@@ -87,9 +93,10 @@ class Team:
 
     def print_starting_lineups(self):
         print(f'Starting lineup for {self.team_name}:')
-        print(self.lineup.to_string(index=True, justify='center'))
+
+        print(self.lineup_new_season.to_string(index=True, justify='center'))
         print('')
         print(f'Pitching for {self.team_name}:')
-        print(self.pitching.to_string(index=False, justify='center'))
+        print(self.pitching_new_season.to_string(index=True, justify='center'))
         print('')
         return

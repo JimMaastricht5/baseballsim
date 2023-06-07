@@ -73,7 +73,7 @@ class BaseballSeason:
     def sim_season(self, chatty=True):
         print(f'{self.new_season} will be {len(self.schedule)} games in length.')
         print(f'Full schedule of games: {self.schedule}')
-        for season_day_num in range(0, len(self.schedule)-1):
+        for season_day_num in range(0, len(self.schedule)):  # loop from 0 to len of schedule - 1 end pt not included
             if self.season_length_limit != 0 and season_day_num + 1 > self.season_length_limit:  # stop if exceeds limit
                 break
             self.print_day_schedule(season_day_num)

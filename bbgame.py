@@ -7,19 +7,23 @@ import pandas as pd
 
 
 class Game:
-    def __init__(self, away_team_name, home_team_name, baseball_data=None, game_num=1, rotation_len=5):
+    def __init__(self, away_team_name, home_team_name, baseball_data=None, game_num=1, rotation_len=5,
+                 print_lineup=True, chatty=True, print_box_score=True):
         self.team_names = [away_team_name, home_team_name]
         self.baseball_data = bbstats.BaseballStats(load_seasons=[2022], new_season=2023, random_data=False) \
             if baseball_data is None else baseball_data
         self.game_num = game_num  # number of games into season
         self.rotation_len = rotation_len  # number of startin pitchers to rotate thru
+        self.chatty = chatty
+        self.print_box_score = print_box_score
+
         self.teams = []  # keep track of away in pos 0 and home team in pos 1
         self.teams.insert(0, gameteam.Team(self.team_names[0], self.baseball_data, self.game_num, self.rotation_len))
-        self.teams[0].set_lineup(show_lineup=True)
+        self.teams[0].set_lineup(show_lineup=print_lineup)
 
         # print(f'Setting home team as {self.team_names[1]}')
         self.teams.insert(1, gameteam.Team(self.team_names[1], self.baseball_data, self.game_num, self.rotation_len))
-        self.teams[1].set_lineup(show_lineup=True)
+        self.teams[1].set_lineup(show_lineup=print_lineup)
 
         self.win_loss = []
         self.total_score = [0, 0]  # total score
@@ -149,16 +153,17 @@ class Game:
             self.teams[1].box_score.pitching_win_loss(self.winning_pitcher, True)
         return
 
-    def sim_game(self, chatty=True):
+    def sim_game(self):
         while self.is_game_end() is False:
-            self.sim_half_inning(chatty=chatty)
+            self.sim_half_inning(chatty=self.chatty)
 
         self.win_loss_record()
         self.teams[0].box_score.totals()
-        self.teams[0].box_score.print()
-
         self.teams[1].box_score.totals()
-        self.teams[1].box_score.print()
+        if self.print_box_score:  # to print or not to print...
+            self.teams[0].box_score.print()
+            self.teams[1].box_score.print()
+
         self.print_inning_score()
         return self.total_score, self.inning, self.win_loss
 
@@ -172,8 +177,9 @@ if __name__ == '__main__':
     team0_season_df = None
     for game_num in range(1, season_length + 1):
         print(f'Game number {game_num}: from bbgame.py test code')
-        game = Game(home_team_name=home_team, away_team_name=away_team)
-        score, inning, win_loss = game.sim_game(chatty=True)
+        game = Game(home_team_name=home_team, away_team_name=away_team, chatty=True, print_lineup=True,
+                    print_box_score=True)
+        score, inning, win_loss = game.sim_game()
         season_win_loss[0] = list(np.add(np.array(season_win_loss[0]), np.array(win_loss[0])))
         season_win_loss[1] = list(np.add(np.array(season_win_loss[1]), np.array(win_loss[1])))
         if team0_season_df is None:

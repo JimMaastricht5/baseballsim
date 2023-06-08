@@ -151,6 +151,14 @@ class BaseballStats:
               to_string(justify='center'))
         return
 
+    def print_prior_season(self, teams=['MIN']):
+        print(self.batting_data[self.new_season_batting_data['Team'].isin(teams)].
+              to_string(justify='center'))
+        print('')
+        print(self.pitching_data[self.new_season_pitching_data['Team'].isin(teams)].
+              to_string(justify='center'))
+        return
+
 
 # static function start
 def trunc_col(df_n, d=3):
@@ -181,7 +189,7 @@ def team_pitching_stats(df):
 
 
 if __name__ == '__main__':
-    baseball_data = BaseballStats(load_seasons=[2022], new_season=2023, random_data=True)
+    baseball_data = BaseballStats(load_seasons=[2022], new_season=2023, random_data=False)
 
     print(*baseball_data.pitching_data.columns)
     print(*baseball_data.batting_data.columns)
@@ -190,4 +198,4 @@ if __name__ == '__main__':
     print(baseball_data.pitching_data[baseball_data.pitching_data.Team == baseball_data.batting_data.Team.unique()[0]].
           sort_values('GS', ascending=False).head(5).to_string(justify='center'))
     print(baseball_data.batting_data.Team.unique())
-    # print(baseball_data.)
+    baseball_data.print_prior_season()

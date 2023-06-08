@@ -21,16 +21,16 @@ class Team:
         self.rotation_len = rotation_len
         return
 
-    def set_lineup(self, show_lineup=False):
+    def set_lineup(self, show_lineup=False, current_season_stats=True):
         self.set_batting_order()
         self.set_starting_rotation()
         if show_lineup:
-            self.print_starting_lineups()
+            self.print_starting_lineups(current_season_stats=current_season_stats)
         self.box_score = teamgamestats.TeamGameStatsBoxScore(self.lineup, self.pitching, self.team_name)
         return
 
     def set_batting_order(self):
-        position_list = ['C', '1B', '2B', '3B', 'SS', 'OF', 'OF', 'OF', 'DH']
+        position_list = ['C', '2B', '3B', 'SS', 'OF', 'OF', 'OF', '1B', 'DH']  # ?? need to handle subs at 1b and dh ??
         pos_index_list = []
         for postion in position_list:
             pos_index = self.search_for_pos(position=postion, lineup_index_list=pos_index_list, stat_criteria='OPS')
@@ -80,7 +80,8 @@ class Team:
         # if pos is DH open up search to any position.
         not_selected_criteria = ~self.pos_players.index.isin(lineup_index_list)
         pos_criteria = self.pos_players['Pos'] == position
-        df_criteria = not_selected_criteria & pos_criteria if position != 'DH' else not_selected_criteria
+        df_criteria = not_selected_criteria & pos_criteria if (position != 'DH' and position != '1B')\
+            else not_selected_criteria
         pos_index = self.pos_players[df_criteria].sort_values(stat_criteria, ascending=False).head(1).index
         return pos_index[0]  # tuple of index and dtype, just want index
 
@@ -91,12 +92,18 @@ class Team:
         # print(f'best at stat: {stat_criteria}, {stat_index}')
         return list(stat_index)
 
-    def print_starting_lineups(self):
+    def print_starting_lineups(self, current_season_stats=True):
         print(f'Starting lineup for {self.team_name}:')
-
-        print(self.lineup_new_season.to_string(index=True, justify='center'))
-        print('')
-        print(f'Pitching for {self.team_name}:')
-        print(self.pitching_new_season.to_string(index=True, justify='center'))
-        print('')
+        if current_season_stats:
+            print(self.lineup_new_season.to_string(index=True, justify='center'))
+            print('')
+            print(f'Pitching for {self.team_name}:')
+            print(self.pitching_new_season.to_string(index=True, justify='center'))
+            print('')
+        else:
+            print(self.lineup.to_string(index=True, justify='center'))
+            print('')
+            print(f'Pitching for {self.team_name}:')
+            print(self.pitching.to_string(index=True, justify='center'))
+            print('')
         return

@@ -62,17 +62,17 @@ class Game:
         return
 
     def print_inning_score(self):
-        print('')
         print_inning_score = self.inning_score.copy()
         print_inning_score.append(['R', self.total_score[0], self.total_score[1]])
-        print_inning_score.append(['H', 0, 0])
-        print_inning_score.append(['E', 0, 0])
+        print_inning_score.append(['H', self.teams[0].box_score.total_hits, self.teams[1].box_score.total_hits])
+        print_inning_score.append(['E', self.teams[0].box_score.total_errors, self.teams[1].box_score.total_errors])
         row_to_col = list(zip(*print_inning_score))
         for ii in range(0, 3):  # print each row
             print_line = ''
             for jj in range(0, len(row_to_col[ii])):
                 print_line = print_line + str(row_to_col[ii][jj]) + '\t'
             print(print_line)
+        print('')
         return
 
     def sim_ab(self):
@@ -163,7 +163,7 @@ class Game:
         if self.print_box_score:  # to print or not to print...
             self.teams[0].box_score.print()
             self.teams[1].box_score.print()
-
+        print('Final:')
         self.print_inning_score()
         return self.total_score, self.inning, self.win_loss
 

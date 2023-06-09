@@ -21,6 +21,8 @@ class TeamGameStatsBoxScore:
         self.game_batting_stats = None
 
         self.team_name = team_name
+        self.total_hits = 0
+        self.total_errors = 0
         return
 
     def pitching_result(self, pitcher_index, outcome):
@@ -61,7 +63,7 @@ class TeamGameStatsBoxScore:
         self.box_batting.loc[batter_index, ['H']] = self.box_batting.loc[batter_index, ['H']] + 1 \
             if outcome[1] != 'BB' and outcome[1] != 'H' and outcome[0] == 'OB' \
             else self.box_batting.loc[batter_index, ['H']]
-
+        self.total_hits = self.box_batting['H'].sum()
         self.box_batting.loc[batter_index, ['RBI']] = self.box_batting.loc[batter_index, ['RBI']] + outcome[3]  # rbis
 
         # print(players_scored_list)

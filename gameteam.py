@@ -4,6 +4,7 @@ import teamgamestats
 
 class Team:
     def __init__(self, team_name, baseball_data, game_num=1, rotation_len=5):
+        pd.options.mode.chained_assignment = None  # suppresses chained assignment warning for lineup pos setting
         self.team_name = team_name
         self.baseball_data = baseball_data
         self.pitchers = baseball_data.pitching_data[baseball_data.pitching_data["Team"] == team_name]
@@ -32,9 +33,11 @@ class Team:
     def set_batting_order(self):
         position_list = ['C', '2B', '3B', 'SS', 'OF', 'OF', 'OF', '1B', 'DH']  # ?? need to handle subs at 1b and dh ??
         pos_index_list = []
-        for postion in position_list:
-            pos_index = self.search_for_pos(position=postion, lineup_index_list=pos_index_list, stat_criteria='OPS')
+        pos_index_dict = {}
+        for position in position_list:
+            pos_index = self.search_for_pos(position=position, lineup_index_list=pos_index_list, stat_criteria='OPS')
             pos_index_list.append(pos_index)
+            pos_index_dict[pos_index] = position  # keep track of the player index and position for this game
 
         sb_index = self.best_at_stat(pos_index_list, 'SB', count=1)
         slg_index = self.best_at_stat(pos_index_list, 'SLG', count=2, exclude=sb_index)  # exclude sb since 1st spot
@@ -44,10 +47,13 @@ class Team:
         ops_index = self.insert_player_in_lineup(lineup_list=ops_index, player_index=slg_index[0], target_pos=4)  # 4th
         ops_index = self.insert_player_in_lineup(lineup_list=ops_index, player_index=slg_index[1], target_pos=5)  # 5th
         self.lineup = self.pos_players.loc[ops_index]
+        # ?? change lineup to target pos
         self.lineup_new_season = self.baseball_data.new_season_batting_data.loc[ops_index]  # get the new season stats
         self.lineup_new_season.drop(['Season', 'Total_OB', 'Total_Outs'], axis=1, inplace=True)
         for row_num in range(0, len(self.lineup)):  # set up battering order in lineup card by index
             self.cur_lineup_index.append(self.lineup.index[row_num])
+            player_index = self.lineup.index[row_num]  # grab the index of the player and set pos for game
+            self.lineup.Pos[player_index] = pos_index_dict[player_index]  # set lineup pos
         return
 
     def insert_player_in_lineup(self, lineup_list, player_index, target_pos):

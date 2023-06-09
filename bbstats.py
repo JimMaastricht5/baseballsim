@@ -144,19 +144,19 @@ class BaseballStats:
             team_batting_stats(self.new_season_batting_data[self.new_season_batting_data['AB'] > 0].fillna(0))
 
     def print_current_season(self, teams=['MIL']):
-        print(self.new_season_batting_data[self.new_season_batting_data['Team'].isin(teams)].
-              to_string(justify='center'))
+        df = self.new_season_batting_data.drop(['Total_OB', 'Total_Outs'], axis=1)
+        print(df[df['Team'].isin(teams)].to_string(justify='center'))
         print('')
-        print(self.new_season_pitching_data[self.new_season_pitching_data['Team'].isin(teams)].
-              to_string(justify='center'))
+        df = self.new_season_pitching_data.drop(['Total_OB', 'Total_Outs'], axis=1)
+        print(df[df['Team'].isin(teams)].to_string(justify='center'))
         return
 
     def print_prior_season(self, teams=['MIN']):
-        print(self.batting_data[self.new_season_batting_data['Team'].isin(teams)].
-              to_string(justify='center'))
+        df = self.batting_data.drop(['Total_OB', 'Total_Outs'], axis=1)
+        print(df[df['Team'].isin(teams)].to_string(justify='center'))
         print('')
-        print(self.pitching_data[self.new_season_pitching_data['Team'].isin(teams)].
-              to_string(justify='center'))
+        df = self.pitching_data.drop(['Total_OB', 'Total_Outs'], axis=1)
+        print(df[df['Team'].isin(teams)].to_string(justify='center'))
         return
 
 

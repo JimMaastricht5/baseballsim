@@ -25,6 +25,8 @@ class Team:
     def set_lineup(self, show_lineup=False, current_season_stats=True):
         self.set_batting_order()
         self.set_starting_rotation()
+        self.set_closers()
+        self.set_mid_relief()
         if show_lineup:
             self.print_starting_lineups(current_season_stats=current_season_stats)
         self.box_score = teamgamestats.TeamGameStatsBoxScore(self.lineup, self.pitching, self.team_name)
@@ -47,7 +49,6 @@ class Team:
         ops_index = self.insert_player_in_lineup(lineup_list=ops_index, player_index=slg_index[0], target_pos=4)  # 4th
         ops_index = self.insert_player_in_lineup(lineup_list=ops_index, player_index=slg_index[1], target_pos=5)  # 5th
         self.lineup = self.pos_players.loc[ops_index]
-        # ?? change lineup to target pos
         self.lineup_new_season = self.baseball_data.new_season_batting_data.loc[ops_index]  # get the new season stats
         self.lineup_new_season.drop(['Season', 'Total_OB', 'Total_Outs'], axis=1, inplace=True)
         for row_num in range(0, len(self.lineup)):  # set up battering order in lineup card by index
@@ -79,6 +80,14 @@ class Team:
         self.cur_pitcher_index = self.pitching.index[0]  # pitcher rotates based on selection above
         self.pitching_new_season = self.baseball_data.new_season_pitching_data.loc[self.cur_pitcher_index].to_frame().T
         self.pitching_new_season.drop(['Season', 'Total_OB', 'Total_Outs'], axis=1, inplace=True)
+        return
+
+    def set_closers(self):
+        not_selected_criteria = ~self.pitchers.index.isin(self.starting_pitchers.index)
+        df_criteria = not_selected_criteria # & something....
+        return
+
+    def set_mid_relief(self):
         return
 
     def search_for_pos(self, position, lineup_index_list, stat_criteria='OPS'):

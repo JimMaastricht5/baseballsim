@@ -17,6 +17,8 @@ class Team:
         self.starting_pitchers = None
         self.cur_pitcher_index = None
         self.cur_lineup_index = []
+        self.relievers = None  # df of 2 best closers
+        self.middle_relievers = None  # remaining pitchers sorted by IP descending
         self.box_score = None
         self.game_num = game_num
         self.rotation_len = rotation_len
@@ -83,11 +85,18 @@ class Team:
         return
 
     def set_closers(self):
+        # grab top two closers for setup and final close
         not_selected_criteria = ~self.pitchers.index.isin(self.starting_pitchers.index)
-        df_criteria = not_selected_criteria # & something....
+        sv_criteria = self.pitchers.SV > 0
+        df_criteria = not_selected_criteria & sv_criteria
+        self.relievers = self.pitchers[df_criteria].sort_values('SV', ascending=False).head(2)
         return
 
     def set_mid_relief(self):
+        not_selected_criteria = ~self.pitchers.index.isin(self.starting_pitchers.index)
+        not_reliever_criteria = ~self.pitchers.index.isin(self.relievers.index)
+        df_criteria = not_selected_criteria & not_reliever_criteria
+        self.middle_relievers = self.pitchers[df_criteria].sort_values('IP', ascending=False)
         return
 
     def search_for_pos(self, position, lineup_index_list, stat_criteria='OPS'):

@@ -1,5 +1,6 @@
 import pandas as pd
 import bbstats
+import numpy as np
 
 
 class TeamGameStatsBoxScore:
@@ -89,8 +90,7 @@ class TeamGameStatsBoxScore:
 
         self.team_box_pitching = self.box_pitching[['GS', 'CG', 'SHO', 'IP', 'H', 'ER', 'K', 'BB', 'HR', 'W', 'L',
                                                     'SV', 'BS', 'HLD', 'ERA', 'WHIP']].sum()
-        cols_to_int = ['GS', 'CG', 'SHO', 'H', 'ER', 'K', 'BB', 'HR', 'W', 'L', 'SV', 'BS', 'HLD']
-        self.team_box_pitching[cols_to_int] = self.team_box_pitching[cols_to_int].astype(int)
+        cols_to_trunc = ['GS', 'CG', 'SHO', 'H', 'ER', 'K', 'BB', 'HR', 'W', 'L', 'SV', 'BS', 'HLD']
         self.team_box_pitching['Player'] = 'Team Totals'
         self.team_box_pitching['Team'] = self.team_name
         self.team_box_pitching['G'] = 1
@@ -98,6 +98,8 @@ class TeamGameStatsBoxScore:
 
         self.box_pitching = pd.concat([self.box_pitching, self.team_box_pitching.to_frame().T], ignore_index=True)
         self.box_pitching = bbstats.team_pitching_stats(self.box_pitching)
+        for col in cols_to_trunc:
+            self.box_pitching[col] = np.floor(self.box_pitching[col])
         return
 
     def print_boxes(self):

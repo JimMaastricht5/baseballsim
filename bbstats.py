@@ -10,8 +10,10 @@ class BaseballStats:
                               'AVG', 'OBP', 'SLG', 'OPS']
         self.numeric_pcols = ['G', 'GS', 'CG', 'SHO', 'IP', 'H', 'ER', 'K', 'BB', 'HR', 'W', 'L',
                               'SV', 'BS', 'HLD', 'ERA', 'WHIP']
+        self.fatigue_start = .85  # 85% of avg max is where fatigue starts
+        self.fatigue_rate = .001  # at 85% of avg max pitchers have a .014 increase in OBP.  using .001 as proxy
 
-        self.load_seasons = load_seasons
+        self.load_seasons = load_seasons  # list of seasons to load from csv files
         self.new_season = new_season
         self.pitching_data = None
         self.batting_data = None
@@ -32,12 +34,15 @@ class BaseballStats:
                 pitching_data['Total_OB'] = pitching_data['H'] + pitching_data['BB']  # + pitching_data['HBP']
                 pitching_data['Total_Outs'] = pitching_data['IP'] * 3  # 3 outs per inning
                 pitching_data = pitching_data[pitching_data['IP'] >= 10]  # drop pitchers without enough innings
+                pitching_data['AVG_faced'] = (pitching_data['Total_OB'] + pitching_data['Total_Outs']) / pitching_data.G
+                pitching_data['Game_Fatigue_Factor'] = 0
 
                 batting_data = pd.read_csv(str(season) + " player-stats-Batters.csv")
                 batting_data['Season'] = str(season)
                 batting_data['Total_OB'] = batting_data['H'] + batting_data['BB'] + batting_data['HBP']
                 batting_data['Total_Outs'] = batting_data['AB'] - batting_data['H'] + batting_data['HBP']
                 batting_data = batting_data[batting_data['AB'] >= 25]  # drop players without enough AB
+                batting_data['Game_Fatigue_Factor'] = 0
 
                 if self.pitching_data is None:
                     self.pitching_data = pitching_data
@@ -152,15 +157,24 @@ class BaseballStats:
         return
 
     def print_prior_season(self, teams=['MIN']):
-        df = self.batting_data.drop(['Total_OB', 'Total_Outs'], axis=1)
+        df = remove_non_print_cols(self.batting_data, False)
+        # df = self.batting_data.drop(['Total_OB', 'Total_Outs'], axis=1)
         print(df[df['Team'].isin(teams)].to_string(justify='center'))
         print('')
-        df = self.pitching_data.drop(['Total_OB', 'Total_Outs'], axis=1)
+        df = remove_non_print_cols(self.pitching_data, True)
+        # df = self.pitching_data.drop(['Total_OB', 'Total_Outs'], axis=1)
         print(df[df['Team'].isin(teams)].to_string(justify='center'))
         return
 
 
 # static function start
+def remove_non_print_cols(df_input, bpitchers=False):
+    df = df_input.drop(['Season', 'Total_OB', 'Total_Outs', 'Game_Fatigue_Factor'], axis=1)  # pitcher and hitter
+    if bpitchers:
+        df = df.drop(['AVG_faced'], axis=1)
+    return df
+
+
 def trunc_col(df_n, d=3):
     return (df_n * 10 ** d).astype(int) / 10 ** d
 

@@ -1,5 +1,6 @@
 import pandas as pd
 import teamgamestats
+import bbstats
 
 
 class Team:
@@ -52,7 +53,8 @@ class Team:
         ops_index = self.insert_player_in_lineup(lineup_list=ops_index, player_index=slg_index[1], target_pos=5)  # 5th
         self.lineup = self.pos_players.loc[ops_index]
         self.lineup_new_season = self.baseball_data.new_season_batting_data.loc[ops_index]  # get the new season stats
-        self.lineup_new_season.drop(['Season', 'Total_OB', 'Total_Outs'], axis=1, inplace=True)
+        # self.lineup_new_season = bbstats.remove_non_print_cols(self.lineup_new_season, False)
+        # self.lineup_new_season.drop(['Season', 'Total_OB', 'Total_Outs'], axis=1, inplace=True)
         for row_num in range(0, len(self.lineup)):  # set up battering order in lineup card by index
             self.cur_lineup_index.append(self.lineup.index[row_num])
             player_index = self.lineup.index[row_num]  # grab the index of the player and set pos for game
@@ -119,15 +121,15 @@ class Team:
     def print_starting_lineups(self, current_season_stats=True):
         print(f'Starting lineup for {self.team_name}:')
         if current_season_stats:
-            print(self.lineup_new_season.to_string(index=True, justify='center'))
-            print('')
-            print(f'Pitching for {self.team_name}:')
-            print(self.pitching_new_season.to_string(index=True, justify='center'))
-            print('')
+            dfb = bbstats.remove_non_print_cols(self.lineup_new_season, False)
+            dfp = bbstats.remove_non_print_cols(self.pitching_new_season, True)
         else:
-            print(self.lineup.to_string(index=True, justify='center'))
-            print('')
-            print(f'Pitching for {self.team_name}:')
-            print(self.pitching.to_string(index=True, justify='center'))
-            print('')
+            dfb = bbstats.remove_non_print_cols(self.lineup, False)
+            dfp = bbstats.remove_non_print_cols(self.pitching, True)
+
+        print(dfb.to_string(index=True, justify='center'))
+        print('')
+        print(f'Pitching for {self.team_name}:')
+        print(dfp.to_string(index=True, justify='center'))
+        print('')
         return

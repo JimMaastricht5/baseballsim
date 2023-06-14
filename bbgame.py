@@ -161,8 +161,8 @@ class Game:
         self.teams[0].box_score.totals()
         self.teams[1].box_score.totals()
         if self.print_box_score:  # to print or not to print...
-            self.teams[0].box_score.print()
-            self.teams[1].box_score.print()
+            self.teams[0].box_score.print_boxes()
+            self.teams[1].box_score.print_boxes()
         print('Final:')
         self.print_inning_score()
         return self.total_score, self.inning, self.win_loss

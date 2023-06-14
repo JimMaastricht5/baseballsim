@@ -8,7 +8,8 @@ class TeamGameStatsBoxScore:
         self.box_pitching[['G', 'GS']] = 1
         self.box_pitching[['CG', 'SHO', 'IP', 'H', 'ER', 'K', 'BB', 'HR', 'W', 'L', 'SV', 'BS', 'HLD', 'ERA', 'WHIP',
                            'OBP', 'SLG', 'OPS']] = 0
-        self.box_pitching.drop(['Season', 'Total_OB', 'Total_Outs'], axis=1, inplace=True)
+        # self.box_pitching.drop(['Season', 'Total_OB', 'Total_Outs'], axis=1, inplace=True)
+        self.box_pitching = bbstats.remove_non_print_cols(self.box_pitching, True)
         self.team_box_pitching = None
         self.game_pitching_stats = None
 
@@ -16,7 +17,8 @@ class TeamGameStatsBoxScore:
         self.box_batting[['G']] = 1
         self.box_batting[['AB', 'R', 'H', '2B', '3B', 'HR', 'RBI', 'SB', 'CS', 'BB', 'SO', 'SH', 'SF', 'HBP', 'AVG',
                           'OBP', 'SLG', 'OPS']] = 0
-        self.box_batting.drop(['Season', 'Total_OB', 'Total_Outs'], axis=1, inplace=True)
+        self.box_batting = bbstats.remove_non_print_cols(self.box_batting, False)
+        # self.box_batting.drop(['Season', 'Total_OB', 'Total_Outs'], axis=1, inplace=True)
         self.team_box_batting = None
         self.game_batting_stats = None
 
@@ -98,7 +100,7 @@ class TeamGameStatsBoxScore:
         self.box_pitching = bbstats.team_pitching_stats(self.box_pitching)
         return
 
-    def print(self):
+    def print_boxes(self):
         print(self.box_batting.to_string(index=False, justify='center'))
         print('')
         print(self.box_pitching.to_string(index=False, justify='center'))

@@ -149,10 +149,12 @@ class BaseballStats:
             team_batting_stats(self.new_season_batting_data[self.new_season_batting_data['AB'] > 0].fillna(0))
 
     def print_current_season(self, teams=['MIL']):
-        df = self.new_season_batting_data.drop(['Total_OB', 'Total_Outs'], axis=1)
+        df = remove_non_print_cols(self.new_season_batting_data, False)
+        # df = self.new_season_batting_data.drop(['Total_OB', 'Total_Outs'], axis=1)
         print(df[df['Team'].isin(teams)].to_string(justify='center'))
         print('')
-        df = self.new_season_pitching_data.drop(['Total_OB', 'Total_Outs'], axis=1)
+        df = remove_non_print_cols(self.new_season_pitching_data, True)
+        # df = self.new_season_pitching_data.drop(['Total_OB', 'Total_Outs'], axis=1)
         print(df[df['Team'].isin(teams)].to_string(justify='center'))
         return
 
@@ -180,25 +182,33 @@ def trunc_col(df_n, d=3):
 
 
 def team_batting_stats(df):
-    df['AVG'] = trunc_col(df['H'] / df['AB'], 3)
-    df['OBP'] = trunc_col((df['H'] + df['BB'] + df['HBP']) / (df['AB'] + df['BB'] + df['HBP']), 3)
-    df['SLG'] = trunc_col(((df['H'] - df['2B'] - df['3B'] - df['HR']) + df['2B'] * 2 + df['3B'] * 3 + df['HR'] * 4) /
-                          df['AB'], 3)
-    df['OPS'] = trunc_col(df['OBP'] + df['SLG'] + df['SLG'], 3)
+    df = df[df['AB'] > 0]
+    try:
+        df['AVG'] = trunc_col(df['H'] / df['AB'], 3)
+        df['OBP'] = trunc_col((df['H'] + df['BB'] + df['HBP']) / (df['AB'] + df['BB'] + df['HBP']), 3)
+        df['SLG'] = trunc_col(((df['H'] - df['2B'] - df['3B'] - df['HR']) + df['2B'] * 2 + df['3B'] * 3 + df['HR'] * 4) /
+                              df['AB'], 3)
+        df['OPS'] = trunc_col(df['OBP'] + df['SLG'] + df['SLG'], 3)
+    except ZeroDivisionError:
+        pass  # skip calculation for zero div error
     return df
 
 
 def team_pitching_stats(df):
     # missing data
     # hbp is 0, 2b are 0, 3b are 0
-    df['IP'] = trunc_col(df['IP'] + .0001, 3)
-    df_ab = df['IP'] * 3 + df['H']
-    df['AVG'] = trunc_col(df['H'] / df_ab, 3)
-    df['OBP'] = trunc_col((df['H'] + df['BB'] + 0) / (df_ab + df['BB'] + 0), 3)
-    df['SLG'] = trunc_col(((df['H'] - 0 - 0 - df['HR']) + 0 * 2 + 0 * 3 + df['HR'] * 4) / df_ab, 3)
-    df['OPS'] = trunc_col(df['OBP'] + df['SLG'] + df['SLG'], 3)
-    df['WHIP'] = trunc_col((df['BB'] + df['H']) / df['IP'], 3)
-    df['ERA'] = trunc_col((df['ER'] / df['IP']) * 9)
+    df = df[df['IP'] > 0]
+    try:
+        df['IP'] = trunc_col(df['IP'] + .0001, 3)
+        df_ab = df['IP'] * 3 + df['H']
+        df['AVG'] = trunc_col(df['H'] / df_ab, 3)
+        df['OBP'] = trunc_col((df['H'] + df['BB'] + 0) / (df_ab + df['BB'] + 0), 3)
+        df['SLG'] = trunc_col(((df['H'] - 0 - 0 - df['HR']) + 0 * 2 + 0 * 3 + df['HR'] * 4) / df_ab, 3)
+        df['OPS'] = trunc_col(df['OBP'] + df['SLG'] + df['SLG'], 3)
+        df['WHIP'] = trunc_col((df['BB'] + df['H']) / df['IP'], 3)
+        df['ERA'] = trunc_col((df['ER'] / df['IP']) * 9)
+    except ZeroDivisionError:
+        pass  # trap zero division error
     return df
 
 

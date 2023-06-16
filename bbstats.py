@@ -10,8 +10,6 @@ class BaseballStats:
                               'AVG', 'OBP', 'SLG', 'OPS']
         self.numeric_pcols = ['G', 'GS', 'CG', 'SHO', 'IP', 'H', 'ER', 'K', 'BB', 'HR', 'W', 'L',
                               'SV', 'BS', 'HLD', 'ERA', 'WHIP']
-        self.fatigue_start = .85  # 85% of avg max is where fatigue starts
-        self.fatigue_rate = .001  # at 85% of avg max pitchers have a .014 increase in OBP.  using .001 as proxy
 
         self.load_seasons = load_seasons  # list of seasons to load from csv files
         self.new_season = new_season

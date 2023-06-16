@@ -38,9 +38,12 @@ class Game:
         self.winning_pitcher = None
         self.losing_pitcher = None
 
+        self.fatigue_start_perc = 50  # % of avg max is where fatigue starts
+        self.fatigue_rate = .001  # at 85% of avg max pitchers have a .014 increase in OBP.  using .001 as proxy
+
         self.rng = np.random.default_rng()  # random number generator between 0 and 1
         self.bases = bbbaserunners.Bases()
-        self.at_bat = at_bat.SimAB(self.baseball_data)
+        self.at_bat = at_bat.SimAB(self.baseball_data)  # setup at class
         return
 
     def update_inning_score(self, number_of_runs=0):
@@ -75,9 +78,23 @@ class Game:
         print('')
         return
 
+    def update_fatigue(self, cur_pitching_index, pitching):
+        # number of batters faced in game vs. historic avg with fatigue start as a ratio
+        in_game_fatigue = 0
+        cur_game_faced = self.teams[(self.top_bottom + 1) % 2].box_score.batters_faced(cur_pitching_index)
+        avg_faced = self.teams[(self.top_bottom + 1) % 2].pitching.iloc[0].AVG_faced  # data for pitcher
+        cur_percentage = cur_game_faced / avg_faced * 100
+        # kicker = 0 if cur_percentage <= 100 else (cur_percentage - 100)
+        if cur_percentage >= self.fatigue_start_perc:
+            in_game_fatigue = (cur_percentage - self.fatigue_start_perc) * self.fatigue_rate # + kicker * self.fatigue_rate  # fatigue quickly after reaching 100%
+        print(cur_game_faced, avg_faced)
+        print(cur_percentage, in_game_fatigue)
+        return in_game_fatigue  # obp impact to pitcher of fatigue
+
     def sim_ab(self):
         cur_pitching_index = self.teams[(self.top_bottom + 1) % 2].cur_pitcher_index
         pitching = self.teams[(self.top_bottom + 1) % 2].pitching.iloc[0]  # data for pitcher
+        pitching.Game_Fatigue_Factor = self.update_fatigue(cur_pitching_index, pitching)
 
         cur_batter_index = self.teams[self.top_bottom].cur_lineup_index[self.batting_num[self.top_bottom]-1]
         batting = self.teams[self.top_bottom].lineup.iloc[self.batting_num[self.top_bottom]-1]  # data for batter

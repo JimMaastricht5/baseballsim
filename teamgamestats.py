@@ -28,6 +28,10 @@ class TeamGameStatsBoxScore:
         self.total_errors = 0
         return
 
+    def batters_faced(self, pitcher_index):
+        total_faced = self.box_pitching.loc[pitcher_index].H + self.box_pitching.loc[pitcher_index].BB + self.box_pitching.loc[pitcher_index].IP
+        return total_faced
+
     def pitching_result(self, pitcher_index, outcome):
         # print(pitcher_num, outcome)
         # print(self.box_pitching)

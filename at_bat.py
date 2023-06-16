@@ -61,7 +61,8 @@ class SimAB:
 
     def onbase(self):
         # print('on base: ' + str(self.odds_ratio(self.batting.OBP, self.pitching.OBP, self.league_batting_obp)))
-        return self.rng() < self.odds_ratio(self.batting.OBP, self.pitching.OBP, self.league_batting_obp)
+        return self.rng() < self.odds_ratio(self.batting.OBP, self.pitching.OBP + self.pitching.Game_Fatigue_Factor,
+                                            self.league_batting_obp)
 
     def bb(self):
         return self.rng() < self.odds_ratio((self.batting.BB / self.batting.Total_OB),

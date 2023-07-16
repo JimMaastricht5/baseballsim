@@ -86,6 +86,18 @@ class Team:
         self.pitching_new_season.drop(['Season', 'Total_OB', 'Total_Outs'], axis=1, inplace=True)
         return
 
+    def pitching_change(self):  # ?? need to understand game situation for close or mid
+        print('gameteam.pitching_change')
+        print(self.middle_relievers)
+        print(self.pitching)
+        reliever_pitcher_index = self.middle_relievers.index[0]
+        print(f'gameteam.pitching change{reliever_pitcher_index}')
+        self.cur_pitcher_index = reliever_pitcher_index
+        self.pitching = self.middle_relievers.loc[reliever_pitcher_index]
+        print(self.pitching)
+        self.box_score.add_pitcher_to_box(self.middle_relievers.loc[reliever_pitcher_index])
+        return
+
     def set_closers(self):
         # grab top two closers for setup and final close
         not_selected_criteria = ~self.pitchers.index.isin(self.starting_pitchers.index)

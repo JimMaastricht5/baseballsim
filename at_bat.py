@@ -44,6 +44,7 @@ class SimAB:
     # Odds(matchup) = .590 -> Matchup OBP = .590 / 1.590 = .371
     #
     def odds_ratio(self, hitter_stat, pitcher_stat, league_stat):
+        # print(f'at_bat.odds ratio, hitter stat:{hitter_stat}, pitcher stat{pitcher_stat}')
         odds_ratio = 0
         with warnings.catch_warnings():
             warnings.filterwarnings("error")
@@ -61,7 +62,8 @@ class SimAB:
 
     def onbase(self):
         # print('on base: ' + str(self.odds_ratio(self.batting.OBP, self.pitching.OBP, self.league_batting_obp)))
-        return self.rng() < self.odds_ratio(self.batting.OBP, self.pitching.OBP + self.pitching.Game_Fatigue_Factor,
+        return self.rng() < self.odds_ratio(self.batting.OBP + self.pitching.Game_Fatigue_Factor,
+                                            self.pitching.OBP + self.pitching.Game_Fatigue_Factor,
                                             self.league_batting_obp)
 
     def bb(self):

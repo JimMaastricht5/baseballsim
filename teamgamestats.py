@@ -29,7 +29,11 @@ class TeamGameStatsBoxScore:
         return
 
     def batters_faced(self, pitcher_index):
-        total_faced = self.box_pitching.loc[pitcher_index].H + self.box_pitching.loc[pitcher_index].BB + self.box_pitching.loc[pitcher_index].IP
+        print('teamgamestats.batters_faced')
+        print(pitcher_index)
+        print(self.box_pitching)
+        total_faced = self.box_pitching.loc[pitcher_index].H + self.box_pitching.loc[pitcher_index].BB + \
+                      self.box_pitching.loc[pitcher_index].IP * 3
         return total_faced
 
     def pitching_result(self, pitcher_index, outcome):
@@ -49,6 +53,14 @@ class TeamGameStatsBoxScore:
 
         # add runs
         self.box_pitching.loc[pitcher_index, ['ER']] = self.box_pitching.loc[pitcher_index, ['ER']] + outcome[3]  # rbis
+        return
+    def add_pitcher_to_box(self, new_pitcher):
+        # print('teamgamestates.add_pitcher_to_box')
+        # print(new_pitcher)
+        # print(self.box_pitching)
+        self.box_pitching = pd.concat([self.box_pitching, new_pitcher.to_frame().T], ignore_index=True)
+        self.box_pitching = bbstats.remove_non_print_cols(self.box_pitching, True)
+        # print(self.box_pitching)
         return
 
     def pitching_win_loss(self, pitcher_index, bwin):

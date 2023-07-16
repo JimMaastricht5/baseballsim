@@ -34,6 +34,7 @@ class BaseballStats:
                 pitching_data = pitching_data[pitching_data['IP'] >= 10]  # drop pitchers without enough innings
                 pitching_data['AVG_faced'] = (pitching_data['Total_OB'] + pitching_data['Total_Outs']) / pitching_data.G
                 pitching_data['Game_Fatigue_Factor'] = 0
+                pitching_data['Condition'] = 100
 
                 batting_data = pd.read_csv(str(season) + " player-stats-Batters.csv")
                 batting_data['Season'] = str(season)
@@ -41,6 +42,7 @@ class BaseballStats:
                 batting_data['Total_Outs'] = batting_data['AB'] - batting_data['H'] + batting_data['HBP']
                 batting_data = batting_data[batting_data['AB'] >= 25]  # drop players without enough AB
                 batting_data['Game_Fatigue_Factor'] = 0
+                batting_data['Condition'] = 100
 
                 if self.pitching_data is None:
                     self.pitching_data = pitching_data
@@ -169,7 +171,7 @@ class BaseballStats:
 
 # static function start
 def remove_non_print_cols(df_input, bpitchers=False):
-    df = df_input.drop(['Season', 'Total_OB', 'Total_Outs', 'Game_Fatigue_Factor'], axis=1)  # pitcher and hitter
+    df = df_input.drop(['Season', 'Total_OB', 'Total_Outs', 'Game_Fatigue_Factor', 'Condition'], axis=1)  # pitcher and hitter
     if bpitchers:
         df = df.drop(['AVG_faced'], axis=1)
     return df

@@ -58,7 +58,7 @@ class TeamGameStatsBoxScore:
         # print('teamgamestates.add_pitcher_to_box')
         # print(new_pitcher)
         # print(self.box_pitching)
-        self.box_pitching = pd.concat([self.box_pitching, new_pitcher.to_frame().T], ignore_index=True)
+        self.box_pitching = pd.concat([self.box_pitching, new_pitcher.to_frame().T], ignore_index=False)
         self.box_pitching = bbstats.remove_non_print_cols(self.box_pitching, True)
         # print(self.box_pitching)
         return

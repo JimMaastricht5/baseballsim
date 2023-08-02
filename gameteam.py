@@ -1,5 +1,5 @@
 import pandas as pd
-import teamgamestats
+import teamgameboxstats
 import bbstats
 
 
@@ -32,7 +32,7 @@ class Team:
         self.set_mid_relief()
         if show_lineup:
             self.print_starting_lineups(current_season_stats=current_season_stats)
-        self.box_score = teamgamestats.TeamGameStatsBoxScore(self.lineup, self.pitching, self.team_name)
+        self.box_score = teamgameboxstats.TeamBoxScore(self.lineup, self.pitching, self.team_name)
         return
 
     def set_batting_order(self):
@@ -93,8 +93,8 @@ class Team:
         reliever_pitcher_index = self.middle_relievers.index[0]
         print(f'gameteam.pitching change{reliever_pitcher_index}')
         self.cur_pitcher_index = reliever_pitcher_index
-        self.pitching = self.middle_relievers.loc[reliever_pitcher_index]
-        print(self.pitching)
+        self.pitching = pd.DataFrame(self.middle_relievers.loc[reliever_pitcher_index].to_frame().T)
+        print(f'teamgame pitching change self.pitching {self.pitching}')
         self.box_score.add_pitcher_to_box(self.middle_relievers.loc[reliever_pitcher_index])
         return
 

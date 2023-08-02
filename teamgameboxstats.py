@@ -3,7 +3,7 @@ import bbstats
 import numpy as np
 
 
-class TeamGameStatsBoxScore:
+class TeamBoxScore:
     def __init__(self, lineup, pitching, team_name):
         self.box_pitching = pitching.copy()
         self.box_pitching[['G', 'GS']] = 1

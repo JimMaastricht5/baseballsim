@@ -96,6 +96,7 @@ class Game:
         cur_percentage = cur_game_faced / avg_faced * 100
         # kicker = 0 if cur_percentage <= 100 else (cur_percentage - 100)
         print(f'bb game update fatigue {cur_game_faced}, {avg_faced}, {cur_percentage}')
+        print(pitching)
         if cur_percentage >= self.fatigue_start_perc:
             in_game_fatigue = (cur_percentage - self.fatigue_start_perc) * self.fatigue_rate  # + kicker * self.fatigue_rate  # fatigue quickly after reaching 100%
         # print(f'bbgame.update_fatigue current game:{cur_game_faced} avg_batters_faced:{avg_faced}')
@@ -105,6 +106,8 @@ class Game:
     def sim_ab(self):
         cur_pitching_index = self.teams[self.team_pitching()].cur_pitcher_index
         pitching = self.teams[self.team_pitching()].pitching.iloc[0]  # data for pitcher
+        if isinstance(pitching, pd.DataFrame):
+            pitching = pitching.to_series()
         pitching.Game_Fatigue_Factor, cur_percentage = self.update_fatigue(cur_pitching_index, pitching)
         pitching.Condition = 100 - cur_percentage if 100 - cur_percentage >= 0 else 0
 

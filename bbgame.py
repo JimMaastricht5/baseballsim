@@ -41,8 +41,8 @@ class Game:
         self.winning_pitcher = None
         self.losing_pitcher = None
 
-        self.fatigue_start_perc = 15  # % of avg max is where fatigue starts
-        self.fatigue_rate = .001  # at 85% of avg max pitchers have a .014 increase in OBP.  using .001 as proxy
+        # self.fatigue_start_perc = 15  # % of avg max is where fatigue starts
+        # self.fatigue_rate = .001  # at 85% of avg max pitchers have a .014 increase in OBP.  using .001 as proxy
 
         self.rng = np.random.default_rng()  # random number generator between 0 and 1
         self.bases = bbbaserunners.Bases()
@@ -88,31 +88,18 @@ class Game:
         print('')
         return
 
-    def update_fatigue(self, cur_pitching_index, pitching):
-        # number of batters faced in game vs. historic avg with fatigue start as a ratio
-        in_game_fatigue = 0
-        cur_game_faced = self.teams[self.team_pitching()].box_score.batters_faced(cur_pitching_index)
-        avg_faced = self.teams[self.team_pitching()].pitching.iloc[0].AVG_faced  # data for pitcher
-        cur_percentage = cur_game_faced / avg_faced * 100
-        # kicker = 0 if cur_percentage <= 100 else (cur_percentage - 100)
-        print(f'bb game update fatigue {cur_game_faced}, {avg_faced}, {cur_percentage}')
-        print(pitching)
-        if cur_percentage >= self.fatigue_start_perc:
-            in_game_fatigue = (cur_percentage - self.fatigue_start_perc) * self.fatigue_rate  # + kicker * self.fatigue_rate  # fatigue quickly after reaching 100%
-        # print(f'bbgame.update_fatigue current game:{cur_game_faced} avg_batters_faced:{avg_faced}')
-        # print(f'current %:{cur_percentage} in game fatigue:{in_game_fatigue}')
-        return in_game_fatigue, cur_percentage  # obp impact to pitcher of fatigue
+
 
     def sim_ab(self):
         cur_pitching_index = self.teams[self.team_pitching()].cur_pitcher_index
-        pitching = self.teams[self.team_pitching()].pitching.iloc[0]  # data for pitcher
-        if isinstance(pitching, pd.DataFrame):
-            pitching = pitching.to_series()
-        pitching.Game_Fatigue_Factor, cur_percentage = self.update_fatigue(cur_pitching_index, pitching)
+        pitching = self.teams[self.team_pitching()].cur_pitcher_stats()  # data for pitcher
+
+        pitching.Game_Fatigue_Factor, cur_percentage = self.teams[self.team_pitching()].update_fatigue(cur_pitching_index)
         pitching.Condition = 100 - cur_percentage if 100 - cur_percentage >= 0 else 0
 
         cur_batter_index = self.teams[self.team_hitting()].cur_lineup_index[self.batting_num[self.team_hitting()]-1]
-        batting = self.teams[self.team_hitting()].lineup.iloc[self.batting_num[self.team_hitting()]-1]  #data for batter
+        batting = self.teams[self.team_hitting()].cur_batter_stats(self.batting_num[self.team_hitting()]-1) # lineup #
+        # batting = self.teams[self.team_hitting()].lineup.iloc[self.batting_num[self.team_hitting()]-1]  #data for batter
         self.bases.new_ab(batter_num=cur_batter_index, player_name=batting.Player)
         outcome = self.at_bat.outcome(pitching, batting)
         if outcome[0] == 'OUT':
@@ -153,6 +140,7 @@ class Game:
                 if (self.batting_num[self.team_hitting()] + 1) <= 9 else 1  # wrap around lineup
             if pitching.Condition <= 10:  # pitching change
                 self.teams[self.team_pitching()].pitching_change()
+
 
         # half inning over
         self.update_inning_score(number_of_runs=0)  # push a zero on the board if no runs score this half inning

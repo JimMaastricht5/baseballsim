@@ -23,6 +23,9 @@ class Team:
         self.box_score = None
         self.game_num = game_num
         self.rotation_len = rotation_len
+
+        self.fatigue_start_perc = 15  # % of avg max is where fatigue starts
+        self.fatigue_rate = .001  # at 85% of avg max pitchers have a .014 increase in OBP.  using .001 as proxy
         return
 
     def set_lineup(self, show_lineup=False, current_season_stats=True):
@@ -86,6 +89,32 @@ class Team:
         self.pitching_new_season.drop(['Season', 'Total_OB', 'Total_Outs'], axis=1, inplace=True)
         return
 
+    def cur_pitcher_stats(self):
+        pitching = self.pitching.iloc[0]  # data for pitcher
+        if isinstance(pitching, pd.DataFrame):  # ?? this should never happen
+            pitching = pitching.to_series()
+        return pitching  # should be a series with a single row
+
+    def cur_batter_stats(self, loc_in_lineup):
+        batting = self.lineup.iloc[loc_in_lineup]  # data for batter
+        return batting  # should be a series with a single row
+
+    def update_fatigue(self, cur_pitching_index):
+        # number of batters faced in game vs. historic avg with fatigue start as a ratio
+        in_game_fatigue = 0
+        cur_game_faced = self.box_score.batters_faced(cur_pitching_index)
+        print(f'current game faced {cur_game_faced}')
+        avg_faced = self.cur_pitcher_stats().AVG_faced  # data for pitcher
+        cur_percentage = cur_game_faced / avg_faced * 100
+        print(f'bb game update fatigue {cur_game_faced}, {avg_faced}, {cur_percentage}')
+        print(self.cur_pitcher_stats())
+        # + kicker * self.fatigue_rate  # fatigue quickly after reaching 100%
+        if cur_percentage >= self.fatigue_start_perc:
+            in_game_fatigue = (cur_percentage - self.fatigue_start_perc) * self.fatigue_rate
+        # print(f'bbgame.update_fatigue current game:{cur_game_faced} avg_batters_faced:{avg_faced}')
+        # print(f'current %:{cur_percentage} in game fatigue:{in_game_fatigue}')
+        return in_game_fatigue, cur_percentage  # obp impact to pitcher of fatigue
+
     def pitching_change(self):  # ?? need to understand game situation for close or mid
         print('gameteam.pitching_change')
         print(self.middle_relievers)
@@ -96,7 +125,7 @@ class Team:
         self.pitching = pd.DataFrame(self.middle_relievers.loc[reliever_pitcher_index].to_frame().T)
         print(f'teamgame pitching change self.pitching {self.pitching}')
         self.box_score.add_pitcher_to_box(self.middle_relievers.loc[reliever_pitcher_index])
-        return
+        return self.cur_pitcher_index
 
     def set_closers(self):
         # grab top two closers for setup and final close

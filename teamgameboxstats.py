@@ -55,12 +55,17 @@ class TeamBoxScore:
         self.box_pitching.loc[pitcher_index, ['ER']] = self.box_pitching.loc[pitcher_index, ['ER']] + outcome[3]  # rbis
         return
     def add_pitcher_to_box(self, new_pitcher):
-        # print('teamgamestates.add_pitcher_to_box')
-        # print(new_pitcher)
-        # print(self.box_pitching)
+        print('teamgamestates.add_pitcher_to_box')
+        print(new_pitcher)
+        print(f'before concat {self.box_pitching}')
+        new_pitcher.assign(G=1, GS=0, CG=0, SHO=0, IP=0, H=0, ER=0, K=0, HR=0, W=0, L=0, SV=0, HLD=0, ERA=0,
+                           WHIP=0, OBP=0, SLG=0, OPS=0, Condition=100)
+        print(new_pitcher)
         self.box_pitching = pd.concat([self.box_pitching, new_pitcher.to_frame().T], ignore_index=False)
+        print(f'after concat {self.box_pitching}')
         self.box_pitching = bbstats.remove_non_print_cols(self.box_pitching, True)
-        # print(self.box_pitching)
+        print(f'after remove non print {self.box_pitching}')
+        print('end add pitcher to box')
         return
 
     def pitching_win_loss(self, pitcher_index, bwin):

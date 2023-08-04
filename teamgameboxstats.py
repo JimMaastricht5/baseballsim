@@ -29,16 +29,11 @@ class TeamBoxScore:
         return
 
     def batters_faced(self, pitcher_index):
-        print('teamgamestats.batters_faced')
-        print(pitcher_index)
-        print(self.box_pitching)
         total_faced = self.box_pitching.loc[pitcher_index].H + self.box_pitching.loc[pitcher_index].BB + \
                       self.box_pitching.loc[pitcher_index].IP * 3
         return total_faced
 
     def pitching_result(self, pitcher_index, outcome):
-        # print(pitcher_num, outcome)
-        # print(self.box_pitching)
         outcome[1] = 'K' if outcome[1] == 'SO' else outcome[1]  # handle stat translation from pitcher SO to batter K
         if outcome[0] == 'OUT':
             self.box_pitching.loc[pitcher_index, ['IP']] = self.box_pitching.loc[pitcher_index, ['IP']] + .333333
@@ -55,17 +50,13 @@ class TeamBoxScore:
         self.box_pitching.loc[pitcher_index, ['ER']] = self.box_pitching.loc[pitcher_index, ['ER']] + outcome[3]  # rbis
         return
     def add_pitcher_to_box(self, new_pitcher):
-        print('teamgamestates.add_pitcher_to_box')
-        print(new_pitcher)
-        print(f'before concat {self.box_pitching}')
-        new_pitcher.assign(G=1, GS=0, CG=0, SHO=0, IP=0, H=0, ER=0, K=0, HR=0, W=0, L=0, SV=0, HLD=0, ERA=0,
-                           WHIP=0, OBP=0, SLG=0, OPS=0, Condition=100)
-        print(new_pitcher)
-        self.box_pitching = pd.concat([self.box_pitching, new_pitcher.to_frame().T], ignore_index=False)
-        print(f'after concat {self.box_pitching}')
+        new_pitcher = new_pitcher if isinstance(new_pitcher, pd.DataFrame) else new_pitcher.to_frame().T
+        new_pitcher[['G', 'GS']] = 1
+        new_pitcher[['CG', 'SHO', 'IP', 'H', 'ER', 'K', 'BB', 'HR', 'W', 'L', 'SV', 'BS', 'HLD', 'ERA', 'WHIP',
+                           'OBP', 'SLG', 'OPS']] = 0
+        new_pitcher[['Condition']] = 100
+        self.box_pitching = pd.concat([self.box_pitching, new_pitcher], ignore_index=False)
         self.box_pitching = bbstats.remove_non_print_cols(self.box_pitching, True)
-        print(f'after remove non print {self.box_pitching}')
-        print('end add pitcher to box')
         return
 
     def pitching_win_loss(self, pitcher_index, bwin):
@@ -90,7 +81,6 @@ class TeamBoxScore:
         self.total_hits = self.box_batting['H'].sum()
         self.box_batting.loc[batter_index, ['RBI']] = self.box_batting.loc[batter_index, ['RBI']] + outcome[3]  # rbis
 
-        # print(players_scored_list)
         for scored_index in players_scored_list.keys():
             self.box_batting.loc[scored_index, ['R']] = self.box_batting.loc[scored_index, ['R']] + 1
         return

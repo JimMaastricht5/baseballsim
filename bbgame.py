@@ -93,7 +93,6 @@ class Game:
     def sim_ab(self):
         cur_pitching_index = self.teams[self.team_pitching()].cur_pitcher_index
         pitching = self.teams[self.team_pitching()].cur_pitcher_stats()  # data for pitcher
-
         pitching.Game_Fatigue_Factor, cur_percentage = self.teams[self.team_pitching()].update_fatigue(cur_pitching_index)
         pitching.Condition = 100 - cur_percentage if 100 - cur_percentage >= 0 else 0
 
@@ -130,7 +129,6 @@ class Game:
                 for player_id in self.bases.player_scored.keys():
                     players = players + ', ' + self.bases.player_scored[player_id] if players != '' \
                         else self.bases.player_scored[player_id]
-                # print(f'{self.bases.player_scored} scored!')
                 print(f'\tScored {self.bases.runs_scored} run(s)!  ({players})\n'
                       f'\tThe score is {self.team_names[0]} {self.total_score[0]} to'
                       f' {self.team_names[1]} {self.total_score[1]}')  # ?? need to handle walk offs...
@@ -138,8 +136,12 @@ class Game:
                 print(f'\t{self.bases.describe_runners()}')
             self.batting_num[self.team_hitting()] = self.batting_num[self.team_hitting()] + 1 \
                 if (self.batting_num[self.team_hitting()] + 1) <= 9 else 1  # wrap around lineup
-            if pitching.Condition <= 10:  # pitching change
+            if pitching.Condition <= 10 and self.outs < 3:  # pitching change
+                print(f'\tManager has made the call to the bull pen.  Pitching change....')
                 self.teams[self.team_pitching()].pitching_change()
+                pitching = self.teams[self.team_pitching()].cur_pitcher_stats()  # data for pitcher
+                print(f'\t{pitching.Player} has entered the game for {self.team_names[self.team_pitching()]}')
+
 
 
         # half inning over

@@ -153,13 +153,15 @@ class BaseballStats:
             team_batting_stats(self.new_season_batting_data[self.new_season_batting_data['AB'] > 0].fillna(0))
 
     def print_current_season(self, teams=['MIL']):
-        df = team_batting_totals(self.new_season_batting_data, team_name='', concat=True)
-        df = remove_non_print_cols(df, False).sort_values(by='OPS', ascending=False)
+        teams.append('')
+        df = self.new_season_batting_data.copy().sort_values(by='OPS', ascending=False)
+        df = team_batting_totals(df, team_name='', concat=True)
+        df = remove_non_print_cols(df, False)
         print(df[df['Team'].isin(teams)].to_string(justify='center'))
-
-        print('')
-        df = team_pitching_totals(self.new_season_pitching_data, team_name='', concat=True)
-        df = remove_non_print_cols(df, True).sort_values(by='ERA', ascending=True)
+        print('\n\n')
+        df = self.new_season_pitching_data.copy().sort_values(by='ERA', ascending=True)
+        df = team_pitching_totals(df, team_name='', concat=True)
+        df = remove_non_print_cols(df, True)
         print(df[df['Team'].isin(teams)].to_string(justify='center'))
         return
 
@@ -220,7 +222,7 @@ def team_pitching_stats(df):
 def team_batting_totals(batting_df, team_name='', concat=True):
     df = batting_df.copy()
     df = df[['AB', 'R', 'H', '2B', '3B', 'HR', 'RBI', 'SB', 'CS', 'BB', 'SO', 'SH', 'SF', 'HBP']].sum().astype(int)
-    df['Player'] = 'Team Totals'
+    df['Player'] = 'Totals'
     df['Team'] = team_name
     df['Age'] = ''
     df['Pos'] = ''
@@ -237,7 +239,7 @@ def team_pitching_totals(pitching_df, team_name='', concat=True):
     df = df[['GS', 'CG', 'SHO', 'IP', 'H', 'ER', 'K', 'BB', 'HR', 'W', 'L', 'SV', 'BS',
              'HLD', 'ERA', 'WHIP']].sum().astype(int)
     cols_to_trunc = ['GS', 'CG', 'SHO', 'H', 'ER', 'K', 'BB', 'HR', 'W', 'L', 'SV', 'BS', 'HLD']
-    df['Player'] = 'Team Totals'
+    df['Player'] = 'Totals'
     df['Team'] = team_name
     df['Age'] = ''
     df['G'] = np.max(pitching_df['G'])

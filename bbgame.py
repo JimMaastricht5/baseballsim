@@ -3,7 +3,6 @@ import gameteam
 import at_bat
 import numpy as np
 import bbbaserunners
-import pandas as pd
 
 AWAY = 0
 HOME = 1
@@ -88,17 +87,15 @@ class Game:
         print('')
         return
 
-
-
     def sim_ab(self):
-        cur_pitching_index = self.teams[self.team_pitching()].cur_pitcher_index
+        cur_pitcher_index = self.teams[self.team_pitching()].cur_pitcher_index
         pitching = self.teams[self.team_pitching()].cur_pitcher_stats()  # data for pitcher
-        pitching.Game_Fatigue_Factor, cur_percentage = self.teams[self.team_pitching()].update_fatigue(cur_pitching_index)
+        pitching.Game_Fatigue_Factor, cur_percentage = \
+            self.teams[self.team_pitching()].update_fatigue(cur_pitcher_index)
         pitching.Condition = 100 - cur_percentage if 100 - cur_percentage >= 0 else 0
 
         cur_batter_index = self.teams[self.team_hitting()].cur_lineup_index[self.batting_num[self.team_hitting()]-1]
-        batting = self.teams[self.team_hitting()].cur_batter_stats(self.batting_num[self.team_hitting()]-1) # lineup #
-        # batting = self.teams[self.team_hitting()].lineup.iloc[self.batting_num[self.team_hitting()]-1]  #data for batter
+        batting = self.teams[self.team_hitting()].cur_batter_stats(self.batting_num[self.team_hitting()]-1)  # lineup #
         self.bases.new_ab(batter_num=cur_batter_index, player_name=batting.Player)
         outcome = self.at_bat.outcome(pitching, batting)
         if outcome[0] == 'OUT':
@@ -107,7 +104,7 @@ class Game:
             self.bases.advance_runners(bases_to_advance=outcome[2])  # outcome 2 is number of bases to advance
             # self.total_score[self.top_bottom] += self.bases.runs_scored  # moved to update innning score
             outcome[3] = self.bases.runs_scored  # rbis for batter
-        self.teams[self.team_pitching()].box_score.pitching_result(cur_pitching_index, outcome)
+        self.teams[self.team_pitching()].box_score.pitching_result(cur_pitcher_index, outcome)
         self.teams[self.team_hitting()].box_score.batting_result(cur_batter_index, outcome, self.bases.player_scored)
         return pitching, batting, outcome
 
@@ -137,12 +134,11 @@ class Game:
             self.batting_num[self.team_hitting()] = self.batting_num[self.team_hitting()] + 1 \
                 if (self.batting_num[self.team_hitting()] + 1) <= 9 else 1  # wrap around lineup
             if pitching.Condition <= 10 and self.outs < 3:  # pitching change
-                print(f'\tManager has made the call to the bull pen.  Pitching change....')
                 self.teams[self.team_pitching()].pitching_change()
                 pitching = self.teams[self.team_pitching()].cur_pitcher_stats()  # data for pitcher
-                print(f'\t{pitching.Player} has entered the game for {self.team_names[self.team_pitching()]}')
-
-
+                if chatty:
+                    print(f'\tManager has made the call to the bull pen.  Pitching change....')
+                    print(f'\t{pitching.Player} has entered the game for {self.team_names[self.team_pitching()]}')
 
         # half inning over
         self.update_inning_score(number_of_runs=0)  # push a zero on the board if no runs score this half inning
@@ -199,8 +195,8 @@ if __name__ == '__main__':
     season_length = 1
     season_win_loss = [[0, 0], [0, 0]]  # away record pos 0, home pos 1
     team0_season_df = None
-    for game_num in range(1, season_length + 1):
-        print(f'Game number {game_num}: from bbgame.py test code')
+    for sim_game_num in range(1, season_length + 1):
+        print(f'Game number {sim_game_num}: from bbgame.py test code')
         game = Game(home_team_name=home_team, away_team_name=away_team, chatty=True, print_lineup=True,
                     print_box_score_b=True)
         score, inning, win_loss = game.sim_game()

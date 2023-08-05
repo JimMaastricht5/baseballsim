@@ -1,4 +1,12 @@
 import numpy as np
+
+# ??? punch list
+# walk with 1b open does not score a run
+# fo runners tag?
+# fc or dp erases lead runners
+# 2 out base hits scores runner from second (2 base advanced instead of one
+
+
 class Bases:
     def __init__(self):
         self.baserunners = None
@@ -22,7 +30,7 @@ class Bases:
         return
 
     def new_ab(self, batter_num=1, player_name=''):
-        self.baserunners[0] = batter_num # put a player ab
+        self.baserunners[0] = batter_num  # put a player ab
         self.baserunners_names[batter_num] = player_name  # add player name to lookup table
         self.player_scored = {}  # key to not double counting runs
         self.runs_scored = 0

@@ -2,6 +2,7 @@ import pandas as pd
 import random
 import city_names as city
 from itertools import combinations
+import numpy as np
 
 
 class BaseballStats:
@@ -129,7 +130,9 @@ class BaseballStats:
             print(i)
         return
 
-    def game_results_to_season(self, batting_box_score, pitching_box_score):
+    def game_results_to_season(self, box_score_class):
+        batting_box_score = box_score_class.get_batter_box()
+        pitching_box_score = box_score_class.get_pitcher_box()
         numeric_cols = self.numeric_bcols
         for index, row in batting_box_score.iterrows():
             new_row = batting_box_score.loc[index][numeric_cols] + self.new_season_batting_data.loc[index][numeric_cols]
@@ -149,12 +152,13 @@ class BaseballStats:
             team_batting_stats(self.new_season_batting_data[self.new_season_batting_data['AB'] > 0].fillna(0))
 
     def print_current_season(self, teams=['MIL']):
-        df = remove_non_print_cols(self.new_season_batting_data, False)
-        # df = self.new_season_batting_data.drop(['Total_OB', 'Total_Outs'], axis=1)
+        df = team_batting_totals(self.new_season_batting_data, team_name='', concat=True)
+        df = remove_non_print_cols(df, False).sort_values(by='OPS', ascending=False)
         print(df[df['Team'].isin(teams)].to_string(justify='center'))
+
         print('')
-        df = remove_non_print_cols(self.new_season_pitching_data, True)
-        # df = self.new_season_pitching_data.drop(['Total_OB', 'Total_Outs'], axis=1)
+        df = team_pitching_totals(self.new_season_pitching_data, team_name='', concat=True)
+        df = remove_non_print_cols(df, True).sort_values(by='ERA', ascending=True)
         print(df[df['Team'].isin(teams)].to_string(justify='center'))
         return
 
@@ -171,7 +175,7 @@ class BaseballStats:
 
 # static function start
 def remove_non_print_cols(df_input, bpitchers=False):
-    df = df_input.drop(['Season', 'Total_OB', 'Total_Outs', 'Game_Fatigue_Factor', 'Condition'], axis=1)  # pitcher and hitter
+    df = df_input.drop(['Season', 'Total_OB', 'Total_Outs', 'Game_Fatigue_Factor', 'Condition'], axis=1)  # pitch&hitter
     if bpitchers:
         df = df.drop(['AVG_faced'], axis=1)
     return df
@@ -186,8 +190,8 @@ def team_batting_stats(df):
     try:
         df['AVG'] = trunc_col(df['H'] / df['AB'], 3)
         df['OBP'] = trunc_col((df['H'] + df['BB'] + df['HBP']) / (df['AB'] + df['BB'] + df['HBP']), 3)
-        df['SLG'] = trunc_col(((df['H'] - df['2B'] - df['3B'] - df['HR']) + df['2B'] * 2 + df['3B'] * 3 + df['HR'] * 4) /
-                              df['AB'], 3)
+        df['SLG'] = trunc_col(
+            ((df['H'] - df['2B'] - df['3B'] - df['HR']) + df['2B'] * 2 + df['3B'] * 3 + df['HR'] * 4) / df['AB'], 3)
         df['OPS'] = trunc_col(df['OBP'] + df['SLG'] + df['SLG'], 3)
     except ZeroDivisionError:
         pass  # skip calculation for zero div error
@@ -209,6 +213,40 @@ def team_pitching_stats(df):
         df['ERA'] = trunc_col((df['ER'] / df['IP']) * 9)
     except ZeroDivisionError:
         pass  # trap zero division error
+    return df
+
+
+def team_batting_totals(batting_df, team_name='', concat=True):
+    df = batting_df.copy()
+    df = df[['AB', 'R', 'H', '2B', '3B', 'HR', 'RBI', 'SB', 'CS', 'BB', 'SO', 'SH', 'SF', 'HBP']].sum().astype(int)
+    df['Player'] = 'Team Totals'
+    df['Team'] = team_name
+    df['Age'] = ''
+    df['Pos'] = ''
+    df['G'] = np.max(batting_df['G'])
+    df = df.to_frame().T
+    if concat:
+        df = pd.concat([batting_df, df], ignore_index=True)
+    df = team_batting_stats(df)
+    return df
+
+
+def team_pitching_totals(pitching_df, team_name='', concat=True):
+    df = pitching_df.copy()
+    df = df[['GS', 'CG', 'SHO', 'IP', 'H', 'ER', 'K', 'BB', 'HR', 'W', 'L', 'SV', 'BS',
+             'HLD', 'ERA', 'WHIP']].sum().astype(int)
+    cols_to_trunc = ['GS', 'CG', 'SHO', 'H', 'ER', 'K', 'BB', 'HR', 'W', 'L', 'SV', 'BS', 'HLD']
+    df['Player'] = 'Team Totals'
+    df['Team'] = team_name
+    df['Age'] = ''
+    df['G'] = np.max(pitching_df['G'])
+
+    df = df.to_frame().T
+    if concat:
+        df = pd.concat([pitching_df, df], ignore_index=True)
+    df = team_pitching_stats(df)
+    for col in cols_to_trunc:  # remove trailing zeros after decimal
+        df[col] = np.floor(df[col])
     return df
 
 

@@ -6,6 +6,9 @@ import bbgame
 import bbstats
 import numpy as np
 
+AWAY = 0
+HOME = 1
+
 
 class BaseballSeason:
     def __init__(self, load_seasons, new_season, team_list, season_length_limit=0, min_games=0, series_length=1,
@@ -70,7 +73,7 @@ class BaseballSeason:
             np.add(np.array(self.team_win_loss[home_team_name]), np.array(win_loss[1])))
         return
 
-    def sim_season(self, chatty=True, print_box_score=True):
+    def sim_season(self, season_chatty=False, season_print_box_score_b=False):
         print(f'{self.new_season} will be {len(self.schedule)} games in length.')
         print(f'Full schedule of games: {self.schedule}')
         for season_day_num in range(0, len(self.schedule)):  # loop from 0 to len of schedule - 1 end pt not included
@@ -82,14 +85,12 @@ class BaseballSeason:
                 print(f'Playing: {match_up[0]} away against {match_up[1]}')
                 game = bbgame.Game(away_team_name=match_up[0], home_team_name=match_up[1],
                                    baseball_data=self.baseball_data, game_num=season_day_num, rotation_len=5,
-                                   print_lineup=False, chatty=False, print_box_score=False)
+                                   print_lineup=False, chatty=season_chatty, print_box_score_b=season_print_box_score_b)
                 score, inning, win_loss_list = game.sim_game()
                 self.update_win_loss(away_team_name=match_up[0], home_team_name=match_up[1], win_loss=win_loss_list)
                 print(f'Final: {match_up[0]} {score[0]} {match_up[1]} {score[1]}')
-                self.baseball_data.game_results_to_season(batting_box_score=game.teams[0].box_score.game_batting_stats,
-                                                         pitching_box_score=game.teams[0].box_score.game_pitching_stats)
-                self.baseball_data.game_results_to_season(batting_box_score=game.teams[1].box_score.game_batting_stats,
-                                                         pitching_box_score=game.teams[1].box_score.game_pitching_stats)
+                self.baseball_data.game_results_to_season(box_score_class=game.teams[AWAY].box_score)
+                self.baseball_data.game_results_to_season(box_score_class=game.teams[HOME].box_score)
                 print('')
                 # end of game
             # end of all games for one day
@@ -110,6 +111,6 @@ class BaseballSeason:
 if __name__ == '__main__':
     seasons = [2022]
     teams = ['CHC', 'CIN', 'COL', 'MIL', 'PIT', 'STL']  # included COL for balance in scheduling
-    bbseason23 = BaseballSeason(load_seasons=seasons, new_season=2023, team_list=teams, season_length_limit=5,
-                                min_games=30, series_length=3, rotation_len=5)
-    bbseason23.sim_season(chatty=False, print_box_score=False)
+    bbseason23 = BaseballSeason(load_seasons=seasons, new_season=2023, team_list=teams,  # season_length_limit=5,
+                                min_games=5, series_length=3, rotation_len=5)
+    bbseason23.sim_season(season_chatty=False, season_print_box_score_b=False)

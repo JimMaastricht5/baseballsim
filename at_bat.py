@@ -1,6 +1,7 @@
 import numpy as np
 import warnings
 
+
 class SimAB:
     def __init__(self, baseball_data):
         self.rng = lambda: np.random.default_rng().uniform(low=0.0, high=1.001)  # random generator between 0 and 1
@@ -22,8 +23,8 @@ class SimAB:
         self.league_batting_Total_3B = int(self.baseball_data.batting_data['3B'].sum())
         self.league_batting_Total_2B = int(self.baseball_data.batting_data['2B'].sum())
         self.league_Total_outs = int(self.baseball_data.batting_data['AB'].sum() -
-                                     self.baseball_data.batting_data['H'].sum() - \
-                                 self.baseball_data.batting_data['HBP'].sum() )
+                                     self.baseball_data.batting_data['H'].sum() -
+                                     self.baseball_data.batting_data['HBP'].sum())
         self.league_K_rate_per_AB = float(self.baseball_data.batting_data['SO'].sum() /
                                           self.league_Total_outs)  # strike out or in play
         self.league_GB = .429  # ground ball rate for season
@@ -68,8 +69,8 @@ class SimAB:
 
     def bb(self):
         return self.rng() < self.odds_ratio((self.batting.BB / self.batting.Total_OB),
-                                                   (self.pitching.BB / self.pitching.Total_OB),
-                                                   (self.league_batting_Total_BB / self.league_batting_Total_OB))
+                                            (self.pitching.BB / self.pitching.Total_OB),
+                                            (self.league_batting_Total_BB / self.league_batting_Total_OB))
 
     def hr(self):
         return self.rng() < self.odds_ratio((self.batting.HR / self.batting.Total_OB),
@@ -78,18 +79,18 @@ class SimAB:
 
     def triple(self):
         # do not have league pitching total for 3b so push it to zero and make it a neutral factor
-        return self.rng() < self.odds_ratio((self.batting['3B'] / self.batting.Total_OB), (.1),
-                                                   (self.league_batting_Total_3B / self.league_batting_Total_OB))
+        return self.rng() < self.odds_ratio(hitter_stat=(self.batting['3B'] / self.batting.Total_OB), pitcher_stat=.1,
+                                            league_stat=(self.league_batting_Total_3B / self.league_batting_Total_OB))
 
     def double(self):
         # do not have league pitching total for 2b so push it to zero and make it a neutral factor
-        return self.rng() < self.odds_ratio((self.batting['2B'] / self.batting.Total_OB), (.200),
-                                                   (self.league_batting_Total_2B / self.league_batting_Total_OB))
+        return self.rng() < self.odds_ratio(hitter_stat=(self.batting['2B'] / self.batting.Total_OB), pitcher_stat=.200,
+                                            league_stat=(self.league_batting_Total_2B / self.league_batting_Total_OB))
 
     def k(self):
         return self.rng() < self.odds_ratio((self.batting['SO'] / self.batting.Total_Outs),
-                                                   (self.pitching['K'] / self.pitching.Total_Outs),
-                                                   self.league_K_rate_per_AB)
+                                            (self.pitching['K'] / self.pitching.Total_Outs),
+                                            self.league_K_rate_per_AB)
 
     def gb_fb_lo(self, result):
         self.dice_roll = self.rng()

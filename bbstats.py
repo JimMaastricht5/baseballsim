@@ -195,7 +195,7 @@ def team_batting_stats(df):
         df['OBP'] = trunc_col((df['H'] + df['BB'] + df['HBP']) / (df['AB'] + df['BB'] + df['HBP']), 3)
         df['SLG'] = trunc_col(
             ((df['H'] - df['2B'] - df['3B'] - df['HR']) + df['2B'] * 2 + df['3B'] * 3 + df['HR'] * 4) / df['AB'], 3)
-        df['OPS'] = trunc_col(df['OBP'] + df['SLG'] + df['SLG'], 3)
+        df['OPS'] = trunc_col(df['OBP'] + df['SLG'], 3)
     except ZeroDivisionError:
         pass  # skip calculation for zero div error
     return df

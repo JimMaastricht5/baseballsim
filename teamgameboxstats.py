@@ -18,7 +18,6 @@ class TeamBoxScore:
         self.box_batting[['AB', 'R', 'H', '2B', '3B', 'HR', 'RBI', 'SB', 'CS', 'BB', 'SO', 'SH', 'SF', 'HBP', 'AVG',
                           'OBP', 'SLG', 'OPS']] = 0
         self.box_batting = bbstats.remove_non_print_cols(self.box_batting, False)
-        # self.box_batting.drop(['Season', 'Total_OB', 'Total_Outs'], axis=1, inplace=True)
         self.team_box_batting = None
         self.game_batting_stats = None
 
@@ -99,8 +98,8 @@ class TeamBoxScore:
         print('')
         return
 
-    def get_batter_box(self):
-        return self.box_batting
+    def get_batter_game_stats(self):
+        return self.game_batting_stats
 
-    def get_pitcher_box(self):
-        return self.box_pitching
+    def get_pitcher_game_stats(self):
+        return self.game_pitching_stats

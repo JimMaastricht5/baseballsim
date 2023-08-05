@@ -131,13 +131,14 @@ class BaseballStats:
         return
 
     def game_results_to_season(self, box_score_class):
-        batting_box_score = box_score_class.get_batter_box()
-        pitching_box_score = box_score_class.get_pitcher_box()
+        batting_box_score = box_score_class.get_batter_game_stats()
+        pitching_box_score = box_score_class.get_pitcher_game_stats()
         numeric_cols = self.numeric_bcols
         for index, row in batting_box_score.iterrows():
+            # print(index, row)
             new_row = batting_box_score.loc[index][numeric_cols] + self.new_season_batting_data.loc[index][numeric_cols]
             self.new_season_batting_data.loc[index, numeric_cols] = new_row
-            # print(self.new_season_batting_data.loc[index].to_string())
+            # print(self.new_season_batting_data.to_string())
         numeric_cols = self.numeric_pcols
         for index, row in pitching_box_score.iterrows():
             new_row = pitching_box_score.loc[index][numeric_cols] + \

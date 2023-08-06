@@ -133,9 +133,9 @@ class Game:
                 print(f'\t{self.bases.describe_runners()}')
             self.batting_num[self.team_hitting()] = self.batting_num[self.team_hitting()] + 1 \
                 if (self.batting_num[self.team_hitting()] + 1) <= 9 else 1  # wrap around lineup
-            if pitching.Condition <= 10 and self.outs < 3:  # pitching change
+            if self.teams[self.team_pitching()].is_pitcher_fatigued() and self.outs < 3:  # pitching change
                 self.teams[self.team_pitching()].pitching_change()
-                pitching = self.teams[self.team_pitching()].cur_pitcher_stats()  # data for pitcher
+                pitching = self.teams[self.team_pitching()].cur_pitcher_stats()  # data for new pitcher
                 if chatty:
                     print(f'\tManager has made the call to the bull pen.  Pitching change....')
                     print(f'\t{pitching.Player} has entered the game for {self.team_names[self.team_pitching()]}')

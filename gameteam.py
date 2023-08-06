@@ -24,8 +24,9 @@ class Team:
         self.game_num = game_num
         self.rotation_len = rotation_len
 
-        self.fatigue_start_perc = 70  # % of avg max is where fatigue starts
+        self.fatigue_start_perc = 85  # % of avg max is where fatigue starts
         self.fatigue_rate = .001  # at 85% of avg max pitchers have a .014 increase in OBP.  using .001 as proxy
+        self.fatigue_pitching_change_limit = 15
         return
 
     def set_lineup(self, show_lineup=False, current_season_stats=True):
@@ -122,6 +123,9 @@ class Team:
         self.box_score.add_pitcher_to_box(self.middle_relievers.loc[reliever_pitcher_index])
         self.middle_relievers = self.middle_relievers.drop(reliever_pitcher_index, axis=0)  # remove reliever from  pen
         return self.cur_pitcher_index
+
+    def is_pitcher_fatigued(self):
+        return self.cur_pitcher_stats().Condition <= self.fatigue_pitching_change_limit
 
     def set_closers(self):
         # grab top two closers for setup and final close

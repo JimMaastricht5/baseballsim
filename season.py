@@ -21,10 +21,10 @@ class BaseballSeason:
         self.team_season_pitching_df = None
         self.load_seasons = load_seasons  # pull base data across for what seasons
         self.new_season = new_season
-        team_list = list(baseball_data.batting_data.Team.unique()) if team_list == [] else team_list
         self.schedule = []
         self.create_schedule()  # set schedule
         self.baseball_data = bbstats.BaseballStats(load_seasons=self.load_seasons, new_season=new_season)
+        team_list = list(self.baseball_data.batting_data.Team.unique()) if team_list == [] else team_list
         self.team_win_loss = {}
         for team in self.teams:
             self.team_win_loss.update({team: [0, 0]})  # set team win loss to 0, 0

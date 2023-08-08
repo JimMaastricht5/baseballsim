@@ -1,5 +1,6 @@
 import numpy as np
 import warnings
+import bbstats
 
 
 class SimAB:
@@ -10,8 +11,14 @@ class SimAB:
         self.batting = None
         self.baseball_data = baseball_data
 
-        self.league_batting_obp = self.baseball_data.batting_data['OBP'].mean()  # ?? incorrect, lazy, fine for now
-        self.league_pitching_obp = self.baseball_data.pitching_data['OBP'].mean()  # ?? incorrect, lazy, fine for now
+        self.league_batting_totals_df = bbstats.team_batting_totals(self.baseball_data.batting_data, concat=False)
+        self.league_pitching_totals_df = bbstats.team_pitching_totals(self.baseball_data.pitching_data, concat=False)
+
+        # set league totals for odds ratio
+        self.league_batting_obp = self.league_batting_totals_df['OBP']
+        self.league_pitching_obp = self.league_pitching_totals_df['OBP']
+        # self.league_batting_obp = self.baseball_data.batting_data['OBP'].mean()  # ?? incorrect, lazy, fine for now
+        # self.league_pitching_obp = self.baseball_data.pitching_data['OBP'].mean()  # ?? incorrect, lazy, fine for now
         self.league_batting_Total_OB = int(
             self.baseball_data.batting_data['H'].sum() + self.baseball_data.batting_data['BB'].sum() +
             self.baseball_data.batting_data['HBP'].sum())
@@ -33,7 +40,7 @@ class SimAB:
 
         return
 
-    # odds ratio is odds of the hitter * odds of the pitcher over the odds of the league or enviroment
+    # odds ratio is odds of the hitter * odds of the pitcher over the odds of the league or environment
     # the ratio only works for 2 outcomes, e.g., on base or not on base.
     # additional outcomes need to be chained, e.g., on base was it a hit?
     # example odds ratio.  Hitter with an obp of .400 odds ratio would be .400/(1-.400)

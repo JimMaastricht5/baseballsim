@@ -11,7 +11,7 @@ HOME = 1
 
 
 class BaseballSeason:
-    def __init__(self, load_seasons, new_season, team_list, season_length_limit=0, min_games=0, series_length=1,
+    def __init__(self, load_seasons, new_season, team_list=[], season_length_limit=0, min_games=0, series_length=1,
                  rotation_len=5):
         self.season_length_limit = season_length_limit  # zero mean there is no limit, based on schedule parameters
         self.min_games = min_games
@@ -21,7 +21,7 @@ class BaseballSeason:
         self.team_season_pitching_df = None
         self.load_seasons = load_seasons  # pull base data across for what seasons
         self.new_season = new_season
-        self.teams = team_list
+        team_list = list(baseball_data.batting_data.Team.unique()) if team_list == [] else team_list
         self.schedule = []
         self.create_schedule()  # set schedule
         self.baseball_data = bbstats.BaseballStats(load_seasons=self.load_seasons, new_season=new_season)
@@ -111,6 +111,8 @@ class BaseballSeason:
 if __name__ == '__main__':
     seasons = [2022]
     teams = ['CHC', 'CIN', 'COL', 'MIL', 'PIT', 'STL']  # included COL for balance in scheduling
-    bbseason23 = BaseballSeason(load_seasons=seasons, new_season=2023, team_list=teams, season_length_limit=162,
+    bbseason23 = BaseballSeason(load_seasons=seasons, new_season=2023,
+                                # team_list=teams,
+                                season_length_limit=162,
                                 min_games=162, series_length=3, rotation_len=5)
     bbseason23.sim_season(season_chatty=False, season_print_box_score_b=False)

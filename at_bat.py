@@ -15,8 +15,8 @@ class SimAB:
         self.league_pitching_totals_df = bbstats.team_pitching_totals(self.baseball_data.pitching_data, concat=False)
 
         # set league totals for odds ratio
-        self.league_batting_obp = self.league_batting_totals_df['OBP']
-        self.league_pitching_obp = self.league_pitching_totals_df['OBP']
+        self.league_batting_obp = float(self.league_batting_totals_df['OBP'])
+        self.league_pitching_obp = float(self.league_pitching_totals_df['OBP'])
         # self.league_batting_obp = self.baseball_data.batting_data['OBP'].mean()  # ?? incorrect, lazy, fine for now
         # self.league_pitching_obp = self.baseball_data.pitching_data['OBP'].mean()  # ?? incorrect, lazy, fine for now
         self.league_batting_Total_OB = int(

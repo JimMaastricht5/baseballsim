@@ -164,7 +164,7 @@ class Game:
         self.win_loss.append([abs(home_win - 1), home_win])  # if home win away team is 0, 1
         self.win_loss.append([home_win, abs(home_win - 1)])  # if home win home team is  1, 0
 
-        # assign winning and losing pitchers, if home team lost assing win to away and vice versa
+        # assign winning and losing pitchers, if home team lost assign win to away and vice versa
         if home_win == 0:
             self.teams[AWAY].box_score.pitching_win_loss(self.winning_pitcher, True)
             self.teams[HOME].box_score.pitching_win_loss(self.losing_pitcher, False)

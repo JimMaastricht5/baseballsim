@@ -153,8 +153,8 @@ class BaseballStats:
             team_batting_stats(self.new_season_batting_data[self.new_season_batting_data['AB'] > 0].fillna(0))
 
     def print_current_season(self, teams=['MIL']):
-        teams.append('')
-        df = self.new_season_batting_data.copy().sort_values(by='OPS', ascending=False)
+        teams.append('')  # add blank team for totals
+        df = self.new_season_batting_data.copy().sort_values(by='OPS', ascending=False) # take copy to add totals
         df = team_batting_totals(df, team_name='', concat=True)
         df = remove_non_print_cols(df, False)
         print(df[df['Team'].isin(teams)].to_string(justify='center'))
@@ -166,12 +166,15 @@ class BaseballStats:
         return
 
     def print_prior_season(self, teams=['MIN']):
-        df = remove_non_print_cols(self.batting_data, False)
-        # df = self.batting_data.drop(['Total_OB', 'Total_Outs'], axis=1)
+        teams.append('')  # add blank team for totals
+        df = self.batting_data.copy().sort_values(by='OPS', ascending=False)  # take copy to add totals
+        df = team_batting_totals(df, team_name='', concat=True)
+        df = remove_non_print_cols(df, False)
         print(df[df['Team'].isin(teams)].to_string(justify='center'))
-        print('')
-        df = remove_non_print_cols(self.pitching_data, True)
-        # df = self.pitching_data.drop(['Total_OB', 'Total_Outs'], axis=1)
+        print('\n\n')
+        df = self.pitching_data.copy().sort_values(by='ERA', ascending=True)
+        df = team_pitching_totals(df, team_name='', concat=True)
+        df = remove_non_print_cols(df, True)
         print(df[df['Team'].isin(teams)].to_string(justify='center'))
         return
 
@@ -258,9 +261,11 @@ if __name__ == '__main__':
 
     print(*baseball_data.pitching_data.columns)
     print(*baseball_data.batting_data.columns)
-    print(baseball_data.batting_data[baseball_data.batting_data.Team == baseball_data.batting_data.Team.unique()[0]].
-          to_string(justify='center'))
-    print(baseball_data.pitching_data[baseball_data.pitching_data.Team == baseball_data.batting_data.Team.unique()[0]].
-          sort_values('GS', ascending=False).head(5).to_string(justify='center'))
+    # print(baseball_data.batting_data[baseball_data.batting_data.Team == baseball_data.batting_data.Team.unique()[0]].
+    #       to_string(justify='center'))
+    # print(baseball_data.pitching_data[baseball_data.pitching_data.Team == baseball_data.batting_data.Team.unique()[0]].
+    #       sort_values('GS', ascending=False).head(5).to_string(justify='center'))
     print(baseball_data.batting_data.Team.unique())
-    baseball_data.print_prior_season()
+    teams = ['CHC', 'CIN', 'COL', 'MIL', 'PIT', 'STL']  # included COL for balance in scheduling
+    # teams = list(baseball_data.batting_data.Team.unique())
+    baseball_data.print_prior_season(teams=teams)

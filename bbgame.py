@@ -100,6 +100,10 @@ class Game:
         outcome = self.at_bat.outcome(pitching, batting)
         if outcome[0] == 'OUT':
             self.outs += 1
+            if outcome[1] == 'DP' and self.outs <= 2:
+                self.outs += 1
+                self.bases.remove_runner(1)  # remove runner on first for DP, only considering 1st
+            # need to advance runners on fly (tag), fc for lead runner, or gb advance
         elif outcome[0] == 'OB':
             self.bases.advance_runners(bases_to_advance=outcome[2])  # outcome 2 is number of bases to advance
             # self.total_score[self.top_bottom] += self.bases.runs_scored  # moved to update innning score

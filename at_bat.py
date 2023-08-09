@@ -35,7 +35,8 @@ class SimAB:
         self.league_GB = .429  # ground ball rate for season
         self.league_FB = .372  # fly ball rate for season
         self.league_LD = .199  # line drive rate for the season
-        self.OBP_adjustment = -0.010  # final adjustment to line up with prior seasons
+        self.OBP_adjustment = -0.005  # final adjustment to line up with prior seasons
+        self.league_DP_per_inning = 145 / 162 / 9  # avg team had 145 DP in 162 games divided by nine to get to inning
 
         return
 
@@ -98,17 +99,20 @@ class SimAB:
                                             (self.pitching['K'] / self.pitching.Total_Outs),
                                             self.league_K_rate_per_AB)
 
-    def gb_fb_lo(self, result):
+    def gb_fb_lo(self, result, outs=0, runner_on_first=False):
         self.dice_roll = self.rng()
         if self.dice_roll <= self.league_GB:  # ground out
             result[1] = 'GB'
+            if runner_on_first and outs <= 1 and self.rng() <= .33:  # 33% chance of gb to 1st base side for dp
+                # self.dice_roll <= self.league_DP_per_inning:
+                result[1] = 'DP'
         elif self.dice_roll <= (self.league_FB + self.league_GB):  # fly out ball
             result[1] = 'FO'
         else:
             result[1] = 'LD'  # line drive
         return result
 
-    def outcome(self, pitching, batting):
+    def outcome(self, pitching, batting, outs=0, runner_on_first=False):
         # tree of the various odds of an event, each event is yes/no.  Onbase? Yes -> BB? no -> Hit yes (stop)
         # outcome: on base or out pos 0, how in pos 1, bases to advance in pos 2, rbis in pos 3
         # ?? hbp is missing, total batters faced is missing, should calc or get pitcher obp
@@ -134,5 +138,5 @@ class SimAB:
             if self.k():
                 result = ['OUT', 'K', 0, 0]  # ob, out sub types ob: 1b, 2b, 3b, hr, hbp, e, w; out: k, ...
             else:
-                result = self.gb_fb_lo(['OUT', '', 0, 0])  # not a strike out, fb, go, or lo
+                result = self.gb_fb_lo(['OUT', '', 0, 0], outs, runner_on_first)  # not a strike out, fb, gb, dp, or lo
         return result

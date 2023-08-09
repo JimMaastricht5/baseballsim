@@ -45,6 +45,13 @@ class Bases:
         self.num_runners = 0
         return
 
+    def remove_runner(self, base):
+        # remove runner from 1st, 2nd, or 3rd for DP or FC
+        # index pos 1 is 1b so base # is used as offset
+        self.baserunners[base] = 0
+        self.baserunners_names[base] = ''
+        return
+
     def describe_runners(self):
         desc = ''
         base_names = ['AB', '1st', '2nd', '3rd', 'home', 'scored', 'scored', 'scored']  # leave this for sort order

@@ -24,6 +24,7 @@ class BaseballSeason:
         self.schedule = []
         self.baseball_data = bbstats.BaseballStats(load_seasons=self.load_seasons, new_season=new_season)
         self.teams = list(self.baseball_data.batting_data.Team.unique()) if team_list == [] else team_list
+        print(self.teams)
         self.create_schedule()  # set schedule
         self.team_win_loss = {}
         for team in self.teams:
@@ -35,8 +36,8 @@ class BaseballSeason:
         for game_day in range(0, len(self.teams)-1):  # setup each team play all other teams one time
             random.shuffle(self.teams)  # randomize team match ups. may repeat, deal with it
             day_schedule = []
-            for ii in range(0, len(teams), 2):  # select home and away without repeating a team, inc by 2 for away/home
-                day_schedule.append([teams[ii], teams[ii+1]])  # build schedule for one day
+            for ii in range(0, len(self.teams), 2):  # select home and away without repeating a team, inc by 2 for away/home
+                day_schedule.append([self.teams[ii], self.teams[ii+1]])  # build schedule for one day
 
             for series_game in range(0, self.series_length):  # repeat day schedule to build series
                 self.schedule.append(day_schedule)  # add day schedule to full schedule
@@ -74,7 +75,7 @@ class BaseballSeason:
         return
 
     def sim_season(self, season_chatty=False, season_print_box_score_b=False):
-        print(f'{self.new_season} will be {len(self.schedule)} games in length.')
+        print(f'{self.new_season} will have {len(self.schedule)} games per team.')
         print(f'Full schedule of games: {self.schedule}')
         for season_day_num in range(0, len(self.schedule)):  # loop from 0 to len of schedule - 1 end pt not included
             if self.season_length_limit != 0 and season_day_num + 1 > self.season_length_limit:  # stop if exceeds limit
@@ -110,9 +111,9 @@ class BaseballSeason:
 # test a number of games
 if __name__ == '__main__':
     seasons = [2022]
-    teams = ['CHC', 'CIN', 'COL', 'MIL', 'PIT', 'STL']  # included COL for balance in scheduling
+    # teams = ['CHC', 'CIN', 'COL', 'MIL', 'PIT', 'STL']  # included COL for balance in scheduling
     bbseason23 = BaseballSeason(load_seasons=seasons, new_season=2023,
-                                team_list=teams,
-                                season_length_limit=162,
-                                min_games=162, series_length=3, rotation_len=5)
+                                # team_list=teams,
+                                season_length_limit=80,
+                                min_games=80, series_length=3, rotation_len=5)
     bbseason23.sim_season(season_chatty=False, season_print_box_score_b=False)

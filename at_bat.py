@@ -35,6 +35,7 @@ class SimAB:
         self.league_GB = .429  # ground ball rate for season
         self.league_FB = .372  # fly ball rate for season
         self.league_LD = .199  # line drive rate for the season
+        self.OBP_adjustment = -0.010  # final adjustment to line up with prior seasons
 
         return
 
@@ -68,9 +69,9 @@ class SimAB:
 
     def onbase(self):
         # print('on base: ' + str(self.odds_ratio(self.batting.OBP, self.pitching.OBP, self.league_batting_obp)))
-        return self.rng() < self.odds_ratio(self.batting.OBP + self.pitching.Game_Fatigue_Factor,
-                                            self.pitching.OBP + self.pitching.Game_Fatigue_Factor,
-                                            self.league_batting_obp)
+        return self.rng() < self.odds_ratio(self.batting.OBP + self.pitching.Game_Fatigue_Factor + self.OBP_adjustment,
+                                            self.pitching.OBP + self.pitching.Game_Fatigue_Factor + self.OBP_adjustment,
+                                            self.league_batting_obp + self.OBP_adjustment)
 
     def bb(self):
         return self.rng() < self.odds_ratio((self.batting.BB / self.batting.Total_OB),

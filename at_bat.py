@@ -17,18 +17,16 @@ class SimAB:
         # set league totals for odds ratio
         self.league_batting_obp = float(self.league_batting_totals_df['OBP'])
         self.league_pitching_obp = float(self.league_pitching_totals_df['OBP'])
-        # self.league_batting_obp = self.baseball_data.batting_data['OBP'].mean()  # ?? incorrect, lazy, fine for now
-        # self.league_pitching_obp = self.baseball_data.pitching_data['OBP'].mean()  # ?? incorrect, lazy, fine for now
         self.league_batting_Total_OB = int(
             self.baseball_data.batting_data['H'].sum() + self.baseball_data.batting_data['BB'].sum() +
             self.baseball_data.batting_data['HBP'].sum())
         self.league_pitching_Total_OB = int(
             self.baseball_data.pitching_data['H'].sum() + self.baseball_data.pitching_data[
                 'BB'].sum())  # + self.baseball_data.pitching_data['HBP']
-        self.league_batting_Total_BB = int(self.baseball_data.batting_data['BB'].sum())
-        self.league_batting_Total_HR = int(self.baseball_data.batting_data['HR'].sum())
-        self.league_batting_Total_3B = int(self.baseball_data.batting_data['3B'].sum())
-        self.league_batting_Total_2B = int(self.baseball_data.batting_data['2B'].sum())
+        self.league_batting_Total_BB = int(self.league_batting_totals_df['BB'])
+        self.league_batting_Total_HR = int(self.league_batting_totals_df['HR'])
+        self.league_batting_Total_3B = int(self.league_batting_totals_df['3B'])
+        self.league_batting_Total_2B = int(self.league_batting_totals_df['2B'])
         self.league_Total_outs = int(self.baseball_data.batting_data['AB'].sum() -
                                      self.baseball_data.batting_data['H'].sum() -
                                      self.baseball_data.batting_data['HBP'].sum())
@@ -86,7 +84,7 @@ class SimAB:
 
     def triple(self):
         # do not have league pitching total for 3b so push it to zero and make it a neutral factor
-        return self.rng() < self.odds_ratio(hitter_stat=(self.batting['3B'] / self.batting.Total_OB), pitcher_stat=.1,
+        return self.rng() < self.odds_ratio(hitter_stat=(self.batting['3B'] / self.batting.Total_OB), pitcher_stat=.05,
                                             league_stat=(self.league_batting_Total_3B / self.league_batting_Total_OB))
 
     def double(self):

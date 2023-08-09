@@ -209,7 +209,8 @@ def team_pitching_stats(df):
     # hbp is 0, 2b are 0, 3b are 0
     df = df[df['IP'] > 0]
     try:
-        df['IP'] = trunc_col(df['IP'] + .0001, 3)
+        df['IP'] = df['IP'].apply(lambda ip: ip if (ip - np.floor(ip)) < .9 else np.floor(ip) + 1)
+        # df['IP'] = trunc_col(df['IP'], 3)
         df_ab = df['IP'] * 3 + df['H']
         df['AVG'] = trunc_col(df['H'] / df_ab, 3)
         df['OBP'] = trunc_col((df['H'] + df['BB'] + 0) / (df_ab + df['BB'] + 0), 3)
@@ -224,7 +225,7 @@ def team_pitching_stats(df):
 
 def team_batting_totals(batting_df, team_name='', concat=True):
     df = batting_df.copy()
-    df = df[['AB', 'R', 'H', '2B', '3B', 'HR', 'RBI', 'SB', 'CS', 'BB', 'SO', 'SH', 'SF', 'HBP']].sum().astype(int)
+    df = df[['AB', 'R', 'H', '2B', '3B', 'HR', 'RBI', 'SB', 'CS', 'BB', 'SO', 'SH', 'SF', 'HBP']].sum()
     df['Player'] = 'Totals'
     df['Team'] = team_name
     df['Age'] = ''
@@ -240,7 +241,7 @@ def team_batting_totals(batting_df, team_name='', concat=True):
 def team_pitching_totals(pitching_df, team_name='', concat=True):
     df = pitching_df.copy()
     df = df[['GS', 'CG', 'SHO', 'IP', 'H', 'ER', 'K', 'BB', 'HR', 'W', 'L', 'SV', 'BS',
-             'HLD', 'ERA', 'WHIP']].sum().astype(int)
+             'HLD', 'ERA', 'WHIP']].sum()
     cols_to_trunc = ['GS', 'CG', 'SHO', 'H', 'ER', 'K', 'BB', 'HR', 'W', 'L', 'SV', 'BS', 'HLD']
     df['Player'] = 'Totals'
     df['Team'] = team_name

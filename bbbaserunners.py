@@ -38,6 +38,8 @@ class Bases:
 
     def clear_bases(self):
         # index 0 is ab, 1st = 1, 2nd =2 , 3rd=3, 4th=home, pos 5-7 scored
+        # if a value is non-zero it is the index number of the player
+        # 0 indicates an empty base
         self.baserunners = [0, 0, 0, 0, 0, 0, 0, 0]
         self.baserunners_names = {}  # names doesn't need to be cleared, but just to be safe every half inning
         self.baserunners_names[0] = ''
@@ -51,6 +53,10 @@ class Bases:
         self.baserunners[base] = 0
         self.baserunners_names[base] = ''
         return
+
+    def is_runner_on_first(self):
+        # print(f'is_runner_on_first {self.baserunners}, {self.baserunners[1] == 1}')
+        return self.baserunners[1] != 0
 
     def describe_runners(self):
         desc = ''

@@ -36,8 +36,7 @@ class SimAB:
         self.league_FB = .372  # fly ball rate for season
         self.league_LD = .199  # line drive rate for the season
         self.OBP_adjustment = -0.005  # final adjustment to line up with prior seasons
-        self.league_DP_per_inning = 145 / 162 / 9  # avg team had 145 DP in 162 games divided by nine to get to inning
-
+        # self.league_DP_per_inning = 145 / 162 / 9  # avg team had 145 DP in 162 games divided by nine to get to inning
         return
 
     # odds ratio is odds of the hitter * odds of the pitcher over the odds of the league or environment
@@ -103,8 +102,8 @@ class SimAB:
         self.dice_roll = self.rng()
         if self.dice_roll <= self.league_GB:  # ground out
             result[1] = 'GB'
-            if runner_on_first and outs <= 1 and self.rng() <= .33:  # 33% chance of gb to 1st base side for dp
-                # self.dice_roll <= self.league_DP_per_inning:
+            # print(f'in_gb_fb_lo 1b check DP: {runner_on_first}, outs:{outs}')
+            if runner_on_first and outs <= 1 and self.rng() <= .50:  # 50% chance of gb to 1st base or mid side for dp
                 result[1] = 'DP'
         elif self.dice_roll <= (self.league_FB + self.league_GB):  # fly out ball
             result[1] = 'FO'

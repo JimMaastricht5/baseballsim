@@ -1,5 +1,7 @@
+import numpy
 import pandas as pd
 import bbstats
+import numpy as np
 
 
 class TeamBoxScore:
@@ -34,7 +36,12 @@ class TeamBoxScore:
     def pitching_result(self, pitcher_index, outcome):
         outcome[1] = 'K' if outcome[1] == 'SO' else outcome[1]  # handle stat translation from pitcher SO to batter K
         if outcome[0] == 'OUT':
-            self.box_pitching.loc[pitcher_index, ['IP']] = self.box_pitching.loc[pitcher_index, ['IP']] + .333333
+            # add 1/3 of an inning and round up if .99
+            self.box_pitching.loc[pitcher_index, ['IP']] = self.box_pitching.loc[pitcher_index, ['IP']] + .33
+            # if float(self.box_pitching.loc[pitcher_index, ['IP']]) >= .9:
+            #     self.box_pitching.loc[pitcher_index, ['IP']] = numpy.round_(float(self.box_pitching.loc[pitcher_index, ['IP']]))
+            # self.box_pitching.loc[pitcher_index, ['IP']] = ip if (ip - np.floor(ip)) < .9 else np.round(ip, 0)
+            print(f'pitching_result ip: {self.box_pitching.loc[pitcher_index, ["IP"]]}')
 
         if outcome[1] in ['H', 'HR', 'K', 'BB', 'HBP']:  # handle plate appearance
             self.box_pitching.loc[pitcher_index, [outcome[1]]] = self.box_pitching.loc[pitcher_index, [outcome[1]]] + 1

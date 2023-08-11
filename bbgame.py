@@ -97,7 +97,7 @@ class Game:
         cur_batter_index = self.teams[self.team_hitting()].cur_lineup_index[self.batting_num[self.team_hitting()]-1]
         batting = self.teams[self.team_hitting()].cur_batter_stats(self.batting_num[self.team_hitting()]-1)  # lineup #
         self.bases.new_ab(batter_num=cur_batter_index, player_name=batting.Player)
-        outcome = self.at_bat.outcome(pitching, batting)
+        outcome = self.at_bat.outcome(pitching, batting, self.outs, self.bases.is_runner_on_first())
         if outcome[0] == 'OUT':
             self.outs += 1
             if outcome[1] == 'DP' and self.outs <= 2:

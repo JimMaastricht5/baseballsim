@@ -102,7 +102,6 @@ class SimAB:
         self.dice_roll = self.rng()
         if self.dice_roll <= self.league_GB:  # ground out
             result[1] = 'GB'
-            # print(f'in_gb_fb_lo 1b check DP: {runner_on_first}, outs:{outs}')
             if runner_on_first and outs <= 1 and self.rng() <= .50:  # 50% chance of gb to 1st base or mid side for dp
                 result[1] = 'DP'
         elif self.dice_roll <= (self.league_FB + self.league_GB):  # fly out ball

@@ -157,12 +157,12 @@ class BaseballStats:
         df = self.new_season_batting_data.copy().sort_values(by='OPS', ascending=False) # take copy to add totals
         df = team_batting_totals(df, team_name='', concat=True)
         df = remove_non_print_cols(df, False)
-        print(df[df['Team'].isin(teams)].to_string(justify='center'))
+        print(df[df['Team'].isin(teams)].to_string(justify='right'))
         print('\n\n')
         df = self.new_season_pitching_data.copy().sort_values(by='ERA', ascending=True)
         df = team_pitching_totals(df, team_name='', concat=True)
         df = remove_non_print_cols(df, True)
-        print(df[df['Team'].isin(teams)].to_string(justify='center'))
+        print(df[df['Team'].isin(teams)].to_string(justify='right'))
         return
 
     def print_prior_season(self, teams=['MIN']):
@@ -170,12 +170,12 @@ class BaseballStats:
         df = self.batting_data.copy().sort_values(by='OPS', ascending=False)  # take copy to add totals
         df = team_batting_totals(df, team_name='', concat=True)
         df = remove_non_print_cols(df, False)
-        print(df[df['Team'].isin(teams)].to_string(justify='center'))
+        print(df[df['Team'].isin(teams)].to_string(justify='right'))
         print('\n\n')
         df = self.pitching_data.copy().sort_values(by='ERA', ascending=True)
         df = team_pitching_totals(df, team_name='', concat=True)
         df = remove_non_print_cols(df, True)
-        print(df[df['Team'].isin(teams)].to_string(justify='center'))
+        print(df[df['Team'].isin(teams)].to_string(justify='right'))
         return
 
 
@@ -217,7 +217,7 @@ def team_pitching_stats(df):
         df['SLG'] = trunc_col(((df['H'] - 0 - 0 - df['HR']) + 0 * 2 + 0 * 3 + df['HR'] * 4) / df_ab, 3)
         df['OPS'] = trunc_col(df['OBP'] + df['SLG'] + df['SLG'], 3)
         df['WHIP'] = trunc_col((df['BB'] + df['H']) / df['IP'], 3)
-        df['ERA'] = trunc_col((df['ER'] / df['IP']) * 9)
+        df['ERA'] = trunc_col((df['ER'] / df['IP']) * 9, 2)
     except ZeroDivisionError:
         pass  # trap zero division error
     return df

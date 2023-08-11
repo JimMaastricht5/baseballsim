@@ -54,9 +54,19 @@ class Bases:
         self.baserunners_names[base] = ''
         return
 
-    def is_runner_on_first(self):
+    def is_runner_on_base_num(self, base_num):
         # print(f'is_runner_on_first {self.baserunners}, {self.baserunners[1] == 1}')
-        return self.baserunners[1] != 0
+        return self.baserunners[base_num] != 0
+
+    def tag_up(self):
+        self.runs_scored += 1  # give batter and RBI
+        self.move_a_runner(3, 4)  # move runner from 3 to 4
+        return
+
+    def move_a_runner(self, basenum_from, basenum_to):
+        self.baserunners[basenum_to] = self.baserunners[basenum_from]
+        self.baserunners[basenum_from] = 0
+        return
 
     def describe_runners(self):
         desc = ''

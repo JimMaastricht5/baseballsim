@@ -96,7 +96,8 @@ class TeamBoxScore:
     def print_boxes(self):
         print(self.box_batting.to_string(index=False, justify='center'))
         print('')
-        print(self.box_pitching.to_string(index=False, justify='center'))
+        print(self.box_pitching.drop(['Total_Outs'], axis=1, inplace=False).to_string(index=False, justify='center'))
+        # print(self.box_pitching.to_string(index=False, justify='center'))
         print('')
         return
 

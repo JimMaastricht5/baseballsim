@@ -111,16 +111,12 @@ class Team:
         # number of batters faced in game vs. historic avg with fatigue start as a ratio
         in_game_fatigue = 0
         cur_game_faced = self.box_score.batters_faced(cur_pitching_index)
-        # print(f'current game faced {cur_game_faced}')
         avg_faced = self.cur_pitcher_stats().AVG_faced  # data for pitcher
         cur_percentage = cur_game_faced / avg_faced * 100
-        # print(f'bb game update fatigue {cur_game_faced}, {avg_faced}, {cur_percentage}')
-        # print(self.cur_pitcher_stats())
-        # + kicker * self.fatigue_rate  # fatigue quickly after reaching 100%
         if cur_percentage >= self.fatigue_start_perc:
             in_game_fatigue = (cur_percentage - self.fatigue_start_perc) * self.fatigue_rate
-        print(f'bbgame.update_fatigue current game:{cur_game_faced} avg_batters_faced:{avg_faced}')
-        print(f'current %:{cur_percentage} in game fatigue:{in_game_fatigue}')
+        # print(f'bbgame.update_fatigue current game:{cur_game_faced} avg_batters_faced:{avg_faced}')
+        # print(f'current %:{cur_percentage} in game fatigue:{in_game_fatigue}')
         # self.set_pitching_condition(cur_percentage)
         return in_game_fatigue, cur_percentage  # obp impact to pitcher of fatigue
 

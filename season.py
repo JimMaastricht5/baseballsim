@@ -83,7 +83,7 @@ class BaseballSeason:
             self.print_day_schedule(season_day_num)
             todays_games = self.schedule[season_day_num]
             for match_up in todays_games:
-                print(f'Playing: {match_up[0]} away against {match_up[1]}')
+                print(f'Playing day #{season_day_num}: {match_up[0]} away against {match_up[1]}')
                 game = bbgame.Game(away_team_name=match_up[0], home_team_name=match_up[1],
                                    baseball_data=self.baseball_data, game_num=season_day_num, rotation_len=5,
                                    print_lineup=False, chatty=season_chatty, print_box_score_b=season_print_box_score_b)

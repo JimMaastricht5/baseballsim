@@ -210,8 +210,7 @@ def team_pitching_stats(df):
     # hbp is 0, 2b are 0, 3b are 0
     df = df[df['IP'] > 0]
     try:
-        df['IP'] = df['IP'].apply(lambda ip: ip if (ip - np.floor(ip)) < .9 else np.floor(ip) + 1)
-        # df['IP'] = trunc_col(df['IP'], 3)
+        df['IP'] = trunc_col(df['IP'], 2)
         df_ab = df['IP'] * 3 + df['H']
         df['AVG'] = trunc_col(df['H'] / df_ab, 3)
         df['OBP'] = trunc_col((df['H'] + df['BB'] + 0) / (df_ab + df['BB'] + 0), 3)

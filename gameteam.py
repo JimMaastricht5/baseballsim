@@ -24,9 +24,9 @@ class Team:
         self.game_num = game_num
         self.rotation_len = rotation_len
 
-        self.fatigue_start_perc = 85  # 85% of way to avg max is where fatigue starts
-        self.fatigue_rate = .01  # at 85% of avg max pitchers have a .014 increase in OBP.  using .001 as proxy
-        self.fatigue_pitching_change_limit = 25  # change pitcher at 25 or below out of 100
+        self.fatigue_start_perc = 70  # 85% of way to avg max is where fatigue starts
+        self.fatigue_rate = .001  # at 85% of avg max pitchers have a .014 increase in OBP.  using .001 as proxy
+        self.fatigue_pitching_change_limit = 5  # change pitcher at # or below out of 100
         return
 
     def set_lineup(self, show_lineup=False, current_season_stats=True):

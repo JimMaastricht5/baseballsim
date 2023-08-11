@@ -10,7 +10,7 @@ class BaseballStats:
         self.numeric_bcols = ['G', 'AB', 'R', 'H', '2B', '3B', 'HR', 'RBI', 'SB', 'CS', 'BB', 'SO', 'SH', 'SF', 'HBP',
                               'AVG', 'OBP', 'SLG', 'OPS']
         self.numeric_pcols = ['G', 'GS', 'CG', 'SHO', 'IP', 'H', 'ER', 'K', 'BB', 'HR', 'W', 'L',
-                              'SV', 'BS', 'HLD', 'ERA', 'WHIP']
+                              'SV', 'BS', 'HLD', 'ERA', 'WHIP', 'Total_Outs']
 
         self.load_seasons = load_seasons  # list of seasons to load from csv files
         self.new_season = new_season
@@ -181,9 +181,10 @@ class BaseballStats:
 
 # static function start
 def remove_non_print_cols(df_input, bpitchers=False):
-    df = df_input.drop(['Season', 'Total_OB', 'Total_Outs', 'Game_Fatigue_Factor', 'Condition'], axis=1)  # pitch&hitter
     if bpitchers:
-        df = df.drop(['AVG_faced'], axis=1)
+        df = df_input.drop(['Season', 'Total_OB', 'AVG_faced', 'Game_Fatigue_Factor', 'Condition'], axis=1)
+    else:
+        df = df_input.drop(['Season', 'Total_OB', 'Total_Outs', 'Game_Fatigue_Factor', 'Condition'], axis=1)
     return df
 
 
@@ -241,8 +242,8 @@ def team_batting_totals(batting_df, team_name='', concat=True):
 def team_pitching_totals(pitching_df, team_name='', concat=True):
     df = pitching_df.copy()
     df = df[['GS', 'CG', 'SHO', 'IP', 'H', 'ER', 'K', 'BB', 'HR', 'W', 'L', 'SV', 'BS',
-             'HLD', 'ERA', 'WHIP']].sum()
-    cols_to_trunc = ['GS', 'CG', 'SHO', 'H', 'ER', 'K', 'BB', 'HR', 'W', 'L', 'SV', 'BS', 'HLD']
+             'HLD', 'ERA', 'WHIP', 'Total_Outs']].sum()
+    cols_to_trunc = ['GS', 'CG', 'SHO', 'H', 'ER', 'K', 'BB', 'HR', 'W', 'L', 'SV', 'BS', 'HLD', 'Total_Outs']
     df['Player'] = 'Totals'
     df['Team'] = team_name
     df['Age'] = ''

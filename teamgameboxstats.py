@@ -1,4 +1,3 @@
-import numpy
 import pandas as pd
 import bbstats
 import numpy as np
@@ -9,7 +8,7 @@ class TeamBoxScore:
         self.box_pitching = pitching.copy()
         self.box_pitching[['G', 'GS']] = 1
         self.box_pitching[['CG', 'SHO', 'IP', 'H', 'ER', 'K', 'BB', 'HR', 'W', 'L', 'SV', 'BS', 'HLD', 'ERA', 'WHIP',
-                           'OBP', 'SLG', 'OPS']] = 0
+                           'OBP', 'SLG', 'OPS', 'OUTS']] = 0
         # self.box_pitching.drop(['Season', 'Total_OB', 'Total_Outs'], axis=1, inplace=True)
         self.box_pitching = bbstats.remove_non_print_cols(self.box_pitching, True)
         self.team_box_pitching = None
@@ -33,15 +32,11 @@ class TeamBoxScore:
                       self.box_pitching.loc[pitcher_index].IP * 3
         return total_faced
 
-    def pitching_result(self, pitcher_index, outcome):
+    def pitching_result(self, pitcher_index, outcome, outs):
         outcome[1] = 'K' if outcome[1] == 'SO' else outcome[1]  # handle stat translation from pitcher SO to batter K
         if outcome[0] == 'OUT':
-            # add 1/3 of an inning and round up if .99
-            self.box_pitching.loc[pitcher_index, ['IP']] = self.box_pitching.loc[pitcher_index, ['IP']] + .33
-            # if float(self.box_pitching.loc[pitcher_index, ['IP']]) >= .9:
-            #     self.box_pitching.loc[pitcher_index, ['IP']] = numpy.round_(float(self.box_pitching.loc[pitcher_index, ['IP']]))
-            # self.box_pitching.loc[pitcher_index, ['IP']] = ip if (ip - np.floor(ip)) < .9 else np.round(ip, 0)
-            print(f'pitching_result ip: {self.box_pitching.loc[pitcher_index, ["IP"]]}')
+            self.box_pitching.loc[pitcher_index, ['OUTS']] = self.box_pitching.loc[pitcher_index, ['OUTS']] + outs
+            self.box_pitching.loc[pitcher_index, ['IP']] = float(self.box_pitching.loc[pitcher_index, ['OUTS']] / 3)
 
         if outcome[1] in ['H', 'HR', 'K', 'BB', 'HBP']:  # handle plate appearance
             self.box_pitching.loc[pitcher_index, [outcome[1]]] = self.box_pitching.loc[pitcher_index, [outcome[1]]] + 1
@@ -59,7 +54,7 @@ class TeamBoxScore:
         new_pitcher = new_pitcher if isinstance(new_pitcher, pd.DataFrame) else new_pitcher.to_frame().T
         new_pitcher[['G']] = 1
         new_pitcher[['GS', 'CG', 'SHO', 'IP', 'H', 'ER', 'K', 'BB', 'HR', 'W', 'L', 'SV', 'BS', 'HLD', 'ERA', 'WHIP',
-                           'OBP', 'SLG', 'OPS']] = 0
+                           'OBP', 'SLG', 'OPS', 'OUTS']] = 0
         new_pitcher[['Condition']] = 100
         self.box_pitching = pd.concat([self.box_pitching, new_pitcher], ignore_index=False)
         self.box_pitching = bbstats.remove_non_print_cols(self.box_pitching, True)

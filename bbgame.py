@@ -98,17 +98,21 @@ class Game:
         batting = self.teams[self.team_hitting()].cur_batter_stats(self.batting_num[self.team_hitting()]-1)  # lineup #
         self.bases.new_ab(batter_num=cur_batter_index, player_name=batting.Player)
         outcome = self.at_bat.outcome(pitching, batting, self.outs, self.bases.is_runner_on_first())
+
+        outs_on_play = 0
         if outcome[0] == 'OUT':
             self.outs += 1
+            outs_on_play = 1
             if outcome[1] == 'DP' and self.outs <= 2:
                 self.outs += 1
+                outs_on_play += 1
                 self.bases.remove_runner(1)  # remove runner on first for DP, only considering 1st
             # need to advance runners on fly (tag), fc for lead runner, or gb advance
         elif outcome[0] == 'OB':
             self.bases.advance_runners(bases_to_advance=outcome[2])  # outcome 2 is number of bases to advance
             # self.total_score[self.top_bottom] += self.bases.runs_scored  # moved to update innning score
             outcome[3] = self.bases.runs_scored  # rbis for batter
-        self.teams[self.team_pitching()].box_score.pitching_result(cur_pitcher_index, outcome)
+        self.teams[self.team_pitching()].box_score.pitching_result(cur_pitcher_index, outcome, outs_on_play)
         self.teams[self.team_hitting()].box_score.batting_result(cur_batter_index, outcome, self.bases.player_scored)
         return pitching, batting, outcome
 

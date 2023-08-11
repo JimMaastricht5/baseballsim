@@ -40,9 +40,6 @@ class Game:
         self.winning_pitcher = None
         self.losing_pitcher = None
 
-        # self.fatigue_start_perc = 15  # % of avg max is where fatigue starts
-        # self.fatigue_rate = .001  # at 85% of avg max pitchers have a .014 increase in OBP.  using .001 as proxy
-
         self.rng = np.random.default_rng()  # random number generator between 0 and 1
         self.bases = bbbaserunners.Bases()
         self.at_bat = at_bat.SimAB(self.baseball_data)  # setup at class
@@ -141,7 +138,7 @@ class Game:
                 print(f'\t{self.bases.describe_runners()}')
             self.batting_num[self.team_hitting()] = self.batting_num[self.team_hitting()] + 1 \
                 if (self.batting_num[self.team_hitting()] + 1) <= 9 else 1  # wrap around lineup
-            if self.teams[self.team_pitching()].is_pitcher_fatigued() and self.outs < 3:  # pitching change
+            if self.teams[self.team_pitching()].is_pitcher_fatigued(pitching.Condition) and self.outs < 3:  # pitch chg
                 self.teams[self.team_pitching()].pitching_change()
                 pitching = self.teams[self.team_pitching()].cur_pitcher_stats()  # data for new pitcher
                 if chatty:

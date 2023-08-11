@@ -25,7 +25,7 @@ class Team:
         self.rotation_len = rotation_len
 
         self.fatigue_start_perc = 85  # 85% of way to avg max is where fatigue starts
-        self.fatigue_rate = .001  # at 85% of avg max pitchers have a .014 increase in OBP.  using .001 as proxy
+        self.fatigue_rate = .01  # at 85% of avg max pitchers have a .014 increase in OBP.  using .001 as proxy
         self.fatigue_pitching_change_limit = 25  # change pitcher at 25 or below out of 100
         return
 
@@ -96,6 +96,13 @@ class Team:
             pitching = pitching.to_series()
         return pitching  # should be a series with a single row
 
+    # def set_pitching_condition(self, percent_of_max):
+    #     condition = 100 - percent_of_max if (100 - percent_of_max) >= 0 else 0
+    #     self.pitching.iloc[0]['Condition'] = condition  # data for pitcher
+    #     print(condition)
+    #     print( self.pitching.iloc[0])
+    #     return
+
     def cur_batter_stats(self, loc_in_lineup):
         batting = self.lineup.iloc[loc_in_lineup]  # data for batter
         return batting  # should be a series with a single row
@@ -112,8 +119,9 @@ class Team:
         # + kicker * self.fatigue_rate  # fatigue quickly after reaching 100%
         if cur_percentage >= self.fatigue_start_perc:
             in_game_fatigue = (cur_percentage - self.fatigue_start_perc) * self.fatigue_rate
-        # print(f'bbgame.update_fatigue current game:{cur_game_faced} avg_batters_faced:{avg_faced}')
-        # print(f'current %:{cur_percentage} in game fatigue:{in_game_fatigue}')
+        print(f'bbgame.update_fatigue current game:{cur_game_faced} avg_batters_faced:{avg_faced}')
+        print(f'current %:{cur_percentage} in game fatigue:{in_game_fatigue}')
+        # self.set_pitching_condition(cur_percentage)
         return in_game_fatigue, cur_percentage  # obp impact to pitcher of fatigue
 
     def pitching_change(self):  # ?? need to understand game situation for close or mid
@@ -124,8 +132,11 @@ class Team:
         self.middle_relievers = self.middle_relievers.drop(reliever_pitcher_index, axis=0)  # remove reliever from  pen
         return self.cur_pitcher_index
 
-    def is_pitcher_fatigued(self):
-        return self.cur_pitcher_stats().Condition <= self.fatigue_pitching_change_limit
+    def is_pitcher_fatigued(self, condition):
+        # print(self.cur_pitcher_stats())
+        # print(self.cur_pitcher_stats().Condition <= self.fatigue_pitching_change_limit)
+        # return self.cur_pitcher_stats().Condition <= self.fatigue_pitching_change_limit
+        return condition <= self.fatigue_pitching_change_limit
 
     def set_closers(self):
         # grab top two closers for setup and final close

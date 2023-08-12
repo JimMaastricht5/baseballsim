@@ -72,7 +72,7 @@ class TeamBoxScore:
         if outcome[1] != 'BB':  # handle walks
             self.box_batting.loc[batter_index, ['AB']] = self.box_batting.loc[batter_index, ['AB']] + 1
 
-        if outcome[1] in ['H', '2B', '3B', 'HR', 'BB', 'SO', 'HBP']:  # record result of plate appearance
+        if outcome[1] in ['H', '2B', '3B', 'HR', 'BB', 'SO', 'SF', 'HBP']:  # record result of plate appearance
             self.box_batting.loc[batter_index, [outcome[1]]] = self.box_batting.loc[batter_index, [outcome[1]]] + 1
 
         # increment hit count if OB, not a walk, and not a single

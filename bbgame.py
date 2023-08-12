@@ -87,21 +87,27 @@ class Game:
         return
 
     def at_bat_out(self, outcome):
-        # there was at least one out on the play
+        # there was at least one out on the play, record that right away and deal with SF, DP, FC, adv runners on GB
+        # outcome 2 is bases to advance, rbis will be taken care of later
         self.outs += 1
         outs_on_play = 1
-        if outcome[1] == 'FO' and self.bases.is_runner_on_base_num(3) and self.rng() <= self.sacfly_odds:
-            self.bases.tag_up()
+        if outcome[1] == 'FO' and self.bases.is_runner_on_base_num(3) and self.outs < 3 and \
+                self.rng() <= self.sacfly_odds:
+            outcome[1] = 'SF'
+            self.bases.tag_up()  # only advance runner from 3b to home
         elif outcome[1] == 'DP' and self.outs <= 2:  # double play
             self.outs += 1
             outs_on_play += 1
             self.bases.remove_runner(1)  # remove runner on first for DP, only considering 1st for now
-            if self.outs < 3:  # sometimes a runner on 2nd or 3rd scores
-               pass
-        else:
-            pass
-            # need to advance runners on fly (tag), fc for lead runner, or gb advance
-        return outs_on_play
+        elif outcome[1] == 'GB' and self.bases.is_runner_on_base_num(2) and self.rng() <= .5:  # fielders choice
+            outcome[1] = 'GB FC'
+            self.bases.remove_runner(1)  # fc drop runner from 1st going to second
+            outcome[2] = 1
+
+        # advance runners on gb or dp if less than 3 outs
+        if (outcome[1] == 'GB' or outcome[1] == 'DP' or outcome[1] == 'GB FC') and self.outs < 3:
+            outcome[2] = 1  # outcome 2 is bases to advance all remaining runners.  may include batter on a FC
+        return outs_on_play, outcome
 
     def sim_ab(self):
         cur_pitcher_index = self.teams[self.team_pitching()].cur_pitcher_index
@@ -117,10 +123,11 @@ class Game:
 
         outs_on_play = 0
         if outcome[0] == 'OUT':
-            outs_on_play = self.at_bat_out(outcome)
-        elif outcome[0] == 'OB':
-            self.bases.advance_runners(bases_to_advance=outcome[2])  # outcome 2 is number of bases to advance
-            outcome[3] = self.bases.runs_scored  # rbis for batter
+            outs_on_play, outcome = self.at_bat_out(outcome)
+
+        # runners may advance on gb, dp, or ob
+        self.bases.advance_runners(bases_to_advance=outcome[2])  # outcome 2 is number of bases to advance
+        outcome[3] = self.bases.runs_scored  # rbis for batter
 
         self.teams[self.team_pitching()].box_score.pitching_result(cur_pitcher_index, outcome, outs_on_play)
         self.teams[self.team_hitting()].box_score.batting_result(cur_batter_index, outcome, self.bases.player_scored)

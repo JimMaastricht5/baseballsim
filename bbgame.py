@@ -53,6 +53,19 @@ class Game:
     def team_hitting(self):
         return self.top_bottom
 
+    def score_diff(self):
+        # team pitching with lead will be positive, team pitching behind will be neg
+        return self.total_score[self.team_pitching()] - self.total_score[self.team_hitting()]
+
+    def save_sit(self):
+        # can go two innings for a save so start measure in the 8th inning
+        # if pitching team is leading and runners + ab + on deck is equal to score diff
+        return (self.score_diff() > 0 and (self.score_diff() <= self.bases.num_runners + 2) and
+                self.inning[self.team_hitting()] >= 8)
+
+    def close_game(self):
+        return self.score_diff() >= 0 and self.inning[self.team_hitting()] >= 7
+
     def update_inning_score(self, number_of_runs=0):
         if len(self.inning_score) <= self.inning[self.team_hitting()]:  # header rows + rows in score must = innings
             self.inning_score.append([self.inning[self.team_hitting()], '', ''])  # expand scores by new inning
@@ -86,6 +99,20 @@ class Game:
         print('')
         return
 
+    def pitching_sit(self, pitching, chatty=True):
+        # switch pitchers based on fatigue or close game
+        # close game is hitting inning >= 7 and, pitching team winning or tied and runners on = save sit
+        if (self.teams[self.team_pitching()].is_pitcher_fatigued(pitching.Condition) and self.outs < 3) or \
+                self.close_game() or self.save_sit():
+            self.teams[self.team_pitching()].pitching_change(inning=self.inning[self.team_hitting()],
+                                                             score_diff=self.score_diff(),
+                                                             runner_count=self.bases.count_runners())
+            pitching = self.teams[self.team_pitching()].cur_pitcher_stats()  # data for new pitcher
+            if chatty:
+                print(f'\tManager has made the call to the bull pen.  Pitching change....')
+                print(f'\t{pitching.Player} has entered the game for {self.team_names[self.team_pitching()]}')
+        return
+
     def at_bat_out(self, outcome):
         # there was at least one out on the play, record that right away and deal with SF, DP, FC, adv runners on GB
         # outcome 2 is bases to advance, rbis will be taken care of later
@@ -109,7 +136,7 @@ class Game:
             outcome[2] = 1  # outcome 2 is bases to advance all remaining runners.  may include batter on a FC
         return outs_on_play, outcome
 
-    def sim_ab(self):
+    def sim_ab(self, chatty=True):
         cur_pitcher_index = self.teams[self.team_pitching()].cur_pitcher_index
         pitching = self.teams[self.team_pitching()].cur_pitcher_stats()  # data for pitcher
         pitching.Game_Fatigue_Factor, cur_percentage = \
@@ -131,6 +158,12 @@ class Game:
 
         self.teams[self.team_pitching()].box_score.pitching_result(cur_pitcher_index, outcome, outs_on_play)
         self.teams[self.team_hitting()].box_score.batting_result(cur_batter_index, outcome, self.bases.player_scored)
+
+        if chatty:
+            print(f'Pitcher: {pitching.Player} against '
+                  f'{self.team_names[self.team_hitting()]} batter #'
+                  f'{self.batting_num[self.team_hitting()]}. {batting.Player} \n'
+                  f'\t {outcome[1]}, {self.outs} Outs')
         return pitching, batting, outcome
 
     def sim_half_inning(self, chatty=True):
@@ -138,13 +171,10 @@ class Game:
         if chatty:
             print(f'\nStarting the {top_or_bottom} of inning {self.inning[self.team_hitting()]}.')
         while self.outs < 3:
-            pitching, batting, outcome = self.sim_ab()
-            if chatty:
-                print(f'Pitcher: {pitching.Player} against '
-                      f'{self.team_names[self.team_hitting()]} batter #'
-                      f'{self.batting_num[self.team_hitting()]}. {batting.Player} \n'
-                      f'\t {outcome[1]}, {self.outs} Outs')
-            if self.bases.runs_scored > 0:
+            # check for pitching change due to fatigue or game sit
+            self.pitching_sit(self.teams[self.team_pitching()].cur_pitcher_stats(), chatty)
+            __pitching, __batting, __outcome = self.sim_ab(chatty)  # resolve ab
+            if self.bases.runs_scored > 0:  # did a run score?
                 self.update_inning_score(number_of_runs=self.bases.runs_scored)
             if self.bases.runs_scored > 0 and chatty:
                 players = ''
@@ -158,12 +188,6 @@ class Game:
                 print(f'\t{self.bases.describe_runners()}')
             self.batting_num[self.team_hitting()] = self.batting_num[self.team_hitting()] + 1 \
                 if (self.batting_num[self.team_hitting()] + 1) <= 9 else 1  # wrap around lineup
-            if self.teams[self.team_pitching()].is_pitcher_fatigued(pitching.Condition) and self.outs < 3:  # pitch chg
-                self.teams[self.team_pitching()].pitching_change()
-                pitching = self.teams[self.team_pitching()].cur_pitcher_stats()  # data for new pitcher
-                if chatty:
-                    print(f'\tManager has made the call to the bull pen.  Pitching change....')
-                    print(f'\t{pitching.Player} has entered the game for {self.team_names[self.team_pitching()]}')
 
         # half inning over
         self.update_inning_score(number_of_runs=0)  # push a zero on the board if no runs score this half inning

@@ -68,6 +68,9 @@ class Bases:
         self.baserunners[basenum_from] = 0
         return
 
+    def count_runners(self):
+        return np.count_nonzero(self.baserunners[1:])  # don't count the hitter
+
     def describe_runners(self):
         desc = ''
         base_names = ['AB', '1st', '2nd', '3rd', 'home', 'scored', 'scored', 'scored']  # leave this for sort order

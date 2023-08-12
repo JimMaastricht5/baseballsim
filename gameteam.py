@@ -120,12 +120,22 @@ class Team:
         # self.set_pitching_condition(cur_percentage)
         return in_game_fatigue, cur_percentage  # obp impact to pitcher of fatigue
 
-    def pitching_change(self):  # ?? need to understand game situation for close or mid
-        reliever_pitcher_index = self.middle_relievers.index[0]  # make sure to drop the same index below
-        self.cur_pitcher_index = reliever_pitcher_index
-        self.pitching = pd.DataFrame(self.middle_relievers.loc[reliever_pitcher_index].to_frame().T)
-        self.box_score.add_pitcher_to_box(self.middle_relievers.loc[reliever_pitcher_index])
-        self.middle_relievers = self.middle_relievers.drop(reliever_pitcher_index, axis=0)  # remove reliever from  pen
+    def pitching_change(self, inning, score_diff, runner_count):
+        if len(self.relievers) >= (9 - (inning - 1)):  # desired 7, 8, 9 short term relief against count
+            # print(inning)
+            # print(9 - (inning - 1))
+            # print(self.relievers)
+            reliever_pitcher_index = self.relievers.index[9 - inning] # 7th would be reliever 2 since row count start 0
+            self.pitching = pd.DataFrame(self.relievers.loc[reliever_pitcher_index].to_frame().T)
+            self.box_score.add_pitcher_to_box(self.relievers.loc[reliever_pitcher_index])
+            self.middle_relievers = self.relievers.drop(reliever_pitcher_index, axis=0)  # remove from pen
+        else:  # grab next middle reliever
+            reliever_pitcher_index = self.middle_relievers.index[0]  # make sure to drop the same index below
+            self.pitching = pd.DataFrame(self.middle_relievers.loc[reliever_pitcher_index].to_frame().T)
+            self.box_score.add_pitcher_to_box(self.middle_relievers.loc[reliever_pitcher_index])
+            self.middle_relievers = self.middle_relievers.drop(reliever_pitcher_index, axis=0)  # remove from pen
+
+        self.cur_pitcher_index = reliever_pitcher_index  # set cur pitcher index
         return self.cur_pitcher_index
 
     def is_pitcher_fatigued(self, condition):

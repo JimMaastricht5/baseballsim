@@ -1,6 +1,6 @@
 import pandas as pd
 import bbstats
-import numpy as np
+# import numpy as np
 
 
 class TeamBoxScore:
@@ -35,8 +35,10 @@ class TeamBoxScore:
     def pitching_result(self, pitcher_index, outcome, outs):
         outcome[1] = 'K' if outcome[1] == 'SO' else outcome[1]  # handle stat translation from pitcher SO to batter K
         if outcome[0] == 'OUT':
-            self.box_pitching.loc[pitcher_index, ['Total_Outs']] = self.box_pitching.loc[pitcher_index, ['Total_Outs']] + outs
-            self.box_pitching.loc[pitcher_index, ['IP']] = float(self.box_pitching.loc[pitcher_index, ['Total_Outs']] / 3)
+            self.box_pitching.loc[pitcher_index, ['Total_Outs']] = \
+                self.box_pitching.loc[pitcher_index, ['Total_Outs']] + outs
+            self.box_pitching.loc[pitcher_index, ['IP']] = \
+                float(self.box_pitching.loc[pitcher_index, ['Total_Outs']] / 3)
 
         if outcome[1] in ['H', 'HR', 'K', 'BB', 'HBP']:  # handle plate appearance
             self.box_pitching.loc[pitcher_index, [outcome[1]]] = self.box_pitching.loc[pitcher_index, [outcome[1]]] + 1
@@ -60,11 +62,16 @@ class TeamBoxScore:
         self.box_pitching = bbstats.remove_non_print_cols(self.box_pitching, True)
         return
 
-    def pitching_win_loss(self, pitcher_index, bwin):
-        if bwin:
+    def pitching_win_loss_save(self, pitcher_index, win_b, save_b):
+        # set win loss records and save if applicable
+        if win_b:  # win boolean, did this pitcher win or lose?
             self.box_pitching.loc[pitcher_index, ['W']] = self.box_pitching.loc[pitcher_index, ['W']] + 1
         else:
             self.box_pitching.loc[pitcher_index, ['L']] = self.box_pitching.loc[pitcher_index, ['L']] + 1
+
+        if save_b:  # add one to save col for last row in box for team is save boolean is true
+            self.box_pitching.loc[self.box_pitching.index[-1], ['SV']] = \
+                self.box_pitching.loc[self.box_pitching.index[-1], ['SV']] + 1
         return
 
     def batting_result(self, batter_index, outcome, players_scored_list):

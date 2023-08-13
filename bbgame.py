@@ -28,6 +28,7 @@ class Game:
         self.teams[HOME].set_lineup(show_lineup=print_lineup, current_season_stats=(True if game_num > 1 else False))
 
         self.win_loss = []
+        self.is_save_sit = [False, False]
         self.total_score = [0, 0]  # total score
         self.inning_score = [['   ', away_team_name, home_team_name], [1, 0, ''], [2, '', ''],
                              [3, '', ''], [4, '', ''], [5, '', ''], [6, '', ''], [7, '', ''], [8, '', ''],
@@ -110,6 +111,7 @@ class Game:
                                                              runner_count=self.bases.count_runners())
             pitching = self.teams[self.team_pitching()].cur_pitcher_stats()  # data for new pitcher
             pitch_switch = True
+            self.is_save_sit[self.team_pitching()] = self.save_sit()
             if chatty:
                 print(f'\tManager has made the call to the bull pen.  Pitching change....')
                 print(f'\t{pitching.Player} has entered the game for {self.team_names[self.team_pitching()]}')
@@ -169,7 +171,7 @@ class Game:
         return pitching, batting, outcome
 
     def sim_half_inning(self, chatty=True):
-        pitch_switch = False
+        pitch_switch = False  # did we switch pitchers this inning, don't sub if closer came in
         top_or_bottom = 'top' if self.top_bottom == 0 else 'bottom'
         if chatty:
             print(f'\nStarting the {top_or_bottom} of inning {self.inning[self.team_hitting()]}.')
@@ -219,11 +221,13 @@ class Game:
 
         # assign winning and losing pitchers, if home team lost assign win to away and vice versa
         if home_win == 0:
-            self.teams[AWAY].box_score.pitching_win_loss(self.winning_pitcher, True)
-            self.teams[HOME].box_score.pitching_win_loss(self.losing_pitcher, False)
+            self.teams[AWAY].box_score.pitching_win_loss_save(self.winning_pitcher, win_b=True,
+                                                              save_b=self.is_save_sit[AWAY])  #
+            self.teams[HOME].box_score.pitching_win_loss_save(self.losing_pitcher, win_b=False, save_b=False)
         else:
-            self.teams[AWAY].box_score.pitching_win_loss(self.losing_pitcher, False)
-            self.teams[HOME].box_score.pitching_win_loss(self.winning_pitcher, True)
+            self.teams[AWAY].box_score.pitching_win_loss_save(self.losing_pitcher, win_b=False, save_b=False)
+            self.teams[HOME].box_score.pitching_win_loss_save(self.winning_pitcher, win_b=True,
+                                                              save_b=self.is_save_sit[HOME])
         return
 
     def sim_game(self):

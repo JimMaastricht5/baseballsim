@@ -99,19 +99,21 @@ class Game:
         print('')
         return
 
-    def pitching_sit(self, pitching, chatty=True):
+    def pitching_sit(self, pitching, pitch_switch, chatty=True):
         # switch pitchers based on fatigue or close game
         # close game is hitting inning >= 7 and, pitching team winning or tied and runners on = save sit
+        # if switch due to save or close game, don't switch again in same inning
         if (self.teams[self.team_pitching()].is_pitcher_fatigued(pitching.Condition) and self.outs < 3) or \
-                self.close_game() or self.save_sit():
+                (pitch_switch is False and (self.close_game() or self.save_sit())):
             self.teams[self.team_pitching()].pitching_change(inning=self.inning[self.team_hitting()],
                                                              score_diff=self.score_diff(),
                                                              runner_count=self.bases.count_runners())
             pitching = self.teams[self.team_pitching()].cur_pitcher_stats()  # data for new pitcher
+            pitch_switch = True
             if chatty:
                 print(f'\tManager has made the call to the bull pen.  Pitching change....')
                 print(f'\t{pitching.Player} has entered the game for {self.team_names[self.team_pitching()]}')
-        return
+        return pitch_switch
 
     def at_bat_out(self, outcome):
         # there was at least one out on the play, record that right away and deal with SF, DP, FC, adv runners on GB
@@ -167,12 +169,14 @@ class Game:
         return pitching, batting, outcome
 
     def sim_half_inning(self, chatty=True):
+        pitch_switch = False
         top_or_bottom = 'top' if self.top_bottom == 0 else 'bottom'
         if chatty:
             print(f'\nStarting the {top_or_bottom} of inning {self.inning[self.team_hitting()]}.')
         while self.outs < 3:
             # check for pitching change due to fatigue or game sit
-            self.pitching_sit(self.teams[self.team_pitching()].cur_pitcher_stats(), chatty)
+            pitch_switch = self.pitching_sit(self.teams[self.team_pitching()].cur_pitcher_stats(),
+                                             pitch_switch=pitch_switch, chatty=chatty)
             __pitching, __batting, __outcome = self.sim_ab(chatty)  # resolve ab
             if self.bases.runs_scored > 0:  # did a run score?
                 self.update_inning_score(number_of_runs=self.bases.runs_scored)

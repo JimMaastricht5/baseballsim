@@ -128,7 +128,7 @@ class Team:
             reliever_pitcher_index = self.relievers.index[9 - inning] # 7th would be reliever 2 since row count start 0
             self.pitching = pd.DataFrame(self.relievers.loc[reliever_pitcher_index].to_frame().T)
             self.box_score.add_pitcher_to_box(self.relievers.loc[reliever_pitcher_index])
-            self.middle_relievers = self.relievers.drop(reliever_pitcher_index, axis=0)  # remove from pen
+            self.relievers = self.relievers.drop(reliever_pitcher_index, axis=0)  # remove from pen
         else:  # grab next middle reliever
             reliever_pitcher_index = self.middle_relievers.index[0]  # make sure to drop the same index below
             self.pitching = pd.DataFrame(self.middle_relievers.loc[reliever_pitcher_index].to_frame().T)

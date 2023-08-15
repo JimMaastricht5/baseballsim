@@ -79,8 +79,8 @@ class Game:
         # pitcher of record tracking, look for lead change
         if self.total_score[self.team_hitting()] <= self.total_score[self.team_pitching()] and \
            (self.total_score[self.team_hitting()] + self.bases.runs_scored) > self.total_score[self.team_pitching()]:
-            self.winning_pitcher = self.teams[self.team_hitting()].pitching.index
-            self.losing_pitcher = self.teams[self.team_pitching()].pitching.index
+            self.winning_pitcher = self.teams[self.team_hitting()].is_pitching_index()
+            self.losing_pitcher = self.teams[self.team_pitching()].is_pitching_index()
 
         self.total_score[self.team_hitting()] += self.bases.runs_scored  # update total score
         return

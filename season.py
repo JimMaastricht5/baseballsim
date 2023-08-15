@@ -113,7 +113,7 @@ if __name__ == '__main__':
     seasons = [2022]
     # teams = ['CHC', 'CIN', 'COL', 'MIL', 'PIT', 'STL']  # included COL for balance in scheduling
     bbseason23 = BaseballSeason(load_seasons=seasons, new_season=2023,
-                                # team_list=teams,
+                                # team_list=teams,1
                                 season_length_limit=80,
                                 min_games=80, series_length=3, rotation_len=5)
     bbseason23.sim_season(season_chatty=False, season_print_box_score_b=False)

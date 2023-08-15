@@ -96,12 +96,15 @@ class Team:
             pitching = pitching.to_series()
         return pitching  # should be a series with a single row
 
-    # def set_pitching_condition(self, percent_of_max):
-    #     condition = 100 - percent_of_max if (100 - percent_of_max) >= 0 else 0
-    #     self.pitching.iloc[0]['Condition'] = condition  # data for pitcher
-    #     print(condition)
-    #     print( self.pitching.iloc[0])
-    #     return
+    def set_pitching_condition(self, percent_of_max):
+        try:
+            condition = 100 - percent_of_max if (100 - percent_of_max) >= 0 else 0
+            self.pitching.iloc[0]['Condition'] = condition  # data for pitcher
+        except Exception as e:
+            print(f'error in set_pitching_condition gameteam.py {e}')
+            print(condition)
+            print(self.pitching.iloc[0])
+        return
 
     def cur_batter_stats(self, loc_in_lineup):
         batting = self.lineup.iloc[loc_in_lineup]  # data for batter
@@ -117,25 +120,33 @@ class Team:
             in_game_fatigue = (cur_percentage - self.fatigue_start_perc) * self.fatigue_rate
         # print(f'bbgame.update_fatigue current game:{cur_game_faced} avg_batters_faced:{avg_faced}')
         # print(f'current %:{cur_percentage} in game fatigue:{in_game_fatigue}')
-        # self.set_pitching_condition(cur_percentage)
+        self.set_pitching_condition(cur_percentage)
         return in_game_fatigue, cur_percentage  # obp impact to pitcher of fatigue
 
     def pitching_change(self, inning, score_diff, runner_count):
-        if len(self.relievers) >= (9 - (inning - 1)):  # desired 7, 8, 9 short term relief against count
+        # desired 7, 8, 9 short term relief against count
+        if (inning <= 9 and len(self.relievers) >= (9 - (inning - 1))):  # or (inning > 9 and len(self.relievers) >= 1):
             # print(inning)
             # print(9 - (inning - 1))
             # print(self.relievers)
-            reliever_pitcher_index = self.relievers.index[9 - inning] # 7th would be reliever 2 since row count start 0
+            # ?? need to handle extra innings and running out of relievers!!!!
+            if inning <= 9:
+                reliever_pitcher_index = self.relievers.index[9 - inning]  # 7th would be rel 2 since row count start 0
+            else:
+                reliever_pitcher_index = self.relievers.index[0]  # just take the next pitcher
             self.pitching = pd.DataFrame(self.relievers.loc[reliever_pitcher_index].to_frame().T)
             self.box_score.add_pitcher_to_box(self.relievers.loc[reliever_pitcher_index])
             self.relievers = self.relievers.drop(reliever_pitcher_index, axis=0)  # remove from pen
-        else:  # grab next middle reliever
+            self.cur_pitcher_index = reliever_pitcher_index  # set cur pitcher index
+        else:
+        # elif len(self.middle_relievers) >= 1:  # grab next middle reliever
             reliever_pitcher_index = self.middle_relievers.index[0]  # make sure to drop the same index below
             self.pitching = pd.DataFrame(self.middle_relievers.loc[reliever_pitcher_index].to_frame().T)
             self.box_score.add_pitcher_to_box(self.middle_relievers.loc[reliever_pitcher_index])
             self.middle_relievers = self.middle_relievers.drop(reliever_pitcher_index, axis=0)  # remove from pen
-
-        self.cur_pitcher_index = reliever_pitcher_index  # set cur pitcher index
+            self.cur_pitcher_index = reliever_pitcher_index  # set cur pitcher index
+        #else:  # you're out of pitching!
+        #    pass
         return self.cur_pitcher_index
 
     def is_pitcher_fatigued(self, condition):

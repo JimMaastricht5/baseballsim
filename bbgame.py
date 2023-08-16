@@ -160,7 +160,8 @@ class Game:
         self.bases.advance_runners(bases_to_advance=outcome[2])  # outcome 2 is number of bases to advance
         outcome[3] = self.bases.runs_scored  # rbis for batter
 
-        self.teams[self.team_pitching()].box_score.pitching_result(cur_pitcher_index, outcome, outs_on_play)
+        self.teams[self.team_pitching()].box_score.pitching_result(cur_pitcher_index, outcome, outs_on_play,
+                                                                   pitching.Condition)
         self.teams[self.team_hitting()].box_score.batting_result(cur_batter_index, outcome, self.bases.player_scored)
 
         if chatty:

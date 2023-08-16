@@ -32,7 +32,7 @@ class TeamBoxScore:
                       self.box_pitching.loc[pitcher_index].IP * 3
         return total_faced
 
-    def pitching_result(self, pitcher_index, outcome, outs):
+    def pitching_result(self, pitcher_index, outcome, outs, condition):
         outcome[1] = 'K' if outcome[1] == 'SO' else outcome[1]  # handle stat translation from pitcher SO to batter K
         if outcome[0] == 'OUT':
             self.box_pitching.loc[pitcher_index, ['Total_Outs']] = \
@@ -50,6 +50,7 @@ class TeamBoxScore:
 
         # add runs
         self.box_pitching.loc[pitcher_index, ['ER']] = self.box_pitching.loc[pitcher_index, ['ER']] + outcome[3]  # rbis
+        self.box_pitching.loc[pitcher_index, ['Condition']] = condition
         return
 
     def add_pitcher_to_box(self, new_pitcher):
@@ -103,8 +104,11 @@ class TeamBoxScore:
     def print_boxes(self):
         print(self.box_batting.to_string(index=False, justify='center'))
         print('')
-        print(self.box_pitching.drop(['Total_Outs'], axis=1, inplace=False).to_string(index=False, justify='center'))
-        # print(self.box_pitching.to_string(index=False, justify='center'))
+        df = self.box_pitching.reindex(['Player', 'Team', 'Age', 'G', 'GS', 'CG', 'SHO', 'IP', 'H', 'ER', 'K', 'BB',
+                                        'HR', 'W', 'L', 'SV', 'BS', 'HLD', 'ERA', 'WHIP', 'AVG', 'OBP', 'SLG', 'OPS',
+                                        'Condition'], axis=1)
+        # print(df.drop(['Total_Outs'], axis=1, inplace=False).to_string(index=False, justify='center'))
+        print(df.to_string(index=False, justify='center'))
         print('')
         return
 

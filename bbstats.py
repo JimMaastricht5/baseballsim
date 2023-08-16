@@ -117,7 +117,6 @@ class BaseballStats:
         self.new_season_batting_data.drop(['Total_OB', 'Total_Outs'], axis=1)
         self.new_season_batting_data['Season'] = str(self.new_season)
         self.new_season_batting_data = self.new_season_batting_data.fillna(0)
-        # print(self.new_season_batting_data.to_string())
         return
 
     def create_leagues(self, league_num=2, team_num=8, minors=True):
@@ -182,9 +181,9 @@ class BaseballStats:
 # static function start
 def remove_non_print_cols(df_input, bpitchers=False):
     if bpitchers:
-        df = df_input.drop(['Season', 'Total_OB', 'AVG_faced', 'Game_Fatigue_Factor', 'Condition'], axis=1)
+        df = df_input.drop(['Season', 'Total_OB', 'AVG_faced', 'Game_Fatigue_Factor'], axis=1)
     else:
-        df = df_input.drop(['Season', 'Total_OB', 'Total_Outs', 'Game_Fatigue_Factor', 'Condition'], axis=1)
+        df = df_input.drop(['Season', 'Total_OB', 'Total_Outs', 'Game_Fatigue_Factor'], axis=1)
     return df
 
 
@@ -200,6 +199,7 @@ def team_batting_stats(df):
         df['SLG'] = trunc_col(
             ((df['H'] - df['2B'] - df['3B'] - df['HR']) + df['2B'] * 2 + df['3B'] * 3 + df['HR'] * 4) / df['AB'], 3)
         df['OPS'] = trunc_col(df['OBP'] + df['SLG'], 3)
+        df['Condition'] = trunc_col(df['Condition'], 0)
     except ZeroDivisionError:
         pass  # skip calculation for zero div error
     return df
@@ -218,6 +218,7 @@ def team_pitching_stats(df):
         df['OPS'] = trunc_col(df['OBP'] + df['SLG'] + df['SLG'], 3)
         df['WHIP'] = trunc_col((df['BB'] + df['H']) / df['IP'], 3)
         df['ERA'] = trunc_col((df['ER'] / df['IP']) * 9, 2)
+        df['Condition'] = trunc_col(df['Condition'], 0)
     except ZeroDivisionError:
         pass  # trap zero division error
     return df
@@ -231,6 +232,7 @@ def team_batting_totals(batting_df, team_name='', concat=True):
     df['Age'] = ''
     df['Pos'] = ''
     df['G'] = np.max(batting_df['G'])
+    df['Condition'] = np.average(batting_df['Condition'])
     df = df.to_frame().T
     if concat:
         df = pd.concat([batting_df, df], ignore_index=True)
@@ -247,6 +249,7 @@ def team_pitching_totals(pitching_df, team_name='', concat=True):
     df['Team'] = team_name
     df['Age'] = ''
     df['G'] = np.max(pitching_df['G'])
+    df['Condition'] = np.average(pitching_df['Condition'])
 
     df = df.to_frame().T
     if concat:

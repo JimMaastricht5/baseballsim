@@ -171,6 +171,10 @@ class BaseballStats:
         df = self.new_season_pitching_data.copy().sort_values(by='ERA', ascending=True)
         df = team_pitching_totals(df, team_name='', concat=True)
         df = remove_non_print_cols(df, True)
+        df = df.reindex(['Player', 'Team', 'Age', 'G', 'GS', 'CG', 'SHO', 'IP', 'H', 'ER', 'K', 'BB',
+                                        'HR', 'W', 'L', 'SV', 'BS', 'HLD', 'ERA', 'WHIP', 'AVG', 'OBP', 'SLG', 'OPS',
+                                        'Condition'], axis=1)
+        df.drop(['Total_Outs'], axis=1, inplace=False)
         print(df[df['Team'].isin(teams)].to_string(justify='right'))
         return
 
@@ -184,6 +188,9 @@ class BaseballStats:
         df = self.pitching_data.copy().sort_values(by='ERA', ascending=True)
         df = team_pitching_totals(df, team_name='', concat=True)
         df = remove_non_print_cols(df, True)
+        df = df.reindex(['Player', 'Team', 'Age', 'G', 'GS', 'CG', 'SHO', 'IP', 'H', 'ER', 'K', 'BB',
+                                        'HR', 'W', 'L', 'SV', 'BS', 'HLD', 'ERA', 'WHIP', 'AVG', 'OBP', 'SLG', 'OPS',
+                                        'Condition'], axis=1)
         print(df[df['Team'].isin(teams)].to_string(justify='right'))
         return
 

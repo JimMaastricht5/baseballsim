@@ -77,12 +77,17 @@ class BaseballSeason:
     def sim_season(self, season_chatty=False, season_print_box_score_b=False):
         print(f'{self.new_season} will have {len(self.schedule)} games per team.')
         print(f'Full schedule of games: {self.schedule}')
+
+        # loop over every day and every game scheduled that day
         for season_day_num in range(0, len(self.schedule)):  # loop from 0 to len of schedule - 1 end pt not included
             if self.season_length_limit != 0 and season_day_num + 1 > self.season_length_limit:  # stop if exceeds limit
                 break
             self.print_day_schedule(season_day_num)
             todays_games = self.schedule[season_day_num]
-            for match_up in todays_games:
+
+            # play every game for the day
+            self.baseball_data.new_game_day()  # update rest and injury data for a new day
+            for match_up in todays_games:  # run all games for a day
                 print(f'Playing day #{season_day_num + 1}: {match_up[0]} away against {match_up[1]}')  # day starts at 0
                 game = bbgame.Game(away_team_name=match_up[0], home_team_name=match_up[1],
                                    baseball_data=self.baseball_data, game_num=season_day_num, rotation_len=5,

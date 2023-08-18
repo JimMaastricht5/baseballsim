@@ -148,6 +148,13 @@ class BaseballStats:
             self.new_season_pitching_data.loc[index, 'Condition'] = pitching_box_score.loc[index, 'Condition']
         return
 
+    def new_game_day(self):
+        self.new_season_pitching_data['Condition'] = self.new_season_pitching_data['Condition'] + 20
+        self.new_season_pitching_data['Condition'] = self.new_season_pitching_data['Condition'].clip(upper=100)
+        self.new_season_batting_data['Condition'] = self.new_season_batting_data['Condition'] + 20
+        self.new_season_batting_data['Condition'] = self.new_season_batting_data['Condition'].clip(upper=100)
+        return
+
     def update_season_stats(self):
         self.new_season_pitching_data = \
             team_pitching_stats(self.new_season_pitching_data[self.new_season_pitching_data['IP'] > 0].fillna(0))

@@ -109,6 +109,7 @@ class BaseballStats:
         self.new_season_pitching_data[['OBP', 'Total_OB', 'Total_Outs']] = 0  # zero out calculated fields
         self.new_season_pitching_data.drop(['Total_OB', 'Total_Outs'], axis=1)
         self.new_season_pitching_data['Season'] = str(self.new_season)
+        self.new_season_pitching_data['Age'] = self.new_season_pitching_data['Age'] + 1  # everyone is a year older
         self.new_season_pitching_data.fillna(0)
 
         self.new_season_batting_data = self.batting_data.copy()
@@ -116,6 +117,7 @@ class BaseballStats:
         self.new_season_batting_data[['Total_OB', 'Total_Outs']] = 0  # zero out calculated fields
         self.new_season_batting_data.drop(['Total_OB', 'Total_Outs'], axis=1)
         self.new_season_batting_data['Season'] = str(self.new_season)
+        self.new_season_batting_data['Age'] = self.new_season_batting_data['Age'] + 1  # everyone is a year older
         self.new_season_batting_data = self.new_season_batting_data.fillna(0)
         return
 
@@ -137,12 +139,13 @@ class BaseballStats:
             # print(index, row)
             new_row = batting_box_score.loc[index][numeric_cols] + self.new_season_batting_data.loc[index][numeric_cols]
             self.new_season_batting_data.loc[index, numeric_cols] = new_row
-            # print(self.new_season_batting_data.to_string())
+            self.new_season_batting_data.loc[index, 'Condition'] = batting_box_score.loc[index, 'Condition']
         numeric_cols = self.numeric_pcols
         for index, row in pitching_box_score.iterrows():
             new_row = pitching_box_score.loc[index][numeric_cols] + \
                       self.new_season_pitching_data.loc[index][numeric_cols]
             self.new_season_pitching_data.loc[index, numeric_cols] = new_row
+            self.new_season_pitching_data.loc[index, 'Condition'] = pitching_box_score.loc[index, 'Condition']
         return
 
     def update_season_stats(self):

@@ -12,6 +12,22 @@ class BaseballStats:
         self.numeric_pcols = ['G', 'GS', 'CG', 'SHO', 'IP', 'H', 'ER', 'K', 'BB', 'HR', 'W', 'L',
                               'SV', 'BS', 'HLD', 'ERA', 'WHIP', 'Total_Outs']
 
+        # condition and injury odds
+        # 64% of injuries are to pitchers (188 of 684); 26% position players (87 of 634)
+        # 27.5% of pitchers w > 5 in will spend time on IL per season (188 out of 684)
+        # 26.3% of pitching injuries affect the throwing elbow results in avg of 74 days lost
+        # position player (non-pitcher) longevitiy: https://www.nytimes.com/2007/07/15/sports/baseball/15careers.html
+        self.condition_change_per_day = 20  # improve with rest
+        self.pitching_injury_odds_for_season = .275
+        self.pitching_injury_avg_len = 74
+        self.batting_injury_odds_for_season = 87 / 634  # 2022 pos player count
+        self.batting_injury_avg_len = 30  # made this up
+        self.odds_of_survival_age_20 = .90  # 90 chance for a 20 year old to play the following year
+        self.odd_of_survival_additional_years = -.0328  # 3.28% decrease in survival, use to increase injury chance
+        self.injured_lists = [7, 14, 60, 162]  # mlb is 10 for pos min, 15 for pitcher min, and 60 day
+        self.injuries_Severity = {'Healthy': 0, 'Minor Injury': 7, 'Injury': 14, 'Major Injury': 75,
+                                  'Season Ending': 162, 'Career Ending': 9999}
+
         self.load_seasons = load_seasons  # list of seasons to load from csv files
         self.new_season = new_season
         self.pitching_data = None
@@ -36,6 +52,8 @@ class BaseballStats:
                 pitching_data['AVG_faced'] = (pitching_data['Total_OB'] + pitching_data['Total_Outs']) / pitching_data.G
                 pitching_data['Game_Fatigue_Factor'] = 0
                 pitching_data['Condition'] = 100
+                pitching_data['Injured'] = 'Healthy' # status
+                pitching_data['Injured List'] = 0  # days to spend in IL
 
                 batting_data = pd.read_csv(str(season) + " player-stats-Batters.csv")
                 batting_data['Season'] = str(season)
@@ -44,6 +62,8 @@ class BaseballStats:
                 batting_data = batting_data[batting_data['AB'] >= 25]  # drop players without enough AB
                 batting_data['Game_Fatigue_Factor'] = 0
                 batting_data['Condition'] = 100
+                batting_data['Injured'] = 'Healthy'
+                batting_data['Injured List'] = 0
 
                 if self.pitching_data is None:
                     self.pitching_data = pitching_data
@@ -149,9 +169,11 @@ class BaseballStats:
         return
 
     def new_game_day(self):
-        self.new_season_pitching_data['Condition'] = self.new_season_pitching_data['Condition'] + 20
+        self.new_season_pitching_data['Condition'] = self.new_season_pitching_data['Condition'] \
+                                                     + self.condition_change_per_day
         self.new_season_pitching_data['Condition'] = self.new_season_pitching_data['Condition'].clip(upper=100)
-        self.new_season_batting_data['Condition'] = self.new_season_batting_data['Condition'] + 20
+        self.new_season_batting_data['Condition'] = self.new_season_batting_data['Condition'] \
+                                                    + self.condition_change_per_day
         self.new_season_batting_data['Condition'] = self.new_season_batting_data['Condition'].clip(upper=100)
         return
 

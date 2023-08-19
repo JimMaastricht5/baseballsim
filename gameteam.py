@@ -27,6 +27,7 @@ class Team:
         self.fatigue_start_perc = 70  # 85% of way to avg max is where fatigue starts
         self.fatigue_rate = .001  # at 85% of avg max pitchers have a .014 increase in OBP.  using .001 as proxy
         self.fatigue_pitching_change_limit = 5  # change pitcher at # or below out of 100
+        self.fatigue_pitching_unavailable = 50  # condition must be 51 or higher for a pitcher to be available
         return
 
     def is_pitching_index(self):
@@ -158,15 +159,17 @@ class Team:
     def set_closers(self):
         # grab top two closers for setup and final close
         not_selected_criteria = ~self.pitchers.index.isin(self.starting_pitchers.index)
+        exhausted = ~self.pitchers['Condition'] <= self.fatigue_pitching_unavailable
         sv_criteria = self.pitchers.SV > 0
-        df_criteria = not_selected_criteria & sv_criteria
+        df_criteria = not_selected_criteria & sv_criteria & exhausted
         self.relievers = self.pitchers[df_criteria].sort_values('SV', ascending=False).head(2)
         return
 
     def set_mid_relief(self):
         not_selected_criteria = ~self.pitchers.index.isin(self.starting_pitchers.index)
         not_reliever_criteria = ~self.pitchers.index.isin(self.relievers.index)
-        df_criteria = not_selected_criteria & not_reliever_criteria
+        exhausted = ~self.pitchers['Condition'] <= self.fatigue_pitching_unavailable
+        df_criteria = not_selected_criteria & not_reliever_criteria & exhausted
         self.middle_relievers = self.pitchers[df_criteria].sort_values('IP', ascending=False)
         return
 

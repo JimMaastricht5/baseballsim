@@ -22,6 +22,7 @@ class Team:
         self.cur_lineup_index = []
         self.relievers = None  # df of 2 best closers
         self.middle_relievers = None  # remaining pitchers sorted by IP descending
+        self.unavailable_pitchers = None
         self.box_score = None
         self.game_num = game_num
         self.rotation_len = rotation_len
@@ -41,6 +42,7 @@ class Team:
         self.set_starting_rotation()
         self.set_closers()
         self.set_mid_relief()
+        # self.set_unavailable()
         if show_lineup:
             self.print_starting_lineups(current_season_stats=current_season_stats)
         self.box_score = teamgameboxstats.TeamBoxScore(self.lineup, self.pitching, self.team_name)
@@ -161,18 +163,29 @@ class Team:
     def set_closers(self):
         # grab top two closers for setup and final close
         not_selected_criteria = ~self.pitchers.index.isin(self.starting_pitchers.index)
-        exhausted = ~(self.pitchers['Condition'] <= self.fatigue_pitching_unavailable)
+        not_exhausted = ~(self.pitchers['Condition'] <= self.fatigue_pitching_unavailable)
+        not_injured = (self.pitchers['Injured List'] == 0)
         sv_criteria = self.pitchers.SV > 0
-        df_criteria = not_selected_criteria & sv_criteria & exhausted
+        df_criteria = not_selected_criteria & sv_criteria & not_exhausted & not_injured
         self.relievers = self.pitchers[df_criteria].sort_values('SV', ascending=False).head(2)
         return
 
     def set_mid_relief(self):
         not_selected_criteria = ~self.pitchers.index.isin(self.starting_pitchers.index)
         not_reliever_criteria = ~self.pitchers.index.isin(self.relievers.index)
-        exhausted = ~(self.pitchers['Condition'] <= self.fatigue_pitching_unavailable)
-        df_criteria = not_selected_criteria & not_reliever_criteria & exhausted
+        not_exhausted = ~(self.pitchers['Condition'] <= self.fatigue_pitching_unavailable)
+        not_injured = (self.pitchers['Injured List'] == 0)
+        df_criteria = not_selected_criteria & not_reliever_criteria & not_exhausted & not_injured
         self.middle_relievers = self.pitchers[df_criteria].sort_values('IP', ascending=False)
+        return
+
+    def set_unavailable(self):
+        exhausted = (self.pitchers['Condition'] > self.fatigue_pitching_unavailable)
+        injured = (self.pitchers['Injured List'] > 0)
+        df_criteria = exhausted | injured
+        self.unavailable_pitchers = self.pitchers[df_criteria].sort_values('IP', ascending=False)
+        print('gameteam.py set unavailable due to fatigue or injury....')
+        print(self.unavailable_pitchers.to_string())
         return
 
     def search_for_pos(self, position, lineup_index_list, stat_criteria='OPS'):

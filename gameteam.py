@@ -6,10 +6,12 @@ import bbstats
 class Team:
     def __init__(self, team_name, baseball_data, game_num=1, rotation_len=5):
         pd.options.mode.chained_assignment = None  # suppresses chained assignment warning for lineup pos setting
+
         self.team_name = team_name
         self.baseball_data = baseball_data
         self.pitchers = baseball_data.pitching_data[baseball_data.pitching_data["Team"] == team_name]
         self.pos_players = baseball_data.batting_data[baseball_data.batting_data["Team"] == team_name]
+        # baseball_data.print_current_season()
 
         self.lineup = None  # uses prior season stats
         self.lineup_new_season = None  # new / current season stats for printing starting lineup
@@ -28,6 +30,7 @@ class Team:
         self.fatigue_rate = .001  # at 85% of avg max pitchers have a .014 increase in OBP.  using .001 as proxy
         self.fatigue_pitching_change_limit = 5  # change pitcher at # or below out of 100
         self.fatigue_pitching_unavailable = 50  # condition must be 51 or higher for a pitcher to be available
+
         return
 
     def is_pitching_index(self):
@@ -106,7 +109,6 @@ class Team:
             self.pitching.Condition = condition
         except Exception as e:
             print(f'error in set_pitching_condition gameteam.py {e}')
-            print(condition)
             print(self.pitching)
             raise Exception('set pitching condition error')
         return
@@ -129,7 +131,7 @@ class Team:
         return in_game_fatigue, cur_percentage  # obp impact to pitcher of fatigue
 
     def pitching_change(self, inning, score_diff, runner_count):
-        # desired 7, 8, 9 short term relief against count
+        # desired 7, 8, 9 short term relief against count, need to check score diff ?????
         if (inning <= 9 and len(self.relievers) >= (9 - (inning - 1))) or (inning > 9 and len(self.relievers) >= 1):
             if inning <= 9:
                 reliever_pitcher_index = self.relievers.index[9 - inning]  # 7th would be rel 2 since row count start 0
@@ -146,7 +148,7 @@ class Team:
             self.box_score.add_pitcher_to_box(self.middle_relievers.loc[reliever_pitcher_index])
             self.middle_relievers = self.middle_relievers.drop(reliever_pitcher_index, axis=0)  # remove from pen
             self.cur_pitcher_index = reliever_pitcher_index  # set cur pitcher index
-        else:  # you're out of pitching!
+        else:  # you're out of pitching!  ?????
             pass
         return self.cur_pitcher_index
 
@@ -159,7 +161,7 @@ class Team:
     def set_closers(self):
         # grab top two closers for setup and final close
         not_selected_criteria = ~self.pitchers.index.isin(self.starting_pitchers.index)
-        exhausted = ~self.pitchers['Condition'] <= self.fatigue_pitching_unavailable
+        exhausted = ~(self.pitchers['Condition'] <= self.fatigue_pitching_unavailable)
         sv_criteria = self.pitchers.SV > 0
         df_criteria = not_selected_criteria & sv_criteria & exhausted
         self.relievers = self.pitchers[df_criteria].sort_values('SV', ascending=False).head(2)
@@ -168,7 +170,7 @@ class Team:
     def set_mid_relief(self):
         not_selected_criteria = ~self.pitchers.index.isin(self.starting_pitchers.index)
         not_reliever_criteria = ~self.pitchers.index.isin(self.relievers.index)
-        exhausted = ~self.pitchers['Condition'] <= self.fatigue_pitching_unavailable
+        exhausted = ~(self.pitchers['Condition'] <= self.fatigue_pitching_unavailable)
         df_criteria = not_selected_criteria & not_reliever_criteria & exhausted
         self.middle_relievers = self.pitchers[df_criteria].sort_values('IP', ascending=False)
         return

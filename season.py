@@ -74,7 +74,7 @@ class BaseballSeason:
             np.add(np.array(self.team_win_loss[home_team_name]), np.array(win_loss[1])))
         return
 
-    def sim_season(self, season_chatty=False, season_print_box_score_b=False):
+    def sim_season(self, season_chatty=False, season_print_lineup_b=False, season_print_box_score_b=False):
         print(f'{self.new_season} will have {len(self.schedule)} games per team.')
         print(f'Full schedule of games: {self.schedule}')
 
@@ -90,8 +90,9 @@ class BaseballSeason:
             for match_up in todays_games:  # run all games for a day
                 print(f'Playing day #{season_day_num + 1}: {match_up[0]} away against {match_up[1]}')  # day starts at 0
                 game = bbgame.Game(away_team_name=match_up[0], home_team_name=match_up[1],
-                                   baseball_data=self.baseball_data, game_num=season_day_num, rotation_len=5,
-                                   print_lineup=False, chatty=season_chatty, print_box_score_b=season_print_box_score_b)
+                                   baseball_data=self.baseball_data, game_num=season_day_num,
+                                   rotation_len=self.rotation_len, print_lineup=season_print_lineup_b,
+                                   chatty=season_chatty, print_box_score_b=season_print_box_score_b)
                 score, inning, win_loss_list = game.sim_game()
                 self.update_win_loss(away_team_name=match_up[0], home_team_name=match_up[1], win_loss=win_loss_list)
                 print(f'Final: {match_up[0]} {score[0]} {match_up[1]} {score[1]}')
@@ -119,9 +120,9 @@ if __name__ == '__main__':
     teams = ['CHC', 'CIN', 'COL', 'MIL', 'PIT', 'STL']  # included COL for balance in scheduling
     bbseason23 = BaseballSeason(load_seasons=seasons, new_season=2023,
                                 team_list=teams,
-                                season_length_limit=10,
-                                min_games=10, series_length=3, rotation_len=5)
-    bbseason23.sim_season(season_chatty=False, season_print_box_score_b=True)
+                                season_length_limit=3,
+                                min_games=3, series_length=3, rotation_len=5)
+    bbseason23.sim_season(season_chatty=False, season_print_lineup_b=False, season_print_box_score_b=True)
 
     # full season
     # bbseason23 = BaseballSeason(load_seasons=seasons, new_season=2023,

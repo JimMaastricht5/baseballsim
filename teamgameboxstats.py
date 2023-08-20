@@ -5,6 +5,7 @@ import bbstats
 
 class TeamBoxScore:
     def __init__(self, lineup, pitching, team_name):
+        # self.rnd = lambda: np.random.default_rng().uniform(low=0.0, high=1.001)  # random generator between 0 and 1
         self.box_pitching = pitching.copy()
         self.box_pitching[['G', 'GS']] = 1
         self.box_pitching[['CG', 'SHO', 'IP', 'H', 'ER', 'K', 'BB', 'HR', 'W', 'L', 'SV', 'BS', 'HLD', 'ERA', 'WHIP',
@@ -25,6 +26,7 @@ class TeamBoxScore:
         self.team_name = team_name
         self.total_hits = 0
         self.total_errors = 0
+
         return
 
     def batters_faced(self, pitcher_index):
@@ -103,8 +105,8 @@ class TeamBoxScore:
 
     def print_boxes(self):
         df = self.box_batting.reindex(['Player', 'Team', 'Pos', 'Age', 'G', 'AB', 'R', 'H', '2B', '3B', 'HR', 'RBI',
-                                        'SB', 'CS', 'BB', 'SO', 'SH', 'SF', 'HBP', 'AVG', 'OBP',
-                                        'Condition', 'Injured'], axis=1)
+                                       'SB', 'CS', 'BB', 'SO', 'SH', 'SF', 'HBP', 'AVG', 'OBP',
+                                       'Condition', 'Injured'], axis=1)
         print(df.to_string(index=False, justify='center'))
         print('')
         df = self.box_pitching.reindex(['Player', 'Team', 'Age', 'G', 'GS', 'CG', 'SHO', 'IP', 'H', 'ER', 'K', 'BB',

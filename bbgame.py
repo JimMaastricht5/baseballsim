@@ -139,7 +139,7 @@ class Game:
 
         # advance runners on gb or dp if less than 3 outs
         if (outcome[1] == 'GB' or outcome[1] == 'DP' or outcome[1] == 'GB FC') and self.outs < 3:
-            print(f'bbgame at_bat_out {outcome[1]}, outs: {self.outs}, adv runners: {outcome[2]}')
+            # print(f'bbgame at_bat_out {outcome[1]}, outs: {self.outs}, adv runners: {outcome[2]}')
             outcome[2] = 1  # outcome 2 is bases to advance all remaining runners.  may include batter on a FC
         return outs_on_play, outcome
 

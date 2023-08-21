@@ -180,7 +180,7 @@ class BaseballStats:
         return
 
     def new_game_day(self):
-        self.is_injured()
+        # self.is_injured()
         self.new_season_pitching_data['Condition'] = self.new_season_pitching_data['Condition'] \
                                                      + self.condition_change_per_day
         self.new_season_pitching_data['Condition'] = self.new_season_pitching_data['Condition'].clip(lower=0, upper=100)
@@ -282,7 +282,7 @@ def team_pitching_stats(df):
         df['AVG'] = trunc_col(df['H'] / df_ab, 3)
         df['OBP'] = trunc_col((df['H'] + df['BB'] + 0) / (df_ab + df['BB'] + 0), 3)
         df['SLG'] = trunc_col(((df['H'] - 0 - 0 - df['HR']) + 0 * 2 + 0 * 3 + df['HR'] * 4) / df_ab, 3)
-        df['OPS'] = trunc_col(df['OBP'] + df['SLG'] + df['SLG'], 3)
+        df['OPS'] = trunc_col(df['OBP'] + df['SLG'], 3)
         df['WHIP'] = trunc_col((df['BB'] + df['H']) / df['IP'], 3)
         df['ERA'] = trunc_col((df['ER'] / df['IP']) * 9, 2)
         df['Condition'] = trunc_col(df['Condition'], 0)

@@ -118,17 +118,19 @@ class BaseballSeason:
 # test a number of games
 if __name__ == '__main__':
     seasons = [2022]
+    startdt = datetime.datetime.now()
     teams = ['CHC', 'CIN', 'COL', 'MIL', 'PIT', 'STL']  # included COL for balance in scheduling
-    # bbseason23 = BaseballSeason(load_seasons=seasons, new_season=2023,
-    #                             team_list=teams,
-    #                             season_length_limit=3,
-    #                             min_games=3, series_length=3, rotation_len=5)
-    # bbseason23.sim_season(season_chatty=False, season_print_lineup_b=False, season_print_box_score_b=True)
+    bbseason23 = BaseballSeason(load_seasons=seasons, new_season=2023,
+                                team_list=teams,
+                                season_length_limit=30,
+                                min_games=30, series_length=3, rotation_len=5)
+    bbseason23.sim_season(season_chatty=False, season_print_lineup_b=False, season_print_box_score_b=False)
 
     # full season
-    print(datetime.datetime.now())
-    bbseason23 = BaseballSeason(load_seasons=seasons, new_season=2023,
-                                season_length_limit=162,
-                                min_games=162, series_length=3, rotation_len=5)
-    bbseason23.sim_season(season_chatty=False, season_print_box_score_b=False)
+    # bbseason23 = BaseballSeason(load_seasons=seasons, new_season=2023,
+    #                             season_length_limit=162,
+    #                             min_games=162, series_length=3, rotation_len=5)
+    # bbseason23.sim_season(season_chatty=False, season_print_box_score_b=False)
+    #
+    print(startdt)
     print(datetime.datetime.now())

@@ -104,8 +104,9 @@ class TeamBoxScore:
         return
 
     def print_boxes(self):
+        # print(self.box_batting.to_string())
         df = self.box_batting.reindex(['Player', 'Team', 'Pos', 'Age', 'G', 'AB', 'R', 'H', '2B', '3B', 'HR', 'RBI',
-                                       'SB', 'CS', 'BB', 'SO', 'SH', 'SF', 'HBP', 'AVG', 'OBP',
+                                       'SB', 'CS', 'BB', 'SO', 'SH', 'SF', 'HBP', 'AVG', 'OBP', 'SLG', 'OPS',
                                        'Condition', 'Injured'], axis=1)
         print(df.to_string(index=False, justify='center'))
         print('')

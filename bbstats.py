@@ -312,7 +312,7 @@ def team_batting_totals(batting_df, team_name='', concat=True):
 def team_pitching_totals(pitching_df, team_name='', concat=True):
     df = pitching_df.copy()
     df = df[['GS', 'CG', 'SHO', 'IP', 'H', 'ER', 'K', 'BB', 'HR', 'W', 'L', 'SV', 'BS',
-             'HLD', 'ERA', 'WHIP', 'Total_Outs']].sum()
+             'HLD', 'Total_Outs']].sum()
     cols_to_trunc = ['GS', 'CG', 'SHO', 'H', 'ER', 'K', 'BB', 'HR', 'W', 'L', 'SV', 'BS', 'HLD', 'Total_Outs']
     df['Player'] = 'Totals'
     df['Team'] = team_name

@@ -173,7 +173,7 @@ class Game:
         outs_on_play = 0
         if outcome[0] == 'OUT':
             outs_on_play, outcome = self.at_bat_out(outcome)
-        if outcome[0] == 'BB':
+        if outcome[1] == 'BB':
             outcome = self.bases.walk(outcome)
 
         # runners may advance on gb, dp, or ob

@@ -76,9 +76,11 @@ class Bases:
         return
 
     def push_a_runner(self, basenum_from, basenum_to):
+        # print(f'bbbaserunners.py push_a_runner {basenum_from}m {basenum_to}')
         if self.is_runner_on_base_num(basenum_to):
             self.push_a_runner(basenum_from + 1, basenum_to +1)
 
+        # print(f'moving runner from {basenum_from}, {basenum_to}')
         self.move_a_runner(basenum_from, basenum_to)
         return
     def walk(self, outcome):

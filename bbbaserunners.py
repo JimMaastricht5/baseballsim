@@ -66,7 +66,6 @@ class Bases:
     def tag_up(self, outs):
         if outs >= 3:
             return
-
         self.runs_scored += 1  # give batter and RBI
         self.move_a_runner(3, 4)  # move runner from 3 to 4
         return
@@ -76,8 +75,22 @@ class Bases:
         self.baserunners[basenum_from] = 0
         return
 
+    def push_a_runner(self, basenum_from, basenum_to):
+        if self.is_runner_on_base_num(basenum_to):
+            self.push_a_runner(basenum_from + 1, basenum_to +1)
+
+        self.move_a_runner(basenum_from, basenum_to)
+        return
+    def walk(self, outcome):
+        if self.count_runners() == 3:  # bases loaded walk
+            outcome[2] = 1  # push all runners up one base and handle rbi and run scored
+        else:  # bases are not loaded so move runners up a base when forced
+            self.push_a_runner(0, 1)  # move the ab player to 1st base
+            outcome[2] = 0
+        return outcome
+
     def count_runners(self):
-        return np.count_nonzero(self.baserunners[1:3])  # add the number of people on base 1st, 2b, and 3rd
+        return np.count_nonzero(self.baserunners[1:3+1])  # add the number of people on base 1st, 2b, and 3rd
 
     def describe_runners(self):
         desc = ''

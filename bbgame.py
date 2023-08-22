@@ -173,6 +173,8 @@ class Game:
         outs_on_play = 0
         if outcome[0] == 'OUT':
             outs_on_play, outcome = self.at_bat_out(outcome)
+        if outcome[0] == 'BB':
+            outcome = self.bases.walk(outcome)
 
         # runners may advance on gb, dp, or ob
         self.bases.advance_runners(bases_to_advance=outcome[2], outs=self.outs)  # outcome 2 is bases to advance
@@ -209,8 +211,8 @@ class Game:
                 print(f'\tScored {self.bases.runs_scored} run(s)!  ({players})\n'
                       f'\tThe score is {self.team_names[0]} {self.total_score[0]} to'
                       f' {self.team_names[1]} {self.total_score[1]}')  # ?? need to handle walk offs...
-            # if self.bases.count_runners() >= 1 and self.outs < 3 and chatty:  # leave out the batter to check for runner
-            print(f'\t{self.bases.describe_runners()}')
+            if self.bases.count_runners() >= 1 and self.outs < 3 and chatty:  # leave out the batter to check for runner
+                print(f'\t{self.bases.describe_runners()}')
             self.batting_num[self.team_hitting()] = self.batting_num[self.team_hitting()] + 1 \
                 if (self.batting_num[self.team_hitting()] + 1) <= 9 else 1  # wrap around lineup
 

@@ -121,6 +121,7 @@ class SimAB:
             # print('on base')
             if self.bb():
                 result[1] = 'BB'
+                result[2] = 0
             elif self.double():
                 result[1] = '2B'
                 result[2] = 2

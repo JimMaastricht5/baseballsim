@@ -185,10 +185,11 @@ class Game:
         self.teams[self.team_hitting()].box_score.batting_result(cur_batter_index, outcome, self.bases.player_scored)
 
         if chatty:
+            out_text = 'Out' if self.outs <= 1 else 'Outs'
             print(f'Pitcher: {pitching.Player} against '
                   f'{self.team_names[self.team_hitting()]} batter #'
                   f'{self.batting_num[self.team_hitting()]}. {batting.Player} \n'
-                  f'\t {outcome[1]}, {self.outs} Outs')
+                  f'\t {outcome[1]}, {self.outs} {out_text}')
         return pitching, batting, outcome
 
     def sim_half_inning(self, chatty=True):

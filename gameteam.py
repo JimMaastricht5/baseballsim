@@ -132,7 +132,7 @@ class Team:
         self.set_pitching_condition(cur_percentage)
         return in_game_fatigue, cur_percentage  # obp impact to pitcher of fatigue
 
-    def pitching_change(self, inning, score_diff, runner_count):
+    def pitching_change(self, inning):
         # desired 7, 8, 9 short term relief against count, need to check score diff ?????
         if (inning <= 9 and len(self.relievers) >= (9 - (inning - 1))) or (inning > 9 and len(self.relievers) >= 1):
             if inning <= 9:

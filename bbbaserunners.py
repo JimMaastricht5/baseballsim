@@ -17,7 +17,10 @@ class Bases:
         self.num_runners = 0
         return
 
-    def advance_runners(self, bases_to_advance=1):
+    def advance_runners(self, bases_to_advance=1, outs=0):
+        if outs >= 3:
+            return
+
         self.player_scored = {}
         self.baserunners = list(np.roll(self.baserunners, bases_to_advance))  # advance runners
         self.runs_scored = np.count_nonzero(self.baserunners[-4:])  # 0 ab 1, 2, 3 are bases. 4-7 run crossed home=len 4
@@ -26,7 +29,7 @@ class Bases:
                 self.player_scored[player_num] = self.baserunners_names[player_num]
         self.baserunners[-4] = 0  # send the runners that score back to the dug out
         self.baserunners = [baserunner if i <= 3 else 0 for i, baserunner in enumerate(self.baserunners)]  # reset bases
-        self.num_runners = np.count_nonzero(self.baserunners[1:3])  # add the number of people on base 1st, 2b, and 3rd
+        self.num_runners = self.count_runners()
         return
 
     def new_ab(self, batter_num=1, player_name=''):
@@ -47,29 +50,40 @@ class Bases:
         self.num_runners = 0
         return
 
-    def remove_runner(self, base):
+    def remove_runner(self, bases):
         # remove runner from 1st, 2nd, or 3rd for DP or FC
         # index pos 1 is 1b so base # is used as offset
-        self.baserunners[base] = 0
-        self.baserunners_names[base] = ''
+        if isinstance(bases, list):
+            for base in bases:
+                self.baserunners[base] = 0
+                self.baserunners_names[base] = ''
+        else:
+            self.baserunners[bases] = 0
+            self.baserunners_names[bases] = ''
+        self.num_runners = self.count_runners()
         return
 
     def is_runner_on_base_num(self, base_num):
         # print(f'is_runner_on_first {self.baserunners}, {self.baserunners[1] == 1}')
         return self.baserunners[base_num] != 0
 
-    def tag_up(self):
+    def tag_up(self, outs):
+        if outs >= 3:
+            return
+
         self.runs_scored += 1  # give batter and RBI
         self.move_a_runner(3, 4)  # move runner from 3 to 4
+        self.num_runners = self.count_runners()
         return
 
     def move_a_runner(self, basenum_from, basenum_to):
         self.baserunners[basenum_to] = self.baserunners[basenum_from]
         self.baserunners[basenum_from] = 0
+        self.num_runners = self.count_runners()
         return
 
     def count_runners(self):
-        return np.count_nonzero(self.baserunners[1:])  # don't count the hitter
+        return np.count_nonzero(self.baserunners[1:3])  # add the number of people on base 1st, 2b, and 3rd
 
     def describe_runners(self):
         desc = ''

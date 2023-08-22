@@ -61,7 +61,7 @@ class Game:
     def save_sit(self):
         # can go two innings for a save so start measure in the 8th inning
         # if pitching team is leading and runners + ab + on deck is equal to score diff
-        return (self.score_diff() > 0 and (self.score_diff() <= self.bases.num_runners + 2) and
+        return (self.score_diff() > 0 and (self.score_diff() <= self.bases.count_runners() + 2) and
                 self.inning[self.team_hitting()] >= 8)
 
     def close_game(self):
@@ -209,8 +209,8 @@ class Game:
                 print(f'\tScored {self.bases.runs_scored} run(s)!  ({players})\n'
                       f'\tThe score is {self.team_names[0]} {self.total_score[0]} to'
                       f' {self.team_names[1]} {self.total_score[1]}')  # ?? need to handle walk offs...
-            if self.bases.num_runners >= 1 and self.outs < 3 and chatty:  # leave out the batter to check for runner
-                print(f'\t{self.bases.describe_runners()}')
+            # if self.bases.count_runners() >= 1 and self.outs < 3 and chatty:  # leave out the batter to check for runner
+            print(f'\t{self.bases.describe_runners()}')
             self.batting_num[self.team_hitting()] = self.batting_num[self.team_hitting()] + 1 \
                 if (self.batting_num[self.team_hitting()] + 1) <= 9 else 1  # wrap around lineup
 

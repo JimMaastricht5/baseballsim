@@ -14,7 +14,6 @@ class Bases:
         self.player_scored = None
         self.clear_bases()  # initialize bases to no runners
         self.runs_scored = 0
-        self.num_runners = 0
         return
 
     def advance_runners(self, bases_to_advance=1, outs=0):
@@ -29,7 +28,6 @@ class Bases:
                 self.player_scored[player_num] = self.baserunners_names[player_num]
         self.baserunners[-4] = 0  # send the runners that score back to the dug out
         self.baserunners = [baserunner if i <= 3 else 0 for i, baserunner in enumerate(self.baserunners)]  # reset bases
-        self.num_runners = self.count_runners()
         return
 
     def new_ab(self, batter_num=1, player_name=''):
@@ -47,7 +45,6 @@ class Bases:
         self.baserunners_names = {}  # names doesn't need to be cleared, but just to be safe every half inning
         self.baserunners_names[0] = ''
         self.player_scored = {}
-        self.num_runners = 0
         return
 
     def remove_runner(self, bases):
@@ -60,7 +57,6 @@ class Bases:
         else:
             self.baserunners[bases] = 0
             self.baserunners_names[bases] = ''
-        self.num_runners = self.count_runners()
         return
 
     def is_runner_on_base_num(self, base_num):
@@ -73,13 +69,11 @@ class Bases:
 
         self.runs_scored += 1  # give batter and RBI
         self.move_a_runner(3, 4)  # move runner from 3 to 4
-        self.num_runners = self.count_runners()
         return
 
     def move_a_runner(self, basenum_from, basenum_to):
         self.baserunners[basenum_to] = self.baserunners[basenum_from]
         self.baserunners[basenum_from] = 0
-        self.num_runners = self.count_runners()
         return
 
     def count_runners(self):
@@ -94,5 +88,5 @@ class Bases:
         base_names_with_runners.sort()
         for base_name in base_names_with_runners:
             desc = base_name[0] if desc == '' else desc + ', ' + base_name[0]
-        prefix = 'Runner on ' if self.num_runners == 1 else 'Runners on '
-        return prefix + desc
+        prefix = 'Runner on ' if self.count_runners() == 1 else 'Runners on '
+        return desc if self.count_runners() == 0 else prefix + desc

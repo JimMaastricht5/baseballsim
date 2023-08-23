@@ -8,7 +8,7 @@ class TeamBoxScore:
         # self.rnd = lambda: np.random.default_rng().uniform(low=0.0, high=1.001)  # random generator between 0 and 1
         self.box_pitching = pitching.copy()
         self.box_pitching[['G', 'GS']] = 1
-        self.box_pitching[['CG', 'SHO', 'IP', 'H', '2B', '3B', 'ER', 'K', 'BB', 'HR', 'W', 'L', 'SV', 'BS',
+        self.box_pitching[['CG', 'SHO', 'IP', 'AB', 'H', '2B', '3B', 'ER', 'K', 'BB', 'HR', 'W', 'L', 'SV', 'BS',
                            'HLD', 'ERA', 'WHIP',
                            'OBP', 'SLG', 'OPS', 'Total_Outs']] = 0
         # self.box_pitching.drop(['Season', 'Total_OB', 'Total_Outs'], axis=1, inplace=True)
@@ -62,7 +62,7 @@ class TeamBoxScore:
     def add_pitcher_to_box(self, new_pitcher):
         new_pitcher = new_pitcher if isinstance(new_pitcher, pd.DataFrame) else new_pitcher.to_frame().T
         new_pitcher[['G']] = 1
-        new_pitcher[['GS', 'CG', 'SHO', 'IP', 'H', 'ER', 'K', 'BB', 'HR', 'W', 'L', 'SV', 'BS', 'HLD', 'ERA', 'WHIP',
+        new_pitcher[['GS', 'CG', 'SHO', 'IP', 'H', 'AB', 'ER', 'K', 'BB', 'HR', 'W', 'L', 'SV', 'BS', 'HLD', 'ERA', 'WHIP',
                            'OBP', 'SLG', 'OPS', 'Total_Outs']] = 0
         new_pitcher[['Condition']] = 100
         self.box_pitching = pd.concat([self.box_pitching, new_pitcher], ignore_index=False)

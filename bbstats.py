@@ -46,7 +46,7 @@ class BaseballStats:
         if self.pitching_data is None or self.batting_data is None:  # need to read data... else skip as cached
             for season in self.load_seasons:
                 pitching_data = pd.read_csv(str(season) + " player-stats-Pitching.csv")
-                pitching_data['AB'] = 0
+                pitching_data['AB'] = pitching_data['IP'] * 3 + pitching_data['H']
                 pitching_data['2B'] = 0
                 pitching_data['3B'] = 0
                 pitching_data['Season'] = str(season)
@@ -281,12 +281,12 @@ def team_pitching_stats(df):
     df = df[df['IP'] > 0]
     try:
         df['IP'] = trunc_col(df['IP'], 2)
-        df_ab = df['IP'] * 3 + df['H']
-        df['AVG'] = trunc_col(df['H'] / df_ab, 3)
-        df['OBP'] = trunc_col((df['H'] + df['BB'] + 0) / (df_ab + df['BB'] + 0), 3)
+        # df_ab = df['IP'] * 3 + df['H']
+        df['AVG'] = trunc_col(df['H'] / df['AB'], 3)
+        df['OBP'] = trunc_col((df['H'] + df['BB'] + 0) / (df['AB'] + df['BB'] + 0), 3)
         # df['SLG'] = trunc_col(((df['H'] - 0 - 0 - df['HR']) + 0 * 2 + 0 * 3 + df['HR'] * 4) / df_ab, 3)
         df['SLG'] = trunc_col(
-            ((df['H'] - df['2B'] - df['3B'] - df['HR']) + df['2B'] * 2 + df['3B'] * 3 + df['HR'] * 4) / df_ab, 3)
+            ((df['H'] - df['2B'] - df['3B'] - df['HR']) + df['2B'] * 2 + df['3B'] * 3 + df['HR'] * 4) / df['AB'], 3)
         df['OPS'] = trunc_col(df['OBP'] + df['SLG'], 3)
         df['WHIP'] = trunc_col((df['BB'] + df['H']) / df['IP'], 3)
         df['ERA'] = trunc_col((df['ER'] / df['IP']) * 9, 2)
@@ -344,4 +344,5 @@ if __name__ == '__main__':
     print(baseball_data.batting_data.Team.unique())
     teams = ['CHC', 'CIN', 'COL', 'MIL', 'PIT', 'STL']  # included COL for balance in scheduling
     # teams = list(baseball_data.batting_data.Team.unique())
-    baseball_data.print_prior_season(teams=teams)
+    # baseball_data.print_prior_season(teams=teams)
+    print(baseball_data.new_season_pitching_data.to_string())

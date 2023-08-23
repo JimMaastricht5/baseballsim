@@ -119,8 +119,8 @@ class Game:
         # there was at least one out on the play, record that right away and deal with SF, DP, FC, adv runners on GB
         # outcome 2 is bases to advance, rbis will be taken care of later
         outs_on_play = 0
-        if outcome[1] == 'FO' and self.bases.is_runner_on_base_num(3) and self.outs < 3 and \
-                self.rng() <= self.sacfly_odds:
+        if outcome[1] == 'FO' and self.bases.is_runner_on_base_num(3) and self.outs < 2 and \
+                self.rng() <= self.sacfly_odds:  # 3rd out not posted yet so less than 2 outs
             outcome[1] = 'SF'  # will not auto advance if SF
             self.outs += 1
             outs_on_play = 1

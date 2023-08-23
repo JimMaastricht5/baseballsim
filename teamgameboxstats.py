@@ -8,7 +8,8 @@ class TeamBoxScore:
         # self.rnd = lambda: np.random.default_rng().uniform(low=0.0, high=1.001)  # random generator between 0 and 1
         self.box_pitching = pitching.copy()
         self.box_pitching[['G', 'GS']] = 1
-        self.box_pitching[['CG', 'SHO', 'IP', 'H', 'ER', 'K', 'BB', 'HR', 'W', 'L', 'SV', 'BS', 'HLD', 'ERA', 'WHIP',
+        self.box_pitching[['CG', 'SHO', 'IP', 'H', '2B', '3B', 'ER', 'K', 'BB', 'HR', 'W', 'L', 'SV', 'BS',
+                           'HLD', 'ERA', 'WHIP',
                            'OBP', 'SLG', 'OPS', 'Total_Outs']] = 0
         # self.box_pitching.drop(['Season', 'Total_OB', 'Total_Outs'], axis=1, inplace=True)
         self.box_pitching = bbstats.remove_non_print_cols(self.box_pitching, True)
@@ -36,13 +37,16 @@ class TeamBoxScore:
 
     def pitching_result(self, pitcher_index, outcome, outs, condition):
         outcome[1] = 'K' if outcome[1] == 'SO' else outcome[1]  # handle stat translation from pitcher SO to batter K
+        if outcome[1] != 'BB':  # handle walks
+            self.box_pitching.loc[pitcher_index, ['AB']] = self.box_pitching.loc[pitcher_index, ['AB']] + 1
+
         if outcome[0] == 'OUT':
             self.box_pitching.loc[pitcher_index, ['Total_Outs']] = \
                 self.box_pitching.loc[pitcher_index, ['Total_Outs']] + outs
             self.box_pitching.loc[pitcher_index, ['IP']] = \
                 float(self.box_pitching.loc[pitcher_index, ['Total_Outs']] / 3)
 
-        if outcome[1] in ['H', 'HR', 'K', 'BB', 'HBP']:  # handle plate appearance
+        if outcome[1] in ['H', '2B', '3B', 'HR', 'K', 'BB', 'HBP']:  # handle plate appearance
             self.box_pitching.loc[pitcher_index, [outcome[1]]] = self.box_pitching.loc[pitcher_index, [outcome[1]]] + 1
 
         # increment hit count if OB, not a walk, and not a single
@@ -104,13 +108,13 @@ class TeamBoxScore:
         return
 
     def print_boxes(self):
-        # print(self.box_batting.to_string())
         df = self.box_batting.reindex(['Player', 'Team', 'Pos', 'Age', 'G', 'AB', 'R', 'H', '2B', '3B', 'HR', 'RBI',
                                        'SB', 'CS', 'BB', 'SO', 'SH', 'SF', 'HBP', 'AVG', 'OBP', 'SLG', 'OPS',
                                        'Condition', 'Injured'], axis=1)
         print(df.to_string(index=False, justify='center'))
         print('')
-        df = self.box_pitching.reindex(['Player', 'Team', 'Age', 'G', 'GS', 'CG', 'SHO', 'IP', 'H', 'ER', 'K', 'BB',
+        df = self.box_pitching.reindex(['Player', 'Team', 'Age', 'G', 'GS', 'CG', 'SHO', 'IP', 'AB', 'H', '2B', '3B',
+                                        'ER', 'K', 'BB',
                                         'HR', 'W', 'L', 'SV', 'BS', 'HLD', 'ERA', 'WHIP', 'AVG', 'OBP', 'SLG', 'OPS',
                                         'Condition', 'Injured'], axis=1)
         # print(df.drop(['Total_Outs'], axis=1, inplace=False).to_string(index=False, justify='center'))

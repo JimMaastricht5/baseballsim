@@ -10,7 +10,7 @@ class BaseballStats:
         self.rnd = lambda: np.random.default_rng().uniform(low=0.0, high=1.001)  # random generator between 0 and 1
         self.numeric_bcols = ['G', 'AB', 'R', 'H', '2B', '3B', 'HR', 'RBI', 'SB', 'CS', 'BB', 'SO', 'SH', 'SF', 'HBP',
                               'AVG', 'OBP', 'SLG', 'OPS']
-        self.numeric_pcols = ['G', 'GS', 'CG', 'SHO', 'IP', 'H', 'ER', 'K', 'BB', 'HR', 'W', 'L',
+        self.numeric_pcols = ['G', 'GS', 'CG', 'SHO', 'IP', 'AB', 'H', '2B', '3B', 'ER', 'K', 'BB', 'HR', 'W', 'L',
                               'SV', 'BS', 'HLD', 'ERA', 'WHIP', 'Total_Outs']
 
         self.load_seasons = load_seasons  # list of seasons to load from csv files
@@ -46,6 +46,9 @@ class BaseballStats:
         if self.pitching_data is None or self.batting_data is None:  # need to read data... else skip as cached
             for season in self.load_seasons:
                 pitching_data = pd.read_csv(str(season) + " player-stats-Pitching.csv")
+                pitching_data['AB'] = 0
+                pitching_data['2B'] = 0
+                pitching_data['3B'] = 0
                 pitching_data['Season'] = str(season)
                 pitching_data['OBP'] = pitching_data['WHIP'] / (3 + pitching_data['WHIP'])  # bat reached / number faced
                 pitching_data['Total_OB'] = pitching_data['H'] + pitching_data['BB']  # + pitching_data['HBP']
@@ -219,7 +222,7 @@ class BaseballStats:
         df = self.new_season_pitching_data.copy().sort_values(by='ERA', ascending=True)
         df = team_pitching_totals(df, team_name='', concat=True)
         df = remove_non_print_cols(df, True)
-        df = df.reindex(['Player', 'Team', 'Age', 'G', 'GS', 'CG', 'SHO', 'IP', 'H', 'ER', 'K', 'BB',
+        df = df.reindex(['Player', 'Team', 'Age', 'G', 'GS', 'CG', 'SHO', 'IP', 'AB', 'H', '2B', '3B', 'ER', 'K', 'BB',
                          'HR', 'W', 'L', 'SV', 'BS', 'HLD', 'ERA', 'WHIP', 'AVG', 'OBP', 'SLG', 'OPS',
                          'Condition', 'Injured', 'Injured List'], axis=1)
         if 'Total_Outs' in df.columns:
@@ -238,7 +241,7 @@ class BaseballStats:
         df = self.pitching_data.copy().sort_values(by='ERA', ascending=True)
         df = team_pitching_totals(df, team_name='', concat=True)
         df = remove_non_print_cols(df, True)
-        df = df.reindex(['Player', 'Team', 'Age', 'G', 'GS', 'CG', 'SHO', 'IP', 'H', 'ER', 'K', 'BB',
+        df = df.reindex(['Player', 'Team', 'Age', 'G', 'GS', 'CG', 'SHO', 'IP', 'AB', 'H', '2B', '3B', 'ER', 'K', 'BB',
                          'HR', 'W', 'L', 'SV', 'BS', 'HLD', 'ERA', 'WHIP', 'AVG', 'OBP', 'SLG', 'OPS',
                          'Condition', 'Injured', 'Injured List'], axis=1)
         print(df[df['Team'].isin(teams)].to_string(justify='right'))
@@ -281,7 +284,9 @@ def team_pitching_stats(df):
         df_ab = df['IP'] * 3 + df['H']
         df['AVG'] = trunc_col(df['H'] / df_ab, 3)
         df['OBP'] = trunc_col((df['H'] + df['BB'] + 0) / (df_ab + df['BB'] + 0), 3)
-        df['SLG'] = trunc_col(((df['H'] - 0 - 0 - df['HR']) + 0 * 2 + 0 * 3 + df['HR'] * 4) / df_ab, 3)
+        # df['SLG'] = trunc_col(((df['H'] - 0 - 0 - df['HR']) + 0 * 2 + 0 * 3 + df['HR'] * 4) / df_ab, 3)
+        df['SLG'] = trunc_col(
+            ((df['H'] - df['2B'] - df['3B'] - df['HR']) + df['2B'] * 2 + df['3B'] * 3 + df['HR'] * 4) / df_ab, 3)
         df['OPS'] = trunc_col(df['OBP'] + df['SLG'], 3)
         df['WHIP'] = trunc_col((df['BB'] + df['H']) / df['IP'], 3)
         df['ERA'] = trunc_col((df['ER'] / df['IP']) * 9, 2)
@@ -311,7 +316,7 @@ def team_batting_totals(batting_df, team_name='', concat=True):
 
 def team_pitching_totals(pitching_df, team_name='', concat=True):
     df = pitching_df.copy()
-    df = df[['GS', 'CG', 'SHO', 'IP', 'H', 'ER', 'K', 'BB', 'HR', 'W', 'L', 'SV', 'BS',
+    df = df[['GS', 'CG', 'SHO', 'IP', 'AB', 'H', '2B', '3B', 'ER', 'K', 'BB', 'HR', 'W', 'L', 'SV', 'BS',
              'HLD', 'Total_Outs']].sum()
     cols_to_trunc = ['GS', 'CG', 'SHO', 'H', 'ER', 'K', 'BB', 'HR', 'W', 'L', 'SV', 'BS', 'HLD', 'Total_Outs']
     df['Player'] = 'Totals'

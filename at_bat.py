@@ -152,7 +152,7 @@ class SimAB:
             score_book_cd = 'LD'  # line drive
         return score_book_cd
 
-    def outcome(self, pitching, batting, outcomes, outs=0, runner_on_first=False):
+    def outcome(self, pitching, batting, outcomes, outs=0, runner_on_first=False, runner_on_third=False):
         # tree of the various odds of an event, each event is yes/no.  Onbase? Yes -> BB? no -> Hit yes (stop)
         # outcome: on base or out pos 0, how in pos 1, bases to advance in pos 2, rbis in pos 3
         # ?? hbp is missing, total batters faced is missing, should calc or get pitcher obp
@@ -175,5 +175,5 @@ class SimAB:
             if self.k():
                 outcomes.set_score_book_cd('K')
             else:
-                outcomes.set_score_book_cd(self.gb_fo_lo(outs, runner_on_first))
+                outcomes.set_score_book_cd(self.gb_fo_lo(outs, runner_on_first, runner_on_third))
         return

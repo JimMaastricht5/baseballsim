@@ -125,7 +125,8 @@ class Game:
         cur_batter_index = self.teams[self.team_hitting()].cur_lineup_index[self.batting_num[self.team_hitting()]-1]
         batting = self.teams[self.team_hitting()].cur_batter_stats(self.batting_num[self.team_hitting()]-1)  # lineup #
         self.bases.new_ab(batter_num=cur_batter_index, player_name=batting.Player)
-        self.at_bat.outcome(pitching, batting, self.outcomes, self.outs, self.bases.is_runner_on_base_num(1))
+        self.at_bat.outcome(pitching, batting, self.outcomes, self.outs, self.bases.is_runner_on_base_num(1),
+                            self.bases.is_runner_on_base_num(3))
         self.outs = self.outs + self.outcomes.outs_on_play
         self.bases.advance_runners(score_book_cd=self.outcomes.score_book_cd,
                                    bases_to_advance=self.outcomes.bases_to_advance, outs=self.outs)

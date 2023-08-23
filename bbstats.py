@@ -277,28 +277,18 @@ def team_batting_stats(df):
 
 def team_pitching_stats(df):
     # hbp is 0, 2b are 0, 3b are 0
-    print(f'team pitching stats1 {df["IP"]}')
-    print(df.to_string())
-    # df = df[df['IP'] > 0]
-    # df = df[df['AB'] > 0]
+    df = df[df['IP'] > 0]
+    df = df[df['AB'] > 0]
     df['AB'] = trunc_col(df['AB'], 0)
     df['IP'] = trunc_col(df['IP'], 2)
-    # df_ab = df['IP'] * 3 + df['H']
-    df['AVG'] = 0  # trunc_col(df['H'] / df['AB'], 3)
-    print(f'team pitching stats2 {df["AB"]}')
+    df['AVG'] = trunc_col(df['H'] / df['AB'], 3)
     df['OBP'] = trunc_col((df['H'] + df['BB'] + 0) / (df['AB'] + df['BB'] + 0), 3)
-    # df['SLG'] = trunc_col(((df['H'] - 0 - 0 - df['HR']) + 0 * 2 + 0 * 3 + df['HR'] * 4) / df_ab, 3)
-    df['SLG'] = 0 #trunc_col(
-        # ((df['H'] - df['2B'] - df['3B'] - df['HR']) + df['2B'] * 2 + df['3B'] * 3 + df['HR'] * 4) / df['AB'], 3)
-    print(f'team pitching stats3 {df["AB"]}')
+    df['SLG'] = trunc_col(
+        ((df['H'] - df['2B'] - df['3B'] - df['HR']) + df['2B'] * 2 + df['3B'] * 3 + df['HR'] * 4) / df['AB'], 3)
     df['OPS'] = trunc_col(df['OBP'] + df['SLG'], 3)
     df['WHIP'] = trunc_col((df['BB'] + df['H']) / df['IP'], 3)
     df['ERA'] = trunc_col((df['ER'] / df['IP']) * 9, 2)
     df['Condition'] = trunc_col(df['Condition'], 0)
-    # except ZeroDivisionError:
-    #     print(f'divide by zero error')
-    #     pass  # trap zero division error
-    print(df.to_string())
     return df
 
 
@@ -336,12 +326,9 @@ def team_pitching_totals(pitching_df, team_name='', concat=True):
     df = df.to_frame().T
     if concat:
         df = pd.concat([pitching_df, df], ignore_index=True)
-    print(f'team_pitching_totals1 {df["AB"]}')
     df = team_pitching_stats(df)
-    print(f'team_pitching_totals2 {df["AB"]}')
     for col in cols_to_trunc:  # remove trailing zeros after decimal
         df[col] = np.floor(df[col])
-    print(f'team_pitching_totals3 {df["AB"]}')
     return df
 
 

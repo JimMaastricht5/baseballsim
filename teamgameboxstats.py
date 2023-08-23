@@ -39,7 +39,6 @@ class TeamBoxScore:
         outcomes.convert_k()
         if outcomes.score_book_cd != 'BB':  # handle walks
             self.box_pitching.loc[pitcher_index, ['AB']] = self.box_pitching.loc[pitcher_index, ['AB']] + 1
-        # print(f'in pitching results AB {self.box_pitching["AB"]}')
         if outcomes.on_base_b is False:
             self.box_pitching.loc[pitcher_index, ['Total_Outs']] = \
                 self.box_pitching.loc[pitcher_index, ['Total_Outs']] + outcomes.outs_on_play
@@ -106,10 +105,8 @@ class TeamBoxScore:
     def totals(self):
         self.game_batting_stats = self.box_batting.copy()  # make a copy w/o totals for season accumulations
         self.game_pitching_stats = self.box_pitching.copy()  # make a copy w/o totals for season accumulations
-        print(f'box stats totals pitching box2 {self.box_pitching["AB"]}')
         self.box_batting = bbstats.team_batting_totals(self.box_batting, team_name=self.team_name, concat=True)
         self.box_pitching = bbstats.team_pitching_totals(self.box_pitching, team_name=self.team_name, concat=True)
-        print(f'box stats totals pitching box3 {self.box_pitching["AB"]}')
         return
 
     def print_boxes(self):

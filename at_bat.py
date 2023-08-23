@@ -11,11 +11,11 @@ class OutCome:
         self.bases_to_advance = 0
         self.runs_scored = 0
         self.bases_dict = {'BB': 1, 'H': 1, '2B': 2, '3B': 3, 'HR': 4, 'K': 0, 'SO': 0, 'GB': 0, 'DP': 0,
-                           'FO': 0, 'LD': 0}
+                           'FO': 0, 'LD': 0, 'SF': 0}
         self.on_base_dict = {'BB': True, 'H': True, '2B': True, '3B': True, 'HR': True, 'K': False, 'SO': False,
-                             'GB': False, 'DP': False, 'FO': False, 'LD': False}
+                             'GB': False, 'DP': False, 'FO': False, 'LD': False, 'SF': False}
         self.outs_dict = {'BB': 0, 'H': 0, '2B': 0, '3B': 0, 'HR': 0, 'K': 1, 'SO': 1, 'GB': 1, 'DP': 2, 'FO': 1,
-                          'LD': 1}
+                          'LD': 1, 'SF': 0}
         return
 
     def reset(self):
@@ -74,7 +74,7 @@ class SimAB:
         self.league_GB = .429  # ground ball rate for season
         self.league_FB = .372  # fly ball rate for season
         self.league_LD = .199  # line drive rate for the season
-        self.OBP_adjustment = -0.005  # final adjustment to line up with prior seasons
+        self.OBP_adjustment = 0.020  # final adjustment to line up with prior seasons
         # self.league_DP_per_inning = 145 / 162 / 9  # avg team had 145 DP in 162 games divided by nine to get to inning
         return
 
@@ -137,14 +137,17 @@ class SimAB:
                                             (self.pitching['K'] / self.pitching.Total_Outs),
                                             self.league_K_rate_per_AB)
 
-    def gb_fb_lo(self, outs=0, runner_on_first=False):
+    def gb_fo_lo(self, outs=0, runner_on_first=False, runner_on_third=False):
         self.dice_roll = self.rng()
         if self.dice_roll <= self.league_GB:  # ground out
             score_book_cd = 'GB'
             if runner_on_first and outs <= 1 and self.rng() <= .50:  # 50% chance of gb to 1st base or mid&side for dp
                 score_book_cd = 'DP'
         elif self.dice_roll <= (self.league_FB + self.league_GB):  # fly out ball
-            score_book_cd = 'FO'
+            if self.rng() <= .50 and runner_on_third:
+                score_book_cd = 'SF'
+            else:
+                score_book_cd = 'FO'
         else:
             score_book_cd = 'LD'  # line drive
         return score_book_cd
@@ -172,5 +175,5 @@ class SimAB:
             if self.k():
                 outcomes.set_score_book_cd('K')
             else:
-                outcomes.set_score_book_cd(self.gb_fb_lo(outs, runner_on_first))
+                outcomes.set_score_book_cd(self.gb_fo_lo(outs, runner_on_first))
         return

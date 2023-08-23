@@ -20,6 +20,8 @@ class Bases:
             return
         if score_book_cd == 'BB':
             bases_to_advance = self.walk(bases_to_advance)  # keep at 1 if bases loaded, else move runners one at a time
+        elif score_book_cd == 'SF':
+            bases_to_advance = self.tag_up(outs)  # move runner from third and set other runners to hold w/ 0
         self.player_scored = {}
         self.baserunners = list(np.roll(self.baserunners, bases_to_advance))  # advance runners
         self.runs_scored = np.count_nonzero(self.baserunners[-4:])  # 0 ab 1, 2, 3 are bases. 4-7 run crossed home=len 4
@@ -68,7 +70,7 @@ class Bases:
             return
         self.runs_scored += 1  # give batter and RBI
         self.move_a_runner(3, 4)  # move runner from 3 to 4
-        return
+        return 0  # bases to advance
 
     def move_a_runner(self, basenum_from, basenum_to):
         self.baserunners[basenum_to] = self.baserunners[basenum_from]

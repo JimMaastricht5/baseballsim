@@ -46,7 +46,6 @@ class Game:
         self.outcomes = at_bat.OutCome()
         self.at_bat = at_bat.SimAB(self.baseball_data)  # setup at class
 
-        self.sacfly_odds = .5
         return
 
     def team_pitching(self):

@@ -340,5 +340,5 @@ if __name__ == '__main__':
     print(baseball_data.batting_data.Team.unique())
     teams = ['CHC', 'CIN', 'COL', 'MIL', 'PIT', 'STL']  # included COL for balance in scheduling
     # teams = list(baseball_data.batting_data.Team.unique())
-    # baseball_data.print_prior_season(teams=teams)
-    print(baseball_data.new_season_pitching_data.to_string())
+    baseball_data.print_prior_season(teams=teams)
+    # print(baseball_data.new_season_pitching_data.to_string())

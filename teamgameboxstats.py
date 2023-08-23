@@ -39,8 +39,8 @@ class TeamBoxScore:
         outcomes.convert_k()
         if outcomes.score_book_cd != 'BB':  # handle walks
             self.box_pitching.loc[pitcher_index, ['AB']] = self.box_pitching.loc[pitcher_index, ['AB']] + 1
-
-        if outcomes.score_book_cd == 'OUT':
+        # print(f'in pitching results AB {self.box_pitching["AB"]}')
+        if outcomes.on_base_b is False:
             self.box_pitching.loc[pitcher_index, ['Total_Outs']] = \
                 self.box_pitching.loc[pitcher_index, ['Total_Outs']] + outcomes.outs_on_play
             self.box_pitching.loc[pitcher_index, ['IP']] = \
@@ -64,7 +64,7 @@ class TeamBoxScore:
     def add_pitcher_to_box(self, new_pitcher):
         new_pitcher = new_pitcher if isinstance(new_pitcher, pd.DataFrame) else new_pitcher.to_frame().T
         new_pitcher[['G']] = 1
-        new_pitcher[['GS', 'CG', 'SHO', 'IP', 'H', 'AB', 'ER', 'K', 'BB', 'HR', 'W', 'L', 'SV', 'BS', 'HLD', 'ERA',
+        new_pitcher[['GS', 'CG', 'SHO', 'IP', 'AB', 'H', 'ER', 'K', 'BB', 'HR', 'W', 'L', 'SV', 'BS', 'HLD', 'ERA',
                      'WHIP', 'OBP', 'SLG', 'OPS', 'Total_Outs']] = 0
         new_pitcher[['Condition']] = 100
         self.box_pitching = pd.concat([self.box_pitching, new_pitcher], ignore_index=False)
@@ -106,8 +106,10 @@ class TeamBoxScore:
     def totals(self):
         self.game_batting_stats = self.box_batting.copy()  # make a copy w/o totals for season accumulations
         self.game_pitching_stats = self.box_pitching.copy()  # make a copy w/o totals for season accumulations
+        print(f'box stats totals pitching box2 {self.box_pitching["AB"]}')
         self.box_batting = bbstats.team_batting_totals(self.box_batting, team_name=self.team_name, concat=True)
         self.box_pitching = bbstats.team_pitching_totals(self.box_pitching, team_name=self.team_name, concat=True)
+        print(f'box stats totals pitching box3 {self.box_pitching["AB"]}')
         return
 
     def print_boxes(self):

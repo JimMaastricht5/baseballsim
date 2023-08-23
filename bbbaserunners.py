@@ -1,12 +1,11 @@
 import numpy as np
 
+
 # ??? punch list
 # walk with 1b open does not score a run
 # fo runners tag?
 # fc or dp erases lead runners
 # 2 out base hits scores runner from second (2 base advanced instead of one
-
-
 class Bases:
     def __init__(self):
         self.baserunners = None
@@ -16,10 +15,11 @@ class Bases:
         self.runs_scored = 0
         return
 
-    def advance_runners(self, bases_to_advance=1, outs=0):
+    def advance_runners(self, score_book_cd, bases_to_advance, outs):
         if outs >= 3:
             return
-
+        if score_book_cd == 'BB':
+            bases_to_advance = self.walk(bases_to_advance)  # keep at 1 if bases loaded, else move runners one at a time
         self.player_scored = {}
         self.baserunners = list(np.roll(self.baserunners, bases_to_advance))  # advance runners
         self.runs_scored = np.count_nonzero(self.baserunners[-4:])  # 0 ab 1, 2, 3 are bases. 4-7 run crossed home=len 4
@@ -78,18 +78,19 @@ class Bases:
     def push_a_runner(self, basenum_from, basenum_to):
         # print(f'bbbaserunners.py push_a_runner {basenum_from}m {basenum_to}')
         if self.is_runner_on_base_num(basenum_to):
-            self.push_a_runner(basenum_from + 1, basenum_to +1)
+            self.push_a_runner(basenum_from + 1, basenum_to + 1)
 
         # print(f'moving runner from {basenum_from}, {basenum_to}')
         self.move_a_runner(basenum_from, basenum_to)
         return
-    def walk(self, outcome):
-        if self.count_runners() == 3:  # bases loaded walk
-            outcome[2] = 1  # push all runners up one base and handle rbi and run scored
-        else:  # bases are not loaded so move runners up a base when forced
+
+    def walk(self, bases_to_move_all_runners):
+        # default is move all runners on base, that works unless there is a hole
+        if self.count_runners() < 3 and self.count_runners() != 0:  # not loaded or empty
+            # bases are not loaded so move runners up a base when forced
             self.push_a_runner(0, 1)  # move the ab player to 1st base
-            outcome[2] = 0
-        return outcome
+            bases_to_move_all_runners = 0
+        return bases_to_move_all_runners
 
     def count_runners(self):
         return np.count_nonzero(self.baserunners[1:3+1])  # add the number of people on base 1st, 2b, and 3rd

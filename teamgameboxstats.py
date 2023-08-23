@@ -35,35 +35,37 @@ class TeamBoxScore:
                       self.box_pitching.loc[pitcher_index].IP * 3
         return total_faced
 
-    def pitching_result(self, pitcher_index, outcome, outs, condition):
-        outcome[1] = 'K' if outcome[1] == 'SO' else outcome[1]  # handle stat translation from pitcher SO to batter K
-        if outcome[1] != 'BB':  # handle walks
+    def pitching_result(self, pitcher_index, outcomes, condition):
+        outcomes.convert_k()
+        if outcomes.score_book_cd != 'BB':  # handle walks
             self.box_pitching.loc[pitcher_index, ['AB']] = self.box_pitching.loc[pitcher_index, ['AB']] + 1
 
-        if outcome[0] == 'OUT':
+        if outcomes.score_book_cd == 'OUT':
             self.box_pitching.loc[pitcher_index, ['Total_Outs']] = \
-                self.box_pitching.loc[pitcher_index, ['Total_Outs']] + outs
+                self.box_pitching.loc[pitcher_index, ['Total_Outs']] + outcomes.outs_on_play
             self.box_pitching.loc[pitcher_index, ['IP']] = \
                 float(self.box_pitching.loc[pitcher_index, ['Total_Outs']] / 3)
 
-        if outcome[1] in ['H', '2B', '3B', 'HR', 'K', 'BB', 'HBP']:  # handle plate appearance
-            self.box_pitching.loc[pitcher_index, [outcome[1]]] = self.box_pitching.loc[pitcher_index, [outcome[1]]] + 1
+        if outcomes.score_book_cd in ['H', '2B', '3B', 'HR', 'K', 'BB', 'HBP']:  # handle plate appearance
+            self.box_pitching.loc[pitcher_index, [outcomes.score_book_cd]] = self.box_pitching.loc[pitcher_index,
+            [outcomes.score_book_cd]] + 1
 
         # increment hit count if OB, not a walk, and not a single
         self.box_pitching.loc[pitcher_index, ['H']] = self.box_pitching.loc[pitcher_index, ['H']] + 1 \
-            if outcome[1] != 'BB' and outcome[1] != 'H' and outcome[0] == 'OB' \
+            if outcomes.score_book_cd != 'BB' and outcomes.score_book_cd != 'H' and outcomes.score_book_cd == 'OB' \
             else self.box_pitching.loc[pitcher_index, ['H']]
 
         # add runs
-        self.box_pitching.loc[pitcher_index, ['ER']] = self.box_pitching.loc[pitcher_index, ['ER']] + outcome[3]  # rbis
+        self.box_pitching.loc[pitcher_index, ['ER']] = self.box_pitching.loc[pitcher_index, ['ER']] \
+                                                       + outcomes.runs_scored
         self.box_pitching.loc[pitcher_index, ['Condition']] = condition
         return
 
     def add_pitcher_to_box(self, new_pitcher):
         new_pitcher = new_pitcher if isinstance(new_pitcher, pd.DataFrame) else new_pitcher.to_frame().T
         new_pitcher[['G']] = 1
-        new_pitcher[['GS', 'CG', 'SHO', 'IP', 'H', 'AB', 'ER', 'K', 'BB', 'HR', 'W', 'L', 'SV', 'BS', 'HLD', 'ERA', 'WHIP',
-                           'OBP', 'SLG', 'OPS', 'Total_Outs']] = 0
+        new_pitcher[['GS', 'CG', 'SHO', 'IP', 'H', 'AB', 'ER', 'K', 'BB', 'HR', 'W', 'L', 'SV', 'BS', 'HLD', 'ERA',
+                     'WHIP', 'OBP', 'SLG', 'OPS', 'Total_Outs']] = 0
         new_pitcher[['Condition']] = 100
         self.box_pitching = pd.concat([self.box_pitching, new_pitcher], ignore_index=False)
         self.box_pitching = bbstats.remove_non_print_cols(self.box_pitching, True)
@@ -81,20 +83,21 @@ class TeamBoxScore:
                 self.box_pitching.loc[self.box_pitching.index[-1], ['SV']] + 1
         return
 
-    def batting_result(self, batter_index, outcome, players_scored_list):
-        outcome[1] = 'SO' if outcome[1] == 'K' else outcome[1]  # handle stat translation from pitcher SO to batter K
-        if outcome[1] != 'BB':  # handle walks
+    def batting_result(self, batter_index, outcomes, players_scored_list):
+        outcomes.convert_k()
+        if outcomes.score_book_cd != 'BB':  # handle walks
             self.box_batting.loc[batter_index, ['AB']] = self.box_batting.loc[batter_index, ['AB']] + 1
 
-        if outcome[1] in ['H', '2B', '3B', 'HR', 'BB', 'SO', 'SF', 'HBP']:  # record result of plate appearance
-            self.box_batting.loc[batter_index, [outcome[1]]] = self.box_batting.loc[batter_index, [outcome[1]]] + 1
+        if outcomes.score_book_cd in ['H', '2B', '3B', 'HR', 'BB', 'SO', 'SF', 'HBP']:  # record result of plate appearance
+            self.box_batting.loc[batter_index, [outcomes.score_book_cd]] = self.box_batting.loc[batter_index,
+            [outcomes.score_book_cd]] + 1
 
         # increment hit count if OB, not a walk, and not a single
         self.box_batting.loc[batter_index, ['H']] = self.box_batting.loc[batter_index, ['H']] + 1 \
-            if outcome[1] != 'BB' and outcome[1] != 'H' and outcome[0] == 'OB' \
+            if outcomes.score_book_cd != 'BB' and outcomes.score_book_cd != 'H' and outcomes.score_book_cd == 'OB' \
             else self.box_batting.loc[batter_index, ['H']]
         self.total_hits = self.box_batting['H'].sum()
-        self.box_batting.loc[batter_index, ['RBI']] = self.box_batting.loc[batter_index, ['RBI']] + outcome[3]  # rbis
+        self.box_batting.loc[batter_index, ['RBI']] = self.box_batting.loc[batter_index, ['RBI']] + outcomes.runs_scored
 
         for scored_index in players_scored_list.keys():
             self.box_batting.loc[scored_index, ['R']] = self.box_batting.loc[scored_index, ['R']] + 1

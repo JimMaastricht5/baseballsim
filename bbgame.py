@@ -43,6 +43,7 @@ class Game:
 
         self.rng = lambda: np.random.default_rng().uniform(low=0.0, high=1.001)  # random generator between 0 and 1
         self.bases = bbbaserunners.Bases()
+        self.outcomes = at_bat.OutCome()
         self.at_bat = at_bat.SimAB(self.baseball_data)  # setup at class
 
         self.sacfly_odds = .5
@@ -115,48 +116,44 @@ class Game:
                 print(f'\t{pitching.Player} has entered the game for {self.team_names[self.team_pitching()]}')
         return pitch_switch
 
-    def at_bat_out(self, outcome):
-        # there was at least one out on the play, record that right away and deal with SF, DP, FC, adv runners on GB
-        # outcome 2 is bases to advance, rbis will be taken care of later
-        outs_on_play = 0
-        if outcome[1] == 'FO' and self.bases.is_runner_on_base_num(3) and self.outs < 2 and \
-                self.rng() <= self.sacfly_odds:  # 3rd out not posted yet so less than 2 outs
-            outcome[1] = 'SF'  # will not auto advance if SF
-            self.outs += 1
-            outs_on_play = 1
-            self.bases.remove_runner(0)  # remove batter
-            self.bases.tag_up(outs=self.outs)  # only advance runner from 3b to home
-            outcome[2] = 0
-        elif outcome[1] == 'FO':
-            self.outs += 1
-            outs_on_play = 1
-            self.bases.remove_runner(0)
-            outcome[2] = 0
-        elif outcome[1] == 'DP' and self.outs <= 1:  # double play
-            self.outs += 2
-            outs_on_play = 2
-            self.bases.remove_runner([0, 1])  # remove runner at bat and first for DP, advancing bases will happen later
-            outcome[2] = 1  # advance other runners one base
-        elif outcome[1] == 'GB' and self.bases.is_runner_on_base_num(1) and self.rng() <= .5:  # fielders choice
-            outcome[1] = 'GB FC'
-            self.outs += 1
-            outs_on_play = 1
-            self.bases.remove_runner(1)  # fc drop runner from 1st going to second, leave batter, advancing bases later
-            outcome[2] = 1
-        elif outcome[1] == 'GB':
-            self.bases.remove_runner(0)  # if it is a gb out runners may advance, but dont adv batter
-            self.outs += 1
-            outs_on_play = 1
-            outcome[2] = 1
-        else:
-            self.outs += 1
-            outs_on_play = 1
-
-        # advance runners on gb or dp if less than 3 outs
-        # if (outcome[1] == 'GB' or outcome[1] == 'DP' or outcome[1] == 'GB FC') and self.outs < 3:
-        #     # print(f'bbgame at_bat_out {outcome[1]}, outs: {self.outs}, adv runners: {outcome[2]}')
-        #     outcome[2] = 1  # outcome 2 is bases to advance all remaining runners.  may include batter on a FC
-        return outs_on_play, outcome
+    # def at_bat_out(self, outcome):
+    #     # there was at least one out on the play, record that right away and deal with SF, DP, FC, adv runners on GB
+    #     # outcome 2 is bases to advance, rbis will be taken care of later
+    #     outs_on_play = 0
+    #     if outcome[1] == 'FO' and self.bases.is_runner_on_base_num(3) and self.outs < 2 and \
+    #             self.rng() <= self.sacfly_odds:  # 3rd out not posted yet so less than 2 outs
+    #         outcome[1] = 'SF'  # will not auto advance if SF
+    #         self.outs += 1
+    #         outs_on_play = 1
+    #         self.bases.remove_runner(0)  # remove batter
+    #         self.bases.tag_up(outs=self.outs)  # only advance runner from 3b to home
+    #         outcome[2] = 0
+    #     elif outcome[1] == 'FO':
+    #         self.outs += 1
+    #         outs_on_play = 1
+    #         self.bases.remove_runner(0)
+    #         outcome[2] = 0
+    #     elif outcome[1] == 'DP' and self.outs <= 1:  # double play
+    #         self.outs += 2
+    #         outs_on_play = 2
+    #         self.bases.remove_runner([0, 1])  # remove runner at bat and first for DP, advancing bases will happen later
+    #         outcome[2] = 1  # advance other runners one base
+    #     elif outcome[1] == 'GB' and self.bases.is_runner_on_base_num(1) and self.rng() <= .5:  # fielders choice
+    #         outcome[1] = 'GB FC'
+    #         self.outs += 1
+    #         outs_on_play = 1
+    #         self.bases.remove_runner(1)  # fc drop runner from 1st going to second, leave batter, advancing bases later
+    #         outcome[2] = 1
+    #     elif outcome[1] == 'GB':
+    #         self.bases.remove_runner(0)  # if it is a gb out runners may advance, but dont adv batter
+    #         self.outs += 1
+    #         outs_on_play = 1
+    #         outcome[2] = 1
+    #     else:
+    #         self.outs += 1
+    #         outs_on_play = 1
+    #
+    #     return outs_on_play, outcome
 
     def sim_ab(self, chatty=True):
         cur_pitcher_index = self.teams[self.team_pitching()].cur_pitcher_index
@@ -168,29 +165,23 @@ class Game:
         cur_batter_index = self.teams[self.team_hitting()].cur_lineup_index[self.batting_num[self.team_hitting()]-1]
         batting = self.teams[self.team_hitting()].cur_batter_stats(self.batting_num[self.team_hitting()]-1)  # lineup #
         self.bases.new_ab(batter_num=cur_batter_index, player_name=batting.Player)
-        outcome = self.at_bat.outcome(pitching, batting, self.outs, self.bases.is_runner_on_base_num(1))
+        self.at_bat.outcome(pitching, batting, self.outcomes, self.outs, self.bases.is_runner_on_base_num(1))
+        self.outs = self.outs + self.outcomes.outs_on_play
+        self.bases.advance_runners(score_book_cd=self.outcomes.score_book_cd,
+                                   bases_to_advance=self.outcomes.bases_to_advance, outs=self.outs)
+        self.outcomes.set_runs_score(self.bases.runs_scored)  # runs and rbis for batter and pitcher
 
-        outs_on_play = 0
-        if outcome[0] == 'OUT':
-            outs_on_play, outcome = self.at_bat_out(outcome)
-        if outcome[1] == 'BB':
-            outcome = self.bases.walk(outcome)
-
-        # runners may advance on gb, dp, or ob
-        self.bases.advance_runners(bases_to_advance=outcome[2], outs=self.outs)  # outcome 2 is bases to advance
-        outcome[3] = self.bases.runs_scored  # rbis for batter
-
-        self.teams[self.team_pitching()].box_score.pitching_result(cur_pitcher_index, outcome, outs_on_play,
-                                                                   pitching.Condition)
-        self.teams[self.team_hitting()].box_score.batting_result(cur_batter_index, outcome, self.bases.player_scored)
+        self.teams[self.team_pitching()].box_score.pitching_result(cur_pitcher_index, self.outcomes, pitching.Condition)
+        self.teams[self.team_hitting()].box_score.batting_result(cur_batter_index, self.outcomes,
+                                                                 self.bases.player_scored)
 
         if chatty:
             out_text = 'Out' if self.outs <= 1 else 'Outs'
             print(f'Pitcher: {pitching.Player} against '
                   f'{self.team_names[self.team_hitting()]} batter #'
                   f'{self.batting_num[self.team_hitting()]}. {batting.Player} \n'
-                  f'\t {outcome[1]}, {self.outs} {out_text}')
-        return pitching, batting, outcome
+                  f'\t {self.outcomes.score_book_cd}, {self.outs} {out_text}')
+        return pitching, batting
 
     def sim_half_inning(self, chatty=True):
         pitch_switch = False  # did we switch pitchers this inning, don't sub if closer came in
@@ -201,7 +192,7 @@ class Game:
             # check for pitching change due to fatigue or game sit
             pitch_switch = self.pitching_sit(self.teams[self.team_pitching()].cur_pitcher_stats(),
                                              pitch_switch=pitch_switch, chatty=chatty)
-            __pitching, __batting, __outcome = self.sim_ab(chatty)  # resolve ab
+            __pitching, __batting = self.sim_ab(chatty)  # resolve ab
             if self.bases.runs_scored > 0:  # did a run score?
                 self.update_inning_score(number_of_runs=self.bases.runs_scored)
             if self.bases.runs_scored > 0 and chatty:

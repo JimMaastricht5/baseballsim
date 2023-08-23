@@ -3,6 +3,45 @@ import warnings
 import bbstats
 
 
+class OutCome:
+    def __init__(self):
+        self.outs_on_play = 0
+        self.on_base_b = False
+        self.score_book_cd = ''
+        self.bases_to_advance = 0
+        self.runs_scored = 0
+        self.bases_dict = {'BB': 1, 'H': 1, '2B': 2, '3B': 3, 'HR': 4, 'K': 0, 'SO': 0, 'GB': 0, 'DP': 0,
+                           'FO': 0, 'LD': 0}
+        self.on_base_dict = {'BB': True, 'H': True, '2B': True, '3B': True, 'HR': True, 'K': False, 'SO': False,
+                             'GB': False, 'DP': False, 'FO': False, 'LD': False}
+        self.outs_dict = {'BB': 0, 'H': 0, '2B': 0, '3B': 0, 'HR': 0, 'K': 1, 'SO': 1, 'GB': 1, 'DP': 2, 'FO': 1,
+                          'LD': 1}
+        return
+
+    def reset(self):
+        self.on_base_b = False
+        self.score_book_cd = ''
+        self.bases_to_advance = 0
+        self.runs_scored = 0
+        return
+
+    def set_score_book_cd(self, cd):
+        self.score_book_cd = cd
+        self.bases_to_advance = self.bases_dict[cd]  # automatically advance x number of bases for all runners
+        self.on_base_b = self.on_base_dict[cd]
+        self.outs_on_play = self.outs_dict[cd]
+        return
+
+    def set_runs_score(self, runs_scored):
+        self.runs_scored = runs_scored
+        return
+
+    def convert_k(self):
+        if self.score_book_cd == 'SO':
+            self.score_book_cd = 'K'
+        return
+
+
 class SimAB:
     def __init__(self, baseball_data):
         self.rng = lambda: np.random.default_rng().uniform(low=0.0, high=1.001)  # random generator between 0 and 1
@@ -98,44 +137,40 @@ class SimAB:
                                             (self.pitching['K'] / self.pitching.Total_Outs),
                                             self.league_K_rate_per_AB)
 
-    def gb_fb_lo(self, result, outs=0, runner_on_first=False):
+    def gb_fb_lo(self, outs=0, runner_on_first=False):
         self.dice_roll = self.rng()
         if self.dice_roll <= self.league_GB:  # ground out
-            result[1] = 'GB'
-            if runner_on_first and outs <= 1 and self.rng() <= .50:  # 50% chance of gb to 1st base or mid side for dp
-                result[1] = 'DP'
+            score_book_cd = 'GB'
+            if runner_on_first and outs <= 1 and self.rng() <= .50:  # 50% chance of gb to 1st base or mid&side for dp
+                score_book_cd = 'DP'
         elif self.dice_roll <= (self.league_FB + self.league_GB):  # fly out ball
-            result[1] = 'FO'
+            score_book_cd = 'FO'
         else:
-            result[1] = 'LD'  # line drive
-        return result
+            score_book_cd = 'LD'  # line drive
+        return score_book_cd
 
-    def outcome(self, pitching, batting, outs=0, runner_on_first=False):
+    def outcome(self, pitching, batting, outcomes, outs=0, runner_on_first=False):
         # tree of the various odds of an event, each event is yes/no.  Onbase? Yes -> BB? no -> Hit yes (stop)
         # outcome: on base or out pos 0, how in pos 1, bases to advance in pos 2, rbis in pos 3
         # ?? hbp is missing, total batters faced is missing, should calc or get pitcher obp
         self.pitching = pitching
         self.batting = batting
-        result = ['OB', '', 1, 0]  # ob or out, type, base to advance runners, rbis
+        outcomes.reset()
+        # result = ['OB', '', 1, 0]  # ob or out, type, base to advance runners, rbis
         if self.onbase():
-            # print('on base')
             if self.bb():
-                result[1] = 'BB'
-                result[2] = 0
+                outcomes.set_score_book_cd('BB')
             elif self.double():
-                result[1] = '2B'
-                result[2] = 2
+                outcomes.set_score_book_cd('2B')
             elif self.triple():
-                result[1] = '3B'
-                result[2] = 3
+                outcomes.set_score_book_cd('3B')
             elif self.hr():
-                result[1] = 'HR'
-                result[2] = 4
+                outcomes.set_score_book_cd('HR')
             else:
-                result[1] = 'H'  # one base is default
+                outcomes.set_score_book_cd('H')
         else:  # handle outs
             if self.k():
-                result = ['OUT', 'K', 0, 0]  # ob, out sub types ob: 1b, 2b, 3b, hr, hbp, e, w; out: k, ...
+                outcomes.set_score_book_cd('K')
             else:
-                result = self.gb_fb_lo(['OUT', '', 0, 0], outs, runner_on_first)  # not a strike out, fb, gb, dp, or lo
-        return result
+                outcomes.set_score_book_cd(self.gb_fb_lo(outs, runner_on_first))
+        return

@@ -74,8 +74,10 @@ class SimAB:
         self.league_GB = .429  # ground ball rate for season
         self.league_FB = .372  # fly ball rate for season
         self.league_LD = .199  # line drive rate for the season
-        self.OBP_adjustment = 0.060  # final adjustment to line up with prior seasons
-        # self.league_DP_per_inning = 145 / 162 / 9  # avg team had 145 DP in 162 games divided by nine to get to inning
+        self.OBP_adjustment = 0.055  # final adjustment to line up with prior seasons
+        self.bb_adjustment = -0.20  # final adjustment to shift more bb to H
+        self.dp_chance = .20  # 20% chance dp with runner on per mlb
+        self.tag_up_chance = .20  # 20% chance of tagging up and scoring, per mlb
         return
 
     # odds ratio is odds of the hitter * odds of the pitcher over the odds of the league or environment
@@ -113,9 +115,10 @@ class SimAB:
                                             self.league_batting_obp + self.OBP_adjustment)
 
     def bb(self):
-        return self.rng() < self.odds_ratio((self.batting.BB / self.batting.Total_OB),
-                                            (self.pitching.BB / self.pitching.Total_OB),
-                                            (self.league_batting_Total_BB / self.league_batting_Total_OB))
+        return self.rng() < self.odds_ratio((self.batting.BB + self.bb_adjustment / self.batting.Total_OB),
+                                            (self.pitching.BB + self.bb_adjustment / self.pitching.Total_OB),
+                                            (self.league_batting_Total_BB + self.bb_adjustment /
+                                             self.league_batting_Total_OB))
 
     def hr(self):
         return self.rng() < self.odds_ratio((self.batting.HR / self.batting.Total_OB),
@@ -141,10 +144,10 @@ class SimAB:
         self.dice_roll = self.rng()
         if self.dice_roll <= self.league_GB:  # ground out
             score_book_cd = 'GB'
-            if runner_on_first and outs <= 1 and self.rng() <= .20:  # 20% chance dp with runner on per mlb
+            if runner_on_first and outs <= 1 and self.rng() <= self.dp_chance:
                 score_book_cd = 'DP'
         elif self.dice_roll <= (self.league_FB + self.league_GB):  # fly out ball
-            if self.rng() <= .20 and runner_on_third:  # 20% chance of tagging up and scoring, per mlb
+            if self.rng() <= self.tag_up_chance and runner_on_third:
                 score_book_cd = 'SF'
             else:
                 score_book_cd = 'FO'

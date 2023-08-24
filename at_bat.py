@@ -74,7 +74,7 @@ class SimAB:
         self.league_GB = .429  # ground ball rate for season
         self.league_FB = .372  # fly ball rate for season
         self.league_LD = .199  # line drive rate for the season
-        self.OBP_adjustment = 0.020  # final adjustment to line up with prior seasons
+        self.OBP_adjustment = 0.060  # final adjustment to line up with prior seasons
         # self.league_DP_per_inning = 145 / 162 / 9  # avg team had 145 DP in 162 games divided by nine to get to inning
         return
 
@@ -124,7 +124,7 @@ class SimAB:
 
     def triple(self):
         # do not have league pitching total for 3b so push it to zero and make it a neutral factor
-        return self.rng() < self.odds_ratio(hitter_stat=(self.batting['3B'] / self.batting.Total_OB), pitcher_stat=.05,
+        return self.rng() < self.odds_ratio(hitter_stat=(self.batting['3B'] / self.batting.Total_OB), pitcher_stat=.016,
                                             league_stat=(self.league_batting_Total_3B / self.league_batting_Total_OB))
 
     def double(self):
@@ -141,10 +141,10 @@ class SimAB:
         self.dice_roll = self.rng()
         if self.dice_roll <= self.league_GB:  # ground out
             score_book_cd = 'GB'
-            if runner_on_first and outs <= 1 and self.rng() <= .50:  # 50% chance of gb to 1st base or mid&side for dp
+            if runner_on_first and outs <= 1 and self.rng() <= .20:  # 20% chance dp with runner on per mlb
                 score_book_cd = 'DP'
         elif self.dice_roll <= (self.league_FB + self.league_GB):  # fly out ball
-            if self.rng() <= .50 and runner_on_third:
+            if self.rng() <= .20 and runner_on_third:  # 20% chance of tagging up and scoring, per mlb
                 score_book_cd = 'SF'
             else:
                 score_book_cd = 'FO'
@@ -159,7 +159,6 @@ class SimAB:
         self.pitching = pitching
         self.batting = batting
         outcomes.reset()
-        # result = ['OB', '', 1, 0]  # ob or out, type, base to advance runners, rbis
         if self.onbase():
             if self.bb():
                 outcomes.set_score_book_cd('BB')

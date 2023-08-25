@@ -75,7 +75,8 @@ class BaseballSeason:
             np.add(np.array(self.team_win_loss[home_team_name]), np.array(win_loss[1])))
         return
 
-    def sim_season(self, season_chatty=False, season_print_lineup_b=False, season_print_box_score_b=False):
+    def sim_season(self, season_chatty=False, season_print_lineup_b=False, season_print_box_score_b=False,
+                   summary_only_b=False):
         print(f'{self.new_season} will have {len(self.schedule)} games per team.')
         print(f'Full schedule of games: {self.schedule}')
 
@@ -111,7 +112,7 @@ class BaseballSeason:
         self.print_standings()
 
         print(f'\n{self.new_season} Season Stats')
-        self.baseball_data.print_current_season(teams=self.teams)  # season totals
+        self.baseball_data.print_current_season(teams=self.teams, summary_only_b=summary_only_b)  # season totals
         return
 
 
@@ -119,18 +120,18 @@ class BaseballSeason:
 if __name__ == '__main__':
     seasons = [2022]
     startdt = datetime.datetime.now()
-    teams = ['CHC', 'CIN', 'COL', 'MIL', 'PIT', 'STL']  # included COL for balance in scheduling
-    bbseason23 = BaseballSeason(load_seasons=seasons, new_season=2023,
-                                team_list=teams,
-                                season_length_limit=4,
-                                min_games=4, series_length=3, rotation_len=5)
-    bbseason23.sim_season(season_chatty=False, season_print_lineup_b=False, season_print_box_score_b=False)
+    # teams = ['CHC', 'CIN', 'COL', 'MIL', 'PIT', 'STL']  # included COL for balance in scheduling
+    # bbseason23 = BaseballSeason(load_seasons=seasons, new_season=2023,
+    #                             team_list=teams,
+    #                             season_length_limit=4,
+    #                             min_games=4, series_length=3, rotation_len=5)
+    # bbseason23.sim_season(season_chatty=False, season_print_lineup_b=False, season_print_box_score_b=False)
 
     # full season
     bbseason23 = BaseballSeason(load_seasons=seasons, new_season=2023,
                                 season_length_limit=162,
                                 min_games=162, series_length=3, rotation_len=5)
-    bbseason23.sim_season(season_chatty=False, season_print_box_score_b=False)
+    bbseason23.sim_season(season_chatty=False, season_print_box_score_b=False, summary_only_b=True)
 
     print(startdt)
     print(datetime.datetime.now())

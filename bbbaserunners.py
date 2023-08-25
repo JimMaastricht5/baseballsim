@@ -75,6 +75,8 @@ class Bases:
     def move_a_runner(self, basenum_from, basenum_to):
         self.baserunners[basenum_to] = self.baserunners[basenum_from]
         self.baserunners[basenum_from] = 0
+        if basenum_from == 3 and basenum_to == 4:
+            self.runs_scored += 1
         return
 
     def push_a_runner(self, basenum_from, basenum_to):

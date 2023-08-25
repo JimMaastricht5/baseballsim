@@ -74,8 +74,8 @@ class SimAB:
         self.league_GB = .429  # ground ball rate for season
         self.league_FB = .372  # fly ball rate for season
         self.league_LD = .199  # line drive rate for the season
-        self.OBP_adjustment = 0.055  # final adjustment to line up with prior seasons
-        self.bb_adjustment = -0.20  # final adjustment to shift more bb to H
+        self.OBP_adjustment = -0.025  # final adjustment to line up with prior seasons
+        self.bb_adjustment = -0.30  # final adjustment to shift more bb to H
         self.dp_chance = .20  # 20% chance dp with runner on per mlb
         self.tag_up_chance = .20  # 20% chance of tagging up and scoring, per mlb
         return
@@ -91,7 +91,7 @@ class SimAB:
     # (.380 / .620)(.300 / .700) * (.350 / .650)
     # Odds(matchup) = .590 -> Matchup OBP = .590 / 1.590 = .371
     #
-    def odds_ratio(self, hitter_stat, pitcher_stat, league_stat):
+    def odds_ratio(self, hitter_stat, pitcher_stat, league_stat, stat_type=''):
         # print(f'at_bat.odds ratio, hitter stat:{hitter_stat}, pitcher stat{pitcher_stat}')
         odds_ratio = 0
         with warnings.catch_warnings():
@@ -101,10 +101,10 @@ class SimAB:
                              (league_stat / (1 - league_stat))
             except ZeroDivisionError:
                 print(f'Exception in odds ratio calculation for hitter:{hitter_stat}, pitcher:{pitcher_stat}, '
-                      f'league: {league_stat}')
+                      f'league: {league_stat} {stat_type}')
             except Warning as warning:
                 print(f'Warning in odds ratio calculation for hitter:{hitter_stat}, pitcher:{pitcher_stat}, '
-                      f'league: {league_stat}')
+                      f'league: {league_stat} {stat_type}')
                 print("Warning caught:", warning)
         return odds_ratio / (1 + odds_ratio)
 
@@ -112,33 +112,37 @@ class SimAB:
         # print('on base: ' + str(self.odds_ratio(self.batting.OBP, self.pitching.OBP, self.league_batting_obp)))
         return self.rng() < self.odds_ratio(self.batting.OBP + self.pitching.Game_Fatigue_Factor + self.OBP_adjustment,
                                             self.pitching.OBP + self.pitching.Game_Fatigue_Factor + self.OBP_adjustment,
-                                            self.league_batting_obp + self.OBP_adjustment)
+                                            self.league_batting_obp + self.OBP_adjustment, stat_type='obp')
 
     def bb(self):
-        return self.rng() < self.odds_ratio((self.batting.BB + self.bb_adjustment / self.batting.Total_OB),
-                                            (self.pitching.BB + self.bb_adjustment / self.pitching.Total_OB),
-                                            (self.league_batting_Total_BB + self.bb_adjustment /
-                                             self.league_batting_Total_OB))
+        return self.rng() < self.odds_ratio(((self.batting.BB + self.bb_adjustment) / self.batting.Total_OB),
+                                            ((self.pitching.BB + self.bb_adjustment) / self.pitching.Total_OB),
+                                            ((self.league_batting_Total_BB + self.bb_adjustment) /
+                                              self.league_batting_Total_OB),
+                                            stat_type='BB')
 
     def hr(self):
         return self.rng() < self.odds_ratio((self.batting.HR / self.batting.Total_OB),
                                             (self.pitching.HR / self.pitching.Total_OB),
-                                            (self.league_batting_Total_HR / self.league_batting_Total_OB))
+                                            (self.league_batting_Total_HR / self.league_batting_Total_OB),
+                                            stat_type='HR')
 
     def triple(self):
         # do not have league pitching total for 3b so push it to zero and make it a neutral factor
         return self.rng() < self.odds_ratio(hitter_stat=(self.batting['3B'] / self.batting.Total_OB), pitcher_stat=.016,
-                                            league_stat=(self.league_batting_Total_3B / self.league_batting_Total_OB))
+                                            league_stat=(self.league_batting_Total_3B / self.league_batting_Total_OB),
+                                            stat_type='3B')
 
     def double(self):
         # do not have league pitching total for 2b so push it to zero and make it a neutral factor
         return self.rng() < self.odds_ratio(hitter_stat=(self.batting['2B'] / self.batting.Total_OB), pitcher_stat=.200,
-                                            league_stat=(self.league_batting_Total_2B / self.league_batting_Total_OB))
+                                            league_stat=(self.league_batting_Total_2B / self.league_batting_Total_OB),
+                                            stat_type='2B')
 
     def k(self):
         return self.rng() < self.odds_ratio((self.batting['SO'] / self.batting.Total_Outs),
                                             (self.pitching['K'] / self.pitching.Total_Outs),
-                                            self.league_K_rate_per_AB)
+                                            self.league_K_rate_per_AB, stat_type='K')
 
     def gb_fo_lo(self, outs=0, runner_on_first=False, runner_on_third=False):
         self.dice_roll = self.rng()

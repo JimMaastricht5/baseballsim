@@ -212,11 +212,13 @@ class BaseballStats:
         self.new_season_batting_data = \
             team_batting_stats(self.new_season_batting_data[self.new_season_batting_data['AB'] > 0].fillna(0))
 
-    def print_current_season(self, teams=['MIL']):
+    def print_current_season(self, teams=['MIL'], summary_only_b=True):
         teams.append('')  # add blank team for totals
         df = self.new_season_batting_data.copy().sort_values(by='OPS', ascending=False)  # take copy to add totals
         df = team_batting_totals(df, team_name='', concat=True)
         df = remove_non_print_cols(df, False)
+        if summary_only_b:
+            df = df.tail(1)
         print(df[df['Team'].isin(teams)].to_string(justify='right'))
         print('\n\n')
         df = self.new_season_pitching_data.copy().sort_values(by='ERA', ascending=True)
@@ -227,15 +229,18 @@ class BaseballStats:
                          'Condition', 'Injured', 'Injured List'], axis=1)
         if 'Total_Outs' in df.columns:
             df.drop(['Total_Outs'], axis=1, inplace=False)
-
+        if summary_only_b:
+            df = df.tail(1)
         print(df[df['Team'].isin(teams)].to_string(justify='right'))
         return
 
-    def print_prior_season(self, teams=['MIN']):
+    def print_prior_season(self, teams=['MIN'], summary_only_b=True):
         teams.append('')  # add blank team for totals
         df = self.batting_data.copy().sort_values(by='OPS', ascending=False)  # take copy to add totals
         df = team_batting_totals(df, team_name='', concat=True)
         df = remove_non_print_cols(df, False)
+        if summary_only_b:
+            df = df.tail(1)
         print(df[df['Team'].isin(teams)].to_string(justify='right'))
         print('\n\n')
         df = self.pitching_data.copy().sort_values(by='ERA', ascending=True)
@@ -244,6 +249,8 @@ class BaseballStats:
         df = df.reindex(['Player', 'Team', 'Age', 'G', 'GS', 'CG', 'SHO', 'IP', 'AB', 'H', '2B', '3B', 'ER', 'K', 'BB',
                          'HR', 'W', 'L', 'SV', 'BS', 'HLD', 'ERA', 'WHIP', 'AVG', 'OBP', 'SLG', 'OPS',
                          'Condition', 'Injured', 'Injured List'], axis=1)
+        if summary_only_b:
+            df = df.tail(1)
         print(df[df['Team'].isin(teams)].to_string(justify='right'))
         return
 

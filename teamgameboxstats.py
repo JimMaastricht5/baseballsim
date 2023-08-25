@@ -51,7 +51,7 @@ class TeamBoxScore:
 
         # increment hit count if OB, not a walk, and not a single
         self.box_pitching.loc[pitcher_index, ['H']] = self.box_pitching.loc[pitcher_index, ['H']] + 1 \
-            if outcomes.score_book_cd != 'BB' and outcomes.score_book_cd != 'H' and outcomes.score_book_cd == 'OB' \
+            if outcomes.score_book_cd != 'BB' and outcomes.score_book_cd != 'H' and outcomes.on_base_b is True \
             else self.box_pitching.loc[pitcher_index, ['H']]
 
         # add runs
@@ -87,13 +87,14 @@ class TeamBoxScore:
         if outcomes.score_book_cd != 'BB':  # handle walks
             self.box_batting.loc[batter_index, ['AB']] = self.box_batting.loc[batter_index, ['AB']] + 1
 
-        if outcomes.score_book_cd in ['H', '2B', '3B', 'HR', 'BB', 'SO', 'SF', 'HBP']:  # record result of plate appearance
-            self.box_batting.loc[batter_index, [outcomes.score_book_cd]] = self.box_batting.loc[batter_index,
-            [outcomes.score_book_cd]] + 1
+        outcome_cd = outcomes.score_book_cd if outcomes.score_book_cd != 'K' else 'SO'  # translate K to SO for batter
+        if outcome_cd in ['H', '2B', '3B', 'HR', 'BB', 'SO', 'SF', 'HBP']:  # record  plate appearance
+            self.box_batting.loc[batter_index, [outcome_cd]] = self.box_batting.loc[batter_index,
+            [outcome_cd]] + 1
 
         # increment hit count if OB, not a walk, and not a single
         self.box_batting.loc[batter_index, ['H']] = self.box_batting.loc[batter_index, ['H']] + 1 \
-            if outcomes.score_book_cd != 'BB' and outcomes.score_book_cd != 'H' and outcomes.score_book_cd == 'OB' \
+            if outcomes.score_book_cd != 'BB' and outcomes.score_book_cd != 'H' and outcomes.on_base_b is True \
             else self.box_batting.loc[batter_index, ['H']]
         self.total_hits = self.box_batting['H'].sum()
         self.box_batting.loc[batter_index, ['RBI']] = self.box_batting.loc[batter_index, ['RBI']] + outcomes.runs_scored

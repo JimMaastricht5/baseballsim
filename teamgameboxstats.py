@@ -99,8 +99,13 @@ class TeamBoxScore:
         self.total_hits = self.box_batting['H'].sum()
         self.box_batting.loc[batter_index, ['RBI']] = self.box_batting.loc[batter_index, ['RBI']] + outcomes.runs_scored
 
+        # find running count error
+        run_count = 0
         for scored_index in players_scored_list.keys():
             self.box_batting.loc[scored_index, ['R']] = self.box_batting.loc[scored_index, ['R']] + 1
+            if scored_index == 0:
+                print(f'teamgameboxstats.py batting result runners scored with zero index.')
+                raise ValueError('Player with zero index value causes problems accumulating runs')
         return
 
     def totals(self):

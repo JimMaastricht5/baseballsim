@@ -87,7 +87,7 @@ class BaseballSeason:
             self.print_day_schedule(season_day_num)
             todays_games = self.schedule[season_day_num]
 
-            # play every game for the day
+             # play every game for the day
             self.baseball_data.new_game_day()  # update rest and injury data for a new day
             for match_up in todays_games:  # run all games for a day
                 print(f'Playing day #{season_day_num + 1}: {match_up[0]} away against {match_up[1]}')  # day starts at 0
@@ -131,7 +131,7 @@ if __name__ == '__main__':
     bbseason23 = BaseballSeason(load_seasons=seasons, new_season=2023,
                                 season_length_limit=162,
                                 min_games=162, series_length=3, rotation_len=5)
-    bbseason23.sim_season(season_chatty=False, season_print_box_score_b=False, summary_only_b=True)
+    bbseason23.sim_season(season_chatty=False, season_print_box_score_b=False, summary_only_b=False)
 
     print(startdt)
     print(datetime.datetime.now())

@@ -59,6 +59,7 @@ class BaseballStats:
                 pitching_data['Condition'] = 100
                 pitching_data['Injured'] = 'Healthy'  # status
                 pitching_data['Injured List'] = 0  # days to spend in IL
+                pitching_data.index += 1
 
                 batting_data = pd.read_csv(str(season) + " player-stats-Batters.csv")
                 batting_data['Season'] = str(season)
@@ -69,6 +70,7 @@ class BaseballStats:
                 batting_data['Condition'] = 100
                 batting_data['Injured'] = 'Healthy'
                 batting_data['Injured List'] = 0
+                batting_data.index += 1
 
                 if self.pitching_data is None:
                     self.pitching_data = pitching_data
@@ -212,7 +214,7 @@ class BaseballStats:
         self.new_season_batting_data = \
             team_batting_stats(self.new_season_batting_data[self.new_season_batting_data['AB'] > 0].fillna(0))
 
-    def print_current_season(self, teams=['MIL'], summary_only_b=True):
+    def print_current_season(self, teams=['MIL'], summary_only_b=False):
         teams.append('')  # add blank team for totals
         df = self.new_season_batting_data.copy().sort_values(by='OPS', ascending=False)  # take copy to add totals
         df = team_batting_totals(df, team_name='', concat=True)
@@ -234,7 +236,7 @@ class BaseballStats:
         print(df[df['Team'].isin(teams)].to_string(justify='right'))
         return
 
-    def print_prior_season(self, teams=['MIN'], summary_only_b=True):
+    def print_prior_season(self, teams=['MIN'], summary_only_b=False):
         teams.append('')  # add blank team for totals
         df = self.batting_data.copy().sort_values(by='OPS', ascending=False)  # take copy to add totals
         df = team_batting_totals(df, team_name='', concat=True)
@@ -345,7 +347,7 @@ if __name__ == '__main__':
     print(*baseball_data.pitching_data.columns)
     print(*baseball_data.batting_data.columns)
     print(baseball_data.batting_data.Team.unique())
-    teams = ['CHC', 'CIN', 'COL', 'MIL', 'PIT', 'STL']  # included COL for balance in scheduling
-    # teams = list(baseball_data.batting_data.Team.unique())
+    #teams = ['CHC', 'CIN', 'COL', 'MIL', 'PIT', 'STL']  # included COL for balance in scheduling
+    teams = list(baseball_data.batting_data.Team.unique())
     baseball_data.print_prior_season(teams=teams)
     # print(baseball_data.new_season_pitching_data.to_string())

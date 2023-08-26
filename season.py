@@ -13,7 +13,7 @@ HOME = 1
 
 class BaseballSeason:
     def __init__(self, load_seasons, new_season, team_list=[], season_length_limit=0, min_games=0, series_length=1,
-                 rotation_len=5):
+                 rotation_len=5, only_nl_b=False):
         self.season_length_limit = season_length_limit  # zero mean there is no limit, based on schedule parameters
         self.min_games = min_games
         self.series_length = series_length
@@ -23,8 +23,12 @@ class BaseballSeason:
         self.load_seasons = load_seasons  # pull base data across for what seasons
         self.new_season = new_season
         self.schedule = []
-        self.baseball_data = bbstats.BaseballStats(load_seasons=self.load_seasons, new_season=new_season)
+        self.baseball_data = bbstats.BaseballStats(load_seasons=self.load_seasons, new_season=new_season,
+                                                   only_nl_b=only_nl_b)
         self.teams = list(self.baseball_data.batting_data.Team.unique()) if team_list == [] else team_list
+        if len(self.teams) % 2 ==1:  # odd number of teams
+            self.teams.append('OFF DAY')
+
         print(self.teams)
         self.create_schedule()  # set schedule
         self.team_win_loss = {}
@@ -34,10 +38,11 @@ class BaseballSeason:
 
     def create_schedule(self):
         # day schedule in format  ([['MIL', 'COL'], ['PIT', 'CIN'], ['CHC', 'STL']])  # test schedule
+        # if there were an off number of teams there may be an "OFF" day
         for game_day in range(0, len(self.teams)-1):  # setup each team play all other teams one time
             random.shuffle(self.teams)  # randomize team match ups. may repeat, deal with it
             day_schedule = []
-            for ii in range(0, len(self.teams), 2):  # select home and away without repeating a team, inc by 2 for away/home
+            for ii in range(0, len(self.teams), 2):  # select home and away without repeating a team, inc by 2 away/home
                 day_schedule.append([self.teams[ii], self.teams[ii+1]])  # build schedule for one day
 
             for series_game in range(0, self.series_length):  # repeat day schedule to build series
@@ -52,17 +57,22 @@ class BaseballSeason:
         day_schedule = self.schedule[day]
         print(f'Games for day {day + 1}:')
         for game in day_schedule:
-            print(f'{game[0]} vs. {game[1]}')
+            if 'OFF DAY' not in game:
+                print(f'{game[0]} vs. {game[1]}')
+            else:
+                game_str = game[0] if game[0] != 'OFF DAY' else game[1]
+        print(f'{game_str} has the day off')
         print('')
         return
 
     def print_standings(self):
         teaml, winl, lossl = [], [], []
         for team in self.team_win_loss:
-            win_loss = self.team_win_loss[team]
-            teaml.append(team)
-            winl.append(win_loss[0])
-            lossl.append(win_loss[1])
+            if team != 'OFF DAY':
+                win_loss = self.team_win_loss[team]
+                teaml.append(team)
+                winl.append(win_loss[0])
+                lossl.append(win_loss[1])
         df = pd.DataFrame({'Team': teaml, 'Win': winl, 'Loss': lossl})
         print(df.sort_values('Win', ascending=False).to_string(index=False, justify='center'))
         print('')
@@ -89,19 +99,20 @@ class BaseballSeason:
 
              # play every game for the day
             self.baseball_data.new_game_day()  # update rest and injury data for a new day
-            for match_up in todays_games:  # run all games for a day
-                print(f'Playing day #{season_day_num + 1}: {match_up[0]} away against {match_up[1]}')  # day starts at 0
-                game = bbgame.Game(away_team_name=match_up[0], home_team_name=match_up[1],
-                                   baseball_data=self.baseball_data, game_num=season_day_num,
-                                   rotation_len=self.rotation_len, print_lineup=season_print_lineup_b,
-                                   chatty=season_chatty, print_box_score_b=season_print_box_score_b)
-                score, inning, win_loss_list = game.sim_game()
-                self.update_win_loss(away_team_name=match_up[0], home_team_name=match_up[1], win_loss=win_loss_list)
-                print(f'Final: {match_up[0]} {score[0]} {match_up[1]} {score[1]}')
-                self.baseball_data.game_results_to_season(box_score_class=game.teams[AWAY].box_score)
-                self.baseball_data.game_results_to_season(box_score_class=game.teams[HOME].box_score)
-                print('')
-                # end of game
+            for match_up in todays_games:  # run all games for a day, day starts at zero
+                if 'OFF DAY' not in match_up:  # not an off day
+                    print(f'Playing day #{season_day_num + 1}: {match_up[0]} away against {match_up[1]}')
+                    game = bbgame.Game(away_team_name=match_up[0], home_team_name=match_up[1],
+                                       baseball_data=self.baseball_data, game_num=season_day_num,
+                                       rotation_len=self.rotation_len, print_lineup=season_print_lineup_b,
+                                       chatty=season_chatty, print_box_score_b=season_print_box_score_b)
+                    score, inning, win_loss_list = game.sim_game()
+                    self.update_win_loss(away_team_name=match_up[0], home_team_name=match_up[1], win_loss=win_loss_list)
+                    print(f'Final: {match_up[0]} {score[0]} {match_up[1]} {score[1]}')
+                    self.baseball_data.game_results_to_season(box_score_class=game.teams[AWAY].box_score)
+                    self.baseball_data.game_results_to_season(box_score_class=game.teams[HOME].box_score)
+                    print('')
+                    # end of game
             # end of all games for one day
             print(f'Standings for Day {season_day_num + 1}:')
             self.print_standings()
@@ -130,8 +141,8 @@ if __name__ == '__main__':
     # full season
     bbseason23 = BaseballSeason(load_seasons=seasons, new_season=2023,
                                 season_length_limit=162,
-                                min_games=162, series_length=3, rotation_len=5)
-    bbseason23.sim_season(season_chatty=False, season_print_box_score_b=False, summary_only_b=False)
+                                min_games=162, series_length=3, rotation_len=5, only_nl_b=True)
+    bbseason23.sim_season(season_chatty=False, season_print_box_score_b=False, summary_only_b=True)
 
     print(startdt)
     print(datetime.datetime.now())

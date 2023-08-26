@@ -6,13 +6,14 @@ import numpy as np
 
 
 class BaseballStats:
-    def __init__(self, load_seasons, new_season, random_data=False):
+    def __init__(self, load_seasons, new_season, random_data=False, only_nl_b=False):
         self.rnd = lambda: np.random.default_rng().uniform(low=0.0, high=1.001)  # random generator between 0 and 1
         self.numeric_bcols = ['G', 'AB', 'R', 'H', '2B', '3B', 'HR', 'RBI', 'SB', 'CS', 'BB', 'SO', 'SH', 'SF', 'HBP',
                               'AVG', 'OBP', 'SLG', 'OPS']
         self.numeric_pcols = ['G', 'GS', 'CG', 'SHO', 'IP', 'AB', 'H', '2B', '3B', 'ER', 'K', 'BB', 'HR', 'W', 'L',
                               'SV', 'BS', 'HLD', 'ERA', 'WHIP', 'Total_Outs']
-
+        self.nl= ['CHC', 'CIN', 'MIL', 'PIT', 'STL', 'ATL', 'MIA', 'NYM', 'PHI', 'WAS', 'AZ', 'COL', 'LA', 'SD', 'SF']
+        self.only_nl_b=only_nl_b
         self.load_seasons = load_seasons  # list of seasons to load from csv files
         self.new_season = new_season
         self.pitching_data = None
@@ -78,6 +79,9 @@ class BaseballStats:
                 else:
                     self.pitching_data = pd.concat([self.pitching_data, pitching_data])
                     self.batting_data = pd.concat([self.batting_data, batting_data])
+                if self.only_nl_b:
+                    self.pitching_data = self.pitching_data[self.pitching_data['Team'].isin(self.nl)]
+                    self.batting_data = self.batting_data[self.batting_data['Team'].isin(self.nl)]
         return
 
     def randomize_data(self):
@@ -342,7 +346,7 @@ def team_pitching_totals(pitching_df, team_name='', concat=True):
 
 
 if __name__ == '__main__':
-    baseball_data = BaseballStats(load_seasons=[2022], new_season=2023, random_data=False)
+    baseball_data = BaseballStats(load_seasons=[2022], new_season=2023, random_data=False, only_nl_b=True)
 
     print(*baseball_data.pitching_data.columns)
     print(*baseball_data.batting_data.columns)

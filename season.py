@@ -86,7 +86,7 @@ class BaseballSeason:
         return
 
     def sim_season(self, season_chatty=False, season_print_lineup_b=False, season_print_box_score_b=False,
-                   summary_only_b=False):
+                   summary_only_b=False, team_to_follow=''):
         print(f'{self.new_season} will have {len(self.schedule)} games per team.')
         print(f'Full schedule of games: {self.schedule}')
 
@@ -106,7 +106,7 @@ class BaseballSeason:
                                        baseball_data=self.baseball_data, game_num=season_day_num,
                                        rotation_len=self.rotation_len, print_lineup=season_print_lineup_b,
                                        chatty=season_chatty, print_box_score_b=season_print_box_score_b)
-                    score, inning, win_loss_list = game.sim_game()
+                    score, inning, win_loss_list = game.sim_game(team_to_follow=team_to_follow)
                     self.update_win_loss(away_team_name=match_up[0], home_team_name=match_up[1], win_loss=win_loss_list)
                     print(f'Final: {match_up[0]} {score[0]} {match_up[1]} {score[1]}')
                     self.baseball_data.game_results_to_season(box_score_class=game.teams[AWAY].box_score)
@@ -123,7 +123,11 @@ class BaseballSeason:
         self.print_standings()
 
         print(f'\n{self.new_season} Season Stats')
+        if team_to_follow != '':
+            self.baseball_data.print_current_season(teams=team_to_follow, summary_only_b=False)  # season for a team
+
         self.baseball_data.print_current_season(teams=self.teams, summary_only_b=summary_only_b)  # season totals
+
         return
 
 
@@ -140,9 +144,10 @@ if __name__ == '__main__':
 
     # full season
     bbseason23 = BaseballSeason(load_seasons=seasons, new_season=2023,
-                                season_length_limit=21,
-                                min_games=21, series_length=3, rotation_len=5, only_nl_b=True)
-    bbseason23.sim_season(season_chatty=False, season_print_box_score_b=False, summary_only_b=True)
+                                season_length_limit=162,
+                                min_games=162, series_length=3, rotation_len=5, only_nl_b=True)
+    bbseason23.sim_season(season_chatty=False, season_print_box_score_b=False, summary_only_b=True,
+                          team_to_follow='MIL')
 
     print(startdt)
     print(datetime.datetime.now())

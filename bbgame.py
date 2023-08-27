@@ -205,7 +205,11 @@ class Game:
                                                               save_b=self.is_save_sit[HOME])
         return
 
-    def sim_game(self):
+    def sim_game(self, team_to_follow=''):
+        if team_to_follow in self.team_names:
+            self.chatty = True
+            self.print_box_score_b = True
+
         while self.is_game_end() is False:
             self.sim_half_inning(chatty=self.chatty)
 

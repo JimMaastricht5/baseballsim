@@ -128,8 +128,9 @@ class Game:
         self.at_bat.outcome(pitching, batting, self.outcomes, self.outs, self.bases.is_runner_on_base_num(1),
                             self.bases.is_runner_on_base_num(3))
         self.outs = self.outs + self.outcomes.outs_on_play
-        self.bases.advance_runners(score_book_cd=self.outcomes.score_book_cd,
-                                   bases_to_advance=self.outcomes.bases_to_advance, outs=self.outs)
+        self.bases.handle_runners(score_book_cd=self.outcomes.score_book_cd,
+                                   bases_to_advance=self.outcomes.bases_to_advance,
+                                   on_base_b=self.outcomes.on_base_b, outs=self.outs)
         self.outcomes.set_runs_score(self.bases.runs_scored)  # runs and rbis for batter and pitcher
 
         self.teams[self.team_pitching()].box_score.pitching_result(cur_pitcher_index, self.outcomes, pitching.Condition)

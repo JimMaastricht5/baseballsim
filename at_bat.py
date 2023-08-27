@@ -6,16 +6,16 @@ import bbstats
 class OutCome:
     def __init__(self):
         self.outs_on_play = 0
-        self.on_base_b = False
+        self.on_base_b = False  # if this a BB or some form of a hit does not cover GB FC
         self.score_book_cd = ''
         self.bases_to_advance = 0
         self.runs_scored = 0
-        self.bases_dict = {'BB': 1, 'H': 1, '2B': 2, '3B': 3, 'HR': 4, 'K': 0, 'SO': 0, 'GB': 0, 'DP': 0,
-                           'FO': 0, 'LD': 0, 'SF': 0}
+        self.bases_dict = {'BB': 1, 'H': 1, '2B': 2, '3B': 3, 'HR': 4, 'K': 0, 'SO': 0, 'GB': 1, 'DP': 1,
+                           'GB FC': 1, 'FO': 0, 'LD': 0, 'SF': 0}  # some outs allow runners to move such as dp or gb
         self.on_base_dict = {'BB': True, 'H': True, '2B': True, '3B': True, 'HR': True, 'K': False, 'SO': False,
-                             'GB': False, 'DP': False, 'FO': False, 'LD': False, 'SF': False}
-        self.outs_dict = {'BB': 0, 'H': 0, '2B': 0, '3B': 0, 'HR': 0, 'K': 1, 'SO': 1, 'GB': 1, 'DP': 2, 'FO': 1,
-                          'LD': 1, 'SF': 0}
+                             'GB': False, 'DP': False, 'GB FC': False, 'FO': False, 'LD': False, 'SF': False}
+        self.outs_dict = {'BB': 0, 'H': 0, '2B': 0, '3B': 0, 'HR': 0, 'K': 1, 'SO': 1, 'GB': 1, 'DP': 2, 'GB FC': 1,
+                          'FO': 1, 'LD': 1, 'SF': 0}
         return
 
     def reset(self):
@@ -72,6 +72,7 @@ class SimAB:
         self.league_K_rate_per_AB = float(self.baseball_data.batting_data['SO'].sum() /
                                           self.league_Total_outs)  # strike out or in play
         self.league_GB = .429  # ground ball rate for season
+        self.league_GB_FC = .10  # GB FC occur 10 out of 100 times ball in play
         self.league_FB = .372  # fly ball rate for season
         self.league_LD = .199  # line drive rate for the season
         self.OBP_adjustment = -0.025  # final adjustment to line up with prior seasons
@@ -150,6 +151,8 @@ class SimAB:
             score_book_cd = 'GB'
             if runner_on_first and outs <= 1 and self.rng() <= self.dp_chance:
                 score_book_cd = 'DP'
+            elif runner_on_first and outs <= 1 and self.rng() <= self.league_GB_FC:
+                score_book_cd = 'GB FC'
         elif self.dice_roll <= (self.league_FB + self.league_GB):  # fly out ball
             if self.rng() <= self.tag_up_chance and runner_on_third:
                 score_book_cd = 'SF'

@@ -15,13 +15,18 @@ class Bases:
         self.runs_scored = 0
         return
 
-    def advance_runners(self, score_book_cd, bases_to_advance, outs):
+    def handle_runners(self, score_book_cd, bases_to_advance, on_base_b, outs):
         if outs >= 3:
             return
         if score_book_cd == 'BB':
             bases_to_advance = self.walk(bases_to_advance)  # keep at 1 if bases loaded, else move runners one at a time
         elif score_book_cd == 'SF':
             bases_to_advance = self.tag_up(outs)  # move runner from third and set other runners to hold w/ 0
+        elif score_book_cd in ['DP', 'GB FC', 'GB']:
+            bases_to_advance = self.ground_out(score_book_cd)
+        elif on_base_b and score_book_cd not in ['BB', 'HR', '3B'] and outs == 2: # two out base hit or 2b gets xta base
+            self.push_a_runner(1, 2) # this will push all runners one base before the std 1 base adv.  adds rbi and runs
+
         self.player_scored = {}
         self.baserunners = list(np.roll(self.baserunners, bases_to_advance))  # advance runners
         self.runs_scored = np.count_nonzero(self.baserunners[-4:])  # 0 ab 1, 2, 3 are bases. 4-7 run crossed home=len 4
@@ -31,6 +36,13 @@ class Bases:
         self.baserunners[-4] = 0  # send the runners that score back to the dug out
         self.baserunners = [baserunner if i <= 3 else 0 for i, baserunner in enumerate(self.baserunners)]  # reset bases
         return
+
+    def ground_out(self, score_book_cd):
+        if score_book_cd in ['GB', 'DP']:  # batter is out
+            self.remove_runner(0)
+        elif score_book_cd in ['GB FC']:  # runner at first is out
+            self.remove_runner(1)
+        return 1  # advance remaining runners and batter on an GB FC one base
 
     def new_ab(self, batter_num=1, player_name=''):
         self.baserunners[0] = batter_num  # put a player ab
@@ -73,6 +85,8 @@ class Bases:
             return
         self.runs_scored += 1  # give batter and RBI
         self.move_a_runner(3, 4)  # move runner from 3 to 4
+        self.move_a_runner(2, 3)  # move runner from 2 to 3rd if there is a runner on second
+        self.remove_runner(0)  # batter is out
         return 0  # bases to advance
 
     def move_a_runner(self, basenum_from, basenum_to):

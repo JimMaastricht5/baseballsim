@@ -124,7 +124,7 @@ class BaseballSeason:
 
         print(f'\n{self.new_season} Season Stats')
         if team_to_follow != '':
-            self.baseball_data.print_current_season(teams=team_to_follow, summary_only_b=False)  # season for a team
+            self.baseball_data.print_current_season(teams=[team_to_follow], summary_only_b=False)  # season for a team
 
         self.baseball_data.print_current_season(teams=self.teams, summary_only_b=summary_only_b)  # season totals
 
@@ -143,11 +143,13 @@ if __name__ == '__main__':
     # bbseason23.sim_season(season_chatty=False, season_print_lineup_b=False, season_print_box_score_b=False)
 
     # full season
+    num_games = 162
+    team_to_follow = ''  # or MIL
     bbseason23 = BaseballSeason(load_seasons=seasons, new_season=2023,
-                                season_length_limit=162,
-                                min_games=162, series_length=3, rotation_len=5, only_nl_b=True)
-    bbseason23.sim_season(season_chatty=False, season_print_box_score_b=False, summary_only_b=True,
-                          team_to_follow='MIL')
+                                season_length_limit=num_games,
+                                min_games=num_games, series_length=3, rotation_len=5, only_nl_b=True)
+    bbseason23.sim_season(season_chatty=False, season_print_box_score_b=False, summary_only_b=False,
+                          team_to_follow=team_to_follow)
 
     print(startdt)
     print(datetime.datetime.now())

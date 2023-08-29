@@ -181,11 +181,12 @@ class BaseballStats:
 
     def is_injured(self):
         self.new_season_pitching_data['Injured List'] = self.new_season_pitching_data.\
-            apply(lambda x: 0 if self.rnd() > self.pitching_injury_odds_for_season else
-                  self.rnd() * self.pitching_injury_avg_len + self.pitching_injury_avg_len / 2)
+            apply(lambda row: 0 if self.rnd() > self.pitching_injury_odds_for_season or row['Injured List'] > 0 else
+                  self.rnd() * self.pitching_injury_avg_len + self.pitching_injury_avg_len / 2, axis=1)
         self.new_season_batting_data['Injured List'] = self.new_season_batting_data.\
             apply(lambda x: 0 if self.rnd() > self.batting_injury_odds_for_season else
-                  self.rnd() * self.batting_injury_avg_len + self.batting_injury_avg_len / 2)
+                  self.rnd() * self.batting_injury_avg_len + self.batting_injury_avg_len / 2, axis=1)
+        print(self.new_season_pitching_data[self.new_season_pitching_data['Injured List'] > 0].to_string())
         return
 
     def new_game_day(self):

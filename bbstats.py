@@ -267,7 +267,7 @@ class BaseballStats:
 
 # static function start
 def remove_non_print_cols(df):
-    non_print_cols = ['Season', 'Total_OB', 'AVG_faced', 'Total_Outs', 'Game_Fatigue_Factor']
+    non_print_cols = ['Season', 'Total_OB', 'AVG_faced', 'Game_Fatigue_Factor']  # 'Total_Outs',
     cols_to_drop = []
     df_columns = df.columns
     for non_print_col in non_print_cols:

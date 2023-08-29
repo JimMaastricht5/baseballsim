@@ -9,9 +9,9 @@ class BaseballStats:
     def __init__(self, load_seasons, new_season, random_data=False, only_nl_b=False):
         self.rnd = lambda: np.random.default_rng().uniform(low=0.0, high=1.001)  # random generator between 0 and 1
         self.numeric_bcols = ['G', 'AB', 'R', 'H', '2B', '3B', 'HR', 'RBI', 'SB', 'CS', 'BB', 'SO', 'SH', 'SF', 'HBP',
-                              'AVG', 'OBP', 'SLG', 'OPS']
+                              'AVG', 'OBP', 'SLG', 'OPS', 'Condition', 'Injured List']
         self.numeric_pcols = ['G', 'GS', 'CG', 'SHO', 'IP', 'AB', 'H', '2B', '3B', 'ER', 'K', 'BB', 'HR', 'W', 'L',
-                              'SV', 'BS', 'HLD', 'ERA', 'WHIP', 'Total_Outs']
+                              'SV', 'BS', 'HLD', 'ERA', 'WHIP', 'Total_Outs', 'Condition', 'Injured List']
         self.nl= ['CHC', 'CIN', 'MIL', 'PIT', 'STL', 'ATL', 'MIA', 'NYM', 'PHI', 'WAS', 'AZ', 'COL', 'LA', 'SD', 'SF']
         self.only_nl_b=only_nl_b
         self.load_seasons = load_seasons  # list of seasons to load from csv files
@@ -189,21 +189,21 @@ class BaseballStats:
         return
 
     def new_game_day(self):
-        # self.is_injured()
+        self.is_injured()
         self.new_season_pitching_data['Condition'] = self.new_season_pitching_data['Condition'] \
                                                      + self.condition_change_per_day
         self.new_season_pitching_data['Condition'] = self.new_season_pitching_data['Condition'].clip(lower=0, upper=100)
         self.new_season_pitching_data['Injured List'] = self.new_season_pitching_data['Injured List'] - 1
         self.new_season_pitching_data['Injured List'] = self.new_season_pitching_data['Injured List'].clip(lower=0)
         self.new_season_pitching_data['Injured'] = \
-            self.new_season_pitching_data['Injured List'].apply(lambda x: 'Injured' if x != 0 else 'Healthy')
+            self.new_season_pitching_data['Injured List'].apply(lambda x: 'Injured' if x > 0 else 'Healthy')
         self.new_season_batting_data['Condition'] = self.new_season_batting_data['Condition'] \
             + self.condition_change_per_day
         self.new_season_batting_data['Condition'] = self.new_season_batting_data['Condition'].clip(lower=0, upper=100)
         self.new_season_batting_data['Injured List'] = self.new_season_batting_data['Injured List'] - 1
         self.new_season_batting_data['Injured List'] = self.new_season_batting_data['Injured List'].clip(lower=0)
         self.new_season_batting_data['Injured'] = \
-            self.new_season_batting_data['Injured List'].apply(lambda x: 'Injured' if x != 0 else 'Healthy')
+            self.new_season_batting_data['Injured List'].apply(lambda x: 'Injured' if x > 0 else 'Healthy')
 
         # copy over results in new season to prior season for game management
         self.pitching_data.loc[:, 'Condition'] = self.new_season_pitching_data.loc[:, 'Condition']

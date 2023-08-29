@@ -26,7 +26,7 @@ class BaseballSeason:
         self.baseball_data = bbstats.BaseballStats(load_seasons=self.load_seasons, new_season=new_season,
                                                    only_nl_b=only_nl_b)
         self.teams = list(self.baseball_data.batting_data.Team.unique()) if team_list == [] else team_list
-        if len(self.teams) % 2 ==1:  # odd number of teams
+        if len(self.teams) % 2 == 1:  # odd number of teams
             self.teams.append('OFF DAY')
 
         print(self.teams)
@@ -54,6 +54,7 @@ class BaseballSeason:
         return
 
     def print_day_schedule(self, day):
+        game_str = ''
         day_schedule = self.schedule[day]
         print(f'Games for day {day + 1}:')
         for game in day_schedule:
@@ -97,7 +98,7 @@ class BaseballSeason:
             self.print_day_schedule(season_day_num)
             todays_games = self.schedule[season_day_num]
 
-             # play every game for the day
+            # play every game for the day
             self.baseball_data.new_game_day()  # update rest and injury data for a new day
             for match_up in todays_games:  # run all games for a day, day starts at zero
                 if 'OFF DAY' not in match_up:  # not an off day
@@ -148,7 +149,10 @@ if __name__ == '__main__':
     bbseason23 = BaseballSeason(load_seasons=seasons, new_season=2023,
                                 season_length_limit=num_games,
                                 min_games=num_games, series_length=3, rotation_len=5, only_nl_b=True)
-    bbseason23.sim_season(season_chatty=False, season_print_box_score_b=False, summary_only_b=False,
+    bbseason23.sim_season(season_chatty=False,
+                          season_print_lineup_b=False,
+                          season_print_box_score_b=False,
+                          summary_only_b=False,
                           team_to_follow=team_to_follow)
 
     print(startdt)

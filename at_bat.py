@@ -119,7 +119,7 @@ class SimAB:
         return self.rng() < self.odds_ratio(((self.batting.BB + self.bb_adjustment) / self.batting.Total_OB),
                                             ((self.pitching.BB + self.bb_adjustment) / self.pitching.Total_OB),
                                             ((self.league_batting_Total_BB + self.bb_adjustment) /
-                                              self.league_batting_Total_OB),
+                                            self.league_batting_Total_OB),
                                             stat_type='BB')
 
     def hr(self):

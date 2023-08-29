@@ -150,7 +150,15 @@ class Team:
             self.box_score.add_pitcher_to_box(self.middle_relievers.loc[reliever_pitcher_index])
             self.middle_relievers = self.middle_relievers.drop(reliever_pitcher_index, axis=0)  # remove from pen
             self.cur_pitcher_index = reliever_pitcher_index  # set cur pitcher index
-        else:  # you're out of pitching!  ?????
+        elif len(self.relievers) == 0 and len(self.relievers) == 0:
+            print(f'gameteam.py out of pitching in inning {inning}!')
+            print(self.starting_pitchers.to_string())
+            print(self.relievers.to_string())
+            print(self.middle_relievers.to_string())
+            print(self.pitchers.to_string())
+
+            raise Exception('no pitching!')
+        else:  # no change
             pass
         return self.cur_pitcher_index
 
@@ -161,7 +169,7 @@ class Team:
         return condition <= self.fatigue_pitching_change_limit
 
     def set_closers(self):
-        # grab top two closers for setup and final close
+        # grab top closers for setup and final close
         not_selected_criteria = ~self.pitchers.index.isin(self.starting_pitchers.index)
         not_exhausted = ~(self.pitchers['Condition'] <= self.fatigue_pitching_unavailable)
         not_injured = (self.pitchers['Injured List'] == 0)
@@ -185,7 +193,7 @@ class Team:
         df_criteria = exhausted | injured
         self.unavailable_pitchers = self.pitchers[df_criteria].sort_values('IP', ascending=False)
         print('gameteam.py set unavailable due to fatigue or injury....')
-        print(self.unavailable_pitchers.to_string())
+        # print(self.unavailable_pitchers.to_string())
         return
 
     def search_for_pos(self, position, lineup_index_list, stat_criteria='OPS'):
@@ -208,11 +216,11 @@ class Team:
     def print_starting_lineups(self, current_season_stats=True):
         print(f'Starting lineup for {self.team_name}:')
         if current_season_stats:
-            dfb = bbstats.remove_non_print_cols(self.lineup_new_season, False)
-            dfp = bbstats.remove_non_print_cols(self.pitching_new_season, True)
+            dfb = bbstats.remove_non_print_cols(self.lineup_new_season)
+            dfp = bbstats.remove_non_print_cols(self.pitching_new_season)
         else:
-            dfb = bbstats.remove_non_print_cols(self.lineup, False)
-            dfp = bbstats.remove_non_print_cols(self.pitching, True)
+            dfb = bbstats.remove_non_print_cols(self.lineup)
+            dfp = bbstats.remove_non_print_cols(self.pitching)
 
         print(dfb.to_string(index=True, justify='center'))
         print('')

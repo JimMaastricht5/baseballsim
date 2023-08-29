@@ -129,8 +129,8 @@ class Game:
                             self.bases.is_runner_on_base_num(3))
         self.outs = self.outs + self.outcomes.outs_on_play
         self.bases.handle_runners(score_book_cd=self.outcomes.score_book_cd,
-                                   bases_to_advance=self.outcomes.bases_to_advance,
-                                   on_base_b=self.outcomes.on_base_b, outs=self.outs)
+                                  bases_to_advance=self.outcomes.bases_to_advance,
+                                  on_base_b=self.outcomes.on_base_b, outs=self.outs)
         self.outcomes.set_runs_score(self.bases.runs_scored)  # runs and rbis for batter and pitcher
 
         self.teams[self.team_pitching()].box_score.pitching_result(cur_pitcher_index, self.outcomes, pitching.Condition)
@@ -216,7 +216,7 @@ class Game:
         self.win_loss_record()
         self.teams[AWAY].box_score.totals()
         self.teams[HOME].box_score.totals()
-        if self.print_box_score_b:  # to print or not to print...
+        if self.print_box_score_b or abs(self.total_score[1] - self.total_score[0]) > 10:  # to print or not to print...
             self.teams[AWAY].box_score.print_boxes()
             self.teams[HOME].box_score.print_boxes()
         print('Final:')

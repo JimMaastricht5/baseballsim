@@ -12,7 +12,7 @@ class TeamBoxScore:
                            'HLD', 'ERA', 'WHIP',
                            'OBP', 'SLG', 'OPS', 'Total_Outs']] = 0
         # self.box_pitching.drop(['Season', 'Total_OB', 'Total_Outs'], axis=1, inplace=True)
-        self.box_pitching = bbstats.remove_non_print_cols(self.box_pitching, True)
+        self.box_pitching = bbstats.remove_non_print_cols(self.box_pitching)
         self.team_box_pitching = None
         self.game_pitching_stats = None
 
@@ -20,7 +20,7 @@ class TeamBoxScore:
         self.box_batting[['G']] = 1
         self.box_batting[['AB', 'R', 'H', '2B', '3B', 'HR', 'RBI', 'SB', 'CS', 'BB', 'SO', 'SH', 'SF', 'HBP', 'AVG',
                           'OBP', 'SLG', 'OPS']] = 0
-        self.box_batting = bbstats.remove_non_print_cols(self.box_batting, False)
+        self.box_batting = bbstats.remove_non_print_cols(self.box_batting)
         self.team_box_batting = None
         self.game_batting_stats = None
 
@@ -46,8 +46,8 @@ class TeamBoxScore:
                 float(self.box_pitching.loc[pitcher_index, ['Total_Outs']] / 3)
 
         if outcomes.score_book_cd in ['H', '2B', '3B', 'HR', 'K', 'BB', 'HBP']:  # handle plate appearance
-            self.box_pitching.loc[pitcher_index, [outcomes.score_book_cd]] = self.box_pitching.loc[pitcher_index,
-            [outcomes.score_book_cd]] + 1
+            self.box_pitching.loc[pitcher_index, [outcomes.score_book_cd]] = \
+                self.box_pitching.loc[pitcher_index, [outcomes.score_book_cd]] + 1
 
         # increment hit count if OB, not a walk, and not a single
         self.box_pitching.loc[pitcher_index, ['H']] = self.box_pitching.loc[pitcher_index, ['H']] + 1 \
@@ -56,7 +56,7 @@ class TeamBoxScore:
 
         # add runs
         self.box_pitching.loc[pitcher_index, ['ER']] = self.box_pitching.loc[pitcher_index, ['ER']] \
-                                                       + outcomes.runs_scored
+            + outcomes.runs_scored
         self.box_pitching.loc[pitcher_index, ['Condition']] = condition
         return
 
@@ -67,7 +67,7 @@ class TeamBoxScore:
                      'WHIP', 'OBP', 'SLG', 'OPS', 'Total_Outs']] = 0
         new_pitcher[['Condition']] = 100
         self.box_pitching = pd.concat([self.box_pitching, new_pitcher], ignore_index=False)
-        self.box_pitching = bbstats.remove_non_print_cols(self.box_pitching, True)
+        self.box_pitching = bbstats.remove_non_print_cols(self.box_pitching)
         return
 
     def pitching_win_loss_save(self, pitcher_index, win_b, save_b):
@@ -89,8 +89,8 @@ class TeamBoxScore:
 
         outcome_cd = outcomes.score_book_cd if outcomes.score_book_cd != 'K' else 'SO'  # translate K to SO for batter
         if outcome_cd in ['H', '2B', '3B', 'HR', 'BB', 'SO', 'SF', 'HBP']:  # record  plate appearance
-            self.box_batting.loc[batter_index, [outcome_cd]] = self.box_batting.loc[batter_index,
-            [outcome_cd]] + 1
+            self.box_batting.loc[batter_index, [outcome_cd]] = \
+                self.box_batting.loc[batter_index, [outcome_cd]] + 1
 
         # increment hit count if OB, not a walk, and not a single
         self.box_batting.loc[batter_index, ['H']] = self.box_batting.loc[batter_index, ['H']] + 1 \
@@ -100,7 +100,6 @@ class TeamBoxScore:
         self.box_batting.loc[batter_index, ['RBI']] = self.box_batting.loc[batter_index, ['RBI']] + outcomes.runs_scored
 
         # find running count error
-        run_count = 0
         for scored_index in players_scored_list.keys():
             self.box_batting.loc[scored_index, ['R']] = self.box_batting.loc[scored_index, ['R']] + 1
             if scored_index == 0:

@@ -24,8 +24,8 @@ class Bases:
             bases_to_advance = self.tag_up(outs)  # move runner from third and set other runners to hold w/ 0
         elif score_book_cd in ['DP', 'GB FC', 'GB']:
             bases_to_advance = self.ground_out(score_book_cd)
-        elif on_base_b and score_book_cd not in ['BB', 'HR', '3B'] and outs == 2: # two out base hit or 2b gets xta base
-            self.push_a_runner(1, 2) # this will push all runners one base before the std 1 base adv.  adds rbi and runs
+        elif on_base_b and score_book_cd not in ['BB', 'HR', '3B'] and outs == 2:  # 2 out base hit or 2b gets xta base
+            self.push_a_runner(1, 2)  # push all runners one base before the std 1 base adv.  adds rbi and runs
 
         self.player_scored = {}
         self.baserunners = list(np.roll(self.baserunners, bases_to_advance))  # advance runners

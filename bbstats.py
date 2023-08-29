@@ -12,8 +12,9 @@ class BaseballStats:
                               'AVG', 'OBP', 'SLG', 'OPS', 'Condition', 'Injured List']
         self.numeric_pcols = ['G', 'GS', 'CG', 'SHO', 'IP', 'AB', 'H', '2B', '3B', 'ER', 'K', 'BB', 'HR', 'W', 'L',
                               'SV', 'BS', 'HLD', 'ERA', 'WHIP', 'Total_Outs', 'Condition', 'Injured List']
-        self.nl= ['CHC', 'CIN', 'MIL', 'PIT', 'STL', 'ATL', 'MIA', 'NYM', 'PHI', 'WAS', 'AZ', 'COL', 'LA', 'SD', 'SF']
-        self.only_nl_b=only_nl_b
+
+        self.nl = ['CHC', 'CIN', 'MIL', 'PIT', 'STL', 'ATL', 'MIA', 'NYM', 'PHI', 'WAS', 'AZ', 'COL', 'LA', 'SD', 'SF']
+        self.only_nl_b = only_nl_b
         self.load_seasons = load_seasons  # list of seasons to load from csv files
         self.new_season = new_season
         self.pitching_data = None
@@ -137,7 +138,8 @@ class BaseballStats:
 
         self.new_season_pitching_data = self.pitching_data.copy()
         self.new_season_pitching_data[self.numeric_pcols] = 0
-        self.new_season_pitching_data[['OBP', 'Total_OB', 'Total_Outs', 'AB']] = 0  # zero out calculated fields
+        self.new_season_pitching_data[['OBP', 'Total_OB', 'Total_Outs', 'AB', 'Injured List']] = 0
+        self.new_season_pitching_data['Condition'] = 100
         self.new_season_pitching_data.drop(['Total_OB', 'Total_Outs'], axis=1)
         self.new_season_pitching_data['Season'] = str(self.new_season)
         self.new_season_pitching_data['Age'] = self.new_season_pitching_data['Age'] + 1  # everyone is a year older
@@ -145,7 +147,8 @@ class BaseballStats:
 
         self.new_season_batting_data = self.batting_data.copy()
         self.new_season_batting_data[self.numeric_bcols] = 0
-        self.new_season_batting_data[['Total_OB', 'Total_Outs']] = 0  # zero out calculated fields
+        self.new_season_batting_data[['Total_OB', 'Total_Outs', 'Injured List']] = 0  # zero out calculated fields
+        self.new_season_batting_data['Condition'] = 100
         self.new_season_batting_data.drop(['Total_OB', 'Total_Outs'], axis=1)
         self.new_season_batting_data['Season'] = str(self.new_season)
         self.new_season_batting_data['Age'] = self.new_season_batting_data['Age'] + 1  # everyone is a year older
@@ -186,13 +189,13 @@ class BaseballStats:
         self.new_season_batting_data['Injured List'] = self.new_season_batting_data.\
             apply(lambda x: 0 if self.rnd() > self.batting_injury_odds_for_season else
                   self.rnd() * self.batting_injury_avg_len + self.batting_injury_avg_len / 2, axis=1)
-        print(self.new_season_pitching_data[self.new_season_pitching_data['Injured List'] > 0].to_string())
+        # print(self.new_season_pitching_data[self.new_season_pitching_data['Injured List'] > 0].to_string())
         return
 
     def new_game_day(self):
         self.is_injured()
         self.new_season_pitching_data['Condition'] = self.new_season_pitching_data['Condition'] \
-                                                     + self.condition_change_per_day
+            + self.condition_change_per_day
         self.new_season_pitching_data['Condition'] = self.new_season_pitching_data['Condition'].clip(lower=0, upper=100)
         self.new_season_pitching_data['Injured List'] = self.new_season_pitching_data['Injured List'] - 1
         self.new_season_pitching_data['Injured List'] = self.new_season_pitching_data['Injured List'].clip(lower=0)
@@ -223,14 +226,14 @@ class BaseballStats:
         teams.append('')  # add blank team for totals
         df = self.new_season_batting_data.copy().sort_values(by='OPS', ascending=False)  # take copy to add totals
         df = team_batting_totals(df, team_name='', concat=True)
-        df = remove_non_print_cols(df, False)
+        df = remove_non_print_cols(df)
         if summary_only_b:
             df = df.tail(1)
         print(df[df['Team'].isin(teams)].to_string(justify='right'))
         print('\n\n')
         df = self.new_season_pitching_data.copy().sort_values(by='ERA', ascending=True)
         df = team_pitching_totals(df, team_name='', concat=True)
-        df = remove_non_print_cols(df, True)
+        df = remove_non_print_cols(df)
         df = df.reindex(['Player', 'Team', 'Age', 'G', 'GS', 'CG', 'SHO', 'IP', 'AB', 'H', '2B', '3B', 'ER', 'K', 'BB',
                          'HR', 'W', 'L', 'SV', 'BS', 'HLD', 'ERA', 'WHIP', 'AVG', 'OBP', 'SLG', 'OPS',
                          'Condition', 'Injured', 'Injured List'], axis=1)
@@ -245,14 +248,14 @@ class BaseballStats:
         teams.append('')  # add blank team for totals
         df = self.batting_data.copy().sort_values(by='OPS', ascending=False)  # take copy to add totals
         df = team_batting_totals(df, team_name='', concat=True)
-        df = remove_non_print_cols(df, False)
+        df = remove_non_print_cols(df)
         if summary_only_b:
             df = df.tail(1)
         print(df[df['Team'].isin(teams)].to_string(justify='right'))
         print('\n\n')
         df = self.pitching_data.copy().sort_values(by='ERA', ascending=True)
         df = team_pitching_totals(df, team_name='', concat=True)
-        df = remove_non_print_cols(df, True)
+        df = remove_non_print_cols(df)
         df = df.reindex(['Player', 'Team', 'Age', 'G', 'GS', 'CG', 'SHO', 'IP', 'AB', 'H', '2B', '3B', 'ER', 'K', 'BB',
                          'HR', 'W', 'L', 'SV', 'BS', 'HLD', 'ERA', 'WHIP', 'AVG', 'OBP', 'SLG', 'OPS',
                          'Condition', 'Injured', 'Injured List'], axis=1)
@@ -263,11 +266,15 @@ class BaseballStats:
 
 
 # static function start
-def remove_non_print_cols(df_input, bpitchers=False):
-    if bpitchers:
-        df = df_input.drop(['Season', 'Total_OB', 'AVG_faced', 'Game_Fatigue_Factor'], axis=1)
-    else:
-        df = df_input.drop(['Season', 'Total_OB', 'Total_Outs', 'Game_Fatigue_Factor'], axis=1)
+def remove_non_print_cols(df):
+    non_print_cols = ['Season', 'Total_OB', 'AVG_faced', 'Total_Outs', 'Game_Fatigue_Factor']
+    cols_to_drop = []
+    df_columns = df.columns
+    for non_print_col in non_print_cols:
+        if non_print_col in df_columns:
+            cols_to_drop.append(non_print_col)
+    if len(cols_to_drop) > 0:
+        df = df.drop(cols_to_drop, axis=1)
     return df
 
 
@@ -352,7 +359,7 @@ if __name__ == '__main__':
     print(*baseball_data.pitching_data.columns)
     print(*baseball_data.batting_data.columns)
     print(baseball_data.batting_data.Team.unique())
-    #teams = ['CHC', 'CIN', 'COL', 'MIL', 'PIT', 'STL']  # included COL for balance in scheduling
+    # teams = ['CHC', 'CIN', 'COL', 'MIL', 'PIT', 'STL']  # included COL for balance in scheduling
     teams = list(baseball_data.batting_data.Team.unique())
-    baseball_data.print_prior_season(teams=teams)
+    baseball_data.print_prior_season(teams=['SD'])
     # print(baseball_data.new_season_pitching_data.to_string())

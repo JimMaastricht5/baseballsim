@@ -95,7 +95,6 @@ class Team:
         self.starting_pitchers = self.pitchers.sort_values('GS', ascending=False).head(5)  # starting 5
         self.pitching = self.starting_pitchers.iloc[[self.game_num % self.rotation_len]]  # grab the nth row dbl []-> df
         self.cur_pitcher_index = self.pitching.index[0]  # pitcher rotates based on selection above
-        self.starting_pitchers = self.starting_pitchers.drop(self.cur_pitcher_index, axis=0)  # remove player from avail
         self.pitching_new_season = self.baseball_data.new_season_pitching_data.loc[self.cur_pitcher_index].to_frame().T
         # self.pitching_new_season.drop(['Season', 'Total_OB', 'Total_Outs'], axis=1, inplace=True)
         return
@@ -148,17 +147,17 @@ class Team:
             self.pitching = self.middle_relievers.loc[self.cur_pitcher_index]  # should be a series
             self.box_score.add_pitcher_to_box(self.middle_relievers.loc[self.cur_pitcher_index])
             self.middle_relievers = self.middle_relievers.drop(self.cur_pitcher_index, axis=0)  # remove from pen
-        elif len(self.relievers) == 0 and len(self.relievers) == 0 and len(self.starting_pitchers) > 0:  # grab someone
-            # print(f'gameteam.py out of pitching in inning {inning}!')
-            # print(self.starting_pitchers.to_string())
-            # print(self.relievers.to_string())
-            # print(self.middle_relievers.to_string())
-            # print(self.pitchers.to_string())
-            self.cur_pitcher_index = self.starting_pitchers.index[0]
-            self.pitching = self.starting_pitchers.loc[0]  # grab any pitcher because we're out!
-            self.box_score.add_pitcher_to_box(self.starting_pitchers.loc[self.cur_pitcher_index])
-            self.starting_pitchers = self.starting_pitchers.drop(self.cur_pitcher_index, axis=0)  # remove from pen
-            # raise Exception('no pitching!')
+        # elif len(self.relievers) == 0 and len(self.relievers) == 0 and len(self.starting_pitchers) > 0:  # grab someone
+        #     # print(f'gameteam.py out of pitching in inning {inning}!')
+        #     # print(self.starting_pitchers.to_string())
+        #     # print(self.relievers.to_string())
+        #     # print(self.middle_relievers.to_string())
+        #     # print(self.pitchers.to_string())
+        #     self.cur_pitcher_index = self.starting_pitchers.index[0]
+        #     self.pitching = self.starting_pitchers.loc[0]  # grab any pitcher because we're out!
+        #     self.box_score.add_pitcher_to_box(self.starting_pitchers.loc[self.cur_pitcher_index])
+        #     self.starting_pitchers = self.starting_pitchers.drop(self.cur_pitcher_index, axis=0)  # remove from pen
+        #     # raise Exception('no pitching!')
         else:  # no change
             pass
         return self.cur_pitcher_index

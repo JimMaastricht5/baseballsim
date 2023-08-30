@@ -35,6 +35,7 @@ class Game:
                              [9, '', '']]  # inning 1, away, home score
         self.inning = [1, 1]
         self.batting_num = [1, 1]
+        self.prior_batter_num = [1, 1]  # used for extra inning runners
         self.pitching_num = [0, 0]
         self.outs = 0
         self.top_bottom = 0  # zero is top offset, 1 is bottom offset
@@ -115,6 +116,14 @@ class Game:
                 print(f'\t{pitching.Player} has entered the game for {self.team_names[self.team_pitching()]}')
         return pitch_switch
 
+    def extra_innings(self, chatty=False):
+        # ignores player name, is already in lookup table if he was the last batter / out
+        if self.inning[self.team_hitting()] > 9:
+            self.bases.add_runner_to_base(base_num=2, batter_num=self.prior_batter_num[self.team_hitting()])
+        if chatty:
+            self.bases.describe_runners()
+        return
+
     def sim_ab(self, chatty=True):
         cur_pitcher_index = self.teams[self.team_pitching()].cur_pitcher_index
         pitching = self.teams[self.team_pitching()].cur_pitcher_stats()  # data for pitcher
@@ -136,7 +145,6 @@ class Game:
         self.teams[self.team_pitching()].box_score.pitching_result(cur_pitcher_index, self.outcomes, pitching.Condition)
         self.teams[self.team_hitting()].box_score.batting_result(cur_batter_index, self.outcomes,
                                                                  self.bases.player_scored)
-
         if chatty:
             out_text = 'Out' if self.outs <= 1 else 'Outs'
             print(f'Pitcher: {pitching.Player} against '
@@ -150,6 +158,7 @@ class Game:
         top_or_bottom = 'top' if self.top_bottom == 0 else 'bottom'
         if chatty:
             print(f'\nStarting the {top_or_bottom} of inning {self.inning[self.team_hitting()]}.')
+        self.extra_innings(chatty=chatty)  # set runner on second if it is extra innings
         while self.outs < 3:
             # check for pitching change due to fatigue or game sit
             pitch_switch = self.pitching_sit(self.teams[self.team_pitching()].cur_pitcher_stats(),
@@ -167,6 +176,7 @@ class Game:
                       f' {self.team_names[1]} {self.total_score[1]}')  # ?? need to handle walk offs...
             if self.bases.count_runners() >= 1 and self.outs < 3 and chatty:  # leave out the batter to check for runner
                 print(f'\t{self.bases.describe_runners()}')
+            self.prior_batter_num[self.team_hitting()] = self.batting_num[self.team_hitting()]
             self.batting_num[self.team_hitting()] = self.batting_num[self.team_hitting()] + 1 \
                 if (self.batting_num[self.team_hitting()] + 1) <= 9 else 1  # wrap around lineup
 

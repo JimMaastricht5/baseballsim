@@ -45,13 +45,20 @@ class Bases:
         return 1  # advance remaining runners and batter on an GB FC one base
 
     def new_ab(self, batter_num=1, player_name=''):
-        self.baserunners[0] = batter_num  # put a player ab
-        self.baserunners_names[batter_num] = player_name  # add player name to lookup table
+        self.add_runner_to_base(0, batter_num, player_name)
+        # self.baserunners[0] = batter_num  # put a player ab
+        # self.baserunners_names[batter_num] = player_name  # add player name to lookup table
         if batter_num == 0:
             print(self.baserunners_names)
             raise ValueError('bbbaserunners.py, new_ab, zero value baserunner index.  must be non-zero')
         self.player_scored = {}  # key to not double counting runs
         self.runs_scored = 0
+        return
+
+    def add_runner_to_base(self, base_num, batter_num, player_name=''):
+        self.baserunners[base_num] = batter_num
+        if player_name != '':
+            self.baserunners_names[batter_num] = player_name  # add name to look up table
         return
 
     def clear_bases(self):

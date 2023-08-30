@@ -144,8 +144,8 @@ if __name__ == '__main__':
     # bbseason23.sim_season(season_chatty=False, season_print_lineup_b=False, season_print_box_score_b=False)
 
     # full season
-    num_games = 3
-    team_to_follow = ''  # or MIL
+    num_games = 162
+    team_to_follow = 'MIL'  # '' or 'MIL'
     bbseason23 = BaseballSeason(load_seasons=seasons, new_season=2023,
                                 season_length_limit=num_games,
                                 min_games=num_games, series_length=3, rotation_len=5, only_nl_b=True)

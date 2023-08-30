@@ -148,7 +148,7 @@ class Team:
             self.pitching = self.middle_relievers.loc[self.cur_pitcher_index]  # should be a series
             self.box_score.add_pitcher_to_box(self.middle_relievers.loc[self.cur_pitcher_index])
             self.middle_relievers = self.middle_relievers.drop(self.cur_pitcher_index, axis=0)  # remove from pen
-        elif len(self.relievers) == 0 and len(self.relievers) == 0:
+        elif len(self.relievers) == 0 and len(self.relievers) == 0 and len(self.starting_pitchers) > 0:  # grab someone
             # print(f'gameteam.py out of pitching in inning {inning}!')
             # print(self.starting_pitchers.to_string())
             # print(self.relievers.to_string())

@@ -35,7 +35,8 @@ class Game:
                              [9, '', '']]  # inning 1, away, home score
         self.inning = [1, 1]
         self.batting_num = [1, 1]
-        self.prior_batter_num = [1, 1]  # used for extra inning runners
+        self.prior_batter_out_num = [1, 1]  # used for extra inning runners
+        self.prior_batter_out_name = ['', '']  # used for extra innings
         self.pitching_num = [0, 0]
         self.outs = 0
         self.top_bottom = 0  # zero is top offset, 1 is bottom offset
@@ -83,7 +84,8 @@ class Game:
             self.winning_pitcher = self.teams[self.team_hitting()].is_pitching_index()
             self.losing_pitcher = self.teams[self.team_pitching()].is_pitching_index()
 
-        self.total_score[self.team_hitting()] += self.bases.runs_scored  # update total score
+        # self.total_score[self.team_hitting()] += self.bases.runs_scored  # update total score
+        self.total_score[self.team_hitting()] += number_of_runs  # update total score
         return
 
     def print_inning_score(self):
@@ -101,7 +103,7 @@ class Game:
         print('')
         return
 
-    def pitching_sit(self, pitching, pitch_switch, chatty=True):
+    def pitching_sit(self, pitching, pitch_switch):
         # switch pitchers based on fatigue or close game
         # close game is hitting inning >= 7 and, pitching team winning or tied and runners on = save sit
         # if switch due to save or close game, don't switch again in same inning
@@ -111,20 +113,28 @@ class Game:
             pitching = self.teams[self.team_pitching()].cur_pitcher_stats()  # data for new pitcher
             pitch_switch = True
             self.is_save_sit[self.team_pitching()] = self.save_sit()
-            if chatty:
+            if self.chatty:
                 print(f'\tManager has made the call to the bull pen.  Pitching change....')
                 print(f'\t{pitching.Player} has entered the game for {self.team_names[self.team_pitching()]}')
         return pitch_switch
 
-    def extra_innings(self, chatty=False):
+    def is_extra_innings(self):
+        # if self.inning[self.team_hitting()] > 9:
+        #     print(f'in extra innings bbgame.py {self.inning} {self.total_score}')
+        return self.inning[self.team_hitting()] > 9
+
+    def extra_innings(self):
         # ignores player name, is already in lookup table if he was the last batter / out
-        if self.inning[self.team_hitting()] > 9:
-            self.bases.add_runner_to_base(base_num=2, batter_num=self.prior_batter_num[self.team_hitting()])
-        if chatty:
-            self.bases.describe_runners()
+        if self.is_extra_innings():
+            self.chatty = True
+            # print(f'in extra_innings bbgame.py {self.prior_batter_out_name, self.prior_batter_out_num}')
+            self.bases.add_runner_to_base(base_num=2, batter_num=self.prior_batter_out_num[self.team_hitting()],
+                                          player_name=self.prior_batter_out_name[self.team_hitting()])
+        if self.chatty:
+            print(f'Extra innings: {self.prior_batter_out_name[self.team_hitting()]} will start at 2nd base.'
         return
 
-    def sim_ab(self, chatty=True):
+    def sim_ab(self):
         cur_pitcher_index = self.teams[self.team_pitching()].cur_pitcher_index
         pitching = self.teams[self.team_pitching()].cur_pitcher_stats()  # data for pitcher
         pitching.Game_Fatigue_Factor, cur_percentage = \
@@ -145,28 +155,31 @@ class Game:
         self.teams[self.team_pitching()].box_score.pitching_result(cur_pitcher_index, self.outcomes, pitching.Condition)
         self.teams[self.team_hitting()].box_score.batting_result(cur_batter_index, self.outcomes,
                                                                  self.bases.player_scored)
-        if chatty:
+        if self.chatty:
             out_text = 'Out' if self.outs <= 1 else 'Outs'
             print(f'Pitcher: {pitching.Player} against '
                   f'{self.team_names[self.team_hitting()]} batter #'
                   f'{self.batting_num[self.team_hitting()]}. {batting.Player} \n'
                   f'\t {self.outcomes.score_book_cd}, {self.outs} {out_text}')
+
+        self.prior_batter_out_name[self.team_hitting()] = batting.Player
+        self.prior_batter_out_num[self.team_hitting()] = cur_batter_index
         return pitching, batting
 
-    def sim_half_inning(self, chatty=True):
+    def sim_half_inning(self):
         pitch_switch = False  # did we switch pitchers this inning, don't sub if closer came in
         top_or_bottom = 'top' if self.top_bottom == 0 else 'bottom'
-        if chatty:
+        if self.chatty:
             print(f'\nStarting the {top_or_bottom} of inning {self.inning[self.team_hitting()]}.')
-        self.extra_innings(chatty=chatty)  # set runner on second if it is extra innings
+        self.extra_innings()  # set runner on second if it is extra innings
         while self.outs < 3:
             # check for pitching change due to fatigue or game sit
             pitch_switch = self.pitching_sit(self.teams[self.team_pitching()].cur_pitcher_stats(),
-                                             pitch_switch=pitch_switch, chatty=chatty)
-            __pitching, __batting = self.sim_ab(chatty)  # resolve ab
+                                             pitch_switch=pitch_switch)
+            __pitching, __batting = self.sim_ab()  # resolve ab
             if self.bases.runs_scored > 0:  # did a run score?
                 self.update_inning_score(number_of_runs=self.bases.runs_scored)
-            if self.bases.runs_scored > 0 and chatty:
+            if self.bases.runs_scored > 0 and self.chatty:
                 players = ''
                 for player_id in self.bases.player_scored.keys():
                     players = players + ', ' + self.bases.player_scored[player_id] if players != '' \
@@ -174,16 +187,18 @@ class Game:
                 print(f'\tScored {self.bases.runs_scored} run(s)!  ({players})\n'
                       f'\tThe score is {self.team_names[0]} {self.total_score[0]} to'
                       f' {self.team_names[1]} {self.total_score[1]}')  # ?? need to handle walk offs...
-            if self.bases.count_runners() >= 1 and self.outs < 3 and chatty:  # leave out the batter to check for runner
+            if self.bases.count_runners() >= 1 and self.outs < 3 and self.chatty:  # leave out batter check for runner
                 print(f'\t{self.bases.describe_runners()}')
-            self.prior_batter_num[self.team_hitting()] = self.batting_num[self.team_hitting()]
             self.batting_num[self.team_hitting()] = self.batting_num[self.team_hitting()] + 1 \
                 if (self.batting_num[self.team_hitting()] + 1) <= 9 else 1  # wrap around lineup
+            # check for walk off
+            if self.is_extra_innings() and self.total_score[AWAY] < self.total_score[HOME]:
+                break  # end the half inning
 
         # half inning over
         self.update_inning_score(number_of_runs=0)  # push a zero on the board if no runs score this half inning
         self.bases.clear_bases()
-        if chatty:
+        if self.chatty:
             print('')  # add a blank line for verbose output
             print(f'Completed {top_or_bottom} half of inning {self.inning[self.team_hitting()]}. '
                   f'The score is {self.team_names[0]} {self.total_score[0]} to {self.team_names[1]} '
@@ -195,9 +210,9 @@ class Game:
         return
 
     def is_game_end(self):
-        return False if self.inning[0] <= 9 or self.inning[1] <= 8 or \
-                        (self.inning[0] != self.inning[1] and self.total_score[0] >= self.total_score[1]) \
-                        or self.total_score[0] == self.total_score[1] else True
+        return False if self.inning[AWAY] <= 9 or self.inning[HOME] <= 8 or \
+                        (self.inning[AWAY] != self.inning[HOME] and self.total_score[AWAY] >= self.total_score[HOME]) \
+                        or self.total_score[AWAY] == self.total_score[HOME] else True
 
     def win_loss_record(self):
         home_win = 0 if self.total_score[0] > self.total_score[1] else 1
@@ -221,7 +236,7 @@ class Game:
             self.print_box_score_b = True
 
         while self.is_game_end() is False:
-            self.sim_half_inning(chatty=self.chatty)
+            self.sim_half_inning()
 
         self.win_loss_record()
         self.teams[AWAY].box_score.totals()

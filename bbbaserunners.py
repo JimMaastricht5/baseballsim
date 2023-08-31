@@ -9,7 +9,7 @@ import numpy as np
 class Bases:
     def __init__(self):
         self.baserunners = None
-        self.baserunners_names = None
+        self.baserunners_names = {}
         self.player_scored = None
         self.clear_bases()  # initialize bases to no runners
         self.runs_scored = 0
@@ -84,7 +84,6 @@ class Bases:
         return
 
     def is_runner_on_base_num(self, base_num):
-        # print(f'is_runner_on_first {self.baserunners}, {self.baserunners[1] == 1}')
         return self.baserunners[base_num] != 0
 
     def tag_up(self, outs):
@@ -104,11 +103,8 @@ class Bases:
         return
 
     def push_a_runner(self, basenum_from, basenum_to):
-        # print(f'bbbaserunners.py push_a_runner {basenum_from}m {basenum_to}')
         if self.is_runner_on_base_num(basenum_to):
             self.push_a_runner(basenum_from + 1, basenum_to + 1)
-
-        # print(f'moving runner from {basenum_from}, {basenum_to}')
         self.move_a_runner(basenum_from, basenum_to)
         return
 

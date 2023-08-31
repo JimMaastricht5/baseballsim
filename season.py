@@ -145,7 +145,7 @@ if __name__ == '__main__':
 
     # full season
     num_games = 162
-    team_to_follow = 'MIL'  # '' or 'MIL'
+    team_to_follow = ''  # 'MIL'
     bbseason23 = BaseballSeason(load_seasons=seasons, new_season=2023,
                                 season_length_limit=num_games,
                                 min_games=num_games, series_length=3, rotation_len=5, only_nl_b=True)

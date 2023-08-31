@@ -131,7 +131,7 @@ class Game:
             self.bases.add_runner_to_base(base_num=2, batter_num=self.prior_batter_out_num[self.team_hitting()],
                                           player_name=self.prior_batter_out_name[self.team_hitting()])
         if self.chatty:
-            print(f'Extra innings: {self.prior_batter_out_name[self.team_hitting()]} will start at 2nd base.'
+            print(f'Extra innings: {self.prior_batter_out_name[self.team_hitting()]} will start at 2nd base.')
         return
 
     def sim_ab(self):

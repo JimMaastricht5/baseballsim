@@ -126,7 +126,7 @@ class Game:
     def extra_innings(self):
         # ignores player name, is already in lookup table if he was the last batter / out
         if self.is_extra_innings():
-            self.chatty = True
+            # self.chatty = True
             # print(f'in extra_innings bbgame.py {self.prior_batter_out_name, self.prior_batter_out_num}')
             self.bases.add_runner_to_base(base_num=2, batter_num=self.prior_batter_out_num[self.team_hitting()],
                                           player_name=self.prior_batter_out_name[self.team_hitting()])

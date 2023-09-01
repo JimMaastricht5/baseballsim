@@ -11,7 +11,6 @@ class Team:
         self.baseball_data = baseball_data
         self.pitchers = baseball_data.pitching_data[baseball_data.pitching_data["Team"] == team_name]
         self.pos_players = baseball_data.batting_data[baseball_data.batting_data["Team"] == team_name]
-        # baseball_data.print_current_season()
 
         self.lineup = None  # uses prior season stats
         self.lineup_new_season = None  # new / current season stats for printing starting lineup
@@ -42,7 +41,6 @@ class Team:
         self.set_starting_rotation()
         self.set_closers()
         self.set_mid_relief()
-        # self.set_unavailable()
         if show_lineup:
             self.print_starting_lineups(current_season_stats=current_season_stats)
         self.box_score = teamgameboxstats.TeamBoxScore(self.lineup, self.pitching, self.team_name)
@@ -66,8 +64,6 @@ class Team:
         ops_index = self.insert_player_in_lineup(lineup_list=ops_index, player_index=slg_index[1], target_pos=5)  # 5th
         self.lineup = self.pos_players.loc[ops_index]
         self.lineup_new_season = self.baseball_data.new_season_batting_data.loc[ops_index]  # get the new season stats
-        # self.lineup_new_season = bbstats.remove_non_print_cols(self.lineup_new_season, False)
-        # self.lineup_new_season.drop(['Season', 'Total_OB', 'Total_Outs'], axis=1, inplace=True)
         for row_num in range(0, len(self.lineup)):  # set up battering order in lineup card by index
             self.cur_lineup_index.append(self.lineup.index[row_num])
             player_index = self.lineup.index[row_num]  # grab the index of the player and set pos for game
@@ -77,18 +73,14 @@ class Team:
     def insert_player_in_lineup(self, lineup_list, player_index, target_pos):
         # target pos is position in line up not pos in life, works if you insert from front to back
         # so dont insert at pos 3 or pos 4 or it will shift pos 4 to pos 5
-        # print(f'Insert player: {player_index} into {target_pos - 1} with current lineup {lineup_list}')
         lineup_list.insert(target_pos - 1, player_index)
-        # print(f'Inserted player: {player_index} into {target_pos - 1} with current lineup {lineup_list}')
         return lineup_list
 
     def move_player_in_lineup(self, lineup_list, player_index, target_pos):
         # target pos is position in line up not pos in life
         # note this will shift the lineup back at that pos
-        # print(f'Move player: {player_index} into {target_pos - 1} with current lineup {lineup_list}')
         lineup_list.remove(player_index)
         lineup_list.insert(target_pos - 1, player_index)
-        # print(f'Moved player: {player_index} into {target_pos - 1} with current lineup {lineup_list}')
         return lineup_list
 
     def set_starting_rotation(self):
@@ -96,13 +88,11 @@ class Team:
         self.pitching = self.starting_pitchers.iloc[[self.game_num % self.rotation_len]]  # grab the nth row dbl []-> df
         self.cur_pitcher_index = self.pitching.index[0]  # pitcher rotates based on selection above
         self.pitching_new_season = self.baseball_data.new_season_pitching_data.loc[self.cur_pitcher_index].to_frame().T
-        # self.pitching_new_season.drop(['Season', 'Total_OB', 'Total_Outs'], axis=1, inplace=True)
         return
 
     def cur_pitcher_stats(self):
         if isinstance(self.pitching, pd.Series) is not pd.Series:  # this should never happen
             self.pitching = self.pitching.squeeze()
-        # print(self.pitching)
         return self.pitching  # should be a series with a single row
 
     def set_pitching_condition(self, percent_of_max):
@@ -127,8 +117,6 @@ class Team:
         cur_percentage = cur_game_faced / avg_faced * 100
         if cur_percentage >= self.fatigue_start_perc:
             in_game_fatigue = (cur_percentage - self.fatigue_start_perc) * self.fatigue_rate
-        # print(f'bbgame.update_fatigue current game:{cur_game_faced} avg_batters_faced:{avg_faced}')
-        # print(f'current %:{cur_percentage} in game fatigue:{in_game_fatigue}')
         self.set_pitching_condition(cur_percentage)
         return in_game_fatigue, cur_percentage  # obp impact to pitcher of fatigue
 
@@ -163,9 +151,6 @@ class Team:
         return self.cur_pitcher_index
 
     def is_pitcher_fatigued(self, condition):
-        # print(self.cur_pitcher_stats())
-        # print(self.cur_pitcher_stats().Condition <= self.fatigue_pitching_change_limit)
-        # return self.cur_pitcher_stats().Condition <= self.fatigue_pitching_change_limit
         return condition <= self.fatigue_pitching_change_limit
 
     def set_closers(self):
@@ -193,7 +178,6 @@ class Team:
         df_criteria = exhausted | injured
         self.unavailable_pitchers = self.pitchers[df_criteria].sort_values('IP', ascending=False)
         print('gameteam.py set unavailable due to fatigue or injury....')
-        # print(self.unavailable_pitchers.to_string())
         return
 
     def search_for_pos(self, position, lineup_index_list, stat_criteria='OPS'):
@@ -210,7 +194,6 @@ class Team:
         # find players in lineup, sort by stat descending to find the best
         df_criteria = self.pos_players.index.isin(lineup_index_list) & ~self.pos_players.index.isin(exclude)
         stat_index = self.pos_players[df_criteria].sort_values(stat_criteria, ascending=False).head(count).index
-        # print(f'best at stat: {stat_criteria}, {stat_index}')
         return list(stat_index)
 
     def print_starting_lineups(self, current_season_stats=True):

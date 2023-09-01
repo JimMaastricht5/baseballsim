@@ -51,7 +51,8 @@ class BaseballStats:
 
     def injured_list(self, idays):
         # mlb is 10 for pos min, 15 for pitcher min, and 60 day
-        return '10 Day DL' if idays <= 10 else '15 Day DL' if idays <= 15 else '60 Day DL'
+        return 'Healthy' if idays == 0 else \
+            '10 Day DL' if idays <= 10 else '15 Day DL' if idays <= 15 else '60 Day DL'
 
     def get_seasons(self):
         if self.pitching_data is None or self.batting_data is None:  # need to read data... else skip as cached

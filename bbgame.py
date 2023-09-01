@@ -84,7 +84,6 @@ class Game:
             self.winning_pitcher = self.teams[self.team_hitting()].is_pitching_index()
             self.losing_pitcher = self.teams[self.team_pitching()].is_pitching_index()
 
-        # self.total_score[self.team_hitting()] += self.bases.runs_scored  # update total score
         self.total_score[self.team_hitting()] += number_of_runs  # update total score
         return
 
@@ -119,15 +118,11 @@ class Game:
         return pitch_switch
 
     def is_extra_innings(self):
-        # if self.inning[self.team_hitting()] > 9:
-        #     print(f'in extra innings bbgame.py {self.inning} {self.total_score}')
         return self.inning[self.team_hitting()] > 9
 
     def extra_innings(self):
         # ignores player name, is already in lookup table if he was the last batter / out
         if self.is_extra_innings():
-            # self.chatty = True
-            # print(f'in extra_innings bbgame.py {self.prior_batter_out_name, self.prior_batter_out_num}')
             self.bases.add_runner_to_base(base_num=2, batter_num=self.prior_batter_out_num[self.team_hitting()],
                                           player_name=self.prior_batter_out_name[self.team_hitting()])
         if self.chatty:
@@ -241,7 +236,7 @@ class Game:
         self.win_loss_record()
         self.teams[AWAY].box_score.totals()
         self.teams[HOME].box_score.totals()
-        if self.print_box_score_b or abs(self.total_score[1] - self.total_score[0]) > 10:  # to print or not to print...
+        if self.print_box_score_b: # print or not to print...
             self.teams[AWAY].box_score.print_boxes()
             self.teams[HOME].box_score.print_boxes()
         print('Final:')
@@ -271,11 +266,7 @@ if __name__ == '__main__':
             team0_season_df['Player'] = game.teams[AWAY].box_score.box_batting['Player']
             team0_season_df['Team'] = game.teams[AWAY].box_score.box_batting['Team']
             team0_season_df['Pos'] = game.teams[AWAY].box_score.box_batting['Pos']
-        # print(f'Code to test inning box, Score was: {score[0]} to {score[1]}')
         print('')
         print(f'{away_team} season : {season_win_loss[0][0]} W and {season_win_loss[0][1]} L')
         print(f'{home_team} season : {season_win_loss[1][0]} W and {season_win_loss[1][1]} L')
 
-    # team0_season_df = bbstats.team_batting_stats(team0_season_df)
-    # print(team0_season_df.to_string(index=False, justify='center'))
-    # end season

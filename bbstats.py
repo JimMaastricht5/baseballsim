@@ -206,10 +206,8 @@ class BaseballStats:
 
         self.new_season_pitching_data['Status'] = \
             self.new_season_pitching_data['Injured Days'].apply(self.injured_list)
-            # self.new_season_pitching_data['Injured Days'].apply(lambda x: 'Injured' if x > 0 else 'Healthy')
         self.new_season_batting_data['Status'] = \
             self.new_season_batting_data['Injured Days'].apply(self.injured_list)
-            # self.new_season_batting_data['Injured Days'].apply(lambda x: 'Injured' if x > 0 else 'Healthy')
 
         if self.new_season_pitching_data[self.new_season_pitching_data["Injured Days"] > 0].shape[0] > 0:
             df = self.new_season_pitching_data[self.new_season_pitching_data["Injured Days"] > 0]
@@ -244,8 +242,18 @@ class BaseballStats:
             team_batting_stats(self.new_season_batting_data[self.new_season_batting_data['AB'] > 0].fillna(0))
 
     def print_current_season(self, teams=['MIL'], summary_only_b=False):
+        self.print_season(self.new_season_batting_data, self.new_season_pitching_data, teams=teams,
+                          summary_only_b=summary_only_b)
+        return
+
+    def print_prior_season(self, teams=['MIN'], summary_only_b=False):
+        self.print_season(self.batting_data, self.pitching_data, teams=teams,
+                          summary_only_b=summary_only_b)
+        return
+
+     def print_season(self, df_b, df_p, teams=['MIL'], summary_only_b=False):
         teams.append('')  # add blank team for totals
-        df = self.new_season_batting_data.copy().sort_values(by='OPS', ascending=False)  # take copy to add totals
+        df = df_b.copy().sort_values(by='OPS', ascending=False)  # take copy to add totals
         if summary_only_b:
             df = df.tail(1)
         else:
@@ -254,7 +262,7 @@ class BaseballStats:
         print(df[self.bcols_to_print].to_string(justify='right'))
         print('\n\n')
 
-        df = self.new_season_pitching_data.copy().sort_values(by='ERA', ascending=True)
+        df = df_p.copy().sort_values(by='ERA', ascending=True)
         if summary_only_b:
             df = df.tail(1)
         else:
@@ -262,27 +270,6 @@ class BaseballStats:
             df = df[df['Team'].isin(teams)]
         print(df[self.pcols_to_print].to_string(justify='right'))
         return
-
-    def print_prior_season(self, teams=['MIN'], summary_only_b=False):
-        teams.append('')  # add blank team for totals
-        df = self.batting_data.copy().sort_values(by='OPS', ascending=False)  # take copy to add totals
-        df = team_batting_totals(df, team_name='', concat=True)
-        df = remove_non_print_cols(df)
-        if summary_only_b:
-            df = df.tail(1)
-        print(df[df['Team'].isin(teams)].to_string(justify='right'))
-        print('\n\n')
-        df = self.pitching_data.copy().sort_values(by='ERA', ascending=True)
-        df = team_pitching_totals(df, team_name='', concat=True)
-        df = remove_non_print_cols(df)
-        df = df.reindex(['Player', 'Team', 'Age', 'G', 'GS', 'CG', 'SHO', 'IP', 'AB', 'H', '2B', '3B', 'ER', 'K', 'BB',
-                         'HR', 'W', 'L', 'SV', 'BS', 'HLD', 'ERA', 'WHIP', 'AVG', 'OBP', 'SLG', 'OPS',
-                         'Condition', 'Status', 'Injured Days'], axis=1)
-        if summary_only_b:
-            df = df.tail(1)
-        print(df[df['Team'].isin(teams)].to_string(justify='right'))
-        return
-
 
 # static function start
 def remove_non_print_cols(df):

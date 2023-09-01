@@ -12,7 +12,12 @@ class BaseballStats:
                               'HBP']  # these cols will get added to running season total
         self.numeric_pcols = ['G', 'GS', 'CG', 'SHO', 'IP', 'AB', 'H', '2B', '3B', 'ER', 'K', 'BB', 'HR', 'W', 'L',
                               'SV', 'BS', 'HLD', 'Total_Outs']  # these cols will get added to running season total
-
+        self.pcols_to_print = ['Player', 'Team', 'Age', 'G', 'GS', 'CG', 'SHO', 'IP', 'H', '2B', '3B', 'ER', 'K',
+                               'BB', 'HR', 'W', 'L', 'SV', 'BS', 'HLD', 'ERA', 'WHIP', 'AVG', 'OBP', 'SLG', 'OPS',
+                               'Condition', 'Injured', 'Injured List']
+        self.bcols_to_print = ['Player', 'Team', 'Age', 'G', 'AB', 'R', 'H', '2B', '3B', 'HR', 'RBI',
+                               'SB', 'CS', 'BB', 'SO', 'SH', 'SF', 'HBP', 'AVG', 'OBP', 'SLG',
+                               'OPS', 'Condition', 'Injured', 'Injured List']
         self.nl = ['CHC', 'CIN', 'MIL', 'PIT', 'STL', 'ATL', 'MIA', 'NYM', 'PHI', 'WAS', 'AZ', 'COL', 'LA', 'SD', 'SF']
         self.only_nl_b = only_nl_b
         self.load_seasons = load_seasons  # list of seasons to load from csv files
@@ -236,23 +241,21 @@ class BaseballStats:
     def print_current_season(self, teams=['MIL'], summary_only_b=False):
         teams.append('')  # add blank team for totals
         df = self.new_season_batting_data.copy().sort_values(by='OPS', ascending=False)  # take copy to add totals
-        df = team_batting_totals(df, team_name='', concat=True)
-        df = remove_non_print_cols(df)
         if summary_only_b:
             df = df.tail(1)
-        print(df[df['Team'].isin(teams)].to_string(justify='right'))
+        else:
+            df = team_batting_totals(df, team_name='', concat=True)
+            df = df[df['Team'].isin(teams)]
+        print(df[self.bcols_to_print].to_string(justify='right'))
         print('\n\n')
+
         df = self.new_season_pitching_data.copy().sort_values(by='ERA', ascending=True)
-        df = team_pitching_totals(df, team_name='', concat=True)
-        df = remove_non_print_cols(df)
-        df = df.reindex(['Player', 'Team', 'Age', 'G', 'GS', 'CG', 'SHO', 'IP', 'AB', 'H', '2B', '3B', 'ER', 'K', 'BB',
-                         'HR', 'W', 'L', 'SV', 'BS', 'HLD', 'ERA', 'WHIP', 'AVG', 'OBP', 'SLG', 'OPS',
-                         'Condition', 'Injured', 'Injured List'], axis=1)
-        if 'Total_Outs' in df.columns:
-            df.drop(['Total_Outs'], axis=1, inplace=False)
         if summary_only_b:
             df = df.tail(1)
-        print(df[df['Team'].isin(teams)].to_string(justify='right'))
+        else:
+            df = team_pitching_totals(df, team_name='', concat=True)
+            df = df[df['Team'].isin(teams)]
+        print(df[self.pcols_to_print].to_string(justify='right'))
         return
 
     def print_prior_season(self, teams=['MIN'], summary_only_b=False):

@@ -117,13 +117,13 @@ class TeamBoxScore:
     def print_boxes(self):
         df = self.box_batting.reindex(['Player', 'Team', 'Pos', 'Age', 'G', 'AB', 'R', 'H', '2B', '3B', 'HR', 'RBI',
                                        'SB', 'CS', 'BB', 'SO', 'SH', 'SF', 'HBP', 'AVG', 'OBP', 'SLG', 'OPS',
-                                       'Condition', 'Injured'], axis=1)
+                                       'Condition', 'Status'], axis=1)
         print(df.to_string(index=False, justify='center'))
         print('')
         df = self.box_pitching.reindex(['Player', 'Team', 'Age', 'G', 'GS', 'CG', 'SHO', 'IP', 'AB', 'H', '2B', '3B',
                                         'ER', 'K', 'BB',
                                         'HR', 'W', 'L', 'SV', 'BS', 'HLD', 'ERA', 'WHIP', 'AVG', 'OBP', 'SLG', 'OPS',
-                                        'Condition', 'Injured'], axis=1)
+                                        'Condition', 'Status'], axis=1)
         # print(df.drop(['Total_Outs'], axis=1, inplace=False).to_string(index=False, justify='center'))
         print(df.to_string(index=False, justify='center'))
         print('')

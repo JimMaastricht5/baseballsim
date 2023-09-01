@@ -172,7 +172,7 @@ class Team:
         # grab top closers for setup and final close
         not_selected_criteria = ~self.pitchers.index.isin(self.starting_pitchers.index)
         not_exhausted = ~(self.pitchers['Condition'] <= self.fatigue_pitching_unavailable)
-        not_injured = (self.pitchers['Injured List'] == 0)
+        not_injured = (self.pitchers['Injured Days'] == 0)
         sv_criteria = self.pitchers.SV > 0
         df_criteria = not_selected_criteria & sv_criteria & not_exhausted & not_injured
         self.relievers = self.pitchers[df_criteria].sort_values('SV', ascending=False).head(2)
@@ -182,14 +182,14 @@ class Team:
         not_selected_criteria = ~self.pitchers.index.isin(self.starting_pitchers.index)
         not_reliever_criteria = ~self.pitchers.index.isin(self.relievers.index)
         not_exhausted = ~(self.pitchers['Condition'] <= self.fatigue_pitching_unavailable)
-        not_injured = (self.pitchers['Injured List'] == 0)
+        not_injured = (self.pitchers['Injured Days'] == 0)
         df_criteria = not_selected_criteria & not_reliever_criteria & not_exhausted & not_injured
         self.middle_relievers = self.pitchers[df_criteria].sort_values('IP', ascending=False)
         return
 
     def set_unavailable(self):
         exhausted = (self.pitchers['Condition'] > self.fatigue_pitching_unavailable)
-        injured = (self.pitchers['Injured List'] > 0)
+        injured = (self.pitchers['Injured Days'] > 0)
         df_criteria = exhausted | injured
         self.unavailable_pitchers = self.pitchers[df_criteria].sort_values('IP', ascending=False)
         print('gameteam.py set unavailable due to fatigue or injury....')

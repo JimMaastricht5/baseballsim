@@ -8,10 +8,10 @@ import numpy as np
 class BaseballStats:
     def __init__(self, load_seasons, new_season, random_data=False, only_nl_b=False):
         self.rnd = lambda: np.random.default_rng().uniform(low=0.0, high=1.001)  # random generator between 0 and 1
-        self.numeric_bcols = ['G', 'AB', 'R', 'H', '2B', '3B', 'HR', 'RBI', 'SB', 'CS', 'BB', 'SO', 'SH', 'SF', 'HBP',
-                              'AVG', 'OBP', 'SLG', 'OPS', 'Condition', 'Injured List']
+        self.numeric_bcols = ['G', 'AB', 'R', 'H', '2B', '3B', 'HR', 'RBI', 'SB', 'CS', 'BB', 'SO', 'SH', 'SF',
+                              'HBP']  # these cols will get added to running season total
         self.numeric_pcols = ['G', 'GS', 'CG', 'SHO', 'IP', 'AB', 'H', '2B', '3B', 'ER', 'K', 'BB', 'HR', 'W', 'L',
-                              'SV', 'BS', 'HLD', 'ERA', 'WHIP', 'Total_Outs', 'Condition', 'Injured List']
+                              'SV', 'BS', 'HLD', 'Total_Outs']  # these cols will get added to running season total
 
         self.nl = ['CHC', 'CIN', 'MIL', 'PIT', 'STL', 'ATL', 'MIA', 'NYM', 'PHI', 'WAS', 'AZ', 'COL', 'LA', 'SD', 'SF']
         self.only_nl_b = only_nl_b
@@ -33,9 +33,11 @@ class BaseballStats:
         # 26.3% of pitching injuries affect the throwing elbow results in avg of 74 days lost
         # position player (non-pitcher) longevitiy: https://www.nytimes.com/2007/07/15/sports/baseball/15careers.html
         self.condition_change_per_day = 20  # improve with rest
-        self.pitching_injury_odds_for_season = .275 / 162  # per game
+        self.pitching_injury_rate = .275  # 27.5 out of 100 players injured per season-> per game
+        self.pitching_injury_odds_for_season = 1 - (1 - self.pitching_injury_rate) ** (1/162)
         self.pitching_injury_avg_len = 74
-        self.batting_injury_odds_for_season = 87 / 634 / 162  # 2022 pos player count of 634
+        self.batting_injury_rate = .137  # 2022 87 out of 634 injured per season
+        self.batting_injury_odds_for_season = 1 - (1 - self.batting_injury_rate) ** (1/162)
         self.batting_injury_avg_len = 30  # made this up
         self.odds_of_survival_age_20 = .90  # 90 chance for a 20 year-old to play the following year
         self.odd_of_survival_additional_years = -.0328  # 3.28% decrease in survival, use to increase injury chance
@@ -174,22 +176,37 @@ class BaseballStats:
             new_row = batting_box_score.loc[index][numeric_cols] + self.new_season_batting_data.loc[index][numeric_cols]
             self.new_season_batting_data.loc[index, numeric_cols] = new_row
             self.new_season_batting_data.loc[index, 'Condition'] = batting_box_score.loc[index, 'Condition']
+            self.new_season_batting_data.loc[index, 'Injured List'] = batting_box_score.loc[index, 'Injured List']
         numeric_cols = self.numeric_pcols
         for index, row in pitching_box_score.iterrows():
             new_row = pitching_box_score.loc[index][numeric_cols] + \
                       self.new_season_pitching_data.loc[index][numeric_cols]
             self.new_season_pitching_data.loc[index, numeric_cols] = new_row
             self.new_season_pitching_data.loc[index, 'Condition'] = pitching_box_score.loc[index, 'Condition']
+            self.new_season_pitching_data.loc[index, 'Injured List'] = pitching_box_score.loc[index, 'Injured List']
         return
 
     def is_injured(self):
         self.new_season_pitching_data['Injured List'] = self.new_season_pitching_data.\
-            apply(lambda row: 0 if self.rnd() > self.pitching_injury_odds_for_season or row['Injured List'] > 0 else
-                  self.rnd() * self.pitching_injury_avg_len + self.pitching_injury_avg_len / 2, axis=1)
+            apply(lambda row: 0 if self.rnd() > self.pitching_injury_odds_for_season and row['Injured List'] == 0 else
+                  row['Injured List'] - 1 if row['Injured List'] > 0 else
+                  int(self.rnd() * self.pitching_injury_avg_len + self.pitching_injury_avg_len / 2), axis=1)
         self.new_season_batting_data['Injured List'] = self.new_season_batting_data.\
-            apply(lambda x: 0 if self.rnd() > self.batting_injury_odds_for_season else
-                  self.rnd() * self.batting_injury_avg_len + self.batting_injury_avg_len / 2, axis=1)
-        # print(self.new_season_pitching_data[self.new_season_pitching_data['Injured List'] > 0].to_string())
+            apply(lambda row: 0 if self.rnd() > self.batting_injury_odds_for_season and row['Injured List'] == 0 else
+                  row['Injured List'] - 1 if row['Injured List'] > 0 else
+                  int(self.rnd() * self.batting_injury_avg_len + self.batting_injury_avg_len / 2), axis=1)
+
+        self.new_season_pitching_data['Injured'] = \
+            self.new_season_pitching_data['Injured List'].apply(lambda x: 'Injured' if x > 0 else 'Healthy')
+        self.new_season_batting_data['Injured'] = \
+            self.new_season_batting_data['Injured List'].apply(lambda x: 'Injured' if x > 0 else 'Healthy')
+
+        if self.new_season_pitching_data[self.new_season_pitching_data["Injured List"] > 0].shape[0] > 0:
+            print(f'Pitching Injury List: '
+                  f'{(self.new_season_pitching_data[self.new_season_pitching_data["Injured List"] > 0].to_string())}\n')
+        if self.new_season_batting_data[self.new_season_batting_data["Injured List"] > 0].shape[0] > 0:
+            print(f'Pos Player Injury List: '
+                  f'{(self.new_season_batting_data[self.new_season_batting_data["Injured List"] > 0].to_string())}\n')
         return
 
     def new_game_day(self):
@@ -197,17 +214,11 @@ class BaseballStats:
         self.new_season_pitching_data['Condition'] = self.new_season_pitching_data['Condition'] \
             + self.condition_change_per_day
         self.new_season_pitching_data['Condition'] = self.new_season_pitching_data['Condition'].clip(lower=0, upper=100)
-        self.new_season_pitching_data['Injured List'] = self.new_season_pitching_data['Injured List'] - 1
-        self.new_season_pitching_data['Injured List'] = self.new_season_pitching_data['Injured List'].clip(lower=0)
-        self.new_season_pitching_data['Injured'] = \
-            self.new_season_pitching_data['Injured List'].apply(lambda x: 'Injured' if x > 0 else 'Healthy')
+        # self.new_season_pitching_data['Injured List'].apply(lambda x: x-1 if x-1 > 0 else 0)
         self.new_season_batting_data['Condition'] = self.new_season_batting_data['Condition'] \
             + self.condition_change_per_day
         self.new_season_batting_data['Condition'] = self.new_season_batting_data['Condition'].clip(lower=0, upper=100)
-        self.new_season_batting_data['Injured List'] = self.new_season_batting_data['Injured List'] - 1
-        self.new_season_batting_data['Injured List'] = self.new_season_batting_data['Injured List'].clip(lower=0)
-        self.new_season_batting_data['Injured'] = \
-            self.new_season_batting_data['Injured List'].apply(lambda x: 'Injured' if x > 0 else 'Healthy')
+        # self.new_season_batting_data['Injured List'].apply(lambda x: x - 1 if x - 1 > 0 else 0)
 
         # copy over results in new season to prior season for game management
         self.pitching_data.loc[:, 'Condition'] = self.new_season_pitching_data.loc[:, 'Condition']

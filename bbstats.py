@@ -251,7 +251,7 @@ class BaseballStats:
                           summary_only_b=summary_only_b)
         return
 
-     def print_season(self, df_b, df_p, teams=['MIL'], summary_only_b=False):
+    def print_season(self, df_b, df_p, teams=['MIL'], summary_only_b=False):
         teams.append('')  # add blank team for totals
         df = df_b.copy().sort_values(by='OPS', ascending=False)  # take copy to add totals
         if summary_only_b:

@@ -13,7 +13,7 @@ HOME = 1
 
 class BaseballSeason:
     def __init__(self, load_seasons, new_season, team_list=[], season_length_limit=0, min_games=0, series_length=1,
-                 rotation_len=5, only_nl_b=False):
+                 rotation_len=5, random_data=False, only_nl_b=False):
         self.season_length_limit = season_length_limit  # zero mean there is no limit, based on schedule parameters
         self.min_games = min_games
         self.series_length = series_length
@@ -24,7 +24,7 @@ class BaseballSeason:
         self.new_season = new_season
         self.schedule = []
         self.baseball_data = bbstats.BaseballStats(load_seasons=self.load_seasons, new_season=new_season,
-                                                   only_nl_b=only_nl_b)
+                                                   random_data=random_data, only_nl_b=only_nl_b)
         self.teams = list(self.baseball_data.batting_data.Team.unique()) if team_list == [] else team_list
         if len(self.teams) % 2 == 1:  # odd number of teams
             self.teams.append('OFF DAY')
@@ -139,11 +139,12 @@ if __name__ == '__main__':
     # teams = ['CHC', 'CIN', 'COL', 'MIL', 'PIT', 'STL']  # included COL for balance in scheduling
 
     # full season
-    num_games = 162
+    num_games = 3
     team_to_follow = ''  # 'MIL'
     bbseason23 = BaseballSeason(load_seasons=seasons, new_season=2023,
                                 season_length_limit=num_games,
-                                min_games=num_games, series_length=3, rotation_len=5, only_nl_b=True)
+                                min_games=num_games, series_length=3, rotation_len=5,
+                                random_data=False, only_nl_b=True)
     bbseason23.sim_season(season_chatty=False,
                           season_print_lineup_b=False,
                           season_print_box_score_b=False,

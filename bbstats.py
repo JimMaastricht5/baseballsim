@@ -1,7 +1,6 @@
 import pandas as pd
 import random
 import city_names as city
-from itertools import combinations
 import numpy as np
 
 
@@ -12,13 +11,13 @@ class BaseballStats:
                               'HBP']  # these cols will get added to running season total
         self.numeric_pcols = ['G', 'GS', 'CG', 'SHO', 'IP', 'AB', 'H', '2B', '3B', 'ER', 'K', 'BB', 'HR', 'W', 'L',
                               'SV', 'BS', 'HLD', 'Total_Outs']  # these cols will get added to running season total
-        self.pcols_to_print = ['Player', 'Team', 'Age', 'G', 'GS', 'CG', 'SHO', 'IP', 'H', '2B', '3B', 'ER', 'K',
-                               'BB', 'HR', 'W', 'L', 'SV', 'BS', 'HLD', 'ERA', 'WHIP', 'AVG', 'OBP', 'SLG', 'OPS',
+        self.pcols_to_print = ['Player', 'League', 'Team', 'Age', 'G', 'GS', 'CG', 'SHO', 'IP', 'H', '2B', '3B', 'ER',
+                               'K', 'BB', 'HR', 'W', 'L', 'SV', 'BS', 'HLD', 'ERA', 'WHIP', 'AVG', 'OBP', 'SLG', 'OPS',
                                'Condition', 'Status', 'Injured Days']
-        self.bcols_to_print = ['Player', 'Team', 'Age', 'G', 'AB', 'R', 'H', '2B', '3B', 'HR', 'RBI',
+        self.bcols_to_print = ['Player', 'League', 'Team', 'Age', 'G', 'AB', 'R', 'H', '2B', '3B', 'HR', 'RBI',
                                'SB', 'CS', 'BB', 'SO', 'SH', 'SF', 'HBP', 'AVG', 'OBP', 'SLG',
                                'OPS', 'Condition', 'Status', 'Injured Days']
-        self.icols_to_print =  ['Player', 'Team', 'Age', 'G', 'Status', 'Injured Days']
+        self.icols_to_print = ['Player', 'Team', 'Age', 'G', 'Status', 'Injured Days']
         self.nl = ['CHC', 'CIN', 'MIL', 'PIT', 'STL', 'ATL', 'MIA', 'NYM', 'PHI', 'WAS', 'AZ', 'COL', 'LA', 'SD', 'SF']
         self.only_nl_b = only_nl_b
         self.load_seasons = load_seasons  # list of seasons to load from csv files
@@ -72,6 +71,7 @@ class BaseballStats:
                 pitching_data['Status'] = 'Healthy'  # status
                 pitching_data['Injured Days'] = 0  # days to spend in IL
                 pitching_data.index += 1
+                pitching_data['League'] = pitching_data['Team'].apply(lambda x: 'NL' if x in self.nl else 'AL')
 
                 batting_data = pd.read_csv(str(season) + " player-stats-Batters.csv")
                 batting_data['Season'] = str(season)
@@ -83,6 +83,8 @@ class BaseballStats:
                 batting_data['Status'] = 'Healthy'
                 batting_data['Injured Days'] = 0
                 batting_data.index += 1
+                batting_data['League'] = 'AL'
+                batting_data['League'] = batting_data['Team'].apply(lambda league: 'NL' if league in self.nl else 'AL')
 
                 if self.pitching_data is None:
                     self.pitching_data = pitching_data
@@ -96,9 +98,9 @@ class BaseballStats:
         return
 
     def randomize_data(self):
+        self.create_leagues()
         self.randomize_player_names()
         self.randomize_city_names()
-        self.create_leagues(league_num=2, team_num=6, minors=False)
         return
 
     def randomize_mascots(self, length):
@@ -107,6 +109,13 @@ class BaseballStats:
         animals = [animal.strip() for animal in animals]
         mascots = random.sample(animals, length)
         return mascots
+
+    def create_leagues(self):
+        league_list = ['ACB', 'NBL', 'SOL', 'NNL']  # Armchair Baseball and Nerd Baseball, Some Other League, No Name
+        league_names = random.sample(league_list, 2)  # replace AL and NL
+        self.pitching_data['League'].apply(lambda x: league_names[0] if x == 'AL' else league_names[1])
+        self.batting_data['League'].apply(lambda x: league_names[0] if x == 'AL' else league_names[1])
+        return
 
     def randomize_city_names(self):
         current_team_names = self.batting_data.Team.unique()  # get list of current team names
@@ -163,16 +172,6 @@ class BaseballStats:
         self.new_season_batting_data['Season'] = str(self.new_season)
         self.new_season_batting_data['Age'] = self.new_season_batting_data['Age'] + 1  # everyone is a year older
         self.new_season_batting_data = self.new_season_batting_data.fillna(0)
-        return
-
-    def create_leagues(self, league_num=2, team_num=8, minors=True):
-        league_names = ['ABC', 'NBL', 'SOL', 'NNL']  # Armchair Baseball and Nerd Baseball, Some Other League, No Name
-        team_names = list(self.batting_data['Team'].unique())  # get list of 3 character team names
-        if len(team_names) < league_num * team_num:
-            raise ValueError(f'Available # of teams {len(team_names)} must be <= then {league_num * team_num}')
-        league_teams = random.sample(team_names, (league_num * team_num))
-        for i in combinations(league_teams, league_num):
-            print(i)
         return
 
     def game_results_to_season(self, box_score_class):
@@ -241,17 +240,17 @@ class BaseballStats:
         self.new_season_batting_data = \
             team_batting_stats(self.new_season_batting_data[self.new_season_batting_data['AB'] > 0].fillna(0))
 
-    def print_current_season(self, teams=['MIL'], summary_only_b=False):
+    def print_current_season(self, teams, summary_only_b=False):
         self.print_season(self.new_season_batting_data, self.new_season_pitching_data, teams=teams,
                           summary_only_b=summary_only_b)
         return
 
-    def print_prior_season(self, teams=['MIN'], summary_only_b=False):
+    def print_prior_season(self, teams, summary_only_b=False):
         self.print_season(self.batting_data, self.pitching_data, teams=teams,
                           summary_only_b=summary_only_b)
         return
 
-    def print_season(self, df_b, df_p, teams=['MIL'], summary_only_b=False):
+    def print_season(self, df_b, df_p, teams, summary_only_b=False):
         teams.append('')  # add blank team for totals
         df = df_b.copy().sort_values(by='OPS', ascending=False)  # take copy to add totals
         if summary_only_b:
@@ -270,6 +269,7 @@ class BaseballStats:
             df = df[df['Team'].isin(teams)]
         print(df[self.pcols_to_print].to_string(justify='right'))
         return
+
 
 # static function start
 def remove_non_print_cols(df):
@@ -360,12 +360,11 @@ def team_pitching_totals(pitching_df, team_name='', concat=True):
 
 
 if __name__ == '__main__':
-    baseball_data = BaseballStats(load_seasons=[2022], new_season=2023, random_data=False, only_nl_b=True)
+    baseball_data = BaseballStats(load_seasons=[2022], new_season=2023, random_data=True, only_nl_b=False)
 
     print(*baseball_data.pitching_data.columns)
     print(*baseball_data.batting_data.columns)
     print(baseball_data.batting_data.Team.unique())
-    # teams = ['CHC', 'CIN', 'COL', 'MIL', 'PIT', 'STL']  # included COL for balance in scheduling
     teams = list(baseball_data.batting_data.Team.unique())
-    baseball_data.print_prior_season(teams=['SD'])
+    baseball_data.print_prior_season(teams=teams)
     # print(baseball_data.new_season_pitching_data.to_string())

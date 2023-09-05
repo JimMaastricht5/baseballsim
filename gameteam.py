@@ -109,6 +109,10 @@ class Team:
         batting = self.lineup.iloc[loc_in_lineup]  # data for batter
         return batting  # should be a series with a single row
 
+    def pos_player_prior_year_stats(self, index):
+        pos_player_stats = self.pos_players.loc[index]  # data for pos player
+        return pos_player_stats  # should be a series with a single row
+
     def update_fatigue(self, cur_pitching_index):
         # number of batters faced in game vs. historic avg with fatigue start as a ratio
         in_game_fatigue = 0

@@ -86,6 +86,14 @@ class Bases:
     def is_runner_on_base_num(self, base_num):
         return self.baserunners[base_num] != 0
 
+    def is_eligible_for_stolen_base(self):
+        return self.is_runner_on_base_num(1) and \
+                (self.is_runner_on_base_num(2) != True) and \
+                (self.is_runner_on_base_num(3) != True)
+
+    def get_runner_key(self, base_num):
+        return self.baserunners[base_num]  # non zero if there is a runner
+
     def tag_up(self, outs):
         if outs >= 3:
             return

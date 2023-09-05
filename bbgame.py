@@ -50,7 +50,8 @@ class Game:
         self.rng = lambda: np.random.default_rng().uniform(low=0.0, high=1.001)  # random generator between 0 and 1
         self.bases = bbbaserunners.Bases()
         self.outcomes = at_bat.OutCome()
-        self.at_bat = at_bat.SimAB(self.baseball_data)  # setup at class
+        self.at_bat = at_bat.SimAB(self.baseball_data)  # setup class
+        self.min_steal_attempts = 10  # min number of steal attempts to be eligable to steal
 
         return
 
@@ -121,6 +122,18 @@ class Game:
                 print(f'\t{pitching.Player} has entered the game for {self.team_names[self.team_pitching()]}')
         return pitch_switch
 
+    def stolen_base_sit(self):
+        if self.bases.is_eligible_for_stolen_base():
+            runner_key = self.bases.get_runner_key(1)
+            runner_stats = self.teams[self.team_hitting()].pos_player_prior_year_stats(runner_key)
+            print(f'In stolen base sit {self.bases.get_runner_key(1)} {runner_stats}')
+            if runner_stats.SB + runner_stats.CS >= self.min_steal_attempts:  # attempt to steal
+               if self.rng() <= (runner_stats.SB / (runner_stats.SB + runner_stats.CS)):  # successful steal
+                   print(f'this would be a successful steal {self.bases.get_runner_key(1)} {runner_stats}')
+               else:
+                   print(f'this would be an unsuccessful steal {self.bases.get_runner_key(1)} {runner_stats}')
+        return
+
     def is_extra_innings(self):
         return self.inning[self.team_hitting()] > 9
 
@@ -175,6 +188,8 @@ class Game:
             # check for pitching change due to fatigue or game sit
             pitch_switch = self.pitching_sit(self.teams[self.team_pitching()].cur_pitcher_stats(),
                                              pitch_switch=pitch_switch)
+            # check for base stealing and then resolve ab
+            self.stolen_base_sit()
             __pitching, __batting = self.sim_ab()  # resolve ab
             if self.bases.runs_scored > 0:  # did a run score?
                 self.update_inning_score(number_of_runs=self.bases.runs_scored)
@@ -240,7 +255,7 @@ class Game:
         self.win_loss_record()
         self.teams[AWAY].box_score.totals()
         self.teams[HOME].box_score.totals()
-        if self.print_box_score_b: # print or not to print...
+        if self.print_box_score_b:  # print or not to print...
             self.teams[AWAY].box_score.print_boxes()
             self.teams[HOME].box_score.print_boxes()
         print('Final:')
@@ -273,4 +288,3 @@ if __name__ == '__main__':
         print('')
         print(f'{away_team} season : {season_win_loss[0][0]} W and {season_win_loss[0][1]} L')
         print(f'{home_team} season : {season_win_loss[1][0]} W and {season_win_loss[1][1]} L')
-

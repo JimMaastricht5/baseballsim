@@ -7,6 +7,7 @@ import numpy as np
 class BaseballStats:
     def __init__(self, load_seasons, new_season, random_data=False, only_nl_b=False):
         self.rnd = lambda: np.random.default_rng().uniform(low=0.0, high=1.001)  # random generator between 0 and 1
+
         self.numeric_bcols = ['G', 'AB', 'R', 'H', '2B', '3B', 'HR', 'RBI', 'SB', 'CS', 'BB', 'SO', 'SH', 'SF',
                               'HBP']  # these cols will get added to running season total
         self.numeric_pcols = ['G', 'GS', 'CG', 'SHO', 'IP', 'AB', 'H', '2B', '3B', 'ER', 'K', 'BB', 'HR', 'W', 'L',
@@ -17,7 +18,7 @@ class BaseballStats:
         self.bcols_to_print = ['Player', 'League', 'Team', 'Age', 'G', 'AB', 'R', 'H', '2B', '3B', 'HR', 'RBI',
                                'SB', 'CS', 'BB', 'SO', 'SH', 'SF', 'HBP', 'AVG', 'OBP', 'SLG',
                                'OPS', 'Condition', 'Status', 'Injured Days']
-        self.icols_to_print = ['Player', 'Team', 'Age', 'G', 'Status', 'Injured Days']
+        self.icols_to_print = ['Player', 'Team', 'Age', 'G', 'Status']  # add 'Injured Days' if you want to see time
         self.nl = ['CHC', 'CIN', 'MIL', 'PIT', 'STL', 'ATL', 'MIA', 'NYM', 'PHI', 'WAS', 'AZ', 'COL', 'LA', 'SD', 'SF']
         self.only_nl_b = only_nl_b
         self.load_seasons = load_seasons  # list of seasons to load from csv files
@@ -46,6 +47,10 @@ class BaseballStats:
         self.batting_injury_avg_len = 30  # made this up
         self.odds_of_survival_age_20 = .90  # 90 chance for a 20 year-old to play the following year
         self.odd_of_survival_additional_years = -.0328  # 3.28% decrease in survival, use to increase injury chance
+        self.rnd_p_inj = lambda: abs(np.random.normal(loc=self.pitching_injury_avg_len,
+                                                      scale=self.pitching_injury_avg_len / 2, size=1)[0])
+        self.rnd_b_inj = lambda: abs(np.random.normal(loc=self.batting_injury_avg_len,
+                                                      scale=self.batting_injury_avg_len /2, size=1)[0])
         return
 
     def injured_list(self, idays):
@@ -197,11 +202,11 @@ class BaseballStats:
         self.new_season_pitching_data['Injured Days'] = self.new_season_pitching_data.\
             apply(lambda row: 0 if self.rnd() > self.pitching_injury_odds_for_season and row['Injured Days'] == 0 else
                   row['Injured Days'] - 1 if row['Injured Days'] > 0 else
-                  int(self.rnd() * self.pitching_injury_avg_len + self.pitching_injury_avg_len / 2), axis=1)
+                  int(self.rnd_p_inj()), axis=1)
         self.new_season_batting_data['Injured Days'] = self.new_season_batting_data.\
             apply(lambda row: 0 if self.rnd() > self.batting_injury_odds_for_season and row['Injured Days'] == 0 else
                   row['Injured Days'] - 1 if row['Injured Days'] > 0 else
-                  int(self.rnd() * self.batting_injury_avg_len + self.batting_injury_avg_len / 2), axis=1)
+                  int(self.rnd_b_inj()), axis=1)
 
         self.new_season_pitching_data['Status'] = \
             self.new_season_pitching_data['Injured Days'].apply(self.injured_list)

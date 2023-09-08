@@ -131,11 +131,11 @@ class Game:
                     self.rng() <= (runner_stats.SB + runner_stats.CS) / runner_stats.G:  # attempt to steal scale w freq
                if self.rng() <= (runner_stats.SB / (runner_stats.SB + runner_stats.CS)):  # successful steal
                    self.bases.push_a_runner(1, 2)  # move runner from 1st to second
-                   print(f'{runner_stats.Player} store 2nd!')
+                   print(f'\t{runner_stats.Player} stole 2nd base!')
                    print(f'{self.bases.describe_runners()}')
                else:
                    self.outs += 1  # this could result in the third out
-                   print(f'{runner_stats.Player} was caught stealing for out number {self.outs}')
+                   print(f'\t{runner_stats.Player} was caught stealing for out number {self.outs}')
         return
 
     def is_extra_innings(self):

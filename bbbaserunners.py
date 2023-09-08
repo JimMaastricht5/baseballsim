@@ -38,8 +38,11 @@ class Bases:
         return
 
     def ground_out(self, score_book_cd):
-        if score_book_cd in ['GB', 'DP']:  # batter is out
+        if score_book_cd in ['GB']:  # batter is out
             self.remove_runner(0)
+        elif score_book_cd in ['DP']:  # runner at first is out and batter are out
+            self.remove_runner(0)
+            self.remove_runner(1)
         elif score_book_cd in ['GB FC']:  # runner at first is out
             self.remove_runner(1)
         return 1  # advance remaining runners and batter on an GB FC one base

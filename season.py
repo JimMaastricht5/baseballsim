@@ -62,7 +62,8 @@ class BaseballSeason:
                 print(f'{game[0]} vs. {game[1]}')
             else:
                 game_str = game[0] if game[0] != 'OFF DAY' else game[1]
-        print(f'{game_str} has the day off')
+        if game_str != '':
+            print(f'{game_str} has the day off')
         print('')
         return
 

@@ -104,8 +104,9 @@ class BaseballStats:
 
     def randomize_data(self):
         self.create_leagues()
-        self.randomize_player_names()
         self.randomize_city_names()
+        self.randomize_player_names()
+
         return
 
     def randomize_mascots(self, length):
@@ -123,19 +124,25 @@ class BaseballStats:
         return
 
     def randomize_city_names(self):
+        city_dict = {}
         current_team_names = self.batting_data.Team.unique()  # get list of current team names
-        city.abbrev = [str(name[:3]).upper() for name in city.names]
-        df_city_names = pd.DataFrame({'Team': city.abbrev, 'City': city.names}).drop_duplicates(subset='Team')
-        df_city_names['Mascot'] = self.randomize_mascots(df_city_names.shape[0])
-        if not df_city_names['Team'].is_unique:
-            raise ValueError('Team abbrev must be unique for city join to work properly')
+        city.abbrev = [str(name[:3]).upper() for name in city.names]  # city names are imported
+        mascots = self.randomize_mascots(len(city.names))
+        for ii, team_abbrev in enumerate(city.abbrev):
+            city_dict.update({city.abbrev[ii]: [city.names[ii], mascots[ii]]})  # update will use the last unique abbrev
 
-        new_team = list(df_city_names['Team'].sample(len(current_team_names)))
-        for ii, team in enumerate(current_team_names):
-            self.pitching_data.replace([team], [new_team[ii]], inplace=True)
-            self.batting_data.replace([team], [new_team[ii]], inplace=True)
-        self.pitching_data = pd.merge(self.pitching_data, df_city_names, on='Team')
-        self.batting_data = pd.merge(self.batting_data, df_city_names, on='Team')
+        new_teams = list(random.sample(city.abbrev, len(current_team_names)))
+        for ii, team in enumerate(current_team_names):  # do not use a df merge her resets the index, thats bad
+            new_team = new_teams[ii]
+            mascot = city_dict[new_team][1]
+            city_name = city_dict[new_team][0]
+            self.pitching_data.replace([team], [new_team], inplace=True)
+            self.pitching_data.loc[self.pitching_data['Team'] == new_team, 'City'] = city_name
+            self.pitching_data.loc[self.pitching_data['Team'] == new_team, 'Mascot'] = mascot
+            self.batting_data.replace([team], [new_team], inplace=True)
+            self.batting_data.loc[self.batting_data['Team'] == new_team, 'City'] = city_name
+            self.batting_data.loc[self.batting_data['Team'] == new_team, 'Mascot'] = mascot
+
         return
 
     def randomize_player_names(self):
@@ -151,11 +158,8 @@ class BaseballStats:
         random_names = random.sample(random_names, self.batting_data.shape[0] + self.pitching_data.shape[0])
         df['Player'] = pd.DataFrame(random_names)
         df.reset_index(inplace=True, drop=True)  # clear duplicate index error, should not happen but leave this alone!
-        self.batting_data.Player = df['Player'][0:self.batting_data.shape[0]]
+        self.batting_data['Player'] = df['Player'][0:self.batting_data.shape[0]]
         self.pitching_data['Player'] = df['Player'][0:self.pitching_data.shape[0]]
-        # self.batting_data.index += 1
-        # self.pitching_data.index += 1
-        print(f'bbstats.py lowest index {np.min(self.batting_data.index)}  {np.min(self.pitching_data.index)}')
         if np.min(self.batting_data.index) == 0 or np.min(self.pitching_data.index) ==0:
             raise Exception('Index value cannot be zero')
         return
@@ -173,8 +177,10 @@ class BaseballStats:
         self.new_season_pitching_data['Season'] = str(self.new_season)
         self.new_season_pitching_data['Age'] = self.new_season_pitching_data['Age'] + 1  # everyone is a year older
         self.new_season_pitching_data.fillna(0)
+        # self.new_season_pitching_data.index += 1
         # if np.min(self.new_season_pitching_data.index) == 0:
-        #     self.new_season_pitching_data.index += 1
+        #     raise Exception('bbstats.py index cannot be zero')
+
 
         self.new_season_batting_data = self.batting_data.copy()
         self.new_season_batting_data[self.numeric_bcols] = 0
@@ -184,9 +190,9 @@ class BaseballStats:
         self.new_season_batting_data['Season'] = str(self.new_season)
         self.new_season_batting_data['Age'] = self.new_season_batting_data['Age'] + 1  # everyone is a year older
         self.new_season_batting_data = self.new_season_batting_data.fillna(0)
-        if np.min(self.new_season_batting_data.index) == 0:
+        # self.new_season_batting_data.index += 1
+        # if np.min(self.new_season_batting_data.index) == 0:
             # print(self.new_season_batting_data.to_string())
-            self.new_season_batting_data.index += 1
             # print(self.new_season_batting_data.to_string())
             # raise Exception('bbstats.py index cannot be zero')
         return
@@ -384,5 +390,7 @@ if __name__ == '__main__':
     print(*baseball_data.batting_data.columns)
     print(baseball_data.batting_data.Team.unique())
     teams = list(baseball_data.batting_data.Team.unique())
-    baseball_data.print_prior_season(teams=teams)
-    # print(baseball_data.new_season_pitching_data.to_string())
+    # baseball_data.print_prior_season(teams=teams)
+    # baseball_data.print_current_season(teams=teams)
+    print(baseball_data.pitching_data.to_string())
+    print(baseball_data.batting_data.to_string())

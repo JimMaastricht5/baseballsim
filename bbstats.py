@@ -14,10 +14,10 @@ class BaseballStats:
                               'SV', 'BS', 'HLD', 'Total_Outs']  # these cols will get added to running season total
         self.pcols_to_print = ['Player', 'League', 'Team', 'Age', 'G', 'GS', 'CG', 'SHO', 'IP', 'H', '2B', '3B', 'ER',
                                'K', 'BB', 'HR', 'W', 'L', 'SV', 'BS', 'HLD', 'ERA', 'WHIP', 'AVG', 'OBP', 'SLG', 'OPS',
-                               'Condition', 'Status', 'Injured Days']
+                               'Status']  # 'Condition', 'Injured Days']
         self.bcols_to_print = ['Player', 'League', 'Team', 'Age', 'G', 'AB', 'R', 'H', '2B', '3B', 'HR', 'RBI',
                                'SB', 'CS', 'BB', 'SO', 'SH', 'SF', 'HBP', 'AVG', 'OBP', 'SLG',
-                               'OPS', 'Condition', 'Status', 'Injured Days']
+                               'OPS', 'Status'] # 'Condition', , 'Injured Days']
         self.icols_to_print = ['Player', 'Team', 'Age', 'G', 'Status']  # add 'Injured Days' if you want to see time
         self.nl = ['CHC', 'CIN', 'MIL', 'PIT', 'STL', 'ATL', 'MIA', 'NYM', 'PHI', 'WAS', 'AZ', 'COL', 'LA', 'SD', 'SF']
         self.only_nl_b = only_nl_b
@@ -41,10 +41,10 @@ class BaseballStats:
         self.condition_change_per_day = 20  # improve with rest
         self.pitching_injury_rate = .275  # 27.5 out of 100 players injured per season-> per game
         self.pitching_injury_odds_for_season = 1 - (1 - self.pitching_injury_rate) ** (1/162)
-        self.pitching_injury_avg_len = 74
+        self.pitching_injury_avg_len = 32  # according to mlb avg len is 74 but that cant be a normal dist
         self.batting_injury_rate = .137  # 2022 87 out of 634 injured per season
         self.batting_injury_odds_for_season = 1 - (1 - self.batting_injury_rate) ** (1/162)
-        self.batting_injury_avg_len = 30  # made this up
+        self.batting_injury_avg_len = 15  # made this up
         self.odds_of_survival_age_20 = .90  # 90 chance for a 20 year-old to play the following year
         self.odd_of_survival_additional_years = -.0328  # 3.28% decrease in survival, use to increase injury chance
         self.rnd_p_inj = lambda: abs(np.random.normal(loc=self.pitching_injury_avg_len,
@@ -120,8 +120,10 @@ class BaseballStats:
     def create_leagues(self):
         league_list = ['ACB', 'NBL', 'SOL', 'NNL']  # Armchair Baseball and Nerd Baseball, Some Other League, No Name
         league_names = random.sample(league_list, 2)  # replace AL and NL
-        self.pitching_data['League'].apply(lambda x: league_names[0] if x == 'AL' else league_names[1])
-        self.batting_data['League'].apply(lambda x: league_names[0] if x == 'AL' else league_names[1])
+        self.pitching_data.loc[self.pitching_data['League'] == 'AL', 'League'] = league_names[0]
+        self.pitching_data.loc[self.pitching_data['League'] == 'NL', 'League'] = league_names[1]
+        self.batting_data.loc[self.batting_data['League'] == 'AL', 'League'] = league_names[0]
+        self.batting_data.loc[self.batting_data['League'] == 'NL', 'League'] = league_names[1]
         return
 
     def randomize_city_names(self):

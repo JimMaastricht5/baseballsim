@@ -29,7 +29,7 @@ class BaseballSeason:
         if len(self.teams) % 2 == 1:  # odd number of teams
             self.teams.append('OFF DAY')
 
-        print(self.teams)
+        # print(self.teams)
         self.create_schedule()  # set schedule
         self.team_win_loss = {}
         for team in self.teams:
@@ -90,7 +90,7 @@ class BaseballSeason:
     def sim_season(self, season_chatty=False, season_print_lineup_b=False, season_print_box_score_b=False,
                    summary_only_b=False, team_to_follow=''):
         print(f'{self.new_season} will have {len(self.schedule)} games per team.')
-        print(f'Full schedule of games: {self.schedule}')
+        # print(f'Full schedule of games: {self.schedule}')
 
         # loop over every day and every game scheduled that day
         for season_day_num in range(0, len(self.schedule)):  # loop from 0 to len of schedule - 1 end pt not included

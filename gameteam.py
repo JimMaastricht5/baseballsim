@@ -12,6 +12,8 @@ class Team:
         self.pitchers = baseball_data.pitching_data[baseball_data.pitching_data["Team"] == team_name]
         self.pos_players = baseball_data.batting_data[baseball_data.batting_data["Team"] == team_name]
 
+        self.mascot = self.pos_players.loc[self.pos_players["Team"] == team_name, "Mascot"].unique()[0]
+        self.city_name = self.pos_players.loc[self.pos_players["Team"] == team_name, "City"].unique()[0]
         self.lineup = None  # uses prior season stats
         self.lineup_new_season = None  # new / current season stats for printing starting lineup
         self.pitching = None  # uses prior season stats
@@ -201,7 +203,7 @@ class Team:
         return list(stat_index)
 
     def print_starting_lineups(self, current_season_stats=True):
-        print(f'Starting lineup for {self.team_name}:')
+        print(f'Starting lineup for the {self.city_name} ({self.team_name}) {self.mascot}:')
         if current_season_stats:
             dfb = bbstats.remove_non_print_cols(self.lineup_new_season)
             dfp = bbstats.remove_non_print_cols(self.pitching_new_season)

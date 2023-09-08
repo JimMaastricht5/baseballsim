@@ -132,7 +132,7 @@ class Game:
                     self.bases.push_a_runner(1, 2)  # move runner from 1st to second
                     if self.chatty:
                         print(f'\t{runner_stats.Player} stole 2nd base!')
-                        print(f'{self.bases.describe_runners()}')
+                        print(f'\t{self.bases.describe_runners()}')
                 else:
                     if self.chatty:
                         self.outs += 1  # this could result in the third out
@@ -253,8 +253,11 @@ class Game:
 
     def sim_game(self, team_to_follow=''):
         if team_to_follow in self.team_names:
+            print(f'Following team: {team_to_follow}')
             self.chatty = True
             self.print_box_score_b = True
+            self.teams[AWAY].print_starting_lineups()
+            self.teams[HOME].print_starting_lineups()
 
         while self.is_game_end() is False:
             self.sim_half_inning()

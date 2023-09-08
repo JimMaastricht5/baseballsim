@@ -126,12 +126,16 @@ class Game:
         if self.bases.is_eligible_for_stolen_base():
             runner_key = self.bases.get_runner_key(1)
             runner_stats = self.teams[self.team_hitting()].pos_player_prior_year_stats(runner_key)
-            print(f'In stolen base sit {self.bases.get_runner_key(1)} {runner_stats}')
-            if runner_stats.SB + runner_stats.CS >= self.min_steal_attempts:  # attempt to steal
+            # print(f'In stolen base sit {self.bases.get_runner_key(1)} {runner_stats}')
+            if runner_stats.SB + runner_stats.CS >= self.min_steal_attempts and \
+                    self.rng() <= (runner_stats.SB + runner_stats.CS) / runner_stats.G:  # attempt to steal scale w freq
                if self.rng() <= (runner_stats.SB / (runner_stats.SB + runner_stats.CS)):  # successful steal
-                   print(f'this would be a successful steal {self.bases.get_runner_key(1)} {runner_stats}')
+                   self.bases.push_a_runner(1, 2)  # move runner from 1st to second
+                   print(f'{runner_stats.Player} store 2nd!')
+                   print(f'{self.bases.describe_runners()}')
                else:
-                   print(f'this would be an unsuccessful steal {self.bases.get_runner_key(1)} {runner_stats}')
+                   self.outs += 1  # this could result in the third out
+                   print(f'{runner_stats.Player} was caught stealing for out number {self.outs}')
         return
 
     def is_extra_innings(self):
@@ -142,8 +146,8 @@ class Game:
         if self.is_extra_innings():
             self.bases.add_runner_to_base(base_num=2, batter_num=self.prior_batter_out_num[self.team_hitting()],
                                           player_name=self.prior_batter_out_name[self.team_hitting()])
-        if self.chatty:
-            print(f'Extra innings: {self.prior_batter_out_name[self.team_hitting()]} will start at 2nd base.')
+            if self.chatty:
+                print(f'Extra innings: {self.prior_batter_out_name[self.team_hitting()]} will start at 2nd base.')
         return
 
     def sim_ab(self):
@@ -190,6 +194,8 @@ class Game:
                                              pitch_switch=pitch_switch)
             # check for base stealing and then resolve ab
             self.stolen_base_sit()
+            if self.outs >= 3:
+                break  # handle caught stealing
             __pitching, __batting = self.sim_ab()  # resolve ab
             if self.bases.runs_scored > 0:  # did a run score?
                 self.update_inning_score(number_of_runs=self.bases.runs_scored)

@@ -106,7 +106,8 @@ class BaseballStats:
         self.create_leagues()
         self.randomize_city_names()
         self.randomize_player_names()
-
+        if np.min(self.batting_data.index) == 0 or np.min(self.pitching_data.index) ==0:  # last ditch check for error
+            raise Exception('Index value cannot be zero')  # screws up bases where 0 is no runner
         return
 
     def randomize_mascots(self, length):
@@ -142,7 +143,6 @@ class BaseballStats:
             self.batting_data.replace([team], [new_team], inplace=True)
             self.batting_data.loc[self.batting_data['Team'] == new_team, 'City'] = city_name
             self.batting_data.loc[self.batting_data['Team'] == new_team, 'Mascot'] = mascot
-
         return
 
     def randomize_player_names(self):
@@ -160,8 +160,6 @@ class BaseballStats:
         df.reset_index(inplace=True, drop=True)  # clear duplicate index error, should not happen but leave this alone!
         self.batting_data['Player'] = df['Player'][0:self.batting_data.shape[0]]
         self.pitching_data['Player'] = df['Player'][0:self.pitching_data.shape[0]]
-        if np.min(self.batting_data.index) == 0 or np.min(self.pitching_data.index) ==0:
-            raise Exception('Index value cannot be zero')
         return
 
     def create_new_season_from_existing(self):
@@ -177,10 +175,6 @@ class BaseballStats:
         self.new_season_pitching_data['Season'] = str(self.new_season)
         self.new_season_pitching_data['Age'] = self.new_season_pitching_data['Age'] + 1  # everyone is a year older
         self.new_season_pitching_data.fillna(0)
-        # self.new_season_pitching_data.index += 1
-        # if np.min(self.new_season_pitching_data.index) == 0:
-        #     raise Exception('bbstats.py index cannot be zero')
-
 
         self.new_season_batting_data = self.batting_data.copy()
         self.new_season_batting_data[self.numeric_bcols] = 0
@@ -190,11 +184,6 @@ class BaseballStats:
         self.new_season_batting_data['Season'] = str(self.new_season)
         self.new_season_batting_data['Age'] = self.new_season_batting_data['Age'] + 1  # everyone is a year older
         self.new_season_batting_data = self.new_season_batting_data.fillna(0)
-        # self.new_season_batting_data.index += 1
-        # if np.min(self.new_season_batting_data.index) == 0:
-            # print(self.new_season_batting_data.to_string())
-            # print(self.new_season_batting_data.to_string())
-            # raise Exception('bbstats.py index cannot be zero')
         return
 
     def game_results_to_season(self, box_score_class):
@@ -389,7 +378,7 @@ if __name__ == '__main__':
     print(*baseball_data.pitching_data.columns)
     print(*baseball_data.batting_data.columns)
     print(baseball_data.batting_data.Team.unique())
-    teams = list(baseball_data.batting_data.Team.unique())
+    # teams = list(baseball_data.batting_data.Team.unique())
     # baseball_data.print_prior_season(teams=teams)
     # baseball_data.print_current_season(teams=teams)
     print(baseball_data.pitching_data.to_string())

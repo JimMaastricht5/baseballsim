@@ -153,6 +153,8 @@ class BaseballStats:
         df.reset_index(inplace=True, drop=True)  # clear duplicate index error, should not happen but leave this alone!
         self.batting_data.Player = df['Player'][0:self.batting_data.shape[0]]
         self.pitching_data['Player'] = df['Player'][0:self.pitching_data.shape[0]]
+        self.batting_data.index += 1
+        self.pitching_data.index += 1
         return
 
     def create_new_season_from_existing(self):

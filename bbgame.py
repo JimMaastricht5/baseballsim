@@ -52,7 +52,6 @@ class Game:
         self.outcomes = at_bat.OutCome()
         self.at_bat = at_bat.SimAB(self.baseball_data)  # setup class
         self.min_steal_attempts = 10  # min number of steal attempts to be eligable to steal
-
         return
 
     def team_pitching(self):
@@ -129,13 +128,15 @@ class Game:
             # print(f'In stolen base sit {self.bases.get_runner_key(1)} {runner_stats}')
             if runner_stats.SB + runner_stats.CS >= self.min_steal_attempts and \
                     self.rng() <= (runner_stats.SB + runner_stats.CS) / runner_stats.G:  # attempt to steal scale w freq
-               if self.rng() <= (runner_stats.SB / (runner_stats.SB + runner_stats.CS)):  # successful steal
-                   self.bases.push_a_runner(1, 2)  # move runner from 1st to second
-                   print(f'\t{runner_stats.Player} stole 2nd base!')
-                   print(f'{self.bases.describe_runners()}')
-               else:
-                   self.outs += 1  # this could result in the third out
-                   print(f'\t{runner_stats.Player} was caught stealing for out number {self.outs}')
+                if self.rng() <= (runner_stats.SB / (runner_stats.SB + runner_stats.CS)):  # successful steal
+                    self.bases.push_a_runner(1, 2)  # move runner from 1st to second
+                    if self.chatty:
+                        print(f'\t{runner_stats.Player} stole 2nd base!')
+                        print(f'{self.bases.describe_runners()}')
+                else:
+                    if self.chatty:
+                        self.outs += 1  # this could result in the third out
+                        print(f'\t{runner_stats.Player} was caught stealing for out number {self.outs}')
         return
 
     def is_extra_innings(self):

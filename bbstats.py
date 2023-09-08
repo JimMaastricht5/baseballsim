@@ -153,8 +153,11 @@ class BaseballStats:
         df.reset_index(inplace=True, drop=True)  # clear duplicate index error, should not happen but leave this alone!
         self.batting_data.Player = df['Player'][0:self.batting_data.shape[0]]
         self.pitching_data['Player'] = df['Player'][0:self.pitching_data.shape[0]]
-        self.batting_data.index += 1
-        self.pitching_data.index += 1
+        # self.batting_data.index += 1
+        # self.pitching_data.index += 1
+        print(f'bbstats.py lowest index {np.min(self.batting_data.index)}  {np.min(self.pitching_data.index)}')
+        if np.min(self.batting_data.index) == 0 or np.min(self.pitching_data.index) ==0:
+            raise Exception('Index value cannot be zero')
         return
 
     def create_new_season_from_existing(self):
@@ -170,6 +173,8 @@ class BaseballStats:
         self.new_season_pitching_data['Season'] = str(self.new_season)
         self.new_season_pitching_data['Age'] = self.new_season_pitching_data['Age'] + 1  # everyone is a year older
         self.new_season_pitching_data.fillna(0)
+        # if np.min(self.new_season_pitching_data.index) == 0:
+        #     self.new_season_pitching_data.index += 1
 
         self.new_season_batting_data = self.batting_data.copy()
         self.new_season_batting_data[self.numeric_bcols] = 0
@@ -179,6 +184,11 @@ class BaseballStats:
         self.new_season_batting_data['Season'] = str(self.new_season)
         self.new_season_batting_data['Age'] = self.new_season_batting_data['Age'] + 1  # everyone is a year older
         self.new_season_batting_data = self.new_season_batting_data.fillna(0)
+        if np.min(self.new_season_batting_data.index) == 0:
+            # print(self.new_season_batting_data.to_string())
+            self.new_season_batting_data.index += 1
+            # print(self.new_season_batting_data.to_string())
+            # raise Exception('bbstats.py index cannot be zero')
         return
 
     def game_results_to_season(self, box_score_class):
@@ -296,6 +306,7 @@ def trunc_col(df_n, d=3):
 
 
 def team_batting_stats(df):
+    # print(f'team_batting_stats bbstats.py {df.to_string()}')
     df = df[df['AB'] > 0]
     try:
         df['AVG'] = trunc_col(df['H'] / df['AB'], 3)
@@ -336,7 +347,7 @@ def team_batting_totals(batting_df, team_name='', concat=True):
     df['Status'] = ''
     df['Injured Days'] = ''
     df['G'] = np.max(batting_df['G'])
-    df['Condition'] = np.average(batting_df['Condition'])
+    df['Condition'] = 0
     df = df.to_frame().T
     if concat:
         df = pd.concat([batting_df, df], ignore_index=True)
@@ -355,7 +366,7 @@ def team_pitching_totals(pitching_df, team_name='', concat=True):
     df['Status'] = ''
     df['Injured Days'] = ''
     df['G'] = np.max(pitching_df['G'])
-    df['Condition'] = np.average(pitching_df['Condition'])
+    df['Condition'] = 0
 
     df = df.to_frame().T
     if concat:

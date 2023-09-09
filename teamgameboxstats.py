@@ -82,6 +82,10 @@ class TeamBoxScore:
                 self.box_pitching.loc[self.box_pitching.index[-1], ['SV']] + 1
         return
 
+    def pitching_blown_save(self, pitcher_index):
+        self.box_pitching.loc[pitcher_index, ['BS']] = 1
+        return
+
     def batting_result(self, batter_index, outcomes, players_scored_list):
         outcomes.convert_k()
         if outcomes.score_book_cd != 'BB':  # handle walks
@@ -116,14 +120,14 @@ class TeamBoxScore:
 
     def print_boxes(self):
         df = self.box_batting[['Player', 'Team', 'Pos', 'Age', 'G', 'AB', 'R', 'H', '2B', '3B', 'HR', 'RBI',
-                                       'SB', 'CS', 'BB', 'SO', 'SH', 'SF', 'HBP', 'AVG', 'OBP', 'SLG', 'OPS',
-                                       'Condition', 'Status']]
+                                       'SB', 'CS', 'BB', 'SO', 'SH', 'SF', 'HBP']]
+        # , 'AVG', 'OBP', 'SLG', 'OPS', 'Condition', 'Status']]
         print(df.to_string(index=False, justify='center'))
         print('')
         df = self.box_pitching[['Player', 'Team', 'Age', 'G', 'GS', 'CG', 'SHO', 'IP', 'AB', 'H', '2B', '3B',
                                         'ER', 'K', 'BB',
-                                        'HR', 'W', 'L', 'SV', 'BS', 'HLD', 'ERA', 'WHIP', 'AVG', 'OBP', 'SLG', 'OPS',
-                                        'Condition', 'Status']]
+                                        'HR', 'W', 'L', 'SV', 'BS', 'HLD']]  #
+        # , 'ERA', 'WHIP', 'AVG', 'OBP', 'SLG', 'OPS', 'Condition', 'Status']]
         print(df.to_string(index=False, justify='center'))
         print('')
         return

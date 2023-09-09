@@ -17,7 +17,7 @@ class BaseballStats:
                                'Status']  # 'Condition', 'Injured Days']
         self.bcols_to_print = ['Player', 'League', 'Team', 'Age', 'G', 'AB', 'R', 'H', '2B', '3B', 'HR', 'RBI',
                                'SB', 'CS', 'BB', 'SO', 'SH', 'SF', 'HBP', 'AVG', 'OBP', 'SLG',
-                               'OPS', 'Status'] # 'Condition', , 'Injured Days']
+                               'OPS', 'Status']  # 'Condition', , 'Injured Days']
         self.icols_to_print = ['Player', 'Team', 'Age', 'G', 'Status']  # add 'Injured Days' if you want to see time
         self.nl = ['CHC', 'CIN', 'MIL', 'PIT', 'STL', 'ATL', 'MIA', 'NYM', 'PHI', 'WAS', 'AZ', 'COL', 'LA', 'SD', 'SF']
         self.only_nl_b = only_nl_b
@@ -50,7 +50,7 @@ class BaseballStats:
         self.rnd_p_inj = lambda: abs(np.random.normal(loc=self.pitching_injury_avg_len,
                                                       scale=self.pitching_injury_avg_len / 2, size=1)[0])
         self.rnd_b_inj = lambda: abs(np.random.normal(loc=self.batting_injury_avg_len,
-                                                      scale=self.batting_injury_avg_len /2, size=1)[0])
+                                                      scale=self.batting_injury_avg_len / 2, size=1)[0])
         return
 
     def injured_list(self, idays):
@@ -106,7 +106,7 @@ class BaseballStats:
         self.create_leagues()
         self.randomize_city_names()
         self.randomize_player_names()
-        if np.min(self.batting_data.index) == 0 or np.min(self.pitching_data.index) ==0:  # last ditch check for error
+        if np.min(self.batting_data.index) == 0 or np.min(self.pitching_data.index) == 0:  # last ditch check for error
             raise Exception('Index value cannot be zero')  # screws up bases where 0 is no runner
         return
 
@@ -282,6 +282,7 @@ class BaseballStats:
             df = team_pitching_totals(df, team_name='', concat=True)
             df = df[df['Team'].isin(teams)]
         print(df[self.pcols_to_print].to_string(justify='right'))
+        print('\n\n')
         return
 
 

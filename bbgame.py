@@ -87,6 +87,10 @@ class Game:
            (self.total_score[self.team_hitting()] + self.bases.runs_scored) > self.total_score[self.team_pitching()]:
             self.winning_pitcher = self.teams[self.team_hitting()].is_pitching_index()
             self.losing_pitcher = self.teams[self.team_pitching()].is_pitching_index()
+            if self.is_save_sit[self.team_pitching()]:  # blown save
+                cur_pitcher = self.teams[self.team_pitching()].is_pitching_index()
+                self.teams[self.team_pitching()].box_score.pitching_blown_save(cur_pitcher)
+
 
         self.total_score[self.team_hitting()] += number_of_runs  # update total score
         return

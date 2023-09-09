@@ -6,11 +6,15 @@ import bbstats
 class Team:
     def __init__(self, team_name, baseball_data, game_num=1, rotation_len=5):
         pd.options.mode.chained_assignment = None  # suppresses chained assignment warning for lineup pos setting
-
         self.team_name = team_name
         self.baseball_data = baseball_data
         self.pitchers = baseball_data.pitching_data[baseball_data.pitching_data["Team"] == team_name]
         self.pos_players = baseball_data.batting_data[baseball_data.batting_data["Team"] == team_name]
+
+        self.p_lineup_cols_to_print = ['Player', 'League', 'Team', 'Age', 'G', 'GS', 'CG', 'SHO', 'IP', 'H', '2B', '3B',
+                                       'ER', 'K', 'BB', 'HR', 'W', 'L', 'SV', 'BS', 'HLD', 'ERA', 'WHIP']
+        self.b_lineup_cols_to_print = ['Player', 'League', 'Team', 'Age', 'G', 'AB', 'R', 'H', '2B', '3B', 'HR', 'RBI',
+                                       'SB', 'CS', 'BB', 'SO', 'SH', 'SF', 'HBP', 'AVG', 'OBP', 'SLG', 'OPS']
 
         self.mascot = self.pos_players.loc[self.pos_players["Team"] == team_name, "Mascot"].unique()[0]
         self.city_name = self.pos_players.loc[self.pos_players["Team"] == team_name, "City"].unique()[0]
@@ -141,7 +145,7 @@ class Team:
             self.pitching = self.middle_relievers.loc[self.cur_pitcher_index]  # should be a series
             self.box_score.add_pitcher_to_box(self.middle_relievers.loc[self.cur_pitcher_index])
             self.middle_relievers = self.middle_relievers.drop(self.cur_pitcher_index, axis=0)  # remove from pen
-        # elif len(self.relievers) == 0 and len(self.relievers) == 0 and len(self.starting_pitchers) > 0:  # grab someone
+        # elif len(self.relievers) == 0 and len(self.relievers) == 0 and len(self.starting_pitchers) > 0:  # grab any p
         #     # print(f'gameteam.py out of pitching in inning {inning}!')
         #     # print(self.starting_pitchers.to_string())
         #     # print(self.relievers.to_string())
@@ -211,8 +215,10 @@ class Team:
             dfb = bbstats.remove_non_print_cols(self.lineup)
             dfp = bbstats.remove_non_print_cols(self.pitching)
 
-        print(dfb.to_string(index=True, justify='center'))
+        dfb = dfb[self.b_lineup_cols_to_print]
+        print(dfb.to_string(index=False, justify='center'))
         print('')
+        dfp = dfp[self.p_lineup_cols_to_print]
         print(f'Pitching for {self.team_name}:')
         print(dfp.to_string(index=True, justify='center'))
         print('')

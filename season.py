@@ -89,7 +89,8 @@ class BaseballSeason:
 
     def sim_season(self, season_chatty=False, season_print_lineup_b=False, season_print_box_score_b=False,
                    summary_only_b=False, team_to_follow=''):
-        print(f'{self.new_season} will have {len(self.schedule)} games per team.')
+        print(f'{self.new_season} will have '
+              f'{self.season_length_limit if self.season_length_limit != 0 else len(self.schedule)} games per team.')
         # print(f'Full schedule of games: {self.schedule}')
 
         # loop over every day and every game scheduled that day
@@ -144,8 +145,9 @@ if __name__ == '__main__':
     bbseason23 = BaseballSeason(load_seasons=seasons, new_season=2023,
                                 season_length_limit=num_games,
                                 min_games=num_games, series_length=3, rotation_len=5,
-                                random_data=True, only_nl_b=False)
-    team_to_follow = bbseason23.teams[0]  # follow the first team in the random set
+                                random_data=False, only_nl_b=False)
+    # team_to_follow = bbseason23.teams[0]  # follow the first team in the random set
+    team_to_follow = ''  # or follow no team
     bbseason23.sim_season(season_chatty=False,
                           season_print_lineup_b=False,
                           season_print_box_score_b=False,

@@ -15,9 +15,12 @@ class Team:
                                        'ER', 'K', 'BB', 'HR', 'W', 'L', 'SV', 'BS', 'HLD', 'ERA', 'WHIP']
         self.b_lineup_cols_to_print = ['Player', 'League', 'Team', 'Age', 'G', 'AB', 'R', 'H', '2B', '3B', 'HR', 'RBI',
                                        'SB', 'CS', 'BB', 'SO', 'SH', 'SF', 'HBP', 'AVG', 'OBP', 'SLG', 'OPS']
-
-        self.mascot = self.pos_players.loc[self.pos_players["Team"] == team_name, "Mascot"].unique()[0]
-        self.city_name = self.pos_players.loc[self.pos_players["Team"] == team_name, "City"].unique()[0]
+        if 'Mascot' in self.pos_players.columns:
+            self.mascot = self.pos_players.loc[self.pos_players["Team"] == team_name, "Mascot"].unique()[0]
+            self.city_name = self.pos_players.loc[self.pos_players["Team"] == team_name, "City"].unique()[0]
+        else:
+            self.mascot = ''
+            self.city_name = ''
         self.lineup = None  # uses prior season stats
         self.lineup_new_season = None  # new / current season stats for printing starting lineup
         self.pitching = None  # uses prior season stats

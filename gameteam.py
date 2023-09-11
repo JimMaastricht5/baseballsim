@@ -196,12 +196,16 @@ class Team:
     def search_for_pos(self, position, lineup_index_list, stat_criteria='OPS'):
         # find players not in lineup at specified position, sort by stat descending to find the best
         # if pos is DH open up search to any position.
-        not_selected_criteria = ~self.pos_players.index.isin(lineup_index_list)
-        pos_criteria = self.pos_players['Pos'] == position
-        df_criteria = not_selected_criteria & pos_criteria if (position != 'DH' and position != '1B')\
-            else not_selected_criteria
-        pos_index = self.pos_players[df_criteria].sort_values(stat_criteria, ascending=False).head(1).index
-        return pos_index[0]  # tuple of index and dtype, just want index
+        # not_selected_criteria = ~self.pos_players.index.isin(lineup_index_list)
+        # pos_criteria = self.pos_players['Pos'] == position
+        # df_criteria = not_selected_criteria & pos_criteria if (position != 'DH' and position != '1B')\
+        #     else not_selected_criteria
+        # pos_index = self.pos_players[df_criteria].sort_values(stat_criteria, ascending=False).head(1).index
+        # return pos_index[0]  # tuple of index and dtype, just want index
+        df_criteria = (~self.pos_players.index.isin(lineup_index_list) & (self.pos_players['Pos'] == position)) if (
+                    position != 'DH' and position != '1B') else ~self.pos_players.index.isin(lineup_index_list)
+        # Return the index directly without creating the pos_index variable
+        return self.pos_players[df_criteria].sort_values(stat_criteria, ascending=False).head(1).index[0]
 
     def best_at_stat(self, lineup_index_list, stat_criteria='OPS', count=9, exclude=[]):
         # find players in lineup, sort by stat descending to find the best

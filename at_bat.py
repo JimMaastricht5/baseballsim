@@ -54,23 +54,34 @@ class SimAB:
         self.league_pitching_totals_df = bbstats.team_pitching_totals(self.baseball_data.pitching_data, concat=False)
 
         # set league totals for odds ratio
-        self.league_batting_obp = float(self.league_batting_totals_df['OBP'])
-        self.league_pitching_obp = float(self.league_pitching_totals_df['OBP'])
-        self.league_batting_Total_OB = int(
-            self.baseball_data.batting_data['H'].sum() + self.baseball_data.batting_data['BB'].sum() +
-            self.baseball_data.batting_data['HBP'].sum())
-        self.league_pitching_Total_OB = int(
-            self.baseball_data.pitching_data['H'].sum() + self.baseball_data.pitching_data[
-                'BB'].sum())  # + self.baseball_data.pitching_data['HBP']
-        self.league_batting_Total_BB = int(self.league_batting_totals_df['BB'])
-        self.league_batting_Total_HR = int(self.league_batting_totals_df['HR'])
-        self.league_batting_Total_3B = int(self.league_batting_totals_df['3B'])
-        self.league_batting_Total_2B = int(self.league_batting_totals_df['2B'])
-        self.league_Total_outs = int(self.baseball_data.batting_data['AB'].sum() -
-                                     self.baseball_data.batting_data['H'].sum() -
-                                     self.baseball_data.batting_data['HBP'].sum())
-        self.league_K_rate_per_AB = float(self.baseball_data.batting_data['SO'].sum() /
-                                          self.league_Total_outs)  # strike out or in play
+        # self.league_batting_obp = float(self.league_batting_totals_df['OBP'])
+        # self.league_pitching_obp = float(self.league_pitching_totals_df['OBP'])
+        self.league_batting_obp = self.league_batting_totals_df.at[0, 'OBP']
+        self.league_pitching_obp = self.league_pitching_totals_df.at[0, 'OBP']
+        # self.league_batting_Total_OB = int(
+        #     self.baseball_data.batting_data['H'].sum() + self.baseball_data.batting_data['BB'].sum() +
+        #     self.baseball_data.batting_data['HBP'].sum())
+        batting_data_sum = self.baseball_data.batting_data[['H', 'BB', 'HBP']].sum()
+        self.league_batting_Total_OB = batting_data_sum['H'] + batting_data_sum['BB'] + batting_data_sum['HBP']
+        # self.league_pitching_Total_OB = int(
+        #     self.baseball_data.pitching_data['H'].sum() + self.baseball_data.pitching_data[
+        #         'BB'].sum())  # + self.baseball_data.pitching_data['HBP']
+        self.league_pitching_Total_OB = self.baseball_data.pitching_data[['H', 'BB']].sum().sum()
+        # self.league_batting_Total_BB = int(self.league_batting_totals_df['BB'])
+        # self.league_batting_Total_HR = int(self.league_batting_totals_df['HR'])
+        # self.league_batting_Total_3B = int(self.league_batting_totals_df['3B'])
+        # self.league_batting_Total_2B = int(self.league_batting_totals_df['2B'])
+        # self.league_Total_outs = int(self.baseball_data.batting_data['AB'].sum() -
+        #                              self.baseball_data.batting_data['H'].sum() -
+        #                              self.baseball_data.batting_data['HBP'].sum())
+        # self.league_K_rate_per_AB = float(self.baseball_data.batting_data['SO'].sum() /
+        #                                   self.league_Total_outs)  # strike out or in play
+        self.league_batting_Total_BB = self.league_batting_totals_df.at[0, 'BB']
+        self.league_batting_Total_HR = self.league_batting_totals_df.at[0, 'HR']
+        self.league_batting_Total_3B = self.league_batting_totals_df.at[0, '3B']
+        self.league_batting_Total_2B = self.league_batting_totals_df.at[0, '2B']
+        self.league_Total_outs = self.baseball_data.batting_data['AB'].sum() - batting_data_sum.sum()
+        self.league_K_rate_per_AB = self.baseball_data.batting_data['SO'].sum() / self.league_Total_outs
         self.league_GB = .429  # ground ball rate for season
         self.league_GB_FC = .10  # GB FC occur 10 out of 100 times ball in play
         self.league_FB = .372  # fly ball rate for season

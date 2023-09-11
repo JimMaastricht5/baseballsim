@@ -89,26 +89,41 @@ class TeamBoxScore:
     def batting_result(self, batter_index, outcomes, players_scored_list):
         outcomes.convert_k()
         if outcomes.score_book_cd != 'BB':  # handle walks
-            self.box_batting.loc[batter_index, ['AB']] = self.box_batting.loc[batter_index, ['AB']] + 1
-
+            self.box_batting.loc[batter_index, ['AB']] += 1
         outcome_cd = outcomes.score_book_cd if outcomes.score_book_cd != 'K' else 'SO'  # translate K to SO for batter
         if outcome_cd in ['H', '2B', '3B', 'HR', 'BB', 'SO', 'SF', 'HBP']:  # record  plate appearance
-            self.box_batting.loc[batter_index, [outcome_cd]] = \
-                self.box_batting.loc[batter_index, [outcome_cd]] + 1
-
+            self.box_batting.loc[batter_index, [outcome_cd]] += 1
         # increment hit count if OB, not a walk, and not a single
-        self.box_batting.loc[batter_index, ['H']] = self.box_batting.loc[batter_index, ['H']] + 1 \
-            if outcomes.score_book_cd != 'BB' and outcomes.score_book_cd != 'H' and outcomes.on_base_b is True \
-            else self.box_batting.loc[batter_index, ['H']]
+        # self.box_batting.loc[batter_index, ['H']] = self.box_batting.loc[batter_index, ['H']] + 1 \
+        #     if outcomes.score_book_cd != 'BB' and outcomes.score_book_cd != 'H' and outcomes.on_base_b is True \
+        #     else self.box_batting.loc[batter_index, ['H']]
+        if outcomes.score_book_cd != 'BB' and outcomes.score_book_cd != 'H' and outcomes.on_base_b is True:
+            self.box_batting.loc[batter_index, ['H']] += 1
         self.total_hits = self.box_batting['H'].sum()
-        self.box_batting.loc[batter_index, ['RBI']] = self.box_batting.loc[batter_index, ['RBI']] + outcomes.runs_scored
+        self.box_batting.loc[batter_index, ['RBI']] += outcomes.runs_scored
+        # batter_stats = self.box_batting.loc[batter_index]
+        # if outcomes.score_book_cd != 'BB':  # handle walks
+        #     batter_stats['AB'] += 1
+        # outcome_cd = outcomes.score_book_cd if outcomes.score_book_cd != 'K' else 'SO'  # translate K to SO for batter
+        # if outcome_cd in ['H', '2B', '3B', 'HR', 'BB', 'SO', 'SF', 'HBP']:  # record  plate appearance
+        #     batter_stats[outcome_cd] += 1
+        # # increment hit count if OB, not a walk, and not a single
+        # if outcomes.score_book_cd != 'BB' and outcomes.score_book_cd != 'H' and outcomes.on_base_b is True:
+        #     batter_stats['H'] += 1
+        # self.total_hits = self.box_batting['H'].sum()
+        # batter_stats['RBI'] += outcomes.runs_scored
 
         # find running count error
-        for scored_index in players_scored_list.keys():
-            self.box_batting.loc[scored_index, ['R']] = self.box_batting.loc[scored_index, ['R']] + 1
-            if scored_index == 0:
-                print(f'teamgameboxstats.py batting result runners scored with zero index.')
-                raise ValueError('Player with zero index value causes problems accumulating runs')
+        # for scored_index in players_scored_list.keys():
+        #     self.box_batting.loc[scored_index, ['R']] = self.box_batting.loc[scored_index, ['R']] + 1
+        #     if scored_index == 0:
+        #         print(f'teamgameboxstats.py batting result runners scored with zero index.')
+        #         raise ValueError('Player with zero index value causes problems accumulating runs')
+        scored_indices = list(players_scored_list.keys())
+        if 0 in scored_indices:
+            print(f'teamgameboxstats.py batting result runners scored with zero index.')
+            raise ValueError('Player with zero index value causes problems accumulating runs')
+        self.box_batting.loc[scored_indices, 'R'] += 1
         return
 
     def totals(self):

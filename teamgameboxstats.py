@@ -38,36 +38,35 @@ class TeamBoxScore:
     def pitching_result(self, pitcher_index, outcomes, condition):
         outcomes.convert_k()
         if outcomes.score_book_cd != 'BB':  # handle walks
-            self.box_pitching.loc[pitcher_index, ['AB']] = self.box_pitching.loc[pitcher_index, ['AB']] + 1
+            self.box_pitching.loc[pitcher_index, ['AB']] += 1
         if outcomes.on_base_b is False:
             self.box_pitching.loc[pitcher_index, ['Total_Outs']] = \
                 self.box_pitching.loc[pitcher_index, ['Total_Outs']] + outcomes.outs_on_play
             self.box_pitching.loc[pitcher_index, ['IP']] = \
                 float(self.box_pitching.loc[pitcher_index, ['Total_Outs']] / 3)
-
         if outcomes.score_book_cd in ['H', '2B', '3B', 'HR', 'K', 'BB', 'HBP']:  # handle plate appearance
-            self.box_pitching.loc[pitcher_index, [outcomes.score_book_cd]] = \
-                self.box_pitching.loc[pitcher_index, [outcomes.score_book_cd]] + 1
-
-        # increment hit count if OB, not a walk, and not a single
-        self.box_pitching.loc[pitcher_index, ['H']] = self.box_pitching.loc[pitcher_index, ['H']] + 1 \
-            if outcomes.score_book_cd != 'BB' and outcomes.score_book_cd != 'H' and outcomes.on_base_b is True \
-            else self.box_pitching.loc[pitcher_index, ['H']]
-
-        # add runs
-        self.box_pitching.loc[pitcher_index, ['ER']] = self.box_pitching.loc[pitcher_index, ['ER']] \
-            + outcomes.runs_scored
+            self.box_pitching.loc[pitcher_index, [outcomes.score_book_cd]] += 1
+        # increment hit count if OB, not a walk, and not a single, handles 2b, 3b, and hr
+        if outcomes.score_book_cd != 'BB' and outcomes.score_book_cd != 'H' and outcomes.on_base_b is True:
+            self.box_pitching.loc[pitcher_index, ['H']] += 1
+        self.box_pitching.loc[pitcher_index, ['ER']] += outcomes.runs_scored
         self.box_pitching.loc[pitcher_index, ['Condition']] = condition
         return
 
     def add_pitcher_to_box(self, new_pitcher):
         new_pitcher = new_pitcher if isinstance(new_pitcher, pd.DataFrame) else new_pitcher.to_frame().T
-        new_pitcher[['G']] = 1
-        new_pitcher[['GS', 'CG', 'SHO', 'IP', 'AB', 'H', 'ER', 'K', 'BB', 'HR', 'W', 'L', 'SV', 'BS', 'HLD', 'ERA',
-                     'WHIP', 'OBP', 'SLG', 'OPS', 'Total_Outs']] = 0
-        new_pitcher[['Condition']] = 100
+        # new_pitcher[['G']] = 1
+        # new_pitcher[['GS', 'CG', 'SHO', 'IP', 'AB', 'H', 'ER', 'K', 'BB', 'HR', 'W', 'L', 'SV', 'BS', 'HLD', 'ERA',
+        #              'WHIP', 'OBP', 'SLG', 'OPS', 'Total_Outs']] = 0
+        # new_pitcher[['Condition']] = 100
+        new_pitcher = new_pitcher.assign(G=1, GS=0, CG=0, SHO=0, IP=0, AB=0, H=0, ER=0, K=0, BB=0, HR=0,
+                                         W=0, L=0, SV=0, BS=0, HLD=0, ERA=0,
+                                         WHIP = 0, OBP = 0, SLG = 0, OPS = 0, Total_Outs = 0, Condition = 100)
+        # Add new_pitcher to self.box_pitching
+        # self.box_pitching = self.box_pitching.append(new_pitcher)
         self.box_pitching = pd.concat([self.box_pitching, new_pitcher], ignore_index=False)
-        self.box_pitching = bbstats.remove_non_print_cols(self.box_pitching)
+        # self.box_pitching = bbstats.remove_non_print_cols(self.box_pitching)
+        # Assign values to the columns
         return
 
     def pitching_win_loss_save(self, pitcher_index, win_b, save_b):

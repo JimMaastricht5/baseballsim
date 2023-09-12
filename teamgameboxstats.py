@@ -90,13 +90,11 @@ class TeamBoxScore:
     def pitching_win_loss_save(self, pitcher_index, win_b, save_b):
         # set win loss records and save if applicable
         if win_b:  # win boolean, did this pitcher win or lose?
-            self.box_pitching.loc[pitcher_index, ['W']] = self.box_pitching.loc[pitcher_index, ['W']] + 1
+            self.box_pitching.loc[pitcher_index, ['W']] += 1
         else:
-            self.box_pitching.loc[pitcher_index, ['L']] = self.box_pitching.loc[pitcher_index, ['L']] + 1
-
+            self.box_pitching.loc[pitcher_index, ['L']] += 1
         if save_b:  # add one to save col for last row in box for team is save boolean is true
-            self.box_pitching.loc[self.box_pitching.index[-1], ['SV']] = \
-                self.box_pitching.loc[self.box_pitching.index[-1], ['SV']] + 1
+            self.box_pitching.loc[self.box_pitching.index[-1], ['SV']] += 1
         return
 
     def pitching_blown_save(self, pitcher_index):

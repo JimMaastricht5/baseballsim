@@ -206,6 +206,25 @@ class BaseballStats:
             self.new_season_pitching_data.loc[index, 'Condition'] = pitching_box_score.loc[index, 'Condition']
             self.new_season_pitching_data.loc[index, 'Injured Days'] = pitching_box_score.loc[index, 'Injured Days']
         return
+    # Proposed optimization:
+    # The given code can be optimized by using vectorized operations provided by pandas library
+    # instead of iterating over each row.
+    # This will significantly improve the performance as pandas vectorized operations are faster than python loops.
+    # Also, the code is more readable and concise with vectorized operations.
+    # def game_results_to_season(self, box_score_class):
+    #     batting_box_score = box_score_class.get_batter_game_stats()
+    #     pitching_box_score = box_score_class.get_pitcher_game_stats()
+    #     # Vectorized addition of corresponding numeric columns in new_season_batting_data and batting_box_score
+    #     self.new_season_batting_data[self.numeric_bcols] += batting_box_score[self.numeric_bcols]
+    #     # Vectorized assignment of 'Condition' and 'Injured Days' columns in new_season_batting_data
+    #     self.new_season_batting_data['Condition'] = batting_box_score['Condition']
+    #     self.new_season_batting_data['Injured Days'] = batting_box_score['Injured Days']
+    #     # Vectorized addition of corresponding numeric columns in new_season_pitching_data and pitching_box_score
+    #     self.new_season_pitching_data[self.numeric_pcols] += pitching_box_score[self.numeric_pcols]
+    #     # Vectorized assignment of 'Condition' and 'Injured Days' columns in new_season_pitching_data
+    #     self.new_season_pitching_data['Condition'] = pitching_box_score['Condition']
+    #     self.new_season_pitching_data['Injured Days'] = pitching_box_score['Injured Days']
+    #     return
 
     def is_injured(self):
         self.new_season_pitching_data['Injured Days'] = self.new_season_pitching_data.\
@@ -308,18 +327,34 @@ def trunc_col(df_n, d=3):
     return (df_n * 10 ** d).astype(int) / 10 ** d
 
 
+# def team_batting_stats(df):
+#     # print(f'team_batting_stats bbstats.py {df.to_string()}')
+#     df = df[df['AB'] > 0]
+#     try:
+#         df['AVG'] = trunc_col(df['H'] / df['AB'], 3)
+#         df['OBP'] = trunc_col((df['H'] + df['BB'] + df['HBP']) / (df['AB'] + df['BB'] + df['HBP']), 3)
+#         df['SLG'] = trunc_col(
+#             ((df['H'] - df['2B'] - df['3B'] - df['HR']) + df['2B'] * 2 + df['3B'] * 3 + df['HR'] * 4) / df['AB'], 3)
+#         df['OPS'] = trunc_col(df['OBP'] + df['SLG'], 3)
+#         df['Condition'] = trunc_col(df['Condition'], 0)
+#     except ZeroDivisionError:
+#         pass  # skip calculation for zero div error
+#     return df
+# Proposed optimization: The given code is already quite optimized and uses vectorized operations for calculations.
+# However, we can make a minor improvement by removing the try-except block for ZeroDivisionError.
+# Instead, we can use the np.divide function which can handle division by zero without raising an error.
+# This function returns inf or NaN when division by zero occurs,
+# which we can then replace with 0 using the np.nan_to_num function.
+# This approach is more efficient because it avoids the overhead of exception handling.
 def team_batting_stats(df):
-    # print(f'team_batting_stats bbstats.py {df.to_string()}')
     df = df[df['AB'] > 0]
-    try:
-        df['AVG'] = trunc_col(df['H'] / df['AB'], 3)
-        df['OBP'] = trunc_col((df['H'] + df['BB'] + df['HBP']) / (df['AB'] + df['BB'] + df['HBP']), 3)
-        df['SLG'] = trunc_col(
-            ((df['H'] - df['2B'] - df['3B'] - df['HR']) + df['2B'] * 2 + df['3B'] * 3 + df['HR'] * 4) / df['AB'], 3)
-        df['OPS'] = trunc_col(df['OBP'] + df['SLG'], 3)
-        df['Condition'] = trunc_col(df['Condition'], 0)
-    except ZeroDivisionError:
-        pass  # skip calculation for zero div error
+    df['AVG'] = np.nan_to_num(np.divide(df['H'], df['AB']), nan=0.0, posinf=0.0)
+    df['OBP'] = np.nan_to_num(np.divide(df['H'] + df['BB'] + df['HBP'], df['AB'] + df['BB'] + df['HBP']),
+                              nan=0.0, posinf=0.0)
+    df['SLG'] = np.nan_to_num(np.divide((df['H'] - df['2B'] - df['3B'] - df['HR']) + df['2B'] * 2 + df['3B'] * 3 +
+                                        df['HR'] * 4, df['AB']), nan=0.0, posinf=0.0)
+    df['OPS'] = np.nan_to_num(df['OBP'] + df['SLG'], nan=0.0, posinf=0.0)
+    df['Condition'] = (df['Condition'] * 10 ** 0).astype(int) / 10 ** 0
     return df
 
 
@@ -372,27 +407,26 @@ def team_batting_totals(batting_df, team_name='', concat=True):
 
 
 def team_pitching_totals(pitching_df, team_name='', concat=True):
-    # df = pitching_df.copy()
-    # df = df[['GS', 'CG', 'SHO', 'IP', 'AB', 'H', '2B', '3B', 'ER', 'K', 'BB', 'HR', 'W', 'L', 'SV', 'BS',
-    #          'HLD', 'Total_Outs']].sum()
     df = pitching_df[['GS', 'CG', 'SHO', 'IP', 'AB', 'H', '2B', '3B', 'ER', 'K', 'BB', 'HR', 'W', 'L', 'SV', 'BS',
-             'HLD', 'Total_Outs']].sum()
-    cols_to_trunc = ['GS', 'CG', 'SHO', 'H', 'AB', 'ER', 'K', 'BB', 'HR', 'W', 'L', 'SV', 'BS', 'HLD', 'Total_Outs']
-    df['Player'] = 'Totals'
-    df['Team'] = team_name
-    df['Age'] = ''
-    df['Status'] = ''
-    df['Injured Days'] = ''
-    df['G'] = np.max(pitching_df['G'])
-    df['Condition'] = 0
-
+                      'HLD', 'Total_Outs']].sum()
+    # df['Player'] = 'Totals'
+    # df['Team'] = team_name
+    # df['Age'] = ''
+    # df['Status'] = ''
+    # df['Injured Days'] = ''
+    # df['G'] = np.max(pitching_df['G'])
+    # df['Condition'] = 0
+    # Add new columns
     df = df.to_frame().T
+    df = df.assign(Player='Totals', Team=team_name, Age='', Status='', Injured_Days='',
+                   G=np.max(pitching_df['G']), Condition=0)
     if concat:
         df = pd.concat([pitching_df, df], ignore_index=True)
     df = team_pitching_stats(df)
     # for col in cols_to_trunc:  # remove trailing zeros after decimal
     #     df[col] = np.floor(df[col])
     # Vectorized the truncation operation using pandas' apply function
+    cols_to_trunc = ['GS', 'CG', 'SHO', 'H', 'AB', 'ER', 'K', 'BB', 'HR', 'W', 'L', 'SV', 'BS', 'HLD', 'Total_Outs']
     df[cols_to_trunc] = df[cols_to_trunc].apply(np.floor)
     return df
 

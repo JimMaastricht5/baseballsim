@@ -4,6 +4,7 @@ import at_bat
 import numpy as np
 import random
 import bbbaserunners
+import datetime
 
 AWAY = 0
 HOME = 1
@@ -279,6 +280,8 @@ class Game:
 
 # test a number of games
 if __name__ == '__main__':
+    startdt = datetime.datetime.now()
+
     home_team = 'MIL'
     away_team = 'MIN'
     season_length = 1
@@ -302,3 +305,6 @@ if __name__ == '__main__':
         print('')
         print(f'{away_team} season : {season_win_loss[0][0]} W and {season_win_loss[0][1]} L')
         print(f'{home_team} season : {season_win_loss[1][0]} W and {season_win_loss[1][1]} L')
+
+        print(startdt)
+        print(datetime.datetime.now())

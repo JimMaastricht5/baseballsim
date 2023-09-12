@@ -195,16 +195,20 @@ class BaseballStats:
         for index, row in batting_box_score.iterrows():
             # print(index, row)
             new_row = batting_box_score.loc[index][numeric_cols] + self.new_season_batting_data.loc[index][numeric_cols]
+            new_row['Condition'] = batting_box_score.loc[index, 'Condition']
+            new_row['Injured Days'] = batting_box_score.loc[index, 'Injured Days']
             self.new_season_batting_data.loc[index, numeric_cols] = new_row
-            self.new_season_batting_data.loc[index, 'Condition'] = batting_box_score.loc[index, 'Condition']
-            self.new_season_batting_data.loc[index, 'Injured Days'] = batting_box_score.loc[index, 'Injured Days']
+            # self.new_season_batting_data.loc[index, 'Condition'] = batting_box_score.loc[index, 'Condition']
+            # self.new_season_batting_data.loc[index, 'Injured Days'] = batting_box_score.loc[index, 'Injured Days']
         numeric_cols = self.numeric_pcols
         for index, row in pitching_box_score.iterrows():
             new_row = pitching_box_score.loc[index][numeric_cols] + \
                       self.new_season_pitching_data.loc[index][numeric_cols]
+            new_row['Condition'] = pitching_box_score.loc[index, 'Condition']
+            new_row['Injured Days'] = pitching_box_score.loc[index, 'Injured Days']
             self.new_season_pitching_data.loc[index, numeric_cols] = new_row
-            self.new_season_pitching_data.loc[index, 'Condition'] = pitching_box_score.loc[index, 'Condition']
-            self.new_season_pitching_data.loc[index, 'Injured Days'] = pitching_box_score.loc[index, 'Injured Days']
+            # self.new_season_pitching_data.loc[index, 'Condition'] = pitching_box_score.loc[index, 'Condition']
+            # self.new_season_pitching_data.loc[index, 'Injured Days'] = pitching_box_score.loc[index, 'Injured Days']
         return
     # Proposed optimization:
     # The given code can be optimized by using vectorized operations provided by pandas library

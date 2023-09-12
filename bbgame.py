@@ -284,7 +284,7 @@ if __name__ == '__main__':
 
     home_team = 'MIL'
     away_team = 'MIN'
-    season_length = 1
+    season_length = 10
     season_win_loss = [[0, 0], [0, 0]]  # away record pos 0, home pos 1
     team0_season_df = None
     for sim_game_num in range(1, season_length + 1):

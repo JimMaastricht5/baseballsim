@@ -34,8 +34,8 @@ class Bases:
             if len(self.baserunners_names[player_num]) > 0:  # base runner names is a lookup and does not need reset
                 self.player_scored[player_num] = self.baserunners_names[player_num]
         self.baserunners[-4] = 0  # send the runners that score back to the dug out
-        self.baserunners = [baserunner if i <= 3 else 0 for i, baserunner in enumerate(self.baserunners)]  #resetbases
-        # self.baserunners[:4] = [0] * 4  # reset based without list comprehension
+        # self.baserunners = [baserunner if i <= 3 else 0 for i, baserunner in enumerate(self.baserunners)]  #resetbases
+        self.baserunners[4:] = [0] * 4  # reset based without list comprehension
         return
 
     def ground_out(self, score_book_cd):

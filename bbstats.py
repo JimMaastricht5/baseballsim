@@ -65,6 +65,7 @@ class BaseballStats:
                 pitching_data['AB'] = pitching_data['IP'] * 3 + pitching_data['H']
                 pitching_data['2B'] = 0
                 pitching_data['3B'] = 0
+                pitching_data['HBP'] = 0
                 pitching_data['Season'] = str(season)
                 pitching_data['OBP'] = pitching_data['WHIP'] / (3 + pitching_data['WHIP'])  # bat reached / number faced
                 pitching_data['Total_OB'] = pitching_data['H'] + pitching_data['BB']  # + pitching_data['HBP']

@@ -10,12 +10,13 @@ class OutCome:
         self.score_book_cd = ''
         self.bases_to_advance = 0
         self.runs_scored = 0
-        self.bases_dict = {'BB': 1, 'H': 1, '2B': 2, '3B': 3, 'HR': 4, 'K': 0, 'SO': 0, 'GB': 1, 'DP': 1,
+        self.bases_dict = {'BB': 1, 'HPB': 1, 'H': 1, '2B': 2, '3B': 3, 'HR': 4, 'K': 0, 'SO': 0, 'GB': 1, 'DP': 1,
                            'GB FC': 1, 'FO': 0, 'LD': 0, 'SF': 0}  # some outs allow runners to move such as dp or gb
-        self.on_base_dict = {'BB': True, 'H': True, '2B': True, '3B': True, 'HR': True, 'K': False, 'SO': False,
-                             'GB': False, 'DP': False, 'GB FC': False, 'FO': False, 'LD': False, 'SF': False}
-        self.outs_dict = {'BB': 0, 'H': 0, '2B': 0, '3B': 0, 'HR': 0, 'K': 1, 'SO': 1, 'GB': 1, 'DP': 2, 'GB FC': 1,
-                          'FO': 1, 'LD': 1, 'SF': 0}
+        self.on_base_dict = {'BB': True, 'HBP': True, 'H': True, '2B': True, '3B': True, 'HR': True, 'K': False,
+                             'SO': False, 'GB': False, 'DP': False, 'GB FC': False, 'FO': False, 'LD': False,
+                             'SF': False}
+        self.outs_dict = {'BB': 0, 'HBP': 0, 'H': 0, '2B': 0, '3B': 0, 'HR': 0, 'K': 1, 'SO': 1, 'GB': 1, 'DP': 2,
+                          'GB FC': 1, 'FO': 1, 'LD': 1, 'SF': 0}
         return
 
     def reset(self):
@@ -60,6 +61,7 @@ class SimAB:
         self.league_batting_Total_OB = batting_data_sum['H'] + batting_data_sum['BB'] + batting_data_sum['HBP']
         self.league_pitching_Total_OB = self.baseball_data.pitching_data[['H', 'BB']].sum().sum()
         self.league_batting_Total_BB = self.league_batting_totals_df.at[0, 'BB']
+        self.league_batting_Total_HBP = self.league_batting_totals_df.at[0, 'HBP']
         self.league_batting_Total_HR = self.league_batting_totals_df.at[0, 'HR']
         self.league_batting_Total_3B = self.league_batting_totals_df.at[0, '3B']
         self.league_batting_Total_2B = self.league_batting_totals_df.at[0, '2B']
@@ -71,6 +73,7 @@ class SimAB:
         self.league_LD = .199  # line drive rate for the season
         self.OBP_adjustment = -0.025  # final adjustment to line up with prior seasons
         self.bb_adjustment = -0.30  # final adjustment to shift more bb to H
+        self.hbp_adjustment = 0.0  # final adjustment to shift more to or from hbp
         self.dp_chance = .20  # 20% chance dp with runner on per mlb
         self.tag_up_chance = .20  # 20% chance of tagging up and scoring, per mlb
         return
@@ -115,6 +118,13 @@ class SimAB:
                                             ((self.league_batting_Total_BB + self.bb_adjustment) /
                                             self.league_batting_Total_OB),
                                             stat_type='BB')
+
+    def hbp(self):
+        return self.rng() < self.odds_ratio(hitter_stat=((self.batting.HBP + self.hbp_adjustment) / self.batting.Total_OB),
+                                            pitcher_stat=((.00143 * (self.pitching.Total_OB + self.pitching.Total_Outs)) / self.league_pitching_Total_OB),  # 2023 rate per plate appearance is 1.43%
+                                            league_stat=((self.league_batting_Total_HBP + self.hbp_adjustment) /
+                                            self.league_batting_Total_OB),
+                                            stat_type='HBP')
 
     def hr(self):
         return self.rng() < self.odds_ratio((self.batting.HR / self.batting.Total_OB),
@@ -172,6 +182,8 @@ class SimAB:
                 outcomes.set_score_book_cd('3B')
             elif self.hr():
                 outcomes.set_score_book_cd('HR')
+            elif self.hbp():
+                outcomes.set_score_book_cd('HBP')
             else:
                 outcomes.set_score_book_cd('H')
         else:  # handle outs

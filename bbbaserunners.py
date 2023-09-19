@@ -18,8 +18,8 @@ class Bases:
     def handle_runners(self, score_book_cd, bases_to_advance, on_base_b, outs):
         if outs >= 3:
             return
-        if score_book_cd == 'BB':
-            bases_to_advance = self.walk(bases_to_advance)  # keep at 1 if bases loaded, else move runners one at a time
+        if score_book_cd == 'BB' or 'HBP':
+            bases_to_advance = self.walk_or_HBP(bases_to_advance)  # set to 1 if bases loaded, else move runners indivly
         elif score_book_cd == 'SF':
             bases_to_advance = self.tag_up(outs)  # move runner from third and set other runners to hold w/ 0
         elif score_book_cd in ['DP', 'GB FC', 'GB']:
@@ -120,7 +120,7 @@ class Bases:
         self.move_a_runner(basenum_from, basenum_to)
         return
 
-    def walk(self, bases_to_move_all_runners):
+    def walk_or_HBP(self, bases_to_move_all_runners):
         # default is move all runners on base, that works unless there is a hole
         if self.count_runners() < 3 and self.count_runners() != 0:  # not loaded or empty
             # bases are not loaded so move runners up a base when forced

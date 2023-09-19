@@ -170,7 +170,9 @@ class BaseballStats:
             raise Exception('load at least one season of pitching and batting')
 
         self.new_season_pitching_data = self.pitching_data.copy()
-        self.new_season_pitching_data[self.numeric_pcols] = 0
+        # self.new_season_pitching_data[self.numeric_pcols] = 0
+        self.new_season_pitching_data[self.numeric_pcols] = \
+            self.new_season_pitching_data[self.numeric_pcols].astype('int')
         self.new_season_pitching_data[['OBP', 'Total_OB', 'Total_Outs', 'AB', 'Injured Days']] = 0
         self.new_season_pitching_data['Condition'] = 100
         self.new_season_pitching_data.drop(['Total_OB', 'Total_Outs'], axis=1)
@@ -352,12 +354,12 @@ def trunc_col(df_n, d=3):
 # This approach is more efficient because it avoids the overhead of exception handling.
 def team_batting_stats(df):
     df = df[df['AB'] > 0]
-    df['AVG'] = np.nan_to_num(np.divide(df['H'], df['AB']), nan=0.0, posinf=0.0)
-    df['OBP'] = np.nan_to_num(np.divide(df['H'] + df['BB'] + df['HBP'], df['AB'] + df['BB'] + df['HBP']),
-                              nan=0.0, posinf=0.0)
-    df['SLG'] = np.nan_to_num(np.divide((df['H'] - df['2B'] - df['3B'] - df['HR']) + df['2B'] * 2 + df['3B'] * 3 +
-                                        df['HR'] * 4, df['AB']), nan=0.0, posinf=0.0)
-    df['OPS'] = np.nan_to_num(df['OBP'] + df['SLG'], nan=0.0, posinf=0.0)
+    df['AVG'] = trunc_col(np.nan_to_num(np.divide(df['H'], df['AB']), nan=0.0, posinf=0.0), 0)
+    df['OBP'] = trunc_col(np.nan_to_num(np.divide(df['H'] + df['BB'] + df['HBP'], df['AB'] + df['BB'] + df['HBP']),
+                              nan=0.0, posinf=0.0), 3)
+    df['SLG'] = trunc_col(np.nan_to_num(np.divide((df['H'] - df['2B'] - df['3B'] - df['HR']) + df['2B'] * 2 +
+                                                   df['3B'] * 3 + df['HR'] * 4, df['AB']), nan=0.0, posinf=0.0), 3)
+    df['OPS'] = trunc_col(np.nan_to_num(df['OBP'] + df['SLG'], nan=0.0, posinf=0.0), 3)
     df['Condition'] = (df['Condition'] * 10 ** 0).astype(int) / 10 ** 0
     return df
 

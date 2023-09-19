@@ -147,8 +147,8 @@ if __name__ == '__main__':
                                 season_length_limit=num_games,
                                 min_games=num_games, series_length=3, rotation_len=5,
                                 random_data=False, only_nl_b=only_nl_b)
-    # team_to_follow = bbseason23.teams[0]  # follow the first team in the random set
-    team_to_follow = ''  # or follow no team
+    team_to_follow = bbseason23.teams[0]  # follow the first team in the random set
+    # team_to_follow = ''  # or follow no team
     bbseason23.sim_season(season_chatty=False,
                           season_print_lineup_b=False,
                           season_print_box_score_b=False,

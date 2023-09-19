@@ -35,14 +35,14 @@ class TeamBoxScore:
     #                   self.box_pitching.loc[pitcher_index].IP * 3
     #     return total_faced
     # Proposed optimization:
-    # The original code is already quite efficient, but we can make a minor improvement by avoiding multiple calls to .loc[].
+    # The org code is already quite efficient, but we can make a minor improvement by avoiding multiple calls to .loc[].
     # .loc[] is a pandas function that can be quite slow, especially when called repeatedly in a loop.
     # Instead, we can call .loc[] once, store the result in a variable, and then use that variable for the calculations.
-    # This should result in a small speedup, although the exact amount will depend on the size of the DataFrame and other factors.
+    # This results in a small speedup, the exact amount will depend on the size of the DataFrame and other factors.
     # Note that this code does not use sklearn or cupy, as they are not necessary for this optimization.
     def batters_faced(self, pitcher_index):
         pitcher_stats = self.box_pitching.loc[pitcher_index]  # Store the result of .loc[] in a variable
-        return  pitcher_stats.H + pitcher_stats.BB + pitcher_stats.IP * 3  # total batters faced
+        return pitcher_stats.H + pitcher_stats.BB + pitcher_stats.IP * 3  # total batters faced
 
     def pitching_result(self, pitcher_index, outcomes, condition):
         outcomes.convert_k()
@@ -83,7 +83,7 @@ class TeamBoxScore:
         new_pitcher = new_pitcher if isinstance(new_pitcher, pd.DataFrame) else new_pitcher.to_frame().T
         new_pitcher = new_pitcher.assign(G=1, GS=0, CG=0, SHO=0, IP=0, AB=0, H=0, ER=0, K=0, BB=0, HR=0,
                                          W=0, L=0, SV=0, BS=0, HLD=0, ERA=0,
-                                         WHIP = 0, OBP = 0, SLG = 0, OPS = 0, Total_Outs = 0, Condition = 100)
+                                         WHIP=0, OBP=0, SLG=0, OPS=0, Total_Outs=0, Condition=100)
         self.box_pitching = pd.concat([self.box_pitching, new_pitcher], ignore_index=False)
         return
 
@@ -95,6 +95,9 @@ class TeamBoxScore:
             self.box_pitching.loc[pitcher_index, ['L']] += 1
         if save_b:  # add one to save col for last row in box for team is save boolean is true
             self.box_pitching.loc[self.box_pitching.index[-1], ['SV']] += 1
+            if float(self.box_pitching.loc[self.box_pitching.index[-1], ['IP']]) < 2.0 and \
+                    float(self.box_pitching.loc[self.box_pitching.index[-2], ['IP']]) > 0:  # if the save was not two innings
+                self.box_pitching.loc[self.box_pitching.index[-2], ['HLD']] += 1,
         return
 
     def pitching_blown_save(self, pitcher_index):
@@ -154,13 +157,12 @@ class TeamBoxScore:
 
     def print_boxes(self):
         df = self.box_batting[['Player', 'Team', 'Pos', 'Age', 'G', 'AB', 'R', 'H', '2B', '3B', 'HR', 'RBI',
-                                       'SB', 'CS', 'BB', 'SO', 'SH', 'SF', 'HBP']]
+                               'SB', 'CS', 'BB', 'SO', 'SH', 'SF', 'HBP']]
         # , 'AVG', 'OBP', 'SLG', 'OPS', 'Condition', 'Status']]
         print(df.to_string(index=False, justify='center'))
         print('')
-        df = self.box_pitching[['Player', 'Team', 'Age', 'G', 'GS', 'CG', 'SHO', 'IP', 'AB', 'H', '2B', '3B',
-                                        'ER', 'K', 'BB',
-                                        'HR', 'W', 'L', 'SV', 'BS', 'HLD']]  #
+        df = self.box_pitching[['Player', 'Team', 'Age', 'G', 'GS', 'CG', 'SHO', 'IP', 'H', '2B', '3B',
+                                'ER', 'K', 'BB', 'HR', 'W', 'L', 'SV', 'BS', 'HLD']]  #
         # , 'ERA', 'WHIP', 'AVG', 'OBP', 'SLG', 'OPS', 'Condition', 'Status']]
         print(df.to_string(index=False, justify='center'))
         print('')

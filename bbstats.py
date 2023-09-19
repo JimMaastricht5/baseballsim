@@ -355,7 +355,7 @@ def trunc_col(df_n, d=3):
 # This approach is more efficient because it avoids the overhead of exception handling.
 def team_batting_stats(df):
     df = df[df['AB'] > 0]
-    df['AVG'] = trunc_col(np.nan_to_num(np.divide(df['H'], df['AB']), nan=0.0, posinf=0.0), 0)
+    df['AVG'] = trunc_col(np.nan_to_num(np.divide(df['H'], df['AB']), nan=0.0, posinf=0.0), 3)
     df['OBP'] = trunc_col(np.nan_to_num(np.divide(df['H'] + df['BB'] + df['HBP'], df['AB'] + df['BB'] + df['HBP']),
                               nan=0.0, posinf=0.0), 3)
     df['SLG'] = trunc_col(np.nan_to_num(np.divide((df['H'] - df['2B'] - df['3B'] - df['HR']) + df['2B'] * 2 +

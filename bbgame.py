@@ -92,7 +92,6 @@ class Game:
                 cur_pitcher = self.teams[self.team_pitching()].is_pitching_index()
                 self.teams[self.team_pitching()].box_score.pitching_blown_save(cur_pitcher)
 
-
         self.total_score[self.team_hitting()] += number_of_runs  # update total score
         return
 
@@ -284,10 +283,10 @@ if __name__ == '__main__':
 
     home_team = 'MIL'
     away_team = 'MIN'
-    season_length = 10
+    sims = 1
     season_win_loss = [[0, 0], [0, 0]]  # away record pos 0, home pos 1
     team0_season_df = None
-    for sim_game_num in range(1, season_length + 1):
+    for sim_game_num in range(1, sims + 1):
         print(f'Game number {sim_game_num}: from bbgame.py test code')
         game = Game(home_team_name=home_team, away_team_name=away_team, chatty=True, print_lineup=True,
                     print_box_score_b=True, random_data=True)

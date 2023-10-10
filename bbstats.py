@@ -5,7 +5,9 @@ import numpy as np
 
 
 class BaseballStats:
-    def __init__(self, load_seasons, new_season, random_data=False, only_nl_b=False):
+    def __init__(self, load_seasons, new_season, generate_random_data=False, only_nl_b=False,
+                 batter_file='player-stats-Batters.csv', pitcher_file='player-stats-Pitching.csv'):
+
         self.rnd = lambda: np.random.default_rng().uniform(low=0.0, high=1.001)  # random generator between 0 and 1
 
         self.numeric_bcols = ['G', 'AB', 'R', 'H', '2B', '3B', 'HR', 'RBI', 'SB', 'CS', 'BB', 'SO', 'SH', 'SF',
@@ -27,9 +29,10 @@ class BaseballStats:
         self.batting_data = None
         self.new_season_pitching_data = None
         self.new_season_batting_data = None
-        self.get_seasons()
-        if random_data:
-            self.randomize_data()
+        self.get_seasons(batter_file, pitcher_file)  # get existing data file
+        if generate_random_data:  # generate new data from existing
+            self.randomize_data()  # generate random data
+            self.save_data()
         self.create_new_season_from_existing()
 
         # ***************** game to game stats and settings for injury and rest
@@ -53,15 +56,20 @@ class BaseballStats:
                                                       scale=self.batting_injury_avg_len / 2, size=1)[0])
         return
 
+    def save_data(self):
+        self.pitching_data.to_csv(f'{self.load_seasons[0]} random-player-stats-Pitching.csv', index=False, header=True)
+        self.batting_data.to_csv(f'{self.load_seasons[0]} random-player-stats-Batters.csv', index=False, header=True)
+        return
+
     def injured_list(self, idays):
         # mlb is 10 for pos min, 15 for pitcher min, and 60 day
         return 'Healthy' if idays == 0 else \
             '10 Day DL' if idays <= 10 else '15 Day DL' if idays <= 15 else '60 Day DL'
 
-    def get_seasons(self):
+    def get_seasons(self, batter_file, pitcher_file):
         if self.pitching_data is None or self.batting_data is None:  # need to read data... else skip as cached
             for season in self.load_seasons:
-                pitching_data = pd.read_csv(str(season) + " player-stats-Pitching.csv")
+                pitching_data = pd.read_csv(str(season) + f" {pitcher_file}")
                 pitching_data['AB'] = pitching_data['IP'] * 3 + pitching_data['H']
                 pitching_data['2B'] = 0
                 pitching_data['3B'] = 0
@@ -79,7 +87,7 @@ class BaseballStats:
                 pitching_data.index += 1
                 pitching_data['League'] = pitching_data['Team'].apply(lambda x: 'NL' if x in self.nl else 'AL')
 
-                batting_data = pd.read_csv(str(season) + " player-stats-Batters.csv")
+                batting_data = pd.read_csv(str(season) + f" {batter_file}")
                 batting_data['Season'] = str(season)
                 batting_data['Total_OB'] = batting_data['H'] + batting_data['BB'] + batting_data['HBP']
                 batting_data['Total_Outs'] = batting_data['AB'] - batting_data['H'] + batting_data['HBP']
@@ -357,9 +365,9 @@ def team_batting_stats(df):
     df = df[df['AB'] > 0]
     df['AVG'] = trunc_col(np.nan_to_num(np.divide(df['H'], df['AB']), nan=0.0, posinf=0.0), 3)
     df['OBP'] = trunc_col(np.nan_to_num(np.divide(df['H'] + df['BB'] + df['HBP'], df['AB'] + df['BB'] + df['HBP']),
-                              nan=0.0, posinf=0.0), 3)
+                          nan=0.0, posinf=0.0), 3)
     df['SLG'] = trunc_col(np.nan_to_num(np.divide((df['H'] - df['2B'] - df['3B'] - df['HR']) + df['2B'] * 2 +
-                                                   df['3B'] * 3 + df['HR'] * 4, df['AB']), nan=0.0, posinf=0.0), 3)
+                          df['3B'] * 3 + df['HR'] * 4, df['AB']), nan=0.0, posinf=0.0), 3)
     df['OPS'] = trunc_col(np.nan_to_num(df['OBP'] + df['SLG'], nan=0.0, posinf=0.0), 3)
     df['Condition'] = (df['Condition'] * 10 ** 0).astype(int) / 10 ** 0
     return df
@@ -439,8 +447,9 @@ def team_pitching_totals(pitching_df, team_name='', concat=True):
 
 
 if __name__ == '__main__':
-    baseball_data = BaseballStats(load_seasons=[2022], new_season=2023, random_data=True, only_nl_b=False)
-
+    baseball_data = BaseballStats(load_seasons=[2022], new_season=2023, generate_random_data=False, only_nl_b=False,
+                                  batter_file='random-player-stats-Batters.csv',
+                                  pitcher_file='random-player-stats-Pitching.csv')
     print(*baseball_data.pitching_data.columns)
     print(*baseball_data.batting_data.columns)
     print(baseball_data.batting_data.Team.unique())

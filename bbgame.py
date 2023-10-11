@@ -17,6 +17,8 @@ class Game:
         if baseball_data is None:
             self.baseball_data = bbstats.BaseballStats(load_seasons=[2022], new_season=2023,
                                                        batter_file=batter_file, pitcher_file=pitcher_file)
+        else:
+            self.baseball_data = baseball_data
         if away_team_name != '' or home_team_name != '':
             self.team_names = [away_team_name, home_team_name]
         else:

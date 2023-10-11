@@ -450,12 +450,13 @@ if __name__ == '__main__':
     baseball_data = BaseballStats(load_seasons=[2023], new_season=2024, generate_random_data=False, only_nl_b=False,
                                   batter_file='player-stats-Batters.csv',
                                   pitcher_file='player-stats-Pitching.csv')
-    print(*baseball_data.pitching_data.columns)
-    print(*baseball_data.batting_data.columns)
+    # baseball_data.print_season(df_b=baseball_data.batting_data, df_p=baseball_data.pitching_data, teams=['MIL', 'ARI'])  # this resets the index
+    # print(*baseball_data.pitching_data.columns)
+    # print(*baseball_data.batting_data.columns)
     print(baseball_data.batting_data.Team.unique())
     # teams = list(baseball_data.batting_data.Team.unique())
     # baseball_data.print_prior_season(teams=teams)
     # baseball_data.print_current_season(teams=teams)
-    print(baseball_data.pitching_data.to_string())
+    print(baseball_data.pitching_data.to_string())  # maintains index numbers
     # print(baseball_data.batting_data.to_string())
     # print(team_batting_totals(baseball_data.batting_data, concat=False).HBP)

@@ -12,7 +12,7 @@ HOME = 1
 
 class Game:
     def __init__(self, away_team_name='', home_team_name='', baseball_data=None, game_num=1, rotation_len=5,
-                 print_lineup=True, chatty=True, print_box_score_b=True, load_seasons=[2023], new_season=2024,
+                 print_lineup=False, chatty=False, print_box_score_b=False, load_seasons=[2023], new_season=2024,
                  starting_pitchers=[None, None],
                  batter_file='player-stats-Batters.csv', pitcher_file='player-stats-Pitching.csv'):
         if baseball_data is None:
@@ -291,16 +291,18 @@ class Game:
 if __name__ == '__main__':
     startdt = datetime.datetime.now()
 
-    away_team = 'NYM'
-    home_team = 'LAA'
+    away_team = 'ARI'
+    home_team = 'MIL'
     sims = 1
     season_win_loss = [[0, 0], [0, 0]]  # away record pos 0, home pos 1
     team0_season_df = None
     for sim_game_num in range(1, sims + 1):
         print(f'Game number {sim_game_num}: from bbgame.py test code')
-        game = Game(home_team_name=home_team, away_team_name=away_team, chatty=True, print_lineup=True,
-                    print_box_score_b=True, load_seasons=[2023], new_season=2024,
-                    starting_pitchers=[704, 705],
+        game = Game(home_team_name=home_team, away_team_name=away_team,
+                    chatty=True, print_lineup=True,
+                    print_box_score_b=True,
+                    load_seasons=[2023], new_season=2024,
+                    starting_pitchers=[2, 38],
                     batter_file='player-stats-Batters.csv',
                     pitcher_file='player-stats-Pitching.csv')
         score, inning, win_loss = game.sim_game()

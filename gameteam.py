@@ -97,6 +97,7 @@ class Team:
         if force_starting_pitcher is None:
             self.pitching = self.starting_pitchers.iloc[[self.game_num % self.rotation_len]]  # grab the nth row dbl []-> df
         else:
+            # print(f'in gameteam.py set_starting_rotation {self.pitchers.to_string()}')
             self.pitching = self.pitchers.loc[[force_starting_pitcher]]
         # pitcher rotates based on selection above or forced number passed in
         self.cur_pitcher_index = self.pitching.index[0] if force_starting_pitcher is None else force_starting_pitcher

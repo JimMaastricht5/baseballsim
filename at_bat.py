@@ -73,7 +73,7 @@ class SimAB:
         self.league_LD = .199  # line drive rate for the season
         self.OBP_adjustment = -0.025  # final adjustment to line up with prior seasons
         self.bb_adjustment = -0.30  # final adjustment to shift more bb to H
-        self.hbp_adjustment = 0.0143 * 3  # adjustment to shift more to or from hbp league avg is 1.4%, results 1/4 of
+        self.hbp_adjustment = 0.0143 * 2.5  # adjustment to shift more to or from hbp league avg is 1.4%, results 1/4 of
         self.dp_chance = .20  # 20% chance dp with runner on per mlb
         self.tag_up_chance = .20  # 20% chance of tagging up and scoring, per mlb
         return

@@ -163,14 +163,14 @@ class BaseballStats:
         first_names = df[0].values.tolist()
         last_names = df[1].values.tolist()
         random_names = []
-        for ii in range(1, df.shape[0] * 2):  # generate twice as many random names as needed
+        for ii in range(1, (df.shape[0] + 1) * 2):  # generate twice as many random names as needed
             random_names.append(random.choice(first_names) + ' ' + random.choice(last_names))
         random_names = list(set(random_names))  # drop non-unique names
         random_names = random.sample(random_names, self.batting_data.shape[0] + self.pitching_data.shape[0])
         df['Player'] = pd.DataFrame(random_names)
         df.reset_index(inplace=True, drop=True)  # clear duplicate index error, should not happen but leave this alone!
-        self.batting_data['Player'] = df['Player'][0:self.batting_data.shape[0]]
-        self.pitching_data['Player'] = df['Player'][0:self.pitching_data.shape[0]]
+        self.batting_data['Player'] = df['Player'][0:self.batting_data.shape[0] + 1]
+        self.pitching_data['Player'] = df['Player'][0:self.pitching_data.shape[0] + 1]
         return
 
     def create_new_season_from_existing(self):
@@ -448,14 +448,14 @@ def team_pitching_totals(pitching_df, team_name='', concat=True):
 
 if __name__ == '__main__':
     baseball_data = BaseballStats(load_seasons=[2022], new_season=2023, generate_random_data=False, only_nl_b=False,
-                                  batter_file='player-stats-Batters.csv',
-                                  pitcher_file='player-stats-Pitching.csv')
+                                  batter_file='random-player-stats-Batters.csv',
+                                  pitcher_file='random-player-stats-Pitching.csv')
     print(*baseball_data.pitching_data.columns)
     print(*baseball_data.batting_data.columns)
     print(baseball_data.batting_data.Team.unique())
     # teams = list(baseball_data.batting_data.Team.unique())
     # baseball_data.print_prior_season(teams=teams)
     # baseball_data.print_current_season(teams=teams)
-    # print(baseball_data.pitching_data.to_string())
+    print(baseball_data.pitching_data.to_string())
     # print(baseball_data.batting_data.to_string())
-    print(team_batting_totals(baseball_data.batting_data, concat=False).HBP)
+    # print(team_batting_totals(baseball_data.batting_data, concat=False).HBP)

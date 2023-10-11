@@ -10,7 +10,7 @@ class OutCome:
         self.score_book_cd = ''
         self.bases_to_advance = 0
         self.runs_scored = 0
-        self.bases_dict = {'BB': 1, 'HPB': 1, 'H': 1, '2B': 2, '3B': 3, 'HR': 4, 'K': 0, 'SO': 0, 'GB': 1, 'DP': 1,
+        self.bases_dict = {'BB': 1, 'HBP': 1, 'H': 1, '2B': 2, '3B': 3, 'HR': 4, 'K': 0, 'SO': 0, 'GB': 1, 'DP': 1,
                            'GB FC': 1, 'FO': 0, 'LD': 0, 'SF': 0}  # some outs allow runners to move such as dp or gb
         self.on_base_dict = {'BB': True, 'HBP': True, 'H': True, '2B': True, '3B': True, 'HR': True, 'K': False,
                              'SO': False, 'GB': False, 'DP': False, 'GB FC': False, 'FO': False, 'LD': False,
@@ -121,7 +121,7 @@ class SimAB:
 
     def hbp(self):
         return self.rng() < self.odds_ratio(hitter_stat=((self.batting.HBP + self.hbp_adjustment) / self.batting.Total_OB),
-                                            pitcher_stat=((.00143 * (self.pitching.Total_OB + self.pitching.Total_Outs)) / self.league_pitching_Total_OB),  # 2023 rate per plate appearance is 1.43%
+                                            pitcher_stat=((.0143 * (self.pitching.Total_OB + self.pitching.Total_Outs)) / self.league_pitching_Total_OB),  # 2023 rate per plate appearance is 1.43%
                                             league_stat=((self.league_batting_Total_HBP + self.hbp_adjustment) /
                                             self.league_batting_Total_OB),
                                             stat_type='HBP')

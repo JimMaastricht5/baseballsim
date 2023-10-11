@@ -447,9 +447,9 @@ def team_pitching_totals(pitching_df, team_name='', concat=True):
 
 
 if __name__ == '__main__':
-    baseball_data = BaseballStats(load_seasons=[2022], new_season=2023, generate_random_data=False, only_nl_b=False,
-                                  batter_file='random-player-stats-Batters.csv',
-                                  pitcher_file='random-player-stats-Pitching.csv')
+    baseball_data = BaseballStats(load_seasons=[2023], new_season=2024, generate_random_data=False, only_nl_b=False,
+                                  batter_file='player-stats-Batters.csv',
+                                  pitcher_file='player-stats-Pitching.csv')
     print(*baseball_data.pitching_data.columns)
     print(*baseball_data.batting_data.columns)
     print(baseball_data.batting_data.Team.unique())

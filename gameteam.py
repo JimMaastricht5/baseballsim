@@ -45,9 +45,9 @@ class Team:
     def is_pitching_index(self):
         return self.cur_pitcher_index
 
-    def set_lineup(self, show_lineup=False, current_season_stats=True):
+    def set_lineup(self, show_lineup=False, current_season_stats=True, force_starting_pitcher=None):
         self.set_batting_order()
-        self.set_starting_rotation()
+        self.set_starting_rotation(force_starting_pitcher=force_starting_pitcher)
         self.set_closers()
         self.set_mid_relief()
         if show_lineup:
@@ -92,10 +92,14 @@ class Team:
         lineup_list.insert(target_pos - 1, player_index)
         return lineup_list
 
-    def set_starting_rotation(self):
+    def set_starting_rotation(self, force_starting_pitcher):
         self.starting_pitchers = self.pitchers.sort_values('GS', ascending=False).head(5)  # starting 5
-        self.pitching = self.starting_pitchers.iloc[[self.game_num % self.rotation_len]]  # grab the nth row dbl []-> df
-        self.cur_pitcher_index = self.pitching.index[0]  # pitcher rotates based on selection above
+        if force_starting_pitcher is None:
+            self.pitching = self.starting_pitchers.iloc[[self.game_num % self.rotation_len]]  # grab the nth row dbl []-> df
+        else:
+            self.pitching = self.pitchers.loc[[force_starting_pitcher]]
+        # pitcher rotates based on selection above or forced number passed in
+        self.cur_pitcher_index = self.pitching.index[0] if force_starting_pitcher is None else force_starting_pitcher
         self.pitching_new_season = self.baseball_data.new_season_pitching_data.loc[self.cur_pitcher_index].to_frame().T
         return
 

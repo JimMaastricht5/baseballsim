@@ -73,7 +73,7 @@ class SimAB:
         self.league_LD = .199  # line drive rate for the season
         self.OBP_adjustment = -0.025  # final adjustment to line up with prior seasons
         self.bb_adjustment = -0.30  # final adjustment to shift more bb to H
-        self.hbp_adjustment = 0.0  # final adjustment to shift more to or from hbp
+        self.hbp_adjustment = 0.0143 * 3  # adjustment to shift more to or from hbp league avg is 1.4%, results 1/4 of
         self.dp_chance = .20  # 20% chance dp with runner on per mlb
         self.tag_up_chance = .20  # 20% chance of tagging up and scoring, per mlb
         return
@@ -120,11 +120,12 @@ class SimAB:
                                             stat_type='BB')
 
     def hbp(self):
-        return self.rng() < self.odds_ratio(hitter_stat=((self.batting.HBP + self.hbp_adjustment) / self.batting.Total_OB),
-                                            pitcher_stat=((.0143 * (self.pitching.Total_OB + self.pitching.Total_Outs)) / self.league_pitching_Total_OB),  # 2023 rate per plate appearance is 1.43%
-                                            league_stat=((self.league_batting_Total_HBP + self.hbp_adjustment) /
-                                            self.league_batting_Total_OB),
-                                            stat_type='HBP')
+        return self.rng() < (.0143 + self.hbp_adjustment)
+        # return self.rng() < self.odds_ratio(hitter_stat=((self.batting.HBP + self.hbp_adjustment) / self.batting.Total_OB),
+        #                                     pitcher_stat=((.0143 * (self.pitching.Total_OB + self.pitching.Total_Outs)) / self.league_pitching_Total_OB),  # 2023 rate per plate appearance is 1.43%
+        #                                     league_stat=((self.league_batting_Total_HBP + self.hbp_adjustment) /
+        #                                     self.league_batting_Total_OB),
+        #                                     stat_type='HBP')
 
     def hr(self):
         return self.rng() < self.odds_ratio((self.batting.HR / self.batting.Total_OB),

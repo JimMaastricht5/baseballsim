@@ -71,9 +71,11 @@ class SimAB:
         self.league_GB_FC = .10  # GB FC occur 10 out of 100 times ball in play
         self.league_FB = .372  # fly ball rate for season
         self.league_LD = .199  # line drive rate for the season
-        self.OBP_adjustment = -0.025  # final adjustment to line up with prior seasons
-        self.bb_adjustment = -0.30  # final adjustment to shift more bb to H
-        self.hbp_adjustment = 0.0143 * 2.5  # adjustment to shift more to or from hbp league avg is 1.4%, results 1/4 of
+        self.OBP_adjustment = 0  # final adjustment to line up with prior seasons, 2022 -0.025
+        self.BB_adjustment = -0.30  # final adjustment to shift more bb to H
+        self.HBP_rate = .0143  # 1.4% of AB in 2022
+        self.HBP_adjustment = 0.0143 * 4.0  # adjustment to shift more to or from hbp league avg is 1.4%, results 1/4 of
+        self.HR_adjustment = 1.1  # adjust for higher HR rate with new 2023 pitching rules
         self.dp_chance = .20  # 20% chance dp with runner on per mlb
         self.tag_up_chance = .20  # 20% chance of tagging up and scoring, per mlb
         return
@@ -113,14 +115,14 @@ class SimAB:
                                             self.league_batting_obp + self.OBP_adjustment, stat_type='obp')
 
     def bb(self):
-        return self.rng() < self.odds_ratio(((self.batting.BB + self.bb_adjustment) / self.batting.Total_OB),
-                                            ((self.pitching.BB + self.bb_adjustment) / self.pitching.Total_OB),
-                                            ((self.league_batting_Total_BB + self.bb_adjustment) /
+        return self.rng() < self.odds_ratio(((self.batting.BB + self.BB_adjustment) / self.batting.Total_OB),
+                                            ((self.pitching.BB + self.BB_adjustment) / self.pitching.Total_OB),
+                                            ((self.league_batting_Total_BB + self.BB_adjustment) /
                                             self.league_batting_Total_OB),
                                             stat_type='BB')
 
     def hbp(self):
-        return self.rng() < (.0143 + self.hbp_adjustment)
+        return self.rng() < (self.HBP_rate + self.HBP_adjustment)
         # return self.rng() < self.odds_ratio(hitter_stat=((self.batting.HBP + self.hbp_adjustment) / self.batting.Total_OB),
         #                                     pitcher_stat=((.0143 * (self.pitching.Total_OB + self.pitching.Total_Outs)) / self.league_pitching_Total_OB),  # 2023 rate per plate appearance is 1.43%
         #                                     league_stat=((self.league_batting_Total_HBP + self.hbp_adjustment) /
@@ -128,9 +130,10 @@ class SimAB:
         #                                     stat_type='HBP')
 
     def hr(self):
-        return self.rng() < self.odds_ratio((self.batting.HR / self.batting.Total_OB),
-                                            (self.pitching.HR / self.pitching.Total_OB),
-                                            (self.league_batting_Total_HR / self.league_batting_Total_OB),
+        return self.rng() < self.odds_ratio(((self.batting.HR + self.HR_adjustment) / self.batting.Total_OB),
+                                            ((self.pitching.HR + self.HR_adjustment) / self.pitching.Total_OB),
+                                            ((self.league_batting_Total_HR + self.HR_adjustment) /
+                                             self.league_batting_Total_OB),
                                             stat_type='HR')
 
     def triple(self):
@@ -177,12 +180,12 @@ class SimAB:
         if self.onbase():
             if self.bb():
                 outcomes.set_score_book_cd('BB')
-            elif self.double():
-                outcomes.set_score_book_cd('2B')
-            elif self.triple():
-                outcomes.set_score_book_cd('3B')
             elif self.hr():
                 outcomes.set_score_book_cd('HR')
+            elif self.triple():
+                outcomes.set_score_book_cd('3B')
+            elif self.double():
+                outcomes.set_score_book_cd('2B')
             elif self.hbp():
                 outcomes.set_score_book_cd('HBP')
             else:

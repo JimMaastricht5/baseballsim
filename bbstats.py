@@ -300,15 +300,6 @@ class BaseballStats:
 
     def print_season(self, df_b, df_p, teams, summary_only_b=False):
         teams.append('')  # add blank team for totals
-        df = df_b.copy().sort_values(by='OPS', ascending=False)  # take copy to add totals
-        if summary_only_b:
-            df = df.tail(1)
-        else:
-            df = team_batting_totals(df, team_name='', concat=True)
-            df = df[df['Team'].isin(teams)]
-        print(df[self.bcols_to_print].to_string(justify='right'))
-        print('\n\n')
-
         df = df_p.copy().sort_values(by='ERA', ascending=True)
         if summary_only_b:
             df = df.tail(1)
@@ -316,6 +307,15 @@ class BaseballStats:
             df = team_pitching_totals(df, team_name='', concat=True)
             df = df[df['Team'].isin(teams)]
         print(df[self.pcols_to_print].to_string(justify='right'))
+        print('\n\n')
+
+        df = df_b.copy().sort_values(by='OPS', ascending=False)  # take copy to add totals
+        if summary_only_b:
+            df = df.tail(1)
+        else:
+            df = team_batting_totals(df, team_name='', concat=True)
+            df = df[df['Team'].isin(teams)]
+        print(df[self.bcols_to_print].to_string(justify='right'))
         print('\n\n')
         return
 
@@ -457,6 +457,6 @@ if __name__ == '__main__':
     # teams = list(baseball_data.batting_data.Team.unique())
     # baseball_data.print_prior_season(teams=teams)
     # baseball_data.print_current_season(teams=teams)
-    print(baseball_data.pitching_data.to_string())  # maintains index numbers
+    # print(baseball_data.pitching_data.to_string())  # maintains index numbers
     # print(baseball_data.batting_data.to_string())
-    # print(team_batting_totals(baseball_data.batting_data, concat=False).HBP)
+    print(team_batting_totals(baseball_data.batting_data, concat=False).to_string())

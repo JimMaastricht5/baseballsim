@@ -6,7 +6,7 @@ by changing the code in at the bottom of the file.  bbgame also accepts the numb
 game.  Run the program from the console using python bbgame.py
 
 enhancement list:
-1. allow for the specific of starting pitching
+1. allow for the specific of starting lineup of hitters and pitchers
 2. turn the parameters into arguments so this can be run from the command line
 
 Running bbseason.py will run an entire season of baseball of 162 games with every team.  This takes about 30 minutes.

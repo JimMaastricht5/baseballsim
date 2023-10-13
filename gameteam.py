@@ -45,8 +45,9 @@ class Team:
     def is_pitching_index(self):
         return self.cur_pitcher_index
 
-    def set_lineup(self, show_lineup=False, current_season_stats=True, force_starting_pitcher=None):
-        self.set_batting_order()
+    def set_lineup(self, show_lineup=False, current_season_stats=True, force_starting_pitcher=None,
+                   force_lineup_dict=None):
+        self.set_batting_order(force_lineup_dict=force_lineup_dict)
         self.set_starting_rotation(force_starting_pitcher=force_starting_pitcher)
         self.set_closers()
         self.set_mid_relief()
@@ -55,28 +56,47 @@ class Team:
         self.box_score = teamgameboxstats.TeamBoxScore(self.lineup, self.pitching, self.team_name)
         return
 
-    def set_batting_order(self):
+    def set_batting_order(self, force_lineup_dict):
         position_list = ['C', '2B', '3B', 'SS', 'OF', 'OF', 'OF', '1B', 'DH']  # ?? need to handle subs at 1b and dh ??
         pos_index_list = []
         pos_index_dict = {}
-        for position in position_list:
+        for position in position_list:  # search for best player at each position, returns a df series and appends list
             pos_index = self.search_for_pos(position=position, lineup_index_list=pos_index_list, stat_criteria='OPS')
-            pos_index_list.append(pos_index)
-            pos_index_dict[pos_index] = position  # keep track of the player index and position for this game
+            pos_index_list.append(pos_index)  # list of indices into the pos player master df
+            pos_index_dict[pos_index] = position  # keep track of the player index and position for this game in a dict
 
-        sb_index = self.best_at_stat(pos_index_list, 'SB', count=1)
-        slg_index = self.best_at_stat(pos_index_list, 'SLG', count=2, exclude=sb_index)  # exclude sb since 1st spot
-        ops_index = self.best_at_stat(pos_index_list, 'OPS', count=6, exclude=sb_index + slg_index)
+        # select player best at each stat to slot into lead off, cleanup, etc.
+        # exclude players prev selected for SLG and ordering remaining players by OPS
+        sb_index_list = self.best_at_stat(pos_index_list, 'SB', count=1)  # takes list of index nums and scans master df
+        slg_index_list = self.best_at_stat(pos_index_list, 'SLG', count=2, exclude=sb_index_list)  # exclude sb
+        ops_index_list = self.best_at_stat(pos_index_list, 'OPS', count=6, exclude=sb_index_list + slg_index_list)
 
-        ops_index = self.insert_player_in_lineup(lineup_list=ops_index, player_index=sb_index[0], target_pos=1)  # 1spot
-        ops_index = self.insert_player_in_lineup(lineup_list=ops_index, player_index=slg_index[0], target_pos=4)  # 4th
-        ops_index = self.insert_player_in_lineup(lineup_list=ops_index, player_index=slg_index[1], target_pos=5)  # 5th
-        self.lineup = self.pos_players.loc[ops_index]
-        self.lineup_new_season = self.baseball_data.new_season_batting_data.loc[ops_index]  # get the new season stats
-        for row_num in range(0, len(self.lineup)):  # set up battering order in lineup card by index
+        # insert players into lineup. 1st spot is best SB, 4th and 5th are best SLG
+        lineup_index_list = self.insert_player_in_lineup(lineup_list=ops_index_list,
+                                                         player_index=sb_index_list[0], target_pos=1)
+        lineup_index_list = self.insert_player_in_lineup(lineup_list=lineup_index_list,
+                                                         player_index=slg_index_list[0], target_pos=4)
+        lineup_index_list = self.insert_player_in_lineup(lineup_list=lineup_index_list,
+                                                         player_index=slg_index_list[1], target_pos=5)
+
+        # ?? dont do search if not needed ??
+        # force_lineup is a dictionary in batting order with fielding pos
+        if force_lineup_dict is None:
+            pass
+        else:
+            lineup_index_list = force_lineup_dict.keys()
+            pos_index_dict = force_lineup_dict
+
+        self.lineup = self.pos_players.loc[lineup_index_list]  # subset the master df using the lineup list of indexes
+        self.lineup_new_season = self.baseball_data.new_season_batting_data.loc[lineup_index_list]  # new season statsdf
+
+        # lineup and lineup new season dfs contain all player data and in the correct order
+        # loop thru lineup from lead off to last, build lineup list and set player fielding pos in lineup df
+        # note cur_lineup_index should be the same as lineup_index_list, but just to be certain we rebuild it.
+        for row_num in range(0, len(self.lineup)):
             self.cur_lineup_index.append(self.lineup.index[row_num])
-            player_index = self.lineup.index[row_num]  # grab the index of the player and set pos for game
-            self.lineup.Pos[player_index] = pos_index_dict[player_index]  # set lineup pos
+            player_index = self.lineup.index[row_num]  # grab the index of the player
+            self.lineup.Pos[player_index] = pos_index_dict[player_index]  # set fielding pos in lineup df
         return
 
     def insert_player_in_lineup(self, lineup_list, player_index, target_pos):

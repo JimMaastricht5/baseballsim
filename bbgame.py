@@ -13,7 +13,7 @@ HOME = 1
 class Game:
     def __init__(self, away_team_name='', home_team_name='', baseball_data=None, game_num=1, rotation_len=5,
                  print_lineup=False, chatty=False, print_box_score_b=False, load_seasons=[2023], new_season=2024,
-                 starting_pitchers=[None, None],
+                 starting_pitchers=[None, None], starting_lineups=[None, None],
                  batter_file='player-stats-Batters.csv', pitcher_file='player-stats-Pitching.csv'):
         if baseball_data is None:
             self.baseball_data = bbstats.BaseballStats(load_seasons=load_seasons, new_season=new_season,
@@ -28,19 +28,22 @@ class Game:
         self.rotation_len = rotation_len  # number of starting pitchers to rotate thru
         self.chatty = chatty
         self.print_box_score_b = print_box_score_b
-        self.starting_pitchers = starting_pitchers  # if you want to sim the same two starter repeatedly
+        self.starting_pitchers = starting_pitchers  # can use if you want to sim the same two starters repeatedly
+        self.starting_lineups = starting_lineups  # is a list of two dict, each dict is in batting order with field pos
 
         self.teams = []  # keep track of away in pos 0 and home team in pos 1
         self.teams.insert(AWAY, gameteam.Team(self.team_names[AWAY], self.baseball_data, self.game_num,
                                               self.rotation_len))  # init away team class
         self.teams[AWAY].set_lineup(show_lineup=print_lineup, current_season_stats=(True if game_num > 1 else False),
-                                    force_starting_pitcher=starting_pitchers[AWAY])
+                                    force_starting_pitcher=starting_pitchers[AWAY],
+                                    force_lineup_dict=starting_lineups[AWAY])
 
         # print(f'Setting home team as {self.team_names[1]}')
         self.teams.insert(HOME, gameteam.Team(self.team_names[HOME], self.baseball_data, self.game_num,
                                               self.rotation_len))  # init away team class
         self.teams[HOME].set_lineup(show_lineup=print_lineup, current_season_stats=(True if game_num > 1 else False),
-                                    force_starting_pitcher=starting_pitchers[HOME])
+                                    force_starting_pitcher=starting_pitchers[HOME],
+                                    force_lineup_dict=starting_lineups[HOME])
 
         self.win_loss = []
         self.is_save_sit = [False, False]
@@ -303,6 +306,7 @@ if __name__ == '__main__':
                     print_box_score_b=True,
                     load_seasons=[2023], new_season=2024,
                     starting_pitchers=[2, 38],
+                    starting_lineups=[None, None],
                     batter_file='player-stats-Batters.csv',
                     pitcher_file='player-stats-Pitching.csv')
         score, inning, win_loss = game.sim_game()

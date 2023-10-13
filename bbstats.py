@@ -12,7 +12,7 @@ class BaseballStats:
 
         self.numeric_bcols = ['G', 'AB', 'R', 'H', '2B', '3B', 'HR', 'RBI', 'SB', 'CS', 'BB', 'SO', 'SH', 'SF',
                               'HBP']  # these cols will get added to running season total
-        self.numeric_pcols = ['G', 'GS', 'CG', 'SHO', 'IP', 'AB', 'H', '2B', '3B', 'ER', 'K', 'BB', 'HR', 'W', 'L',
+        self.numeric_pcols = ['G', 'GS', 'CG', 'SHO', 'IP', 'AB', 'H', '2B', '3B', 'HR', 'ER', 'K', 'BB', 'W', 'L',
                               'SV', 'BS', 'HLD', 'Total_Outs']  # these cols will get added to running season total
         self.pcols_to_print = ['Player', 'League', 'Team', 'Age', 'G', 'GS', 'CG', 'SHO', 'IP', 'H', '2B', '3B', 'ER',
                                'K', 'BB', 'HR', 'W', 'L', 'SV', 'BS', 'HLD', 'ERA', 'WHIP', 'AVG', 'OBP', 'SLG', 'OPS',
@@ -294,29 +294,28 @@ class BaseballStats:
         return
 
     def print_prior_season(self, teams, summary_only_b=False):
-        self.print_season(self.batting_data, self.pitching_data, teams=teams,
+        self.print_season(team_batting_stats(self.batting_data), team_pitching_stats(self.pitching_data), teams=teams,
                           summary_only_b=summary_only_b)
         return
 
     def print_season(self, df_b, df_p, teams, summary_only_b=False):
         teams.append('')  # add blank team for totals
-        df = df_p.copy().sort_values(by='ERA', ascending=True)
-        if summary_only_b:
-            df = df.tail(1)
-        else:
-            df = team_pitching_totals(df, team_name='', concat=True)
-            df = df[df['Team'].isin(teams)]
-        print(df[self.pcols_to_print].to_string(justify='right', index=True))
+        df = df_p[df_p['Team'].isin(teams)]
+        df_totals = team_pitching_totals(df, team_name='', concat=False)
+        if summary_only_b is False:
+            print(df[self.pcols_to_print].to_string(justify='right'))
+
+        print('\nTeam Pitching Totals:')
+        print(df_totals[self.numeric_pcols].to_string(justify='right', index=False))
         print('\n\n')
 
-        df = df_b.copy().sort_values(by='OPS', ascending=False)  # take copy to add totals
-        if summary_only_b:
-            df = df.tail(1)
-        else:
-            df = team_batting_totals(df, team_name='', concat=True)
-            df = df[df['Team'].isin(teams)]
-        print(df.to_string())
-        print(df[self.bcols_to_print].to_string(justify='right', index=True))
+        df = df_b[df_b['Team'].isin(teams)]
+        df_totals = team_batting_totals(df, team_name='', concat=False)
+        if summary_only_b is False:
+            print(df[self.bcols_to_print].to_string(justify='right'))
+
+        print('\nTeam Batting Totals:')
+        print(df_totals[self.numeric_bcols].to_string(justify='right', index=False))
         print('\n\n')
         return
 
@@ -431,5 +430,5 @@ if __name__ == '__main__':
     baseball_data.print_prior_season(teams=teams)
     # baseball_data.print_current_season(teams=teams)
     # print(baseball_data.pitching_data.to_string())  # maintains index numbers
-    print(baseball_data.batting_data.to_string())
+    # print(baseball_data.batting_data.to_string())
     # print(team_batting_totals(baseball_data.batting_data, concat=False).to_string())

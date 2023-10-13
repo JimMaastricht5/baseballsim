@@ -237,7 +237,7 @@ class Team:
             dfp = bbstats.remove_non_print_cols(self.pitching)
 
         dfb = dfb[self.b_lineup_cols_to_print]
-        print(dfb.to_string(index=False, justify='center'))
+        print(dfb.to_string(index=True, justify='center'))
         print('')
         dfp = dfp[self.p_lineup_cols_to_print]
         print(f'Pitching for {self.team_name}:')

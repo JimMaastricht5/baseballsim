@@ -76,6 +76,7 @@ class SimAB:
         self.HBP_rate = .0143  # 1.4% of AB in 2022
         self.HBP_adjustment = 0.0143 * 4.0  # adjustment to shift more to or from hbp league avg is 1.4%, results 1/4 of
         self.HR_adjustment = 1.1  # adjust for higher HR rate with new 2023 pitching rules
+        self.DBL_adjustment = 1.1  # adjust for higher 2B rate with new 2023 pitching rules
         self.dp_chance = .20  # 20% chance dp with runner on per mlb
         self.tag_up_chance = .20  # 20% chance of tagging up and scoring, per mlb
         return
@@ -144,8 +145,10 @@ class SimAB:
 
     def double(self):
         # do not have league pitching total for 2b so push it to zero and make it a neutral factor
-        return self.rng() < self.odds_ratio(hitter_stat=(self.batting['2B'] / self.batting.Total_OB), pitcher_stat=.200,
-                                            league_stat=(self.league_batting_Total_2B / self.league_batting_Total_OB),
+        return self.rng() < self.odds_ratio(hitter_stat=((self.batting['2B'] + self.DBL_adjustment) /
+                                                         self.batting.Total_OB), pitcher_stat=.200,
+                                            league_stat=((self.league_batting_Total_2B + self.DBL_adjustment) /
+                                                         self.league_batting_Total_OB),
                                             stat_type='2B')
 
     def k(self):

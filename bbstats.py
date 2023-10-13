@@ -306,7 +306,7 @@ class BaseballStats:
         else:
             df = team_pitching_totals(df, team_name='', concat=True)
             df = df[df['Team'].isin(teams)]
-        print(df[self.pcols_to_print].to_string(justify='right'))
+        print(df[self.pcols_to_print].to_string(justify='right', index=True))
         print('\n\n')
 
         df = df_b.copy().sort_values(by='OPS', ascending=False)  # take copy to add totals
@@ -315,22 +315,14 @@ class BaseballStats:
         else:
             df = team_batting_totals(df, team_name='', concat=True)
             df = df[df['Team'].isin(teams)]
-        print(df[self.bcols_to_print].to_string(justify='right'))
+        print(df.to_string())
+        print(df[self.bcols_to_print].to_string(justify='right', index=True))
         print('\n\n')
         return
 
 
 # static function start
 def remove_non_print_cols(df):
-    # non_print_cols = ['Season', 'Total_OB', 'AVG_faced', 'Game_Fatigue_Factor']  # 'Total_Outs',
-    # cols_to_drop = []
-    # df_columns = df.columns
-    # for non_print_col in non_print_cols:
-    #     if non_print_col in df_columns:
-    #         cols_to_drop.append(non_print_col)
-    # if len(cols_to_drop) > 0:
-    #     df = df.drop(cols_to_drop, axis=1)
-    # return df
     non_print_cols = set(['Season', 'Total_OB', 'AVG_faced', 'Game_Fatigue_Factor'])  # 'Total_Outs',
     cols_to_drop = non_print_cols.intersection(df.columns)
     if cols_to_drop:
@@ -375,20 +367,12 @@ def team_batting_stats(df):
 
 def team_pitching_stats(df):
     # hbp is 0, 2b are 0, 3b are 0
-    # df = df[df['IP'] > 0]
-    # df = df[df['AB'] > 0]
     df = df[(df['IP'] > 0) & (df['AB'] > 0)]
     df['AB'] = trunc_col(df['AB'], 0)
     df['IP'] = trunc_col(df['IP'], 2)
     df['AVG'] = trunc_col(df['H'] / df['AB'], 3)
     df['OBP'] = trunc_col((df['H'] + df['BB']) / (df['AB'] + df['BB']), 3)
 
-    # df['SLG'] = trunc_col(
-    #     ((df['H'] - df['2B'] - df['3B'] - df['HR']) + df['2B'] * 2 + df['3B'] * 3 + df['HR'] * 4) / df['AB'], 3)
-    # df['OPS'] = trunc_col(df['OBP'] + df['SLG'], 3)
-    # df['WHIP'] = trunc_col((df['BB'] + df['H']) / df['IP'], 3)
-    # df['ERA'] = trunc_col((df['ER'] / df['IP']) * 9, 2)
-    # df['Condition'] = trunc_col(df['Condition'], 0)
     # Calculate 'SLG' column
     slg_numerator = (df['H'] - df['2B'] - df['3B'] - df['HR']) + df['2B'] * 2 + df['3B'] * 3 + df['HR'] * 4
     df['SLG'] = trunc_col(slg_numerator / df['AB'], 3)
@@ -403,8 +387,6 @@ def team_pitching_stats(df):
 
 
 def team_batting_totals(batting_df, team_name='', concat=True):
-    # df = batting_df.copy()
-    # df = df[['AB', 'R', 'H', '2B', '3B', 'HR', 'RBI', 'SB', 'CS', 'BB', 'SO', 'SH', 'SF', 'HBP']].sum()
     df = batting_df[['AB', 'R', 'H', '2B', '3B', 'HR', 'RBI', 'SB', 'CS', 'BB', 'SO', 'SH', 'SF', 'HBP']].sum()
     df['Player'] = 'Totals'
     df['Team'] = team_name
@@ -424,22 +406,12 @@ def team_batting_totals(batting_df, team_name='', concat=True):
 def team_pitching_totals(pitching_df, team_name='', concat=True):
     df = pitching_df[['GS', 'CG', 'SHO', 'IP', 'AB', 'H', '2B', '3B', 'ER', 'K', 'BB', 'HR', 'W', 'L', 'SV', 'BS',
                       'HLD', 'Total_Outs']].sum()
-    # df['Player'] = 'Totals'
-    # df['Team'] = team_name
-    # df['Age'] = ''
-    # df['Status'] = ''
-    # df['Injured Days'] = ''
-    # df['G'] = np.max(pitching_df['G'])
-    # df['Condition'] = 0
-    # Add new columns
     df = df.to_frame().T
     df = df.assign(Player='Totals', Team=team_name, Age='', Status='', Injured_Days='',
                    G=np.max(pitching_df['G']), Condition=0)
     if concat:
         df = pd.concat([pitching_df, df], ignore_index=True)
     df = team_pitching_stats(df)
-    # for col in cols_to_trunc:  # remove trailing zeros after decimal
-    #     df[col] = np.floor(df[col])
     # Vectorized the truncation operation using pandas' apply function
     cols_to_trunc = ['GS', 'CG', 'SHO', 'H', 'AB', 'ER', 'K', 'BB', 'HR', 'W', 'L', 'SV', 'BS', 'HLD', 'Total_Outs']
     df[cols_to_trunc] = df[cols_to_trunc].apply(np.floor)
@@ -456,7 +428,7 @@ if __name__ == '__main__':
     print(baseball_data.batting_data.Team.unique())
     # teams = list(baseball_data.batting_data.Team.unique())
     teams = ['MIL']
-    # baseball_data.print_prior_season(teams=teams)
+    baseball_data.print_prior_season(teams=teams)
     # baseball_data.print_current_season(teams=teams)
     # print(baseball_data.pitching_data.to_string())  # maintains index numbers
     print(baseball_data.batting_data.to_string())

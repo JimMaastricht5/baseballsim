@@ -455,8 +455,9 @@ if __name__ == '__main__':
     # print(*baseball_data.batting_data.columns)
     print(baseball_data.batting_data.Team.unique())
     # teams = list(baseball_data.batting_data.Team.unique())
+    teams = ['MIL']
     # baseball_data.print_prior_season(teams=teams)
     # baseball_data.print_current_season(teams=teams)
     # print(baseball_data.pitching_data.to_string())  # maintains index numbers
-    # print(baseball_data.batting_data.to_string())
-    print(team_batting_totals(baseball_data.batting_data, concat=False).to_string())
+    print(baseball_data.batting_data.to_string())
+    # print(team_batting_totals(baseball_data.batting_data, concat=False).to_string())

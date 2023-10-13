@@ -296,6 +296,7 @@ if __name__ == '__main__':
 
     away_team = 'ARI'
     home_team = 'MIL'
+    MIL_lineup = {65: 'LF', 71: 'C', 336: '1B', 369: 'DH', 355: 'CF', 62: 'SS', 536: '3B', 154: '2B', 310: 'RF'}
     sims = 1
     season_win_loss = [[0, 0], [0, 0]]  # away record pos 0, home pos 1
     team0_season_df = None
@@ -306,7 +307,7 @@ if __name__ == '__main__':
                     print_box_score_b=True,
                     load_seasons=[2023], new_season=2024,
                     starting_pitchers=[2, 38],
-                    starting_lineups=[None, None],
+                    starting_lineups=[None, MIL_lineup],
                     batter_file='player-stats-Batters.csv',
                     pitcher_file='player-stats-Pitching.csv')
         score, inning, win_loss = game.sim_game()

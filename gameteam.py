@@ -57,29 +57,6 @@ class Team:
         return
 
     def set_batting_order(self, force_lineup_dict):
-        # position_list = ['C', '2B', '3B', 'SS', 'OF', 'OF', 'OF', '1B', 'DH']  # ?? need to handle subs at 1b and dh ??
-        # pos_index_list = []
-        # pos_index_dict = {}
-        # for position in position_list:  # search for best player at each position, returns a df series and appends list
-        #     pos_index = self.search_for_pos(position=position, lineup_index_list=pos_index_list, stat_criteria='OPS')
-        #     pos_index_list.append(pos_index)  # list of indices into the pos player master df
-        #     pos_index_dict[pos_index] = position  # keep track of the player index and position for this game in a dict
-        #
-        # # select player best at each stat to slot into lead off, cleanup, etc.
-        # # exclude players prev selected for SLG and ordering remaining players by OPS
-        # sb_index_list = self.best_at_stat(pos_index_list, 'SB', count=1)  # takes list of index nums and scans master df
-        # slg_index_list = self.best_at_stat(pos_index_list, 'SLG', count=2, exclude=sb_index_list)  # exclude sb
-        # ops_index_list = self.best_at_stat(pos_index_list, 'OPS', count=6, exclude=sb_index_list + slg_index_list)
-        #
-        # # insert players into lineup. 1st spot is best SB, 4th and 5th are best SLG
-        # lineup_index_list = self.insert_player_in_lineup(lineup_list=ops_index_list,
-        #                                                  player_index=sb_index_list[0], target_pos=1)
-        # lineup_index_list = self.insert_player_in_lineup(lineup_list=lineup_index_list,
-        #                                                  player_index=slg_index_list[0], target_pos=4)
-        # lineup_index_list = self.insert_player_in_lineup(lineup_list=lineup_index_list,
-        #                                                  player_index=slg_index_list[1], target_pos=5)
-
-        # ?? dont do search if not needed ??
         # force_lineup is a dictionary in batting order with fielding pos
         if force_lineup_dict is None:
             lineup_index_list, pos_index_dict = self.dynamic_lineup()

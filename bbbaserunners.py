@@ -18,9 +18,9 @@ class Bases:
     def handle_runners(self, score_book_cd, bases_to_advance, on_base_b, outs):
         if outs >= 3:
             return
-        if score_book_cd == 'BB' or 'HBP':
+        if score_book_cd in ['BB', 'HBP']:
             bases_to_advance = self.walk_or_HBP(bases_to_advance)  # set to 1 if bases loaded, else move runners indivly
-        elif score_book_cd == 'SF':
+        elif score_book_cd in ['SF']:
             bases_to_advance = self.tag_up(outs)  # move runner from third and set other runners to hold w/ 0
         elif score_book_cd in ['DP', 'GB FC', 'GB']:
             bases_to_advance = self.ground_out(score_book_cd)

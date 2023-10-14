@@ -6,7 +6,7 @@ import numpy as np
 
 class BaseballStats:
     def __init__(self, load_seasons, new_season, generate_random_data=False, only_nl_b=False,
-                 batter_file='player-stats-Batters.csv', pitcher_file='player-stats-Pitching.csv'):
+                 load_batter_file='player-stats-Batters.csv', load_pitcher_file='player-stats-Pitching.csv'):
 
         self.rnd = lambda: np.random.default_rng().uniform(low=0.0, high=1.001)  # random generator between 0 and 1
 
@@ -29,7 +29,7 @@ class BaseballStats:
         self.batting_data = None
         self.new_season_pitching_data = None
         self.new_season_batting_data = None
-        self.get_seasons(batter_file, pitcher_file)  # get existing data file
+        self.get_seasons(load_batter_file, load_pitcher_file)  # get existing data file
         if generate_random_data:  # generate new data from existing
             self.randomize_data()  # generate random data
             self.save_data()
@@ -419,15 +419,15 @@ def team_pitching_totals(pitching_df, team_name='', concat=True):
 
 if __name__ == '__main__':
     baseball_data = BaseballStats(load_seasons=[2023], new_season=2024, generate_random_data=False, only_nl_b=False,
-                                  batter_file='player-stats-Batters.csv',
-                                  pitcher_file='player-stats-Pitching.csv')
-    # baseball_data.print_season(df_b=baseball_data.batting_data, df_p=baseball_data.pitching_data, teams=['MIL', 'ARI'])  # this resets the index
+                                  load_batter_file='random-player-stats-Batters.csv',
+                                  load_pitcher_file='random-player-stats-Pitching.csv')
+    #baseball_data.print_season(df_b=baseball_data.batting_data, df_p=baseball_data.pitching_data, teams=['MIL', 'ARI'])
     # print(*baseball_data.pitching_data.columns)
     # print(*baseball_data.batting_data.columns)
     print(baseball_data.batting_data.Team.unique())
     # teams = list(baseball_data.batting_data.Team.unique())
-    teams = ['MIL']
-    baseball_data.print_prior_season(teams=teams)
+    # teams = ['MIL']
+    # baseball_data.print_prior_season(teams=teams)
     # baseball_data.print_current_season(teams=teams)
     # print(baseball_data.pitching_data.to_string())  # maintains index numbers
     # print(baseball_data.batting_data.to_string())

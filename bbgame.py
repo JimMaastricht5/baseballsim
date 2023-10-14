@@ -14,10 +14,11 @@ class Game:
     def __init__(self, away_team_name='', home_team_name='', baseball_data=None, game_num=1, rotation_len=5,
                  print_lineup=False, chatty=False, print_box_score_b=False, load_seasons=[2023], new_season=2024,
                  starting_pitchers=[None, None], starting_lineups=[None, None],
-                 batter_file='player-stats-Batters.csv', pitcher_file='player-stats-Pitching.csv'):
+                 load_batter_file='player-stats-Batters.csv', load_pitcher_file='player-stats-Pitching.csv'):
         if baseball_data is None:
             self.baseball_data = bbstats.BaseballStats(load_seasons=load_seasons, new_season=new_season,
-                                                       batter_file=batter_file, pitcher_file=pitcher_file)
+                                                       load_batter_file=load_batter_file,
+                                                       load_pitcher_file=load_pitcher_file)
         else:
             self.baseball_data = baseball_data
         if away_team_name != '' or home_team_name != '':
@@ -308,8 +309,8 @@ if __name__ == '__main__':
                     load_seasons=[2023], new_season=2024,
                     starting_pitchers=[2, 38],
                     starting_lineups=[None, MIL_lineup],
-                    batter_file='player-stats-Batters.csv',
-                    pitcher_file='player-stats-Pitching.csv')
+                    load_batter_file='player-stats-Batters.csv',
+                    load_pitcher_file='player-stats-Pitching.csv')
         score, inning, win_loss = game.sim_game()
         season_win_loss[0] = list(np.add(np.array(season_win_loss[0]), np.array(win_loss[0])))
         season_win_loss[1] = list(np.add(np.array(season_win_loss[1]), np.array(win_loss[1])))

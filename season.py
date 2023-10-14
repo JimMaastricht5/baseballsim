@@ -13,8 +13,8 @@ HOME = 1
 
 class BaseballSeason:
     def __init__(self, load_seasons, new_season, team_list=[], season_length_limit=0, min_games=0, series_length=1,
-                 rotation_len=5, only_nl_b=False, batter_file='player-stats-Batters.csv',
-                 pitcher_file='player-stats-Pitching.csv'):
+                 rotation_len=5, only_nl_b=False, load_batter_file='player-stats-Batters.csv',
+                 load_pitcher_file='player-stats-Pitching.csv'):
         self.season_length_limit = season_length_limit  # zero mean there is no limit, based on schedule parameters
         self.min_games = min_games
         self.series_length = series_length
@@ -25,8 +25,8 @@ class BaseballSeason:
         self.new_season = new_season
         self.schedule = []
         self.baseball_data = bbstats.BaseballStats(load_seasons=self.load_seasons, new_season=new_season,
-                                                   only_nl_b=only_nl_b, batter_file=batter_file,
-                                                   pitcher_file=pitcher_file)
+                                                   only_nl_b=only_nl_b, load_batter_file=load_batter_file,
+                                                   load_pitcher_file=load_pitcher_file)
         self.teams = list(self.baseball_data.batting_data.Team.unique()) if team_list == [] else team_list
         if len(self.teams) % 2 == 1:  # odd number of teams
             self.teams.append('OFF DAY')
@@ -143,13 +143,13 @@ if __name__ == '__main__':
     # teams = ['CHC', 'CIN', 'COL', 'MIL', 'PIT', 'STL']  # included COL for balance in scheduling
 
     # full season
-    num_games = 162
+    num_games = 2
     only_nl_b = False
     bbseason23 = BaseballSeason(load_seasons=seasons, new_season=2023,
                                 season_length_limit=num_games,
                                 min_games=num_games, series_length=3, rotation_len=5,
-                                only_nl_b=only_nl_b, batter_file='player-stats-Batters.csv',
-                                pitcher_file='player-stats-Pitching.csv')
+                                only_nl_b=only_nl_b, load_batter_file='random-player-stats-Batters.csv',
+                                load_pitcher_file='random-player-stats-Pitching.csv')
     # team_to_follow = bbseason23.teams[0]  # follow the first team in the random set
     team_to_follow = ''  # or follow no team
     bbseason23.sim_season(season_chatty=False,

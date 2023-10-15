@@ -17,7 +17,7 @@ class BaseballStats:
         self.pcols_to_print = ['Player', 'League', 'Team', 'Age', 'G', 'GS', 'CG', 'SHO', 'IP', 'H', '2B', '3B', 'ER',
                                'K', 'BB', 'HR', 'W', 'L', 'SV', 'BS', 'HLD', 'ERA', 'WHIP', 'AVG', 'OBP', 'SLG', 'OPS',
                                'Status']  # 'Condition', 'Injured Days']
-        self.bcols_to_print = ['Player', 'League', 'Team', 'Age', 'G', 'AB', 'R', 'H', '2B', '3B', 'HR', 'RBI',
+        self.bcols_to_print = ['Player', 'League', 'Team', 'Pos', 'Age', 'G', 'AB', 'R', 'H', '2B', '3B', 'HR', 'RBI',
                                'SB', 'CS', 'BB', 'SO', 'SH', 'SF', 'HBP', 'AVG', 'OBP', 'SLG',
                                'OPS', 'Status']  # 'Condition', , 'Injured Days']
         self.icols_to_print = ['Player', 'Team', 'Age', 'G', 'Status']  # add 'Injured Days' if you want to see time
@@ -85,7 +85,9 @@ class BaseballStats:
                 pitching_data['Status'] = 'Healthy'  # status
                 pitching_data['Injured Days'] = 0  # days to spend in IL
                 pitching_data.index += 1
-                pitching_data['League'] = pitching_data['Team'].apply(lambda x: 'NL' if x in self.nl else 'AL')
+                if ('League' in pitching_data.columns) is False:  # if no league set one up
+                    pitching_data['League'] = \
+                        pitching_data['Team'].apply(lambda x: 'NL' if x in self.nl else 'AL')
 
                 batting_data = pd.read_csv(str(season) + f" {batter_file}")
                 batting_data['Season'] = str(season)
@@ -97,8 +99,9 @@ class BaseballStats:
                 batting_data['Status'] = 'Healthy'
                 batting_data['Injured Days'] = 0
                 batting_data.index += 1
-                batting_data['League'] = 'AL'
-                batting_data['League'] = batting_data['Team'].apply(lambda league: 'NL' if league in self.nl else 'AL')
+                if ('League' in batting_data.columns) is False:
+                    batting_data['League'] = \
+                        batting_data['Team'].apply(lambda league: 'NL' if league in self.nl else 'AL')
 
                 if self.pitching_data is None:
                     self.pitching_data = pitching_data
@@ -422,12 +425,13 @@ if __name__ == '__main__':
                                   load_batter_file='random-player-stats-Batters.csv',
                                   load_pitcher_file='random-player-stats-Pitching.csv')
     #baseball_data.print_season(df_b=baseball_data.batting_data, df_p=baseball_data.pitching_data, teams=['MIL', 'ARI'])
-    # print(*baseball_data.pitching_data.columns)
-    # print(*baseball_data.batting_data.columns)
+    print(*baseball_data.pitching_data.columns)
+    print(*baseball_data.batting_data.columns)
     print(baseball_data.batting_data.Team.unique())
-    # teams = list(baseball_data.batting_data.Team.unique())
-    # teams = ['MIL']
-    # baseball_data.print_prior_season(teams=teams)
+    print(baseball_data.batting_data.Mascot.unique())
+    teams = list(baseball_data.batting_data.Team.unique())
+    teams = ['JER']  # MIL, NYM, etc
+    baseball_data.print_prior_season(teams=teams)
     # baseball_data.print_current_season(teams=teams)
     # print(baseball_data.pitching_data.to_string())  # maintains index numbers
     # print(baseball_data.batting_data.to_string())

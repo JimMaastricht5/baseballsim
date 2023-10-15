@@ -236,6 +236,8 @@ class Team:
             dfb = bbstats.remove_non_print_cols(self.lineup)
             dfp = bbstats.remove_non_print_cols(self.pitching)
 
+        print(dfb.columns)
+        print(dfb.head(1))
         dfb = dfb[self.b_lineup_cols_to_print]
         print(dfb.to_string(index=True, justify='center'))
         print('')

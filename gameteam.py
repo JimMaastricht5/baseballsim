@@ -213,15 +213,18 @@ class Team:
 
     def search_for_pos(self, position, lineup_index_list, stat_criteria='OPS'):
         # find players not in lineup at specified position, sort by stat descending to find the best
+        # if no players at that position make a recursive call to the func and ask for best remaining player
         # if pos is DH open up search to any position.
+        df_player_num = None
         df_criteria = (~self.pos_players.index.isin(lineup_index_list) & (self.pos_players['Pos'] == position)) if (
                     position != 'DH' and position != '1B') else ~self.pos_players.index.isin(lineup_index_list)
         df_players = self.pos_players[df_criteria].sort_values(stat_criteria, ascending=False)
         if len(df_players) == 0:  # missing player at pos, pick any player
-            df_players = self.pos_players.sort_values(stat_criteria, ascending=False)
+            df_player_num = self.search_for_pos('DH', lineup_index_list, stat_criteria)  # do not grab the same player
+            # df_players = self.pos_players.sort_values(stat_criteria, ascending=False)
             # print(df_players.head(1))
             # print(df_players.head(1).index[0])
-        return df_players.head(1).index[0]  # pick top player at pos
+        return df_players.head(1).index[0] if df_player_num is None else df_player_num  # pick top player at pos
 
     def best_at_stat(self, lineup_index_list, stat_criteria='OPS', count=9, exclude=[]):
         # find players in lineup, sort by stat descending to find the best

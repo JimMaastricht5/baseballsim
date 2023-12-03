@@ -300,7 +300,7 @@ if __name__ == '__main__':
     # away_team = 'SAN'
     # home_team = 'TEM'
     MIL_lineup = {65: 'LF', 71: 'C', 336: '1B', 369: 'DH', 355: 'CF', 62: 'SS', 536: '3B', 154: '2B', 310: 'RF'}
-    sims = 10
+    sims = 1
     season_win_loss = [[0, 0], [0, 0]]  # away record pos 0, home pos 1
     team0_season_df = None
     for sim_game_num in range(1, sims + 1):

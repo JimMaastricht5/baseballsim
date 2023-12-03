@@ -143,13 +143,13 @@ if __name__ == '__main__':
     # teams = ['CHC', 'CIN', 'COL', 'MIL', 'PIT', 'STL']  # included COL for balance in scheduling
 
     # full season
-    num_games = 162
+    num_games = 10
     only_nl_b = False
     bbseason23 = BaseballSeason(load_seasons=[2023], new_season=2024,
                                 season_length_limit=num_games,
                                 min_games=num_games, series_length=3, rotation_len=5,
-                                only_nl_b=only_nl_b, load_batter_file='random-player-stats-Batters.csv',
-                                load_pitcher_file='random-player-stats-Pitching.csv')
+                                only_nl_b=only_nl_b, load_batter_file='player-stats-Batters.csv',
+                                load_pitcher_file='player-stats-Pitching.csv')
     # team_to_follow = bbseason23.teams[0]  # follow the first team in the random set
     team_to_follow = 'JER'  # or follow no team
     bbseason23.sim_season(season_chatty=False,

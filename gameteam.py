@@ -16,8 +16,8 @@ class Team:
 
         self.p_lineup_cols_to_print = ['Player', 'League', 'Team', 'Age', 'G', 'GS', 'CG', 'SHO', 'IP', 'H', '2B', '3B',
                                        'ER', 'K', 'BB', 'HR', 'W', 'L', 'SV', 'BS', 'HLD', 'ERA', 'WHIP']
-        self.b_lineup_cols_to_print = ['Player', 'League', 'Team', 'Pos', 'Age', 'G', 'AB', 'R', 'H', '2B', '3B', 'HR', 'RBI',
-                                       'SB', 'CS', 'BB', 'SO', 'SH', 'SF', 'HBP', 'AVG', 'OBP', 'SLG', 'OPS']
+        self.b_lineup_cols_to_print = ['Player', 'League', 'Team', 'Pos', 'Age', 'G', 'AB', 'R', 'H', '2B', '3B', 'HR',
+                                       'RBI', 'SB', 'CS', 'BB', 'SO', 'SH', 'SF', 'HBP', 'AVG', 'OBP', 'SLG', 'OPS']
         if ('Mascot' in self.pos_players.columns) is True:
             self.mascot = self.pos_players.loc[self.pos_players["Team"] == team_name, "Mascot"].unique()[0]
             self.city_name = self.pos_players.loc[self.pos_players["Team"] == team_name, "City"].unique()[0]
@@ -41,7 +41,7 @@ class Team:
         self.fatigue_start_perc = 70  # 85% of way to avg max is where fatigue starts, adjust factor to inc outing lgth
         self.fatigue_rate = .001  # at 85% of avg max pitchers have a .014 increase in OBP.  using .001 as proxy
         self.fatigue_pitching_change_limit = 5  # change pitcher at # or below out of 100
-        self.fatigue_pitching_unavailable = 50  # condition must be 51 or higher for a pitcher to be available
+        self.fatigue_unavailable = 50  # condition must be 51 or higher for a pitcher or pos player to be available
 
         return
 
@@ -186,7 +186,7 @@ class Team:
     def set_closers(self):
         # grab top closers for setup and final close
         not_selected_criteria = ~self.pitchers.index.isin(self.starting_pitchers.index)
-        not_exhausted = ~(self.pitchers['Condition'] <= self.fatigue_pitching_unavailable)
+        not_exhausted = ~(self.pitchers['Condition'] <= self.fatigue_unavailable)
         not_injured = (self.pitchers['Injured Days'] == 0)
         sv_criteria = self.pitchers.SV > 0
         df_criteria = not_selected_criteria & sv_criteria & not_exhausted & not_injured
@@ -196,27 +196,30 @@ class Team:
     def set_mid_relief(self):
         not_selected_criteria = ~self.pitchers.index.isin(self.starting_pitchers.index)
         not_reliever_criteria = ~self.pitchers.index.isin(self.relievers.index)
-        not_exhausted = ~(self.pitchers['Condition'] <= self.fatigue_pitching_unavailable)
+        not_exhausted = ~(self.pitchers['Condition'] <= self.fatigue_unavailable)
         not_injured = (self.pitchers['Injured Days'] == 0)
         df_criteria = not_selected_criteria & not_reliever_criteria & not_exhausted & not_injured
         self.middle_relievers = self.pitchers[df_criteria].sort_values(['ERA', 'IP'], ascending=[True, False])
         return
 
-    def set_unavailable(self):
-        exhausted = (self.pitchers['Condition'] > self.fatigue_pitching_unavailable)
-        injured = (self.pitchers['Injured Days'] > 0)
-        df_criteria = exhausted | injured
-        self.unavailable_pitchers = self.pitchers[df_criteria].sort_values('IP', ascending=False)
-        print('gameteam.py set unavailable due to fatigue or injury....')
-        return
+    # def set_unavailable(self):
+    #     exhausted = (self.pitchers['Condition'] > self.fatigue_pitching_unavailable)
+    #     injured = (self.pitchers['Injured Days'] > 0)
+    #     df_criteria = exhausted | injured
+    #     self.unavailable_pitchers = self.pitchers[df_criteria].sort_values('IP', ascending=False)
+    #     print('gameteam.py set unavailable due to fatigue or injury....')
+    #     return
 
     def search_for_pos(self, position, lineup_index_list, stat_criteria='OPS'):
         # find players not in lineup at specified position, sort by stat descending to find the best
         # if no players at that position make a recursive call to the func and ask for best remaining player
         # if pos is DH open up search to any position.
         df_player_num = None
+        not_exhausted = ~(self.pos_players['Condition'] <= self.fatigue_unavailable)
+        not_injured = (self.pos_players['Injured Days'] == 0)
         df_criteria = (~self.pos_players.index.isin(lineup_index_list) & (self.pos_players['Pos'] == position)) if (
                     position != 'DH' and position != '1B') else ~self.pos_players.index.isin(lineup_index_list)
+        df_criteria = df_criteria & not_exhausted & not_injured
         df_players = self.pos_players[df_criteria].sort_values(stat_criteria, ascending=False)
         if len(df_players) == 0:  # missing player at pos, pick best remaining player
             df_player_num = self.search_for_pos('DH', lineup_index_list, stat_criteria)  # do not grab the same player

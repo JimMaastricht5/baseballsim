@@ -104,30 +104,6 @@ class TeamBoxScore:
         self.box_pitching.loc[pitcher_index, ['BS']] = 1
         return
 
-    # def batting_result(self, batter_index, outcomes, players_scored_list):
-    #     outcomes.convert_k()
-    #     if outcomes.score_book_cd != 'BB':  # handle walks
-    #         self.box_batting.loc[batter_index, ['AB']] += 1
-    #     outcome_cd = outcomes.score_book_cd if outcomes.score_book_cd != 'K' else 'SO'  # translate K to SO for batter
-    #     if outcome_cd in ['H', '2B', '3B', 'HR', 'BB', 'SO', 'SF', 'HBP']:  # record  plate appearance
-    #         self.box_batting.loc[batter_index, [outcome_cd]] += 1
-    #     # increment hit count if OB, not a walk, and not a single
-    #     if outcomes.score_book_cd != 'BB' and outcomes.score_book_cd != 'H' and outcomes.on_base_b is True:
-    #         self.box_batting.loc[batter_index, ['H']] += 1
-    #     self.total_hits = self.box_batting['H'].sum()
-    #     self.box_batting.loc[batter_index, ['RBI']] += outcomes.runs_scored
-    #     scored_indices = list(players_scored_list.keys())
-    #     if 0 in scored_indices:
-    #         print(f'teamgameboxstats.py batting result runners scored with zero index.')
-    #         raise ValueError('Player with zero index value causes problems accumulating runs')
-    #     self.box_batting.loc[scored_indices, 'R'] += 1
-    #     return
-    # Proposed optimization:
-    # The given code can be optimized by reducing the number of times we access the DataFrame.
-    # Instead of accessing the DataFrame multiple times, we can store the row in a variable, modify it,
-    # and then update the DataFrame. This will reduce the time complexity of the code.
-    # However, the use of GPU or vectorized operations is not applicable in this case as there are no
-    # heavy computations or loops that can be parallelized.
     def batting_result(self, batter_index, outcomes, players_scored_list):
         outcomes.convert_k()
         batter_stats = self.box_batting.loc[batter_index].copy()  # Store the row in a variable
@@ -157,7 +133,7 @@ class TeamBoxScore:
 
     def print_boxes(self):
         df = self.box_batting[['Player', 'Team', 'Pos', 'Age', 'G', 'AB', 'R', 'H', '2B', '3B', 'HR', 'RBI',
-                               'SB', 'CS', 'BB', 'SO', 'SH', 'SF', 'HBP']]
+                               'SB', 'CS', 'BB', 'SO', 'SH', 'SF', 'HBP', 'Condition']]
         # , 'AVG', 'OBP', 'SLG', 'OPS', 'Condition', 'Status']]
         print(df.to_string(index=False, justify='center'))
         print('')

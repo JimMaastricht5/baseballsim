@@ -207,6 +207,8 @@ class BaseballStats:
 
     def game_results_to_season(self, box_score_class):
         batting_box_score = box_score_class.get_batter_game_stats()
+        batting_box_score = self.end_game_day(batting_box_score)  # reduce condition for pos players that played today
+        print(f'in bbstats,py game_results_to_season {batting_box_score}')
         pitching_box_score = box_score_class.get_pitcher_game_stats()
         numeric_cols = self.numeric_bcols
         for index, row in batting_box_score.iterrows():
@@ -215,8 +217,6 @@ class BaseballStats:
             new_row['Condition'] = batting_box_score.loc[index, 'Condition']
             new_row['Injured Days'] = batting_box_score.loc[index, 'Injured Days']
             self.new_season_batting_data.loc[index, numeric_cols] = new_row
-            # self.new_season_batting_data.loc[index, 'Condition'] = batting_box_score.loc[index, 'Condition']
-            # self.new_season_batting_data.loc[index, 'Injured Days'] = batting_box_score.loc[index, 'Injured Days']
         numeric_cols = self.numeric_pcols
         for index, row in pitching_box_score.iterrows():
             new_row = pitching_box_score.loc[index][numeric_cols] + \
@@ -224,8 +224,6 @@ class BaseballStats:
             new_row['Condition'] = pitching_box_score.loc[index, 'Condition']
             new_row['Injured Days'] = pitching_box_score.loc[index, 'Injured Days']
             self.new_season_pitching_data.loc[index, numeric_cols] = new_row
-            # self.new_season_pitching_data.loc[index, 'Condition'] = pitching_box_score.loc[index, 'Condition']
-            # self.new_season_pitching_data.loc[index, 'Injured Days'] = pitching_box_score.loc[index, 'Injured Days']
         return
 
     def is_injured(self):
@@ -266,6 +264,12 @@ class BaseballStats:
         self.batting_data.loc[:, 'Condition'] = self.new_season_batting_data.loc[:, 'Condition']
         self.batting_data.loc[:, 'Injured Days'] = self.new_season_batting_data.loc[:, 'Injured Days']
         return
+
+    def end_game_day(self, box_batting_df):
+        box_batting_df['Condition'] = box_batting_df. \
+            apply(lambda row: row['Condition'] - self.rnd_condition_chg(), axis=1)
+        box_batting_df['Condition'] = box_batting_df['Condition'].clip(lower=0, upper=100)
+        return box_batting_df
 
     def update_season_stats(self):
         self.new_season_pitching_data = \
@@ -318,25 +322,6 @@ def trunc_col(df_n, d=3):
     return (df_n * 10 ** d).astype(int) / 10 ** d
 
 
-# def team_batting_stats(df):
-#     # print(f'team_batting_stats bbstats.py {df.to_string()}')
-#     df = df[df['AB'] > 0]
-#     try:
-#         df['AVG'] = trunc_col(df['H'] / df['AB'], 3)
-#         df['OBP'] = trunc_col((df['H'] + df['BB'] + df['HBP']) / (df['AB'] + df['BB'] + df['HBP']), 3)
-#         df['SLG'] = trunc_col(
-#             ((df['H'] - df['2B'] - df['3B'] - df['HR']) + df['2B'] * 2 + df['3B'] * 3 + df['HR'] * 4) / df['AB'], 3)
-#         df['OPS'] = trunc_col(df['OBP'] + df['SLG'], 3)
-#         df['Condition'] = trunc_col(df['Condition'], 0)
-#     except ZeroDivisionError:
-#         pass  # skip calculation for zero div error
-#     return df
-# Proposed optimization: The given code is already quite optimized and uses vectorized operations for calculations.
-# However, we can make a minor improvement by removing the try-except block for ZeroDivisionError.
-# Instead, we can use the np.divide function which can handle division by zero without raising an error.
-# This function returns inf or NaN when division by zero occurs,
-# which we can then replace with 0 using the np.nan_to_num function.
-# This approach is more efficient because it avoids the overhead of exception handling.
 def team_batting_stats(df):
     df = df[df['AB'] > 0]
     df['AVG'] = trunc_col(np.nan_to_num(np.divide(df['H'], df['AB']), nan=0.0, posinf=0.0), 3)

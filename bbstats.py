@@ -41,18 +41,15 @@ class BaseballStats:
         # 27.5% of pitchers w > 5 in will spend time on IL per season (188 out of 684)
         # 26.3% of pitching injuries affect the throwing elbow results in avg of 74 days lost
         # position player (non-pitcher) longevitiy: https://www.nytimes.com/2007/07/15/sports/baseball/15careers.html
-        self.condition_change_per_day = 20  # improve with rest, mid point of normal dist for recovery
+        self.condition_change_per_day = 20  # improve with rest
         self.pitching_injury_rate = .275  # 27.5 out of 100 players injured per season-> per game
         self.pitching_injury_odds_for_season = 1 - (1 - self.pitching_injury_rate) ** (1/162)
         self.pitching_injury_avg_len = 32  # according to mlb avg len is 74 but that cant be a normal dist
-        self.batting_injury_rate = .137  # 2022 87 out of 634 injured per season .137 avg age 27
+        self.batting_injury_rate = .137  # 2022 87 out of 634 injured per season
         self.batting_injury_odds_for_season = 1 - (1 - self.batting_injury_rate) ** (1/162)
-        # self.odds_of_survival_age_20 = .90  # 90 chance for a 20 year-old to play the following year, base injury rate
-        self.odd_of_adjustment_for_age = .0328  # 3.28% inc in injury per year above age 20 w/ .90 survival at age 20
         self.batting_injury_avg_len = 15  # made this up
-        # self.age_adj_inj_odds_batting = lambda: 1 - (1 - self.batting_injury_rate - ()) ** (1/162)
-        self.rnd_codnition_chg = lambda: abs(np.random.normal(loc=self.condition_change_per_day,
-                                                              scale=self.condition_change_per_day / 2, size=1)[0])
+        self.odds_of_survival_age_20 = .90  # 90 chance for a 20 year-old to play the following year
+        self.odd_of_survival_additional_years = -.0328  # 3.28% decrease in survival, use to increase injury chance
         self.rnd_p_inj = lambda: abs(np.random.normal(loc=self.pitching_injury_avg_len,
                                                       scale=self.pitching_injury_avg_len / 2, size=1)[0])
         self.rnd_b_inj = lambda: abs(np.random.normal(loc=self.batting_injury_avg_len,
@@ -272,12 +269,14 @@ class BaseballStats:
 
     def new_game_day(self):
         self.is_injured()
-        self.new_season_pitching_data['Condition'] = self.new_season_pitching_data.\
-            apply(lambda row: self.rnd_codnition_chg() + row['Condition'], axis=1)
+        self.new_season_pitching_data['Condition'] = self.new_season_pitching_data['Condition'] \
+            + self.condition_change_per_day
         self.new_season_pitching_data['Condition'] = self.new_season_pitching_data['Condition'].clip(lower=0, upper=100)
-        self.new_season_batting_data['Condition'] = self.new_season_batting_data.\
-            apply(lambda row: self.rnd_codnition_chg() + row['Condition'], axis=1)
+        # self.new_season_pitching_data['Injured Days'].apply(lambda x: x-1 if x-1 > 0 else 0)
+        self.new_season_batting_data['Condition'] = self.new_season_batting_data['Condition'] \
+            + self.condition_change_per_day
         self.new_season_batting_data['Condition'] = self.new_season_batting_data['Condition'].clip(lower=0, upper=100)
+        # self.new_season_batting_data['Injured Days'].apply(lambda x: x - 1 if x - 1 > 0 else 0)
 
         # copy over results in new season to prior season for game management
         self.pitching_data.loc[:, 'Condition'] = self.new_season_pitching_data.loc[:, 'Condition']
@@ -423,15 +422,15 @@ def team_pitching_totals(pitching_df, team_name='', concat=True):
 
 if __name__ == '__main__':
     baseball_data = BaseballStats(load_seasons=[2023], new_season=2024, generate_random_data=False, only_nl_b=False,
-                                  load_batter_file='player-stats-Batters.csv',
-                                  load_pitcher_file='player-stats-Pitching.csv')
+                                  load_batter_file='random-player-stats-Batters.csv',
+                                  load_pitcher_file='random-player-stats-Pitching.csv')
     #baseball_data.print_season(df_b=baseball_data.batting_data, df_p=baseball_data.pitching_data, teams=['MIL', 'ARI'])
     print(*baseball_data.pitching_data.columns)
     print(*baseball_data.batting_data.columns)
     print(baseball_data.batting_data.Team.unique())
-    # print(baseball_data.batting_data.Mascot.unique())
+    print(baseball_data.batting_data.Mascot.unique())
     teams = list(baseball_data.batting_data.Team.unique())
-    teams = ['MIL']  # MIL, NYM, etc
+    teams = ['SAN']  # MIL, NYM, etc
     baseball_data.print_prior_season(teams=teams)
     # baseball_data.print_current_season(teams=teams)
     # print(baseball_data.pitching_data.to_string())  # maintains index numbers

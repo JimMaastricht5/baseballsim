@@ -13,7 +13,8 @@ HOME = 1
 
 class BaseballSeason:
     def __init__(self, load_seasons, new_season, team_list=[], season_length_limit=0, min_games=0, series_length=1,
-                 rotation_len=5, only_nl_b=False, load_batter_file='player-stats-Batters.csv',
+                 rotation_len=5, only_nl_b=False, interactive=False,
+                 load_batter_file='player-stats-Batters.csv',
                  load_pitcher_file='player-stats-Pitching.csv'):
         self.season_length_limit = season_length_limit  # zero mean there is no limit, based on schedule parameters
         self.min_games = min_games
@@ -24,6 +25,7 @@ class BaseballSeason:
         self.load_seasons = load_seasons  # pull base data across for what seasons
         self.new_season = new_season
         self.schedule = []
+        self.interactive = interactive
         self.baseball_data = bbstats.BaseballStats(load_seasons=self.load_seasons, new_season=new_season,
                                                    only_nl_b=only_nl_b, load_batter_file=load_batter_file,
                                                    load_pitcher_file=load_pitcher_file)
@@ -106,6 +108,8 @@ class BaseballSeason:
             self.baseball_data.new_game_day()  # update rest and injury data for a new day
             for match_up in todays_games:  # run all games for a day, day starts at zero
                 if 'OFF DAY' not in match_up:  # not an off day
+                    if team_to_follow in match_up and self.interactive:
+                        pass
                     print(f'Playing day #{season_day_num + 1}: {match_up[0]} away against {match_up[1]}')
                     game = bbgame.Game(away_team_name=match_up[0], home_team_name=match_up[1],
                                        baseball_data=self.baseball_data, game_num=season_day_num,
@@ -121,6 +125,8 @@ class BaseballSeason:
             # end of all games for one day
             print(f'Standings for Day {season_day_num + 1}:')
             self.print_standings()
+            if self.interactive:
+                pass
         # end season
         self.baseball_data.update_season_stats()
         print(f'\n\n****** End of {self.new_season} season ******')
@@ -145,13 +151,16 @@ if __name__ == '__main__':
     # full season
     num_games = 10
     only_nl_b = False
+    interactive = True
     bbseason23 = BaseballSeason(load_seasons=[2023], new_season=2024,
                                 season_length_limit=num_games,
                                 min_games=num_games, series_length=3, rotation_len=5,
-                                only_nl_b=only_nl_b, load_batter_file='player-stats-Batters.csv',
+                                only_nl_b=only_nl_b,
+                                interactive=interactive,
+                                load_batter_file='player-stats-Batters.csv',
                                 load_pitcher_file='player-stats-Pitching.csv')
     # team_to_follow = bbseason23.teams[0]  # follow the first team in the random set
-    team_to_follow = 'JER'  # or follow no team
+    team_to_follow = 'MIL'  # or follow no team
     bbseason23.sim_season(season_chatty=False,
                           season_print_lineup_b=False,
                           season_print_box_score_b=False,

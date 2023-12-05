@@ -51,7 +51,7 @@ class BaseballStats:
         self.odd_of_adjustment_for_age = .0328  # 3.28% inc in injury per year above age 20 w/ .90 survival at age 20
         self.batting_injury_avg_len = 15  # made this up
         # self.age_adj_inj_odds_batting = lambda: 1 - (1 - self.batting_injury_rate - ()) ** (1/162)
-        self.rnd_codnition_chg = lambda: abs(np.random.normal(loc=self.condition_change_per_day,
+        self.rnd_condition_chg = lambda: abs(np.random.normal(loc=self.condition_change_per_day,
                                                               scale=self.condition_change_per_day / 2, size=1)[0])
         self.rnd_p_inj = lambda: abs(np.random.normal(loc=self.pitching_injury_avg_len,
                                                       scale=self.pitching_injury_avg_len / 2, size=1)[0])
@@ -227,25 +227,6 @@ class BaseballStats:
             # self.new_season_pitching_data.loc[index, 'Condition'] = pitching_box_score.loc[index, 'Condition']
             # self.new_season_pitching_data.loc[index, 'Injured Days'] = pitching_box_score.loc[index, 'Injured Days']
         return
-    # Proposed optimization:
-    # The given code can be optimized by using vectorized operations provided by pandas library
-    # instead of iterating over each row.
-    # This will significantly improve the performance as pandas vectorized operations are faster than python loops.
-    # Also, the code is more readable and concise with vectorized operations.
-    # def game_results_to_season(self, box_score_class):
-    #     batting_box_score = box_score_class.get_batter_game_stats()
-    #     pitching_box_score = box_score_class.get_pitcher_game_stats()
-    #     # Vectorized addition of corresponding numeric columns in new_season_batting_data and batting_box_score
-    #     self.new_season_batting_data[self.numeric_bcols] += batting_box_score[self.numeric_bcols]
-    #     # Vectorized assignment of 'Condition' and 'Injured Days' columns in new_season_batting_data
-    #     self.new_season_batting_data['Condition'] = batting_box_score['Condition']
-    #     self.new_season_batting_data['Injured Days'] = batting_box_score['Injured Days']
-    #     # Vectorized addition of corresponding numeric columns in new_season_pitching_data and pitching_box_score
-    #     self.new_season_pitching_data[self.numeric_pcols] += pitching_box_score[self.numeric_pcols]
-    #     # Vectorized assignment of 'Condition' and 'Injured Days' columns in new_season_pitching_data
-    #     self.new_season_pitching_data['Condition'] = pitching_box_score['Condition']
-    #     self.new_season_pitching_data['Injured Days'] = pitching_box_score['Injured Days']
-    #     return
 
     def is_injured(self):
         self.new_season_pitching_data['Injured Days'] = self.new_season_pitching_data.\
@@ -273,10 +254,10 @@ class BaseballStats:
     def new_game_day(self):
         self.is_injured()
         self.new_season_pitching_data['Condition'] = self.new_season_pitching_data.\
-            apply(lambda row: self.rnd_codnition_chg() + row['Condition'], axis=1)
+            apply(lambda row: self.rnd_condition_chg() + row['Condition'], axis=1)
         self.new_season_pitching_data['Condition'] = self.new_season_pitching_data['Condition'].clip(lower=0, upper=100)
         self.new_season_batting_data['Condition'] = self.new_season_batting_data.\
-            apply(lambda row: self.rnd_codnition_chg() + row['Condition'], axis=1)
+            apply(lambda row: self.rnd_condition_chg() + row['Condition'], axis=1)
         self.new_season_batting_data['Condition'] = self.new_season_batting_data['Condition'].clip(lower=0, upper=100)
 
         # copy over results in new season to prior season for game management

@@ -1,11 +1,10 @@
 import datetime
 import random
-
 import pandas as pd
-
 import bbgame
 import bbstats
 import numpy as np
+import keyboard
 
 AWAY = 0
 HOME = 1
@@ -33,7 +32,6 @@ class BaseballSeason:
         if len(self.teams) % 2 == 1:  # odd number of teams
             self.teams.append('OFF DAY')
 
-        # print(self.teams)
         self.create_schedule()  # set schedule
         self.team_win_loss = {}
         for team in self.teams:
@@ -109,8 +107,12 @@ class BaseballSeason:
             for match_up in todays_games:  # run all games for a day, day starts at zero
                 if 'OFF DAY' not in match_up:  # not an off day
                     if team_to_follow in match_up and self.interactive:
-                        self.baseball_data.print_current_season(teams=[team_to_follow])
-                        user_input = input("Press Enter to Continue.....")
+                        if season_day_num > 0:
+                            self.baseball_data.print_current_season(teams=[team_to_follow])
+                        else:
+                            self.baseball_data.print_prior_season(teams=[team_to_follow])
+                        print(f'Press spacebar to Continue.....')
+                        keyboard.wait('space')
                         pass
                     print(f'Playing day #{season_day_num + 1}: {match_up[0]} away against {match_up[1]}')
                     game = bbgame.Game(away_team_name=match_up[0], home_team_name=match_up[1],

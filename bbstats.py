@@ -262,12 +262,6 @@ class BaseballStats:
         self.batting_data.loc[:, 'Injured Days'] = self.new_season_batting_data.loc[:, 'Injured Days']
         return
 
-    # def end_game_day(self, box_batting_df):
-    #     box_batting_df['Condition'] = box_batting_df. \
-    #         apply(lambda row: row['Condition'] - 5 * self.rnd_condition_chg(), axis=1)
-    #     box_batting_df['Condition'] = box_batting_df['Condition'].clip(lower=0, upper=100)
-    #     return box_batting_df
-
     def update_season_stats(self):
         self.new_season_pitching_data = \
             team_pitching_stats(self.new_season_pitching_data[self.new_season_pitching_data['IP'] > 0].fillna(0))

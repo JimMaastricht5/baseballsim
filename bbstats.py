@@ -11,15 +11,15 @@ class BaseballStats:
         self.rnd = lambda: np.random.default_rng().uniform(low=0.0, high=1.001)  # random generator between 0 and 1
 
         self.numeric_bcols = ['G', 'AB', 'R', 'H', '2B', '3B', 'HR', 'RBI', 'SB', 'CS', 'BB', 'SO', 'SH', 'SF',
-                              'HBP']  # these cols will get added to running season total
+                              'HBP', 'Condition']  # these cols will get added to running season total
         self.numeric_pcols = ['G', 'GS', 'CG', 'SHO', 'IP', 'AB', 'H', '2B', '3B', 'HR', 'ER', 'K', 'BB', 'W', 'L',
-                              'SV', 'BS', 'HLD', 'Total_Outs']  # these cols will get added to running season total
+                              'SV', 'BS', 'HLD', 'Total_Outs', 'Condition']  # cols will add to running season total
         self.pcols_to_print = ['Player', 'League', 'Team', 'Age', 'G', 'GS', 'CG', 'SHO', 'IP', 'H', '2B', '3B', 'ER',
                                'K', 'BB', 'HR', 'W', 'L', 'SV', 'BS', 'HLD', 'ERA', 'WHIP', 'AVG', 'OBP', 'SLG', 'OPS',
-                               'Status']  # 'Condition', 'Injured Days']
+                               'Status', 'Injured Days', 'Condition']
         self.bcols_to_print = ['Player', 'League', 'Team', 'Pos', 'Age', 'G', 'AB', 'R', 'H', '2B', '3B', 'HR', 'RBI',
                                'SB', 'CS', 'BB', 'SO', 'SH', 'SF', 'HBP', 'AVG', 'OBP', 'SLG',
-                               'OPS', 'Status']  # 'Condition', , 'Injured Days']
+                               'OPS', 'Status', 'Injured Days', 'Condition']
         self.icols_to_print = ['Player', 'Team', 'Age', 'G', 'Status']  # add 'Injured Days' if you want to see time
         self.nl = ['CHC', 'CIN', 'MIL', 'PIT', 'STL', 'ATL', 'MIA', 'NYM', 'PHI', 'WAS', 'AZ', 'COL', 'LA', 'SD', 'SF']
         self.only_nl_b = only_nl_b
@@ -207,12 +207,9 @@ class BaseballStats:
 
     def game_results_to_season(self, box_score_class):
         batting_box_score = box_score_class.get_batter_game_stats()
-        batting_box_score = self.end_game_day(batting_box_score)  # reduce condition for pos players that played today
-        print(f'in bbstats,py game_results_to_season {batting_box_score}')
         pitching_box_score = box_score_class.get_pitcher_game_stats()
         numeric_cols = self.numeric_bcols
         for index, row in batting_box_score.iterrows():
-            # print(index, row)
             new_row = batting_box_score.loc[index][numeric_cols] + self.new_season_batting_data.loc[index][numeric_cols]
             new_row['Condition'] = batting_box_score.loc[index, 'Condition']
             new_row['Injured Days'] = batting_box_score.loc[index, 'Injured Days']
@@ -265,11 +262,11 @@ class BaseballStats:
         self.batting_data.loc[:, 'Injured Days'] = self.new_season_batting_data.loc[:, 'Injured Days']
         return
 
-    def end_game_day(self, box_batting_df):
-        box_batting_df['Condition'] = box_batting_df. \
-            apply(lambda row: row['Condition'] - self.rnd_condition_chg(), axis=1)
-        box_batting_df['Condition'] = box_batting_df['Condition'].clip(lower=0, upper=100)
-        return box_batting_df
+    # def end_game_day(self, box_batting_df):
+    #     box_batting_df['Condition'] = box_batting_df. \
+    #         apply(lambda row: row['Condition'] - 5 * self.rnd_condition_chg(), axis=1)
+    #     box_batting_df['Condition'] = box_batting_df['Condition'].clip(lower=0, upper=100)
+    #     return box_batting_df
 
     def update_season_stats(self):
         self.new_season_pitching_data = \
@@ -391,7 +388,8 @@ if __name__ == '__main__':
     baseball_data = BaseballStats(load_seasons=[2023], new_season=2024, generate_random_data=False, only_nl_b=False,
                                   load_batter_file='player-stats-Batters.csv',
                                   load_pitcher_file='player-stats-Pitching.csv')
-    #baseball_data.print_season(df_b=baseball_data.batting_data, df_p=baseball_data.pitching_data, teams=['MIL', 'ARI'])
+    # baseball_data.print_season(df_b=baseball_data.batting_data, df_p=baseball_data.pitching_data,
+    # teams=['MIL', 'ARI'])
     print(*baseball_data.pitching_data.columns)
     print(*baseball_data.batting_data.columns)
     print(baseball_data.batting_data.Team.unique())

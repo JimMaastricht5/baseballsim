@@ -1,6 +1,6 @@
 import pandas as pd
 import bbstats
-# import numpy as np
+import numpy as np
 
 
 class TeamBoxScore:
@@ -28,39 +28,17 @@ class TeamBoxScore:
         self.total_hits = 0
         self.total_errors = 0
 
+        self.condition_change_per_day = 20
+        self.rnd_condition_chg = lambda: abs(np.random.normal(loc=self.condition_change_per_day,
+                                                              scale=self.condition_change_per_day / 2, size=1)[0])
         return
 
-    # def batters_faced(self, pitcher_index):
-    #     total_faced = self.box_pitching.loc[pitcher_index].H + self.box_pitching.loc[pitcher_index].BB + \
-    #                   self.box_pitching.loc[pitcher_index].IP * 3
-    #     return total_faced
-    # Proposed optimization:
-    # The org code is already quite efficient, but we can make a minor improvement by avoiding multiple calls to .loc[].
-    # .loc[] is a pandas function that can be quite slow, especially when called repeatedly in a loop.
-    # Instead, we can call .loc[] once, store the result in a variable, and then use that variable for the calculations.
-    # This results in a small speedup, the exact amount will depend on the size of the DataFrame and other factors.
-    # Note that this code does not use sklearn or cupy, as they are not necessary for this optimization.
     def batters_faced(self, pitcher_index):
         pitcher_stats = self.box_pitching.loc[pitcher_index]  # Store the result of .loc[] in a variable
         return pitcher_stats.H + pitcher_stats.BB + pitcher_stats.IP * 3  # total batters faced
 
     def pitching_result(self, pitcher_index, outcomes, condition):
         outcomes.convert_k()
-        # if outcomes.score_book_cd != 'BB':  # handle walks
-        #     self.box_pitching.loc[pitcher_index, ['AB']] += 1
-        # if outcomes.on_base_b is False:
-        #     self.box_pitching.loc[pitcher_index, ['Total_Outs']] = \
-        #         self.box_pitching.loc[pitcher_index, ['Total_Outs']] + outcomes.outs_on_play
-        #     self.box_pitching.loc[pitcher_index, ['IP']] = \
-        #         float(self.box_pitching.loc[pitcher_index, ['Total_Outs']] / 3)
-        # if outcomes.score_book_cd in ['H', '2B', '3B', 'HR', 'K', 'BB', 'HBP']:  # handle plate appearance
-        #     self.box_pitching.loc[pitcher_index, [outcomes.score_book_cd]] += 1
-        # # increment hit count if OB, not a walk, and not a single, handles 2b, 3b, and hr
-        # if outcomes.score_book_cd != 'BB' and outcomes.score_book_cd != 'H' and outcomes.on_base_b is True:
-        #     self.box_pitching.loc[pitcher_index, ['H']] += 1
-        # self.box_pitching.loc[pitcher_index, ['ER']] += outcomes.runs_scored
-        # self.box_pitching.loc[pitcher_index, ['Condition']] = condition
-        # Get the row we are interested in
         row = self.box_pitching.loc[pitcher_index]
         if outcomes.score_book_cd != 'BB':  # Handle walks
             row['AB'] += 1
@@ -83,7 +61,7 @@ class TeamBoxScore:
         new_pitcher = new_pitcher if isinstance(new_pitcher, pd.DataFrame) else new_pitcher.to_frame().T
         new_pitcher = new_pitcher.assign(G=1, GS=0, CG=0, SHO=0, IP=0, AB=0, H=0, ER=0, K=0, BB=0, HR=0,
                                          W=0, L=0, SV=0, BS=0, HLD=0, ERA=0,
-                                         WHIP=0, OBP=0, SLG=0, OPS=0, Total_Outs=0, Condition=100)
+                                         WHIP=0, OBP=0, SLG=0, OPS=0, Total_Outs=0, Condition=100)  # ?? ISSUE!!!
         self.box_pitching = pd.concat([self.box_pitching, new_pitcher], ignore_index=False)
         return
 
@@ -96,7 +74,7 @@ class TeamBoxScore:
         if save_b:  # add one to save col for last row in box for team is save boolean is true
             self.box_pitching.loc[self.box_pitching.index[-1], ['SV']] += 1
             if float(self.box_pitching.loc[self.box_pitching.index[-1], ['IP']]) < 2.0 and \
-                    float(self.box_pitching.loc[self.box_pitching.index[-2], ['IP']]) > 0:  # if the save was not two innings
+                    float(self.box_pitching.loc[self.box_pitching.index[-2], ['IP']]) > 0:  # if save was not 2 innings
                 self.box_pitching.loc[self.box_pitching.index[-2], ['HLD']] += 1,
         return
 
@@ -122,6 +100,12 @@ class TeamBoxScore:
             print(f'teamgameboxstats.py batting result runners scored with zero index.')
             raise ValueError('Player with zero index value causes problems accumulating runs')
         self.box_batting.loc[scored_indices, 'R'] += 1
+        return
+
+    def set_box_batting_condition(self):
+        self.box_batting['Condition'] = self.box_batting. \
+            apply(lambda row: row['Condition'] - self.rnd_condition_chg(), axis=1)
+        self.box_batting['Condition'] = self.box_batting['Condition'].clip(lower=0, upper=100)
         return
 
     def totals(self):

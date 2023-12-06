@@ -269,6 +269,19 @@ class Game:
                                                               save_b=self.is_save_sit[HOME])
         return
 
+    def end_game(self):
+        self.teams[AWAY].set_batting_condition()
+        self.teams[HOME].set_batting_condition()
+        self.win_loss_record()
+        self.teams[AWAY].box_score.totals()
+        self.teams[HOME].box_score.totals()
+        if self.print_box_score_b:  # print or not to print...
+            self.teams[AWAY].box_score.print_boxes()
+            self.teams[HOME].box_score.print_boxes()
+        print('Final:')
+        self.print_inning_score()
+        return
+
     def sim_game(self, team_to_follow=''):
         if team_to_follow in self.team_names:
             print(f'Following team: {team_to_follow}')
@@ -279,15 +292,8 @@ class Game:
 
         while self.is_game_end() is False:
             self.sim_half_inning()
+        self.end_game()
 
-        self.win_loss_record()
-        self.teams[AWAY].box_score.totals()
-        self.teams[HOME].box_score.totals()
-        if self.print_box_score_b:  # print or not to print...
-            self.teams[AWAY].box_score.print_boxes()
-            self.teams[HOME].box_score.print_boxes()
-        print('Final:')
-        self.print_inning_score()
         return self.total_score, self.inning, self.win_loss
 
 

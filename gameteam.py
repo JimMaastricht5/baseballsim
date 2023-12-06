@@ -10,14 +10,19 @@ class Team:
         self.baseball_data = baseball_data
         self.pitchers = baseball_data.pitching_data[baseball_data.pitching_data["Team"] == team_name]
         self.pos_players = baseball_data.batting_data[baseball_data.batting_data["Team"] == team_name]
+        self.pitchers['Condition'] = self.baseball_data.new_season_pitching_data['Condition']
+        self.pos_players['Condition'] = self.baseball_data.new_season_batting_data['Condition']
+        # print(f'in gameteam init {self.pos_players}')
         if len(self.pitchers) == 0:
             print(f'Teams available are {self.baseball_data.pitching_data["Team"].unique()}')
             raise ValueError(f'Pitching or batting data was empty for {team_name}')
 
         self.p_lineup_cols_to_print = ['Player', 'League', 'Team', 'Age', 'G', 'GS', 'CG', 'SHO', 'IP', 'H', '2B', '3B',
-                                       'ER', 'K', 'BB', 'HR', 'W', 'L', 'SV', 'BS', 'HLD', 'ERA', 'WHIP']
+                                       'ER', 'K', 'BB', 'HR', 'W', 'L', 'SV', 'BS', 'HLD', 'ERA', 'WHIP',
+                                       'Condition']
         self.b_lineup_cols_to_print = ['Player', 'League', 'Team', 'Pos', 'Age', 'G', 'AB', 'R', 'H', '2B', '3B', 'HR',
-                                       'RBI', 'SB', 'CS', 'BB', 'SO', 'SH', 'SF', 'HBP', 'AVG', 'OBP', 'SLG', 'OPS']
+                                       'RBI', 'SB', 'CS', 'BB', 'SO', 'SH', 'SF', 'HBP', 'AVG', 'OBP', 'SLG', 'OPS',
+                                       'Condition']
         if ('Mascot' in self.pos_players.columns) is True:
             self.mascot = self.pos_players.loc[self.pos_players["Team"] == team_name, "Mascot"].unique()[0]
             self.city_name = self.pos_players.loc[self.pos_players["Team"] == team_name, "City"].unique()[0]
@@ -140,6 +145,10 @@ class Team:
             print(f'error in set_pitching_condition gameteam.py {e}')
             print(self.pitching)
             raise Exception('set pitching condition error')
+        return
+
+    def set_batting_condition(self):
+        self.box_score.set_box_batting_condition()
         return
 
     def cur_batter_stats(self, loc_in_lineup):

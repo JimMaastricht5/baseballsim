@@ -109,6 +109,8 @@ class BaseballSeason:
             for match_up in todays_games:  # run all games for a day, day starts at zero
                 if 'OFF DAY' not in match_up:  # not an off day
                     if team_to_follow in match_up and self.interactive:
+                        self.baseball_data.print_current_season(teams=[team_to_follow])
+                        user_input = input("Press Enter to Continue.....")
                         pass
                     print(f'Playing day #{season_day_num + 1}: {match_up[0]} away against {match_up[1]}')
                     game = bbgame.Game(away_team_name=match_up[0], home_team_name=match_up[1],

@@ -275,7 +275,8 @@ class BaseballStats:
             team_batting_stats(self.new_season_batting_data[self.new_season_batting_data['AB'] > 0].fillna(0))
 
     def print_current_season(self, teams, summary_only_b=False):
-        self.print_season(self.new_season_batting_data, self.new_season_pitching_data, teams=teams,
+        self.print_season(team_batting_stats(self.new_season_batting_data),
+                          team_pitching_stats(self.new_season_pitching_data), teams=teams,
                           summary_only_b=summary_only_b)
         return
 

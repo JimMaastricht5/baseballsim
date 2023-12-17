@@ -20,7 +20,7 @@ class BaseballStats:
         self.bcols_to_print = ['Player', 'League', 'Team', 'Pos', 'Age', 'G', 'AB', 'R', 'H', '2B', '3B', 'HR', 'RBI',
                                'SB', 'CS', 'BB', 'SO', 'SH', 'SF', 'HBP', 'AVG', 'OBP', 'SLG',
                                'OPS', 'Status', 'Injured Days', 'Condition']
-        self.icols_to_print = ['Player', 'Team', 'Age', 'G', 'Status']  # add 'Injured Days' if you want to see time
+        self.injury_cols_to_print = ['Player', 'Team', 'Age', 'Status', 'Days Remaining']  # Days Remaining to see time
         self.nl = ['CHC', 'CIN', 'MIL', 'PIT', 'STL', 'ATL', 'MIA', 'NYM', 'PHI', 'WAS', 'AZ', 'COL', 'LA', 'SD', 'SF']
         self.only_nl_b = only_nl_b
         self.load_seasons = load_seasons  # list of seasons to load from csv files
@@ -240,10 +240,12 @@ class BaseballStats:
         print(f'Season Disabled Lists:')
         if self.new_season_pitching_data[self.new_season_pitching_data["Injured Days"] > 0].shape[0] > 0:
             df = self.new_season_pitching_data[self.new_season_pitching_data["Injured Days"] > 0]
-            print(f'{df[self.icols_to_print].to_string(justify="right")}\n')
+            df = df.rename(columns={'Injured Days': 'Days Remaining'})
+            print(f'{df[self.injury_cols_to_print].to_string(justify="right")}\n')
         if self.new_season_batting_data[self.new_season_batting_data["Injured Days"] > 0].shape[0] > 0:
             df = self.new_season_batting_data[self.new_season_batting_data["Injured Days"] > 0]
-            print(f'{df[self.icols_to_print].to_string(justify="right")}\n')
+            df = df.rename(columns={'Injured Days': 'Days Remaining'})
+            print(f'{df[self.injury_cols_to_print].to_string(justify="right")}\n')
         return
 
     def new_game_day(self):

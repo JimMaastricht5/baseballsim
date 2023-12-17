@@ -43,20 +43,23 @@ class BaseballStats:
         # position player (non-pitcher) longevitiy: https://www.nytimes.com/2007/07/15/sports/baseball/15careers.html
         self.condition_change_per_day = 20  # improve with rest, mid point of normal dist for recovery
         self.pitching_injury_rate = .275  # 27.5 out of 100 players injured per season-> per game
-        self.pitching_injury_odds_for_season = 1 - (1 - self.pitching_injury_rate) ** (1/162)
+        # self.pitching_injury_odds_for_season = 1 - (1 - self.pitching_injury_rate) ** (1/162)
         self.pitching_injury_avg_len = 32  # according to mlb avg len is 74 but that cant be a normal dist
         self.batting_injury_rate = .137  # 2022 87 out of 634 injured per season .137 avg age 27
-        self.batting_injury_odds_for_season = 1 - (1 - self.batting_injury_rate) ** (1/162)
-        # self.odds_of_survival_age_20 = .90  # 90 chance for a 20 year-old to play the following year, base injury rate
-        self.injury_odds_adjustment_for_age = .0328 / 162  # 3.28% inc injury per year above 20 w/ .90 survival
+        # self.batting_injury_odds_for_season = 1 - (1 - self.batting_injury_rate) ** (1/162)
+        self.injury_odds_adjustment_for_age = .000328  # 3.28% inc injury per season above 20 w/ .90 survival
         self.batting_injury_avg_len = 15  # made this up
-        # self.age_adj_inj_odds_batting = lambda: 1 - (1 - self.batting_injury_rate - ()) ** (1/162)
-        self.rnd_condition_chg = lambda: abs(np.random.normal(loc=self.condition_change_per_day,
-                                                              scale=self.condition_change_per_day / 2, size=1)[0])
-        self.rnd_p_inj = lambda: abs(np.random.normal(loc=self.pitching_injury_avg_len,
-                                                      scale=self.pitching_injury_avg_len / 2, size=1)[0])
-        self.rnd_b_inj = lambda: abs(np.random.normal(loc=self.batting_injury_avg_len,
-                                                      scale=self.batting_injury_avg_len / 2, size=1)[0])
+        # ?? need to use age in condition recover and injury length
+        self.pitcher_injury_odds_for_season = lambda age: 1 - (1 - (self.pitching_injury_rate + ((age - 20)
+                                                                    * self.injury_odds_adjustment_for_age))) ** (1/162)
+        self.batter_injury_odds_for_season = lambda age: 1 - (1 - (self.batting_injury_rate + ((age - 20)
+                                                                   * self.injury_odds_adjustment_for_age))) ** (1 / 162)
+        self.rnd_condition_chg = lambda age: abs(np.random.normal(loc=self.condition_change_per_day,
+                                                                  scale=self.condition_change_per_day / 2, size=1)[0])
+        self.rnd_p_inj = lambda age: abs(np.random.normal(loc=self.pitching_injury_avg_len,
+                                                          scale=self.pitching_injury_avg_len / 2, size=1)[0])
+        self.rnd_b_inj = lambda age: abs(np.random.normal(loc=self.batting_injury_avg_len,
+                                                          scale=self.batting_injury_avg_len / 2, size=1)[0])
         return
 
     def save_data(self):
@@ -184,7 +187,6 @@ class BaseballStats:
             raise Exception('load at least one season of pitching and batting')
 
         self.new_season_pitching_data = self.pitching_data.copy()
-        # self.new_season_pitching_data[self.numeric_pcols] = 0
         self.new_season_pitching_data[self.numeric_pcols] = \
             self.new_season_pitching_data[self.numeric_pcols].astype('int')
         self.new_season_pitching_data[['OBP', 'Total_OB', 'Total_Outs', 'AB', 'Injured Days']] = 0
@@ -224,13 +226,15 @@ class BaseballStats:
 
     def is_injured(self):
         self.new_season_pitching_data['Injured Days'] = self.new_season_pitching_data.\
-            apply(lambda row: 0 if self.rnd() > (self.pitching_injury_odds_for_season + (row['Age'] - 20) * self.injury_odds_adjustment_for_age) and row['Injured Days'] == 0 else
+            apply(lambda row: 0 if self.rnd() > self.pitcher_injury_odds_for_season(row['Age']) and
+                  row['Injured Days'] == 0 else
                   row['Injured Days'] - 1 if row['Injured Days'] > 0 else
-                  int(self.rnd_p_inj()), axis=1)
+                  int(self.rnd_p_inj(row['Age'])), axis=1)
         self.new_season_batting_data['Injured Days'] = self.new_season_batting_data.\
-            apply(lambda row: 0 if self.rnd() > (self.batting_injury_odds_for_season + (row['Age'] - 20) * self.injury_odds_adjustment_for_age) and row['Injured Days'] == 0 else
+            apply(lambda row: 0 if self.rnd() > self.batter_injury_odds_for_season(row['Age']) and
+                  row['Injured Days'] == 0 else
                   row['Injured Days'] - 1 if row['Injured Days'] > 0 else
-                  int(self.rnd_b_inj()), axis=1)
+                  int(self.rnd_b_inj(row['Age'])), axis=1)
 
         self.new_season_pitching_data['Status'] = \
             self.new_season_pitching_data['Injured Days'].apply(self.injured_list)
@@ -251,10 +255,10 @@ class BaseballStats:
     def new_game_day(self):
         self.is_injured()
         self.new_season_pitching_data['Condition'] = self.new_season_pitching_data.\
-            apply(lambda row: self.rnd_condition_chg() + row['Condition'], axis=1)
+            apply(lambda row: self.rnd_condition_chg(row['Age']) + row['Condition'], axis=1)
         self.new_season_pitching_data['Condition'] = self.new_season_pitching_data['Condition'].clip(lower=0, upper=100)
         self.new_season_batting_data['Condition'] = self.new_season_batting_data.\
-            apply(lambda row: self.rnd_condition_chg() + row['Condition'], axis=1)
+            apply(lambda row: self.rnd_condition_chg(row['Age']) + row['Condition'], axis=1)
         self.new_season_batting_data['Condition'] = self.new_season_batting_data['Condition'].clip(lower=0, upper=100)
 
         # copy over results in new season to prior season for game management

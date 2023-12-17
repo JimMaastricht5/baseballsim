@@ -48,7 +48,7 @@ class BaseballStats:
         self.batting_injury_rate = .137  # 2022 87 out of 634 injured per season .137 avg age 27
         self.batting_injury_odds_for_season = 1 - (1 - self.batting_injury_rate) ** (1/162)
         # self.odds_of_survival_age_20 = .90  # 90 chance for a 20 year-old to play the following year, base injury rate
-        self.odd_of_adjustment_for_age = .0328  # 3.28% inc in injury per year above age 20 w/ .90 survival at age 20
+        self.injury_odds_adjustment_for_age = .0328 / 162  # 3.28% inc injury per year above 20 w/ .90 survival
         self.batting_injury_avg_len = 15  # made this up
         # self.age_adj_inj_odds_batting = lambda: 1 - (1 - self.batting_injury_rate - ()) ** (1/162)
         self.rnd_condition_chg = lambda: abs(np.random.normal(loc=self.condition_change_per_day,
@@ -180,7 +180,6 @@ class BaseballStats:
         return
 
     def create_new_season_from_existing(self):
-        # print('creating new season of data....')
         if self.pitching_data is None or self.batting_data is None:
             raise Exception('load at least one season of pitching and batting')
 
@@ -225,11 +224,11 @@ class BaseballStats:
 
     def is_injured(self):
         self.new_season_pitching_data['Injured Days'] = self.new_season_pitching_data.\
-            apply(lambda row: 0 if self.rnd() > self.pitching_injury_odds_for_season and row['Injured Days'] == 0 else
+            apply(lambda row: 0 if self.rnd() > (self.pitching_injury_odds_for_season + (row['Age'] - 20) * self.injury_odds_adjustment_for_age) and row['Injured Days'] == 0 else
                   row['Injured Days'] - 1 if row['Injured Days'] > 0 else
                   int(self.rnd_p_inj()), axis=1)
         self.new_season_batting_data['Injured Days'] = self.new_season_batting_data.\
-            apply(lambda row: 0 if self.rnd() > self.batting_injury_odds_for_season and row['Injured Days'] == 0 else
+            apply(lambda row: 0 if self.rnd() > (self.batting_injury_odds_for_season + (row['Age'] - 20) * self.injury_odds_adjustment_for_age) and row['Injured Days'] == 0 else
                   row['Injured Days'] - 1 if row['Injured Days'] > 0 else
                   int(self.rnd_b_inj()), axis=1)
 
@@ -238,6 +237,7 @@ class BaseballStats:
         self.new_season_batting_data['Status'] = \
             self.new_season_batting_data['Injured Days'].apply(self.injured_list)
 
+        print(f'Season Disabled Lists:')
         if self.new_season_pitching_data[self.new_season_pitching_data["Injured Days"] > 0].shape[0] > 0:
             df = self.new_season_pitching_data[self.new_season_pitching_data["Injured Days"] > 0]
             print(f'{df[self.icols_to_print].to_string(justify="right")}\n')

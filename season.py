@@ -103,15 +103,16 @@ class BaseballSeason:
             todays_games = self.schedule[season_day_num]
 
             # play every game for the day
-            self.baseball_data.new_game_day()  # update rest and injury data for a new day
+            self.baseball_data.new_game_day()  # update rest and injury data for a new day, print DL injury list
             for match_up in todays_games:  # run all games for a day, day starts at zero
                 if 'OFF DAY' not in match_up:  # not an off day
                     if team_to_follow in match_up and self.interactive:
+                        print(f'Teams stats for day {season_day_num + 1}')
                         if season_day_num > 0:
                             self.baseball_data.print_current_season(teams=[team_to_follow])
                         else:
                             self.baseball_data.print_prior_season(teams=[team_to_follow])
-                        print(f'Press spacebar to Continue.....')
+                        print(f'Press space bar to Continue.....')
                         keyboard.wait('space')
                         pass
                     print(f'Playing day #{season_day_num + 1}: {match_up[0]} away against {match_up[1]}')
@@ -155,7 +156,7 @@ if __name__ == '__main__':
     # full season
     num_games = 162
     only_nl_b = True
-    interactive = True
+    interactive = False
     bbseason23 = BaseballSeason(load_seasons=[2023], new_season=2024,
                                 season_length_limit=num_games,
                                 min_games=num_games, series_length=3, rotation_len=5,

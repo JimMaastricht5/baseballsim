@@ -11,6 +11,7 @@ class Team:
         self.pitchers = baseball_data.pitching_data[baseball_data.pitching_data["Team"] == team_name]
         self.pos_players = baseball_data.batting_data[baseball_data.batting_data["Team"] == team_name]
         self.pitchers['Condition'] = self.baseball_data.new_season_pitching_data['Condition']
+        self.pitchers['AVG_faced'] = self.pitchers['AVG_faced'] * self.pitchers['Condition']
         self.pos_players['Condition'] = self.baseball_data.new_season_batting_data['Condition']
         # print(f'in gameteam init {self.pos_players}')
         if len(self.pitchers) == 0:
@@ -162,10 +163,12 @@ class Team:
 
     def update_fatigue(self, cur_pitching_index):
         # number of batters faced in game vs. historic avg with fatigue start as a ratio
+        # bring in game starting condition by mult
         in_game_fatigue = 0
         cur_game_faced = self.box_score.batters_faced(cur_pitching_index)
-        avg_faced = self.cur_pitcher_stats().AVG_faced  # data for pitcher
-        cur_percentage = 100 - (cur_game_faced / avg_faced * 100)
+        # avg_faced = self.cur_pitcher_stats().AVG_faced  # data for pitcher perf prior year
+        avg_faced = self.pitching.AVG_faced  # avg adjusted for starting condition
+        cur_percentage = cur_game_faced / avg_faced * 100
         if cur_percentage >= self.fatigue_start_perc:
             in_game_fatigue = (cur_percentage - self.fatigue_start_perc) * self.fatigue_rate
         self.set_pitching_condition(cur_percentage)  # cur_perc includes pre game condition

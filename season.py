@@ -112,8 +112,8 @@ class BaseballSeason:
                             self.baseball_data.print_current_season(teams=[team_to_follow])
                         else:
                             self.baseball_data.print_prior_season(teams=[team_to_follow])
-                        print(f'Press space bar to Continue.....')
-                        keyboard.wait('space')
+                        # print(f'Press space bar to Continue.....')
+                        # keyboard.wait('space')
                         pass
                     print(f'Playing day #{season_day_num + 1}: {match_up[0]} away against {match_up[1]}')
                     game = bbgame.Game(away_team_name=match_up[0], home_team_name=match_up[1],
@@ -156,7 +156,7 @@ if __name__ == '__main__':
     # full season
     num_games = 162
     only_nl_b = True
-    interactive = False
+    interactive = True
     bbseason23 = BaseballSeason(load_seasons=[2023], new_season=2024,
                                 season_length_limit=num_games,
                                 min_games=num_games, series_length=3, rotation_len=5,

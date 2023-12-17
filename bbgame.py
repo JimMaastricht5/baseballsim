@@ -170,7 +170,6 @@ class Game:
         return
 
     def sim_ab(self):
-        # ?? need to add starting condition to call, pass to gameteam.update_fatigue
         cur_pitcher_index = self.teams[self.team_pitching()].cur_pitcher_index
         pitching = self.teams[self.team_pitching()].cur_pitcher_stats()  # data for pitcher
         pitching.Game_Fatigue_Factor, cur_percentage = \

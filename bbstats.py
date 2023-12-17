@@ -55,7 +55,7 @@ class BaseballStats:
         self.batter_injury_odds_for_season = lambda age: 1 - (1 - (self.batting_injury_rate + ((age - 20)
                                                                    * self.injury_odds_adjustment_for_age))) ** (1 / 162)
         self.rnd_condition_chg = lambda age: abs(np.random.normal(loc=(self.condition_change_per_day - (age - 20) / 100 * self.condition_change_per_day),
-                                                                  scale=self.condition_change_per_day / 2, size=1)[0])
+                                                                  scale=self.condition_change_per_day / 3, size=1)[0])
         self.rnd_p_inj = lambda age: abs(np.random.normal(loc=self.pitching_injury_avg_len,
                                                           scale=self.pitching_injury_avg_len / 2, size=1)[0])
         self.rnd_b_inj = lambda age: abs(np.random.normal(loc=self.batting_injury_avg_len,

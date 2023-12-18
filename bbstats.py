@@ -189,6 +189,7 @@ class BaseballStats:
         self.new_season_pitching_data = self.pitching_data.copy()
         self.new_season_pitching_data[self.numeric_pcols] = \
             self.new_season_pitching_data[self.numeric_pcols].astype('int')
+        self.new_season_pitching_data[self.numeric_pcols] = 0
         self.new_season_pitching_data[['OBP', 'Total_OB', 'Total_Outs', 'AB', 'Injured Days']] = 0
         self.new_season_pitching_data['Condition'] = 100
         self.new_season_pitching_data.drop(['Total_OB', 'Total_Outs'], axis=1)
@@ -273,6 +274,8 @@ class BaseballStats:
             team_pitching_stats(self.new_season_pitching_data[self.new_season_pitching_data['IP'] > 0].fillna(0))
         self.new_season_batting_data = \
             team_batting_stats(self.new_season_batting_data[self.new_season_batting_data['AB'] > 0].fillna(0))
+        print(f'bbstats update season stats {self.new_season_pitching_data.to_string(justify="right")}')
+        return
 
     def print_current_season(self, teams, summary_only_b=False):
         self.print_season(team_batting_stats(self.new_season_batting_data),

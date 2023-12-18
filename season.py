@@ -154,8 +154,8 @@ if __name__ == '__main__':
     # teams = ['CHC', 'CIN', 'COL', 'MIL', 'PIT', 'STL']  # included COL for balance in scheduling
 
     # full season
-    num_games = 162
-    only_nl_b = False
+    num_games = 5
+    only_nl_b = True
     interactive = True
     bbseason23 = BaseballSeason(load_seasons=[2023], new_season=2024,
                                 season_length_limit=num_games,
@@ -168,7 +168,7 @@ if __name__ == '__main__':
     team_to_follow = 'MIL'  # or follow no team
     bbseason23.sim_season(season_chatty=False,
                           season_print_lineup_b=False,
-                          season_print_box_score_b=True,
+                          season_print_box_score_b=False,
                           summary_only_b=False,
                           team_to_follow=team_to_follow)
 

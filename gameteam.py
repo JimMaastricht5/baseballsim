@@ -138,11 +138,12 @@ class Team:
             self.pitching = self.pitching.squeeze()
         return self.pitching  # should be a series with a single row
 
-    def set_pitching_condition(self, percent_of_max):
+    def set_pitching_condition(self, cur_ratio):
         # percent of max includes starting condition of player
         try:
-            condition = 100 - percent_of_max if (100 - percent_of_max) >= 0 else 0
-            self.pitching.Condition = condition
+            # condition = 100 - percent_of_max if (100 - percent_of_max) >= 0 else 0
+            # condition = 0 if cur_percentage < 0 else 0
+            self.pitching.Condition = 0 if 100 - (cur_ratio * 100) < 0 else 100 - (cur_ratio * 100)
         except Exception as e:
             print(f'error in set_pitching_condition gameteam.py {e}')
             print(self.pitching)
@@ -168,11 +169,12 @@ class Team:
         cur_game_faced = self.box_score.batters_faced(cur_pitching_index)
         # avg_faced = self.cur_pitcher_stats().AVG_faced  # data for pitcher perf prior year
         avg_faced = self.pitching.AVG_faced  # avg adjusted for starting condition
-        cur_percentage = cur_game_faced / avg_faced * 100
-        if cur_percentage >= self.fatigue_start_perc:
-            in_game_fatigue = (cur_percentage - self.fatigue_start_perc) * self.fatigue_rate
-        self.set_pitching_condition(cur_percentage)  # cur_perc includes pre game condition
-        return in_game_fatigue, cur_percentage  # obp impact to pitcher of fatigue
+        cur_ratio = cur_game_faced / avg_faced * 100
+        # print(f'gameteam update fatigue {100 - (cur_ratio * 100)}')
+        if cur_ratio >= self.fatigue_start_perc:
+            in_game_fatigue = (cur_ratio - self.fatigue_start_perc) * self.fatigue_rate
+        self.set_pitching_condition(cur_ratio)
+        return in_game_fatigue, cur_ratio  # obp impact to pitcher of fatigue
 
     def pitching_change(self, inning):
         # desired 7, 8, 9 short term relief against count, need to check score diff ?????

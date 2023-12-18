@@ -168,7 +168,7 @@ if __name__ == '__main__':
     team_to_follow = 'MIL'  # or follow no team
     bbseason23.sim_season(season_chatty=False,
                           season_print_lineup_b=False,
-                          season_print_box_score_b=False,
+                          season_print_box_score_b=True,
                           summary_only_b=False,
                           team_to_follow=team_to_follow)
 

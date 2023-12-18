@@ -174,7 +174,7 @@ class Game:
         pitching = self.teams[self.team_pitching()].cur_pitcher_stats()  # data for pitcher
         pitching.Game_Fatigue_Factor, cur_percentage = \
             self.teams[self.team_pitching()].update_fatigue(cur_pitcher_index)
-        pitching.Condition = 100 - cur_percentage if 100 - cur_percentage >= 0 else 0
+        # pitching.Condition = 100 - cur_percentage if 100 - cur_percentage >= 0 else 0  # redundant and wrong!!! ??
 
         cur_batter_index = self.teams[self.team_hitting()].cur_lineup_index[self.batting_num[self.team_hitting()]-1]
         batting = self.teams[self.team_hitting()].cur_batter_stats(self.batting_num[self.team_hitting()]-1)  # lineup #

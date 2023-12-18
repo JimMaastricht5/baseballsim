@@ -55,6 +55,7 @@ class TeamBoxScore:
         row['Condition'] = condition
         # Write the row back to the DataFrame
         self.box_pitching.loc[pitcher_index] = row
+        # print(f'teamgameboxstats pitching_results {self.box_pitching.loc[pitcher_index]}')
         return
 
     def add_pitcher_to_box(self, new_pitcher):
@@ -122,7 +123,7 @@ class TeamBoxScore:
         print(df.to_string(index=False, justify='center'))
         print('')
         df = self.box_pitching[['Player', 'Team', 'Age', 'G', 'GS', 'CG', 'SHO', 'IP', 'H', '2B', '3B',
-                                'ER', 'K', 'BB', 'HR', 'W', 'L', 'SV', 'BS', 'HLD']]  #
+                                'ER', 'K', 'BB', 'HR', 'W', 'L', 'SV', 'BS', 'HLD', 'Condition']]  #
         # , 'ERA', 'WHIP', 'AVG', 'OBP', 'SLG', 'OPS', 'Condition', 'Status']]
         print(df.to_string(index=False, justify='center'))
         print('')

@@ -118,14 +118,16 @@ class TeamBoxScore:
 
     def print_boxes(self):
         df = self.box_batting[['Player', 'Team', 'Pos', 'Age', 'G', 'AB', 'R', 'H', '2B', '3B', 'HR', 'RBI',
-                               'SB', 'CS', 'BB', 'SO', 'SH', 'SF', 'HBP', 'Condition']]
+                               'SB', 'CS', 'BB', 'SO', 'SH', 'SF', 'HBP']]
         # , 'AVG', 'OBP', 'SLG', 'OPS', 'Condition', 'Status']]
-        print(df.to_string(index=False, justify='center'))
+        # df = df.apply(bbstats.condition_txt_f)  # throws a conversion error, col not int
+        print(df.to_string(index=False, justify='right'))
         print('')
         df = self.box_pitching[['Player', 'Team', 'Age', 'G', 'GS', 'CG', 'SHO', 'IP', 'H', '2B', '3B',
-                                'ER', 'K', 'BB', 'HR', 'W', 'L', 'SV', 'BS', 'HLD', 'Condition']]  #
+                                'ER', 'K', 'BB', 'HR', 'W', 'L', 'SV', 'BS', 'HLD']]  #
         # , 'ERA', 'WHIP', 'AVG', 'OBP', 'SLG', 'OPS', 'Condition', 'Status']]
-        print(df.to_string(index=False, justify='center'))
+        # df = df.apply(bbstats.condition_txt_f)
+        print(df.to_string(index=False, justify='right'))
         print('')
         return
 

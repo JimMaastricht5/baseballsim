@@ -11,7 +11,7 @@ HOME = 1
 
 
 class BaseballSeason:
-    def __init__(self, load_seasons, new_season, team_list=[], season_length_limit=0, min_games=0, series_length=1,
+    def __init__(self, load_seasons, new_season, team_list=None, season_length_limit=0, min_games=0, series_length=1,
                  rotation_len=5, only_nl_b=False, interactive=False,
                  load_batter_file='player-stats-Batters.csv',
                  load_pitcher_file='player-stats-Pitching.csv'):
@@ -28,7 +28,8 @@ class BaseballSeason:
         self.baseball_data = bbstats.BaseballStats(load_seasons=self.load_seasons, new_season=new_season,
                                                    only_nl_b=only_nl_b, load_batter_file=load_batter_file,
                                                    load_pitcher_file=load_pitcher_file)
-        self.teams = list(self.baseball_data.batting_data.Team.unique()) if team_list == [] else team_list
+        self.teams = list(self.baseball_data.batting_data.Team.unique()) if team_list == [] or team_list is None \
+            else team_list
         if len(self.teams) % 2 == 1:  # odd number of teams
             self.teams.append('OFF DAY')
 
@@ -155,22 +156,22 @@ if __name__ == '__main__':
 
     # full season
     num_games = 162
-    only_nl_b = False
-    interactive = True
+    only_national_league_teams = False
+    interactive_keyboard_pauses = True
     bbseason23 = BaseballSeason(load_seasons=[2023], new_season=2024,
                                 season_length_limit=num_games,
                                 min_games=num_games, series_length=3, rotation_len=5,
-                                only_nl_b=only_nl_b,
-                                interactive=interactive,
+                                only_nl_b=only_national_league_teams,
+                                interactive=interactive_keyboard_pauses,
                                 load_batter_file='player-stats-Batters.csv',
                                 load_pitcher_file='player-stats-Pitching.csv')
     # team_to_follow = bbseason23.teams[0]  # follow the first team in the random set
-    team_to_follow = 'MIL'  # or follow no team
+    my_teams_to_follow = 'MIL'  # or follow no team
     bbseason23.sim_season(season_chatty=False,
                           season_print_lineup_b=False,
                           season_print_box_score_b=False,
                           summary_only_b=False,
-                          team_to_follow=team_to_follow)
+                          team_to_follow=my_teams_to_follow)
 
     print(startdt)
     print(datetime.datetime.now())

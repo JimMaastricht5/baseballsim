@@ -19,7 +19,7 @@ class Bases:
         if outs >= 3:
             return
         if score_book_cd in ['BB', 'HBP']:
-            bases_to_advance = self.walk_or_HBP(bases_to_advance)  # set to 1 if bases loaded, else move runners indivly
+            bases_to_advance = self.walk_or_hbp(bases_to_advance)  # set to 1 if bases loaded, else move runners indivly
         elif score_book_cd in ['SF']:
             bases_to_advance = self.tag_up(outs)  # move runner from third and set other runners to hold w/ 0
         elif score_book_cd in ['DP', 'GB FC', 'GB']:
@@ -70,7 +70,7 @@ class Bases:
         # if a value is non-zero it is the index number of the player
         # 0 indicates an empty base
         self.baserunners = [0, 0, 0, 0, 0, 0, 0, 0]
-        self.baserunners_names = {}  # names doesn't need to be cleared, but just to be safe every half inning
+        self.baserunners_names.clear()  # ={} doesn't need to be cleared, but just to be safe every half inning
         self.baserunners_names[0] = ''
         self.player_scored = {}
         return
@@ -91,9 +91,9 @@ class Bases:
         return self.baserunners[base_num] != 0
 
     def is_eligible_for_stolen_base(self):
+        # for some reason is not true or is false fails to produce the required logic, using !=
         return self.is_runner_on_base_num(1) and \
-                (self.is_runner_on_base_num(2) != True) and \
-                (self.is_runner_on_base_num(3) != True)
+                (self.is_runner_on_base_num(2) != True) and (self.is_runner_on_base_num(3) != True)
 
     def get_runner_key(self, base_num):
         return self.baserunners[base_num]  # non zero if there is a runner
@@ -120,7 +120,7 @@ class Bases:
         self.move_a_runner(basenum_from, basenum_to)
         return
 
-    def walk_or_HBP(self, bases_to_move_all_runners):
+    def walk_or_hbp(self, bases_to_move_all_runners):
         # default is move all runners on base, that works unless there is a hole
         if self.count_runners() < 3 and self.count_runners() != 0:  # not loaded or empty
             # bases are not loaded so move runners up a base when forced

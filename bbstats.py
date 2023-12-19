@@ -135,12 +135,12 @@ class BaseballStats:
     def randomize_city_names(self):
         city_dict = {}
         current_team_names = self.batting_data.Team.unique()  # get list of current team names
-        city.abbrev = [str(name[:3]).upper() for name in city.names]  # city names are imported
+        city_abbrev = [str(name[:3]).upper() for name in city.names]  # city names are imported
         mascots = randomize_mascots(len(city.names))
-        for ii, team_abbrev in enumerate(city.abbrev):
-            city_dict.update({city.abbrev[ii]: [city.names[ii], mascots[ii]]})  # update will use the last unique abbrev
+        for ii, team_abbrev in enumerate(city_abbrev):
+            city_dict.update({city_abbrev[ii]: [city.names[ii], mascots[ii]]})  # update will use the last unique abbrev
 
-        new_teams = list(random.sample(city.abbrev, len(current_team_names)))
+        new_teams = list(random.sample(city_abbrev, len(current_team_names)))
         for ii, team in enumerate(current_team_names):  # do not use a df merge her resets the index, thats bad
             new_team = new_teams[ii]
             mascot = city_dict[new_team][1]

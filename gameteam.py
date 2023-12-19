@@ -101,26 +101,13 @@ class Team:
         ops_index_list = self.best_at_stat(pos_index_list, 'OPS', count=6, exclude=sb_index_list + slg_index_list)
 
         # insert players into lineup. 1st spot is best SB, 4th and 5th are best SLG
-        lineup_index_list = self.insert_player_in_lineup(lineup_list=ops_index_list,
-                                                         player_index=sb_index_list[0], target_pos=1)
-        lineup_index_list = self.insert_player_in_lineup(lineup_list=lineup_index_list,
-                                                         player_index=slg_index_list[0], target_pos=4)
-        lineup_index_list = self.insert_player_in_lineup(lineup_list=lineup_index_list,
-                                                         player_index=slg_index_list[1], target_pos=5)
+        lineup_index_list = insert_player_in_lineup(lineup_list=ops_index_list,
+                                                    player_index=sb_index_list[0], target_pos=1)
+        lineup_index_list = insert_player_in_lineup(lineup_list=lineup_index_list,
+                                                    player_index=slg_index_list[0], target_pos=4)
+        lineup_index_list = insert_player_in_lineup(lineup_list=lineup_index_list,
+                                                    player_index=slg_index_list[1], target_pos=5)
         return lineup_index_list, pos_index_dict
-
-    def insert_player_in_lineup(self, lineup_list, player_index, target_pos):
-        # target pos is position in line up not pos in life, works if you insert from front to back
-        # so dont insert at pos 3 or pos 4 or it will shift pos 4 to pos 5
-        lineup_list.insert(target_pos - 1, player_index)
-        return lineup_list
-
-    def move_player_in_lineup(self, lineup_list, player_index, target_pos):
-        # target pos is position in line up not pos in life
-        # note this will shift the lineup back at that pos
-        lineup_list.remove(player_index)
-        lineup_list.insert(target_pos - 1, player_index)
-        return lineup_list
 
     def set_starting_rotation(self, force_starting_pitcher):
         # pitcher rotates based on selection above or forced number passed in
@@ -240,8 +227,9 @@ class Team:
             df_player_num = self.search_for_pos('DH', lineup_index_list, stat_criteria)  # do not grab the same player
         return df_players.head(1).index[0] if df_player_num is None else df_player_num  # pick top player at pos
 
-    def best_at_stat(self, lineup_index_list, stat_criteria='OPS', count=9, exclude=[]):
+    def best_at_stat(self, lineup_index_list, stat_criteria='OPS', count=9, exclude=None):
         # find players in lineup, sort by stat descending to find the best
+        exclude = [] if exclude is None else exclude
         df_criteria = self.pos_players.index.isin(lineup_index_list) & ~self.pos_players.index.isin(exclude)
         stat_index = self.pos_players[df_criteria].sort_values(stat_criteria, ascending=False).head(count).index
         return list(stat_index)
@@ -263,3 +251,19 @@ class Team:
         print(dfp.to_string(index=True, justify='center'))
         print('')
         return
+
+
+# static functions
+def insert_player_in_lineup(lineup_list, player_index, target_pos):
+    # target pos is position in line up not pos in life, works if you insert from front to back
+    # so dont insert at pos 3 or pos 4 or it will shift pos 4 to pos 5
+    lineup_list.insert(target_pos - 1, player_index)
+    return lineup_list
+
+
+def move_player_in_lineup(lineup_list, player_index, target_pos):
+    # target pos is position in line up not pos in life
+    # note this will shift the lineup back at that pos
+    lineup_list.remove(player_index)
+    lineup_list.insert(target_pos - 1, player_index)
+    return lineup_list

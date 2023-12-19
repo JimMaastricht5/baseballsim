@@ -69,8 +69,13 @@ class BaseballStats:
 
     def injured_list(self, idays):
         # mlb is 10 for pos min, 15 for pitcher min, and 60 day
-        return 'Healthy' if idays == 0 else \
+        return 'Active' if idays == 0 else \
             '10 Day DL' if idays <= 10 else '15 Day DL' if idays <= 15 else '60 Day DL'
+
+    def condition_txt(self, condition):
+        return 'Healthy' if condition > 75 else \
+            'Tired' if condition > 51 else \
+            'Exhausted'
 
     def get_seasons(self, batter_file, pitcher_file):
         if self.pitching_data is None or self.batting_data is None:  # need to read data... else skip as cached
@@ -88,7 +93,7 @@ class BaseballStats:
                 pitching_data['AVG_faced'] = (pitching_data['Total_OB'] + pitching_data['Total_Outs']) / pitching_data.G
                 pitching_data['Game_Fatigue_Factor'] = 0
                 pitching_data['Condition'] = 100
-                pitching_data['Status'] = 'Healthy'  # status
+                pitching_data['Status'] = 'Active'  # DL or active
                 pitching_data['Injured Days'] = 0  # days to spend in IL
                 pitching_data.index += 1
                 if ('League' in pitching_data.columns) is False:  # if no league set one up
@@ -102,7 +107,7 @@ class BaseballStats:
                 batting_data = batting_data[batting_data['AB'] >= 25]  # drop players without enough AB
                 batting_data['Game_Fatigue_Factor'] = 0
                 batting_data['Condition'] = 100
-                batting_data['Status'] = 'Healthy'
+                batting_data['Status'] = 'Active'  # DL or active
                 batting_data['Injured Days'] = 0
                 batting_data.index += 1
                 if ('League' in batting_data.columns) is False:
@@ -288,8 +293,12 @@ class BaseballStats:
                           summary_only_b=summary_only_b)
         return
 
-    def print_season(self, df_b, df_p, teams, summary_only_b=False):
+    def print_season(self, df_b, df_p, teams, summary_only_b=False, condition_text=True):
         teams.append('')  # add blank team for totals
+        if condition_text:
+            df_p['Condition'] = df_p['Condition'].apply(self.condition_txt)
+            df_b['Condition'] = df_b['Condition'].apply(self.condition_txt)
+
         df = df_p[df_p['Team'].isin(teams)]
         df_totals = team_pitching_totals(df, team_name='', concat=False)
         if summary_only_b is False:

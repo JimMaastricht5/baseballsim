@@ -83,6 +83,15 @@ class TeamBoxScore:
         self.box_pitching.loc[pitcher_index, ['BS']] = 1
         return
 
+    def steal_result(self, runner_index, steal=True):
+        runner_stats = self.box_batting.loc[runner_index].copy()
+        if steal:
+            runner_stats['SB'] += 1
+        else:  # caught stealing
+            runner_stats['CS'] += 1
+        self.box_batting.loc[runner_index] = runner_stats
+        return
+
     def batting_result(self, batter_index, outcomes, players_scored_list):
         outcomes.convert_k()
         batter_stats = self.box_batting.loc[batter_index].copy()  # Store the row in a variable

@@ -149,7 +149,6 @@ class SimAB:
     def outcome(self, pitching, batting, outcomes, outs=0, runner_on_first=False, runner_on_third=False):
         # tree of the various odds of an event, each event is yes/no.  Onbase? Yes -> BB? no -> Hit yes (stop)
         # outcome: on base or out pos 0, how in pos 1, bases to advance in pos 2, rbis in pos 3
-        # ?? hbp is missing, total batters faced is missing, should calc or get pitcher obp
         self.pitching = pitching
         self.batting = batting
         outcomes.reset()

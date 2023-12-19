@@ -69,6 +69,8 @@ class BaseballStats:
 
     def get_seasons(self, batter_file, pitcher_file):
         if self.pitching_data is None or self.batting_data is None:  # need to read data... else skip as cached
+            if not isinstance(self.load_seasons, list):
+                self.load_seasons = [self.load_seasons]  # convert to list if a single value
             for season in self.load_seasons:
                 pitching_data = pd.read_csv(str(season) + f" {pitcher_file}")
                 pitching_data['AB'] = pitching_data['IP'] * 3 + pitching_data['H']

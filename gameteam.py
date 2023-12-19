@@ -163,9 +163,12 @@ class Team:
         self.set_pitching_condition(cur_ratio)
         return in_game_fatigue, cur_ratio  # obp impact to pitcher of fatigue
 
-    def pitching_change(self, inning):
-        # desired 7, 8, 9 short term relief against count, need to check score diff ?????
-        if (inning <= 9 and len(self.relievers) >= (9 - (inning - 1))) or (inning > 9 and len(self.relievers) >= 1):
+    def pitching_change(self, inning, score_diff):
+        # if the score difference is between zero and 3 (pitching team leading) consider a short term reliever
+        # check the number of available relievers against the inning, if the current pitcher is tired and
+        # have available short-term relievers grab one.
+        if 0 <= score_diff <= 3 and \
+           (inning <= 9 and len(self.relievers) >= (9 - (inning - 1))) or (inning > 9 and len(self.relievers) >= 1):
             if inning <= 9:
                 self.cur_pitcher_index = self.relievers.index[9 - inning]  # 7th would be rel 2 since row count start 0
             else:
@@ -173,7 +176,7 @@ class Team:
             self.pitching = self.relievers.loc[self.cur_pitcher_index]  # should be a series
             self.box_score.add_pitcher_to_box(self.relievers.loc[self.cur_pitcher_index])
             self.relievers = self.relievers.drop(self.cur_pitcher_index, axis=0)  # remove from pen
-        elif len(self.middle_relievers) >= 1:  # grab next middle reliever
+        elif len(self.middle_relievers) >= 1:  # grab the next best middle reliever
             self.cur_pitcher_index = self.middle_relievers.index[0]  # make sure to drop the same index below
             self.pitching = self.middle_relievers.loc[self.cur_pitcher_index]  # should be a series
             self.box_score.add_pitcher_to_box(self.middle_relievers.loc[self.cur_pitcher_index])

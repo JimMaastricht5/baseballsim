@@ -1,11 +1,5 @@
 import numpy as np
 
-
-# ??? punch list
-# walk with 1b open does not score a run
-# fo runners tag?
-# fc or dp erases lead runners
-# 2 out base hits scores runner from second (2 base advanced instead of one
 class Bases:
     def __init__(self):
         self.baserunners = None
@@ -91,9 +85,8 @@ class Bases:
         return self.baserunners[base_num] != 0
 
     def is_eligible_for_stolen_base(self):
-        # for some reason is not true or is false fails to produce the required logic, using !=
         return self.is_runner_on_base_num(1) and \
-                (self.is_runner_on_base_num(2) != True) and (self.is_runner_on_base_num(3) != True)
+                not self.is_runner_on_base_num(2) and not self.is_runner_on_base_num(3)
 
     def get_runner_key(self, base_num):
         return self.baserunners[base_num]  # non zero if there is a runner

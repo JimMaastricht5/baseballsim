@@ -12,8 +12,8 @@ HOME = 1
 
 class Game:
     def __init__(self, away_team_name='', home_team_name='', baseball_data=None, game_num=1, rotation_len=5,
-                 print_lineup=False, chatty=False, print_box_score_b=False, load_seasons=[2023], new_season=2024,
-                 starting_pitchers=[None, None], starting_lineups=[None, None],
+                 print_lineup=False, chatty=False, print_box_score_b=False, load_seasons=2023, new_season=2024,
+                 starting_pitchers=None, starting_lineups=None,
                  load_batter_file='player-stats-Batters.csv', load_pitcher_file='player-stats-Pitching.csv'):
         if baseball_data is None:
             self.baseball_data = bbstats.BaseballStats(load_seasons=load_seasons, new_season=new_season,
@@ -29,7 +29,11 @@ class Game:
         self.rotation_len = rotation_len  # number of starting pitchers to rotate thru
         self.chatty = chatty
         self.print_box_score_b = print_box_score_b
+        if starting_pitchers is None:
+            starting_pitchers = [None, None]
         self.starting_pitchers = starting_pitchers  # can use if you want to sim the same two starters repeatedly
+        if starting_lineups is None:
+            starting_lineups = [None, None]
         self.starting_lineups = starting_lineups  # is a list of two dict, each dict is in batting order with field pos
 
         self.teams = []  # keep track of away in pos 0 and home team in pos 1
@@ -88,6 +92,7 @@ class Game:
     def close_game(self):
         return self.score_diff() >= 0 and self.inning[self.team_hitting()] >= 7
 
+    # noinspection PyTypeChecker
     def update_inning_score(self, number_of_runs=0):
         if len(self.inning_score) <= self.inning[self.team_hitting()]:  # header rows + rows in score must = innings
             self.inning_score.append([self.inning[self.team_hitting()], '', ''])  # expand scores by new inning
@@ -98,8 +103,8 @@ class Game:
             else int(self.inning_score[self.inning[self.team_hitting()]][self.team_hitting() + 1]) + number_of_runs
 
         # pitcher of record tracking, look for lead change
-        if self.total_score[self.team_hitting()] <= self.total_score[self.team_pitching()] and \
-           (self.total_score[self.team_hitting()] + self.bases.runs_scored) > self.total_score[self.team_pitching()]:
+        if self.total_score[self.team_hitting()] <= self.total_score[self.team_pitching()] \
+                < (self.total_score[self.team_hitting()] + self.bases.runs_scored):
             self.winning_pitcher = self.teams[self.team_hitting()].is_pitching_index()
             self.losing_pitcher = self.teams[self.team_pitching()].is_pitching_index()
             if self.is_save_sit[self.team_pitching()]:  # blown save
@@ -124,13 +129,17 @@ class Game:
         print('')
         return
 
+    def score_difference(self):
+        return self.total_score[self.team_pitching()] - self.total_score[self.team_hitting()]
+
     def pitching_sit(self, pitching, pitch_switch):
         # switch pitchers based on fatigue or close game
         # close game is hitting inning >= 7 and, pitching team winning or tied and runners on = save sit
         # if switch due to save or close game, don't switch again in same inning
         if (self.teams[self.team_pitching()].is_pitcher_fatigued(pitching.Condition) and self.outs < 3) or \
                 (pitch_switch is False and (self.close_game() or self.save_sit())):
-            self.teams[self.team_pitching()].pitching_change(inning=self.inning[self.team_hitting()])
+            self.teams[self.team_pitching()].pitching_change(inning=self.inning[self.team_hitting()],
+                                                             score_diff=self.score_difference())
             pitching = self.teams[self.team_pitching()].cur_pitcher_stats()  # data for new pitcher
             pitch_switch = True
             self.is_save_sit[self.team_pitching()] = self.save_sit()
@@ -148,10 +157,12 @@ class Game:
                     self.rng() <= (runner_stats.SB + runner_stats.CS) / runner_stats.G:  # attempt to steal scale w freq
                 if self.rng() <= (runner_stats.SB / (runner_stats.SB + runner_stats.CS)):  # successful steal
                     self.bases.push_a_runner(1, 2)  # move runner from 1st to second
+                    self.teams[self.team_hitting()].box_score.steal_result(runner_key, True)  # stole the base
                     if self.chatty:
                         print(f'\t{runner_stats.Player} stole 2nd base!')
                         print(f'\t{self.bases.describe_runners()}')
                 else:
+                    self.teams[self.team_hitting()].box_score.steal_result(runner_key, False)  # caught stealing
                     if self.chatty:
                         self.outs += 1  # this could result in the third out
                         print(f'\t{runner_stats.Player} was caught stealing for out number {self.outs}')
@@ -174,7 +185,6 @@ class Game:
         pitching = self.teams[self.team_pitching()].cur_pitcher_stats()  # data for pitcher
         pitching.Game_Fatigue_Factor, cur_percentage = \
             self.teams[self.team_pitching()].update_fatigue(cur_pitcher_index)
-        # pitching.Condition = 100 - cur_percentage if 100 - cur_percentage >= 0 else 0  # redundant and wrong!!! ??
 
         cur_batter_index = self.teams[self.team_hitting()].cur_lineup_index[self.batting_num[self.team_hitting()]-1]
         batting = self.teams[self.team_hitting()].cur_batter_stats(self.batting_num[self.team_hitting()]-1)  # lineup #
@@ -225,7 +235,7 @@ class Game:
                         else self.bases.player_scored[player_id]
                 print(f'\tScored {self.bases.runs_scored} run(s)!  ({players})\n'
                       f'\tThe score is {self.team_names[0]} {self.total_score[0]} to'
-                      f' {self.team_names[1]} {self.total_score[1]}')  # ?? need to handle walk offs...
+                      f' {self.team_names[1]} {self.total_score[1]}')
             if self.bases.count_runners() >= 1 and self.outs < 3 and self.chatty:  # leave out batter check for runner
                 print(f'\t{self.bases.describe_runners()}')
             self.batting_num[self.team_hitting()] = self.batting_num[self.team_hitting()] + 1 \
@@ -314,7 +324,7 @@ if __name__ == '__main__':
         game = Game(home_team_name=home_team, away_team_name=away_team,
                     chatty=True, print_lineup=True,
                     print_box_score_b=True,
-                    load_seasons=[2023], new_season=2024,
+                    load_seasons=2023, new_season=2024,
                     # starting_pitchers=[2, 38],
                     # starting_lineups=[None, MIL_lineup],
                     load_batter_file='player-stats-Batters.csv',

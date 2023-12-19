@@ -155,7 +155,7 @@ if __name__ == '__main__':
 
     # full season
     num_games = 162
-    only_nl_b = True
+    only_nl_b = False
     interactive = True
     bbseason23 = BaseballSeason(load_seasons=[2023], new_season=2024,
                                 season_length_limit=num_games,

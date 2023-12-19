@@ -67,16 +67,6 @@ class BaseballStats:
         self.batting_data.to_csv(f'{self.load_seasons[0]} random-player-stats-Batters.csv', index=False, header=True)
         return
 
-    def injured_list(self, idays):
-        # mlb is 10 for pos min, 15 for pitcher min, and 60 day
-        return 'Active' if idays == 0 else \
-            '10 Day DL' if idays <= 10 else '15 Day DL' if idays <= 15 else '60 Day DL'
-
-    def condition_txt(self, condition):
-        return 'Healthy' if condition > 75 else \
-            'Tired' if condition > 51 else \
-            'Exhausted'
-
     def get_seasons(self, batter_file, pitcher_file):
         if self.pitching_data is None or self.batting_data is None:  # need to read data... else skip as cached
             for season in self.load_seasons:
@@ -133,13 +123,6 @@ class BaseballStats:
             raise Exception('Index value cannot be zero')  # screws up bases where 0 is no runner
         return
 
-    def randomize_mascots(self, length):
-        with open('animals.txt', 'r') as f:
-            animals = f.readlines()
-        animals = [animal.strip() for animal in animals]
-        mascots = random.sample(animals, length)
-        return mascots
-
     def create_leagues(self):
         league_list = ['ACB', 'NBL', 'SOL', 'NNL']  # Armchair Baseball and Nerd Baseball, Some Other League, No Name
         league_names = random.sample(league_list, 2)  # replace AL and NL
@@ -153,7 +136,7 @@ class BaseballStats:
         city_dict = {}
         current_team_names = self.batting_data.Team.unique()  # get list of current team names
         city.abbrev = [str(name[:3]).upper() for name in city.names]  # city names are imported
-        mascots = self.randomize_mascots(len(city.names))
+        mascots = randomize_mascots(len(city.names))
         for ii, team_abbrev in enumerate(city.abbrev):
             city_dict.update({city.abbrev[ii]: [city.names[ii], mascots[ii]]})  # update will use the last unique abbrev
 
@@ -243,9 +226,9 @@ class BaseballStats:
                   int(self.rnd_b_inj(row['Age'])), axis=1)
 
         self.new_season_pitching_data['Status'] = \
-            self.new_season_pitching_data['Injured Days'].apply(self.injured_list)
+            self.new_season_pitching_data['Injured Days'].apply(injured_list_f)  # apply injured list static func
         self.new_season_batting_data['Status'] = \
-            self.new_season_batting_data['Injured Days'].apply(self.injured_list)
+            self.new_season_batting_data['Injured Days'].apply(injured_list_f)  # apply injured list static func
 
         print(f'Season Disabled Lists:')
         if self.new_season_pitching_data[self.new_season_pitching_data["Injured Days"] > 0].shape[0] > 0:
@@ -296,8 +279,8 @@ class BaseballStats:
     def print_season(self, df_b, df_p, teams, summary_only_b=False, condition_text=True):
         teams.append('')  # add blank team for totals
         if condition_text:
-            df_p['Condition'] = df_p['Condition'].apply(self.condition_txt)
-            df_b['Condition'] = df_b['Condition'].apply(self.condition_txt)
+            df_p['Condition'] = df_p['Condition'].apply(condition_txt_f)  # apply condition_txt static func
+            df_b['Condition'] = df_b['Condition'].apply(condition_txt_f)  # apply condition_txt static func
 
         df = df_p[df_p['Team'].isin(teams)]
         df_totals = team_pitching_totals(df, team_name='', concat=False)
@@ -320,8 +303,28 @@ class BaseballStats:
 
 
 # static function start
+def randomize_mascots(length):
+    with open('animals.txt', 'r') as f:
+        animals = f.readlines()
+    animals = [animal.strip() for animal in animals]
+    mascots = random.sample(animals, length)
+    return mascots
+
+
+def injured_list_f(idays):
+    # mlb is 10 for pos min, 15 for pitcher min, and 60 day
+    return 'Active' if idays == 0 else \
+        '10 Day DL' if idays <= 10 else '15 Day DL' if idays <= 15 else '60 Day DL'
+
+
+def condition_txt_f(condition):
+    return 'Healthy' if condition > 75 else \
+        'Tired' if condition > 51 else \
+        'Exhausted'
+
+
 def remove_non_print_cols(df):
-    non_print_cols = set(['Season', 'Total_OB', 'AVG_faced', 'Game_Fatigue_Factor'])  # 'Total_Outs',
+    non_print_cols = {'Season', 'Total_OB', 'AVG_faced', 'Game_Fatigue_Factor'}  # 'Total_Outs',
     cols_to_drop = non_print_cols.intersection(df.columns)
     if cols_to_drop:
         df = df.drop(cols_to_drop, axis=1)
@@ -407,9 +410,9 @@ if __name__ == '__main__':
     print(*baseball_data.batting_data.columns)
     print(baseball_data.batting_data.Team.unique())
     # print(baseball_data.batting_data.Mascot.unique())
-    teams = list(baseball_data.batting_data.Team.unique())
-    teams = ['MIL']  # MIL, NYM, etc
-    baseball_data.print_prior_season(teams=teams)
+    # teams_to_print = list(baseball_data.batting_data.Team.unique())
+    teams_to_print = ['MIL']  # MIL, NYM, etc
+    baseball_data.print_prior_season(teams=teams_to_print)
     # baseball_data.print_current_season(teams=teams)
     # print(baseball_data.pitching_data.to_string())  # maintains index numbers
     # print(baseball_data.batting_data.to_string())

@@ -287,7 +287,7 @@ class BaseballStats:
         df = df_p[df_p['Team'].isin(teams)]
         df_totals = team_pitching_totals(df, team_name='', concat=False)
         if summary_only_b is False:
-            print(df[self.pcols_to_print].to_string(justify='right'))
+            print(df[self.pcols_to_print].to_string(justify='right'))  # print entire team
 
         print('\nTeam Pitching Totals:')
         print(df_totals[self.numeric_pcols].to_string(justify='right', index=False))
@@ -296,7 +296,7 @@ class BaseballStats:
         df = df_b[df_b['Team'].isin(teams)]
         df_totals = team_batting_totals(df, team_name='', concat=False)
         if summary_only_b is False:
-            print(df[self.bcols_to_print].to_string(justify='right'))
+            print(df[self.bcols_to_print].to_string(justify='right'))  # print entire team
 
         print('\nTeam Batting Totals:')
         print(df_totals[self.numeric_bcols].to_string(justify='right', index=False))

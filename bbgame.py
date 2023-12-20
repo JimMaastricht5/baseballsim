@@ -14,7 +14,8 @@ class Game:
     def __init__(self, away_team_name='', home_team_name='', baseball_data=None, game_num=1, rotation_len=5,
                  print_lineup=False, chatty=False, print_box_score_b=False, load_seasons=2023, new_season=2024,
                  starting_pitchers=None, starting_lineups=None,
-                 load_batter_file='player-stats-Batters.csv', load_pitcher_file='player-stats-Pitching.csv'):
+                 load_batter_file='player-stats-Batters.csv', load_pitcher_file='player-stats-Pitching.csv',
+                 interactive=False, show_bench=False):
         if baseball_data is None:
             self.baseball_data = bbstats.BaseballStats(load_seasons=load_seasons, new_season=new_season,
                                                        load_batter_file=load_batter_file,
@@ -39,14 +40,16 @@ class Game:
         self.teams = []  # keep track of away in pos 0 and home team in pos 1
         self.teams.insert(AWAY, gameteam.Team(self.team_names[AWAY], self.baseball_data, self.game_num,
                                               self.rotation_len))  # init away team class
-        self.teams[AWAY].set_lineup(show_lineup=print_lineup, current_season_stats=(True if game_num > 1 else False),
+        self.teams[AWAY].set_lineup(show_lineup=print_lineup, show_bench=show_bench,
+                                    current_season_stats=(True if game_num > 1 else False),
                                     force_starting_pitcher=starting_pitchers[AWAY],
                                     force_lineup_dict=starting_lineups[AWAY])
 
         # print(f'Setting home team as {self.team_names[1]}')
         self.teams.insert(HOME, gameteam.Team(self.team_names[HOME], self.baseball_data, self.game_num,
                                               self.rotation_len))  # init away team class
-        self.teams[HOME].set_lineup(show_lineup=print_lineup, current_season_stats=(True if game_num > 1 else False),
+        self.teams[HOME].set_lineup(show_lineup=print_lineup, show_bench=show_bench,
+                                    current_season_stats=(True if game_num > 1 else False),
                                     force_starting_pitcher=starting_pitchers[HOME],
                                     force_lineup_dict=starting_lineups[HOME])
 
@@ -70,7 +73,8 @@ class Game:
         self.bases = bbbaserunners.Bases()
         self.outcomes = at_bat.OutCome()
         self.at_bat = at_bat.SimAB(self.baseball_data)  # setup class
-        self.min_steal_attempts = 10  # min number of steal attempts to be eligable to steal
+        self.min_steal_attempts = 10  # min number of steal attempts to be eligible to steal
+        self.interactive = interactive  # is this game being controlled by a human or straight sim
         return
 
     def team_pitching(self):
@@ -152,7 +156,7 @@ class Game:
         if self.bases.is_eligible_for_stolen_base():
             runner_key = self.bases.get_runner_key(1)
             runner_stats = self.teams[self.team_hitting()].pos_player_prior_year_stats(runner_key)
-            # print(f'In stolen base sit {self.bases.get_runner_key(1)} {runner_stats}')
+            # ?? SB is about 10 times too high for the league and not a good distribution
             if runner_stats.SB + runner_stats.CS >= self.min_steal_attempts and \
                     self.rng() <= (runner_stats.SB + runner_stats.CS) / runner_stats.G:  # attempt to steal scale w freq
                 if self.rng() <= (runner_stats.SB / (runner_stats.SB + runner_stats.CS)):  # successful steal
@@ -295,10 +299,15 @@ class Game:
     def sim_game(self, team_to_follow=''):
         if team_to_follow in self.team_names:
             print(f'Following team: {team_to_follow}')
+            # ?? insert manager input here
             self.chatty = True
             self.print_box_score_b = True
-            self.teams[AWAY].print_starting_lineups()
-            self.teams[HOME].print_starting_lineups()
+            if self.team_names.index(team_to_follow) == AWAY:
+                # self.teams[AWAY].print_starting_lineups()
+                self.teams[AWAY].print_pos_not_in_lineup()
+            else:
+                # self.teams[HOME].print_starting_lineups()
+                self.teams[HOME].print_pos_not_in_lineup()
 
         while self.is_game_end() is False:
             self.sim_half_inning()
@@ -328,11 +337,13 @@ if __name__ == '__main__':
                     # starting_pitchers=[2, 38],
                     # starting_lineups=[None, MIL_lineup],
                     load_batter_file='player-stats-Batters.csv',
-                    load_pitcher_file='player-stats-Pitching.csv'
+                    load_pitcher_file='player-stats-Pitching.csv',
                     # load_batter_file='random-player-stats-Batters.csv',
                     # load_pitcher_file='random-player-stats-Pitching.csv'
+                    interactive=True,
+                    show_bench=True
                     )
-        score, inning, win_loss = game.sim_game()
+        score, inning, win_loss = game.sim_game(team_to_follow='MIL')
         season_win_loss[0] = list(np.add(np.array(season_win_loss[0]), np.array(win_loss[0])))
         season_win_loss[1] = list(np.add(np.array(season_win_loss[1]), np.array(win_loss[1])))
         if team0_season_df is None:

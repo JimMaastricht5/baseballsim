@@ -54,7 +54,8 @@ class Team:
     def is_pitching_index(self):
         return self.cur_pitcher_index
 
-    def set_lineup(self, show_lineup=False, current_season_stats=True, force_starting_pitcher=None,
+    def set_lineup(self, show_lineup=False, show_bench=False,
+                   current_season_stats=True, force_starting_pitcher=None,
                    force_lineup_dict=None):
         self.set_batting_order(force_lineup_dict=force_lineup_dict)
         self.set_starting_rotation(force_starting_pitcher=force_starting_pitcher)
@@ -62,6 +63,8 @@ class Team:
         self.set_mid_relief()
         if show_lineup:
             self.print_starting_lineups(current_season_stats=current_season_stats)
+        if show_bench:
+            self.print_pos_not_in_lineup(current_season_stats=current_season_stats)
         self.box_score = teamgameboxstats.TeamBoxScore(self.lineup, self.pitching, self.team_name)
         return
 
@@ -207,14 +210,6 @@ class Team:
         self.middle_relievers = self.pitchers[df_criteria].sort_values(['ERA', 'IP'], ascending=[True, False])
         return
 
-    # def set_unavailable(self):
-    #     exhausted = (self.pitchers['Condition'] > self.fatigue_pitching_unavailable)
-    #     injured = (self.pitchers['Injured Days'] > 0)
-    #     df_criteria = exhausted | injured
-    #     self.unavailable_pitchers = self.pitchers[df_criteria].sort_values('IP', ascending=False)
-    #     print('gameteam.py set unavailable due to fatigue or injury....')
-    #     return
-
     def search_for_pos(self, position, lineup_index_list, stat_criteria='OPS'):
         # find players not in lineup at specified position, sort by stat descending to find the best
         # if no players at that position make a recursive call to the func and ask for best remaining player
@@ -247,14 +242,20 @@ class Team:
             dfp = bbstats.remove_non_print_cols(self.pitching)
 
         dfb = dfb[self.b_lineup_cols_to_print]
-        print(dfb.to_string(index=True, justify='center'))
+        print(dfb.to_string(index=True, justify='right'))
         print('')
         dfp = dfp[self.p_lineup_cols_to_print]
         print(f'Pitching for {self.team_name}:')
-        print(dfp.to_string(index=True, justify='center'))
+        print(dfp.to_string(index=True, justify='right'))
         print('')
         return
 
+    def print_pos_not_in_lineup(self, current_season_stats=True):
+        # ?? need to make sure we print the right season
+        print('bench players:')
+        print(self.pos_players.to_string(index=True, justify='right'))
+        print('')
+        return
 
 # static functions
 def insert_player_in_lineup(lineup_list, player_index, target_pos):

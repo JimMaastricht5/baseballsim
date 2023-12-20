@@ -4,7 +4,6 @@ import pandas as pd
 import bbgame
 import bbstats
 import numpy as np
-import keyboard
 
 AWAY = 0
 HOME = 1
@@ -113,14 +112,13 @@ class BaseballSeason:
                             self.baseball_data.print_current_season(teams=[team_to_follow])
                         else:
                             self.baseball_data.print_prior_season(teams=[team_to_follow])
-                        # print(f'Press space bar to Continue.....')
-                        # keyboard.wait('space')
                         pass
                     print(f'Playing day #{season_day_num + 1}: {match_up[0]} away against {match_up[1]}')
                     game = bbgame.Game(away_team_name=match_up[0], home_team_name=match_up[1],
                                        baseball_data=self.baseball_data, game_num=season_day_num,
                                        rotation_len=self.rotation_len, print_lineup=season_print_lineup_b,
-                                       chatty=season_chatty, print_box_score_b=season_print_box_score_b)
+                                       chatty=season_chatty, print_box_score_b=season_print_box_score_b,
+                                       interactive=self.interactive)
                     score, inning, win_loss_list = game.sim_game(team_to_follow=team_to_follow)
                     self.update_win_loss(away_team_name=match_up[0], home_team_name=match_up[1], win_loss=win_loss_list)
                     print(f'Final: {match_up[0]} {score[0]} {match_up[1]} {score[1]}')
@@ -158,7 +156,7 @@ if __name__ == '__main__':
     num_games = 162
     only_national_league_teams = False
     interactive_keyboard_pauses = True
-    bbseason23 = BaseballSeason(load_seasons=[2023], new_season=2024,
+    bbseason23 = BaseballSeason(load_seasons=2023, new_season=2024,
                                 season_length_limit=num_games,
                                 min_games=num_games, series_length=3, rotation_len=5,
                                 only_nl_b=only_national_league_teams,

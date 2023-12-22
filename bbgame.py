@@ -158,9 +158,9 @@ class Game:
         if self.bases.is_eligible_for_stolen_base():
             runner_key = self.bases.get_runner_key(1)
             runner_stats = self.teams[self.team_hitting()].pos_player_prior_year_stats(runner_key)
-            # ?? SB is about 10 times too high for the league and not a good distribution
+            # scale steal attempts with frequency of stealing when on base
             if runner_stats.SB + runner_stats.CS >= self.min_steal_attempts and \
-                    self.rng() <= (runner_stats.SB + runner_stats.CS) / runner_stats.AB:  # attempt steal scale w freq
+                    self.rng() <= (runner_stats.SB + runner_stats.CS) / (runner_stats.H + runner_stats.BB):
                 if self.rng() <= (runner_stats.SB / (runner_stats.SB + runner_stats.CS)):  # successful steal
                     self.bases.push_a_runner(1, 2)  # move runner from 1st to second
                     self.teams[self.team_hitting()].box_score.steal_result(runner_key, True)  # stole the base

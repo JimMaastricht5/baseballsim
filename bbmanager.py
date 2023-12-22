@@ -30,7 +30,7 @@ class Manager:
                 print("Invalid choice. Please try again.")
         return
 
-   def lineup_changes(self):
+    def lineup_changes(self):
        while True:
            print(self.team.print_pos_not_in_lineup())  # lineup already printed
            batting_order_number = int(input("\nEnter the batting order number to change (1-9), 0 is done: "))
@@ -44,5 +44,5 @@ class Manager:
            else:
                print("Invalid input. Please enter valid batting order and player index numbers.")
 
-            print(self.team.print_starting_lineups())  # reprint line up and loop to unused pos players at top
+           print(self.team.print_starting_lineups())  # reprint line up and loop to unused pos players at top
        return

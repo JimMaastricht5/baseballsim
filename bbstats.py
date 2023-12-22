@@ -267,13 +267,15 @@ class BaseballStats:
         print(f'bbstats update season stats {self.new_season_pitching_data.to_string(justify="right")}')
         return
 
-    def print_current_season(self, teams, summary_only_b=False):
+    def print_current_season(self, teams=None, summary_only_b=False):
+        teams = list(self.batting_data.Team.unique()) if teams is None else teams
         self.print_season(team_batting_stats(self.new_season_batting_data),
                           team_pitching_stats(self.new_season_pitching_data), teams=teams,
                           summary_only_b=summary_only_b)
         return
 
-    def print_prior_season(self, teams, summary_only_b=False):
+    def print_prior_season(self, teams=None, summary_only_b=False):
+        teams = list(self.batting_data.Team.unique()) if teams is None else teams
         self.print_season(team_batting_stats(self.batting_data), team_pitching_stats(self.pitching_data), teams=teams,
                           summary_only_b=summary_only_b)
         return
@@ -415,6 +417,7 @@ if __name__ == '__main__':
     # teams_to_print = list(baseball_data.batting_data.Team.unique())
     teams_to_print = ['MIL']  # MIL, NYM, etc
     baseball_data.print_prior_season(teams=teams_to_print)
+    baseball_data.print_prior_season()
     # baseball_data.print_current_season(teams=teams)
     # print(baseball_data.pitching_data.to_string())  # maintains index numbers
     # print(baseball_data.batting_data.to_string())

@@ -31,8 +31,8 @@ class Manager:
         return
 
     def lineup_changes(self):
+        # with print lineup and print bench set to true in bbgame it is not necessary to reprint them here
        while True:
-           print(self.team.print_pos_not_in_lineup())  # lineup already printed
            batting_order_number = int(input("\nEnter the batting order number to change (1-9), 0 is done: "))
            if batting_order_number == 0 or not isinstance(batting_order_number, (int, float, complex)):  # completed
                break
@@ -40,9 +40,11 @@ class Manager:
            player_index = int(input("Enter the index of the new player: "))
            if isinstance(player_index, (int, float, complex)) and 1 <= batting_order_number <= 9 and \
                    player_index in self.team.pos_players.index:  # check pos number and player exists
+               self.team.swap_player_in_lineup_w_bench(target_pos=batting_order_number,
+                                                       pos_player_bench_index=player_index)
                print("\nLineup updated!")
            else:
                print("Invalid input. Please enter valid batting order and player index numbers.")
-
            print(self.team.print_starting_lineups())  # reprint line up and loop to unused pos players at top
+           print(self.team.print_pos_not_in_lineup())  # lineup already printed
        return

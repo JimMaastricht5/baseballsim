@@ -32,6 +32,7 @@ class Team:
             self.city_name = ''
         self.lineup = None  # uses prior season stats
         self.lineup_new_season = None  # new / current season stats for printing starting lineup
+        self.bench_pos_new_season = None
         self.pitching = None  # uses prior season stats
         self.pitching_new_season = None  # new / current season stats for printing starting lineup
         self.starting_pitchers = None
@@ -68,6 +69,11 @@ class Team:
         self.box_score = teamgameboxstats.TeamBoxScore(self.lineup, self.pitching, self.team_name)
         return
 
+    # def set_pos_player_batting_bench_dfs(self):
+    #     self.bench_pos_new_season = self.pos_players.loc[~self.pos_players.index.isin(self.lineup.index)]
+    #     self.lineup_new_season = self.baseball_data.new_season_batting_data.loc[self.lineup.index]  # new season statsdf
+    #     return
+
     def set_batting_order(self, force_lineup_dict):
         # force_lineup is a dictionary in batting order with fielding pos
         if force_lineup_dict is None:
@@ -77,6 +83,8 @@ class Team:
             pos_index_dict = force_lineup_dict
 
         self.lineup = self.pos_players.loc[lineup_index_list]  # subset the master df using the lineup list of indexes
+        self.set_pos_player_batting_bench_dfs()
+        self.bench_pos_new_season = self.pos_players.loc[~self.pos_players.index.isin(self.lineup.index)]
         self.lineup_new_season = self.baseball_data.new_season_batting_data.loc[lineup_index_list]  # new season statsdf
 
         # lineup and lineup new season dfs contain all player data and in the correct order
@@ -251,11 +259,19 @@ class Team:
         return
 
     def print_pos_not_in_lineup(self, current_season_stats=True):
-        # ?? need to make sure we print the right season
         print('bench players:')
-        print(self.pos_players.to_string(index=True, justify='right'))
+        print(self.bench_pos_new_season.to_string(index=True, justify='right'))
         print('')
         return
+
+    def swap_player_in_lineup_w_bench(self, pos_player_bench_index, target_pos):
+        print(f'gameteam.py swap player with bench {target_pos}, {self.cur_lineup_index}')
+        cur_player_index = self.cur_lineup_index[target_pos - 1]
+        insert_player_in_lineup(self.cur_lineup_index, pos_player_bench_index,
+                                target_pos=target_pos - 1)
+        self.cur_lineup_index.remove(cur_player_index)
+        return
+
 
 # static functions
 def insert_player_in_lineup(lineup_list, player_index, target_pos):
@@ -264,8 +280,6 @@ def insert_player_in_lineup(lineup_list, player_index, target_pos):
     lineup_list.insert(target_pos - 1, player_index)
     return lineup_list
 
-def swap_player_in_lineup_w_bench(lineup_list, player_in_lineup_index, pos_player_bench_index):
-    return
 
 def move_player_in_lineup(lineup_list, player_index, target_pos):
     # target pos is position in line up not pos in life

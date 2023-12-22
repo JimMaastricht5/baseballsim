@@ -304,7 +304,8 @@ class Game:
             self.chatty = True
             self.print_box_score_b = True
             if self.interactive:
-                self.manager = bbmanager.Manager(self.team_names.index(team_to_follow))  # interactive input
+                self.manager = bbmanager.Manager(self.teams[self.team_names.index(team_to_follow)])  # interactive input
+                self.manager.game_setup()
 
         while self.is_game_end() is False:
             self.sim_half_inning()

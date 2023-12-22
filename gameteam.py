@@ -83,7 +83,7 @@ class Team:
             pos_index_dict = force_lineup_dict
 
         self.lineup = self.pos_players.loc[lineup_index_list]  # subset the master df using the lineup list of indexes
-        self.set_pos_player_batting_bench_dfs()
+        # self.set_pos_player_batting_bench_dfs()
         self.bench_pos_new_season = self.pos_players.loc[~self.pos_players.index.isin(self.lineup.index)]
         self.lineup_new_season = self.baseball_data.new_season_batting_data.loc[lineup_index_list]  # new season statsdf
 

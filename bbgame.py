@@ -338,7 +338,7 @@ if __name__ == '__main__':
                     load_pitcher_file='player-stats-Pitching.csv',
                     # load_batter_file='random-player-stats-Batters.csv',
                     # load_pitcher_file='random-player-stats-Pitching.csv'
-                    interactive=True,
+                    interactive=False,
                     show_bench=True
                     )
         score, inning, win_loss = game.sim_game(team_to_follow='MIL')

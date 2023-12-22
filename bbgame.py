@@ -4,6 +4,7 @@ import at_bat
 import numpy as np
 import random
 import bbbaserunners
+import bbmanager
 import datetime
 
 AWAY = 0
@@ -75,6 +76,7 @@ class Game:
         self.at_bat = at_bat.SimAB(self.baseball_data)  # setup class
         self.min_steal_attempts = 10  # min number of steal attempts to be eligible to steal
         self.interactive = interactive  # is this game being controlled by a human or straight sim
+        self.manager = None
         return
 
     def team_pitching(self):
@@ -158,7 +160,7 @@ class Game:
             runner_stats = self.teams[self.team_hitting()].pos_player_prior_year_stats(runner_key)
             # ?? SB is about 10 times too high for the league and not a good distribution
             if runner_stats.SB + runner_stats.CS >= self.min_steal_attempts and \
-                    self.rng() <= (runner_stats.SB + runner_stats.CS) / runner_stats.G:  # attempt to steal scale w freq
+                    self.rng() <= (runner_stats.SB + runner_stats.CS) / runner_stats.AB:  # attempt steal scale w freq
                 if self.rng() <= (runner_stats.SB / (runner_stats.SB + runner_stats.CS)):  # successful steal
                     self.bases.push_a_runner(1, 2)  # move runner from 1st to second
                     self.teams[self.team_hitting()].box_score.steal_result(runner_key, True)  # stole the base
@@ -299,15 +301,10 @@ class Game:
     def sim_game(self, team_to_follow=''):
         if team_to_follow in self.team_names:
             print(f'Following team: {team_to_follow}')
-            # ?? insert manager input here
             self.chatty = True
             self.print_box_score_b = True
-            if self.team_names.index(team_to_follow) == AWAY:
-                # self.teams[AWAY].print_starting_lineups()
-                self.teams[AWAY].print_pos_not_in_lineup()
-            else:
-                # self.teams[HOME].print_starting_lineups()
-                self.teams[HOME].print_pos_not_in_lineup()
+            if self.interactive:
+                self.manager = bbmanager.Manager(self.team_names.index(team_to_follow))  # interactive input
 
         while self.is_game_end() is False:
             self.sim_half_inning()

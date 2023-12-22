@@ -264,6 +264,8 @@ def insert_player_in_lineup(lineup_list, player_index, target_pos):
     lineup_list.insert(target_pos - 1, player_index)
     return lineup_list
 
+def swap_player_in_lineup_w_bench(lineup_list, player_in_lineup_index, pos_player_bench_index):
+    return
 
 def move_player_in_lineup(lineup_list, player_index, target_pos):
     # target pos is position in line up not pos in life

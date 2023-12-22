@@ -34,6 +34,7 @@ class Team:
             self.city_name = ''
         self.prior_season_lineup_df = None  # uses prior season stats
         self.new_season_lineup_df = None  # new / current season stats for printing starting lineup
+        self.prior_season_bench_pos_df = None
         self.new_season_bench_pos_df = None
         self.prior_season_pitching_df = None  # uses prior season stats
         self.new_season_pitching_df = None  # new / current season stats for printing starting lineup
@@ -78,10 +79,15 @@ class Team:
                                                        self.team_name)
         return
 
-    # def set_pos_player_batting_bench_dfs(self):
-    #     self.bench_pos_new_season = self.pos_players.loc[~self.pos_players.index.isin(self.lineup.index)]
-    #     self.lineup_new_season = self.baseball_data.new_season_batting_data.loc[self.lineup.index]
-    #     return
+    def set_prior_and_new_pos_player_batting_bench_dfs(self):
+        self.prior_season_lineup_df = self.prior_season_pos_players_df.loc[self.cur_lineup_index_list]  # subset team df
+        self.new_season_lineup_df = self.baseball_data.new_season_batting_data.loc[self.cur_lineup_index_list]
+
+        self.prior_season_bench_pos_df = self.prior_season_pos_players_df.loc[
+           ~self.prior_season_pos_players_df.index.isin(self.prior_season_lineup_df.index)]
+        self.new_season_bench_pos_df = self.baseball_data.new_season_batting_data.loc[
+            ~self.baseball_data.new_season_batting_data.index.isin(self.new_season_lineup_df.index)]
+        return
 
     def set_batting_order(self, force_lineup_dict):
         # force_lineup is a dictionary in batting order with fielding pos
@@ -91,10 +97,11 @@ class Team:
             self.cur_lineup_index_list = force_lineup_dict.keys()
             pos_index_dict = force_lineup_dict
 
-        self.prior_season_lineup_df = self.prior_season_pos_players_df.loc[self.cur_lineup_index_list]  # subset team df
-        # self.set_pos_player_batting_bench_dfs()
-        self.new_season_bench_pos_df = self.prior_season_pos_players_df.loc[~self.prior_season_pos_players_df.index.isin(self.prior_season_lineup_df.index)]
-        self.new_season_lineup_df = self.baseball_data.new_season_batting_data.loc[self.cur_lineup_index_list]
+        # self.prior_season_lineup_df = self.prior_season_pos_players_df.loc[self.cur_lineup_index_list]  # subset df
+        self.set_prior_and_new_pos_player_batting_bench_dfs()
+        # self.new_season_bench_pos_df = self.prior_season_pos_players_df.
+        # loc[~self.prior_season_pos_players_df.index.isin(self.prior_season_lineup_df.index)]
+        # self.new_season_lineup_df = self.baseball_data.new_season_batting_data.loc[self.cur_lineup_index_list]
 
         # lineup and lineup new season dfs contain all player data and in the correct order
         # loop thru lineup from lead off to last, build lineup list and set player fielding pos in lineup df
@@ -281,7 +288,10 @@ class Team:
 
     def print_pos_not_in_lineup(self, current_season_stats=True):
         print('bench players:')
-        print(self.new_season_bench_pos_df.to_string(index=True, justify='right'))
+        if current_season_stats:
+            print(self.new_season_bench_pos_df.to_string(index=True, justify='right'))
+        else:
+            print(self.prior_season_bench_pos_df.to_string(index=True, justify='right'))
         print('')
         return
 

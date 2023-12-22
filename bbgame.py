@@ -74,7 +74,7 @@ class Game:
         self.bases = bbbaserunners.Bases()
         self.outcomes = at_bat.OutCome()
         self.at_bat = at_bat.SimAB(self.baseball_data)  # setup class
-        self.min_steal_attempts = 10  # min number of steal attempts to be eligible to steal
+        self.steal_multiplier = 1.7  # rate of steals per on base is not generating the desired result so increase it
         self.interactive = interactive  # is this game being controlled by a human or straight sim
         self.manager = None
         return
@@ -159,8 +159,8 @@ class Game:
             runner_key = self.bases.get_runner_key(1)
             runner_stats = self.teams[self.team_hitting()].pos_player_prior_year_stats(runner_key)
             # scale steal attempts with frequency of stealing when on base
-            if runner_stats.SB + runner_stats.CS >= self.min_steal_attempts and \
-                    self.rng() <= (runner_stats.SB + runner_stats.CS) / (runner_stats.H + runner_stats.BB):
+            # runner_stats.SB + runner_stats.CS >= self.min_steal_attempts and \
+            if self.rng() <= (runner_stats.SB + runner_stats.CS) / (runner_stats.H + runner_stats.BB) * self.steal_multiplier:
                 if self.rng() <= (runner_stats.SB / (runner_stats.SB + runner_stats.CS)):  # successful steal
                     self.bases.push_a_runner(1, 2)  # move runner from 1st to second
                     self.teams[self.team_hitting()].box_score.steal_result(runner_key, True)  # stole the base

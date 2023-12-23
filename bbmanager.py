@@ -12,36 +12,41 @@ class Manager:
     def options(self):
         while True:
             print("\nOptions:")
+            print("0. Accept the Lineup and Start the Game")
             print("1. Change Lineup")
             print("2. Change Starting Pitcher")
-            print("3. Done")
-            choice = input("\nEnter your choice (1-3): ")
+            choice = input("\nEnter your choice: ")
             if choice == "1":
                 # Perform actions for option 1
                 print("Changing lineup....")
-                self.lineup_changes()
+                self.interactive_lineup_changes()
             elif choice == "2":
                 # Perform actions for option 2
-                print("You chose Option 2.")
-            elif choice == "3":
+                self.interactive_pitching_changes()
+            elif choice == "0":
                 print("Starting game.")
                 break  # Exit the loop
             else:
                 print("Invalid choice. Please try again.")
         return
 
-    def lineup_changes(self):
+    def interactive_pitching_changes(self):
+        print(f'Please enter the number of the pitcher you would like to enter the game')
+        self.team.print_available_pitchers(include_starters=True)
+        player_index = int(input("Enter the index of the new player: "))
+        self.team.set_starting_rotation(force_starting_pitcher=player_index)
+        return
+
+    def interactive_lineup_changes(self):
         # with print lineup and print bench set to true in bbgame it is not necessary to reprint them here
        while True:
-           batting_order_number = int(input("\nEnter the batting order number to change (1-9), 0 is done: "))
+           batting_order_number = int(input("\nEnter the batting order number to change (1-9), 0 accepts the lineup: "))
            if batting_order_number == 0 or not isinstance(batting_order_number, (int, float, complex)):  # completed
                break
 
            player_index = int(input("Enter the index of the new player: "))
            if isinstance(player_index, (int, float, complex)) and 1 <= batting_order_number <= 9:
-               # and player_index in self.team.pos_players.index:  # check pos number and player exists
-               self.team.change_lineup(target_pos=batting_order_number,
-                                                       pos_player_bench_index=player_index)
+               self.team.change_lineup(target_pos=batting_order_number, pos_player_bench_index=player_index)
                print("\nLineup updated!")
            else:
                print("Invalid input. Please enter valid batting order and player index numbers.")

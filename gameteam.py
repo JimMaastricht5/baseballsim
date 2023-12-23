@@ -150,6 +150,16 @@ class Team:
             self.baseball_data.new_season_pitching_data.loc[self.cur_pitcher_index].to_frame().T
         return
 
+    def print_available_pitchers(self, include_starters=False):
+        if include_starters:
+            print(self.starting_pitchers_df.to_string(justify='right'))
+            print('')
+        print(self.middle_relievers_df.to_string(justify='right'))
+        print('')
+        print(self.relievers_df.to_string(justify='right'))
+        print('')
+        return
+
     def cur_pitcher_stats(self):
         if isinstance(self.prior_season_pitching_df, pd.Series) is not pd.Series:  # this should never happen
             self.prior_season_pitching_df = self.prior_season_pitching_df.squeeze()

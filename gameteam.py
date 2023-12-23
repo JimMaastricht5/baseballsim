@@ -8,10 +8,10 @@ class Team:
         pd.options.mode.chained_assignment = None  # suppresses chained assignment warning for lineup pos setting
         self.team_name = team_name
         self.baseball_data = baseball_data
-        self.prior_season_pitchers_df = baseball_data.pitching_data[baseball_data.pitching_data["Team"] == team_name]
-        self.prior_season_pos_players_df = baseball_data.batting_data[baseball_data.batting_data["Team"] == team_name]
-        self.new_season_pos_players_df = \
-            baseball_data.new_season_batting_data[baseball_data.new_season_batting_data["Team"] == team_name]
+        self.prior_season_pitchers_df = baseball_data.get_pitching_data(team_name=team_name, prior_season=True)
+        self.prior_season_pos_players_df = baseball_data.get_batting_data(team_name=team_name, prior_season=True)
+        self.new_season_pos_players_df = baseball_data.get_batting_data(team_name=team_name, prior_season=False)
+
         self.prior_season_pitchers_df['Condition'] = self.baseball_data.new_season_pitching_data['Condition']
         self.prior_season_pitchers_df['AVG_faced'] = self.prior_season_pitchers_df['AVG_faced'] * \
             self.prior_season_pitchers_df['Condition']
@@ -66,10 +66,10 @@ class Team:
     def is_pitching_index(self):
         return self.cur_pitcher_index
 
-    def set_lineup(self, show_lineup=False, show_bench=False,
-                   current_season_stats=True, force_starting_pitcher=None,
-                   force_lineup_dict=None):
-        self.set_batting_order(force_lineup_dict=force_lineup_dict)
+    def set_initial_lineup(self, show_lineup=False, show_bench=False,
+                           current_season_stats=True, force_starting_pitcher=None,
+                           force_lineup_dict=None):
+        self.set_initial_batting_order(force_lineup_dict=force_lineup_dict)
         self.set_starting_rotation(force_starting_pitcher=force_starting_pitcher)
         self.set_closers()
         self.set_mid_relief()
@@ -92,7 +92,7 @@ class Team:
             ~self.new_season_pos_players_df.index.isin(self.new_season_lineup_df.index)]
         return
 
-    def set_batting_order(self, force_lineup_dict):
+    def set_initial_batting_order(self, force_lineup_dict):
         # force_lineup is a dictionary in batting order with fielding pos
         if force_lineup_dict is None:
             pos_index_dict = self.dynamic_lineup()  # build cur_lineup_index_list
@@ -298,12 +298,15 @@ class Team:
         print('')
         return
 
-    def swap_player_in_lineup_w_bench(self, pos_player_bench_index, target_pos):
+    def change_lineup(self, pos_player_bench_index, target_pos, in_game=False):
         print(f'gameteam.py swap player with bench {target_pos}, {self.cur_lineup_index_list}')
         cur_player_index = self.cur_lineup_index_list[target_pos - 1]
         if pos_player_bench_index in self.prior_season_pos_players_df.index:
             self.insert_player_in_lineup(player_index=pos_player_bench_index, target_pos=target_pos)
             self.cur_lineup_index_list.remove(cur_player_index)
+            self.set_prior_and_new_pos_player_batting_bench_dfs()
+            self.box_score = teamgameboxstats.TeamBoxScore(self.prior_season_lineup_df, self.prior_season_pitching_df,
+                                                           self.team_name)  # update box score
         else:
             print(f'Player Index is {pos_player_bench_index} is not on the team.  No substitution made')
         return

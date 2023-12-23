@@ -41,18 +41,18 @@ class Game:
         self.teams = []  # keep track of away in pos 0 and home team in pos 1
         self.teams.insert(AWAY, gameteam.Team(self.team_names[AWAY], self.baseball_data, self.game_num,
                                               self.rotation_len))  # init away team class
-        self.teams[AWAY].set_lineup(show_lineup=print_lineup, show_bench=show_bench,
-                                    current_season_stats=(True if game_num > 1 else False),
-                                    force_starting_pitcher=starting_pitchers[AWAY],
-                                    force_lineup_dict=starting_lineups[AWAY])
+        self.teams[AWAY].set_initial_lineup(show_lineup=print_lineup, show_bench=show_bench,
+                                            current_season_stats=(True if game_num > 1 else False),
+                                            force_starting_pitcher=starting_pitchers[AWAY],
+                                            force_lineup_dict=starting_lineups[AWAY])
 
         # print(f'Setting home team as {self.team_names[1]}')
         self.teams.insert(HOME, gameteam.Team(self.team_names[HOME], self.baseball_data, self.game_num,
                                               self.rotation_len))  # init away team class
-        self.teams[HOME].set_lineup(show_lineup=print_lineup, show_bench=show_bench,
-                                    current_season_stats=(True if game_num > 1 else False),
-                                    force_starting_pitcher=starting_pitchers[HOME],
-                                    force_lineup_dict=starting_lineups[HOME])
+        self.teams[HOME].set_initial_lineup(show_lineup=print_lineup, show_bench=show_bench,
+                                            current_season_stats=(True if game_num > 1 else False),
+                                            force_starting_pitcher=starting_pitchers[HOME],
+                                            force_lineup_dict=starting_lineups[HOME])
 
         self.win_loss = []
         self.is_save_sit = [False, False]

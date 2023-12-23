@@ -62,6 +62,32 @@ class BaseballStats:
                                                           scale=self.batting_injury_avg_len / 2, size=1)[0])
         return
 
+    def get_batting_data(self, team_name=None, prior_season=True):
+        if prior_season:
+            if team_name is None:
+                df = self.batting_data
+            else:
+                df = self.batting_data[self.batting_data['Team'] == team_name]
+        else:
+            if team_name is None:
+                df = self.new_season_batting_data
+            else:
+                df = self.new_season_batting_data[self.new_season_batting_data['Team'] == team_name]
+        return df
+
+    def get_pitching_data(self, team_name=None, prior_season=True):
+        if prior_season:
+            if team_name is None:
+                df = self.pitching_data
+            else:
+                df = self.pitching_data[self.pitching_data['Team'] == team_name]
+        else:
+            if team_name is None:
+                df = self.new_season_pitching_data
+            else:
+                df = self.new_season_pitching_data[self.new_season_pitching_data['Team'] == team_name]
+        return df
+
     def save_data(self):
         self.pitching_data.to_csv(f'{self.load_seasons[0]} random-player-stats-Pitching.csv', index=False, header=True)
         self.batting_data.to_csv(f'{self.load_seasons[0]} random-player-stats-Batters.csv', index=False, header=True)

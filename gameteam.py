@@ -10,6 +10,8 @@ class Team:
         self.baseball_data = baseball_data
         self.prior_season_pitchers_df = baseball_data.pitching_data[baseball_data.pitching_data["Team"] == team_name]
         self.prior_season_pos_players_df = baseball_data.batting_data[baseball_data.batting_data["Team"] == team_name]
+        self.new_season_pos_players_df = \
+            baseball_data.new_season_batting_data[baseball_data.new_season_batting_data["Team"] == team_name]
         self.prior_season_pitchers_df['Condition'] = self.baseball_data.new_season_pitching_data['Condition']
         self.prior_season_pitchers_df['AVG_faced'] = self.prior_season_pitchers_df['AVG_faced'] * \
             self.prior_season_pitchers_df['Condition']
@@ -80,13 +82,14 @@ class Team:
         return
 
     def set_prior_and_new_pos_player_batting_bench_dfs(self):
+        # print(f'gameteam.py set_prior_and_new....  {self.cur_lineup_index_list}')
         self.prior_season_lineup_df = self.prior_season_pos_players_df.loc[self.cur_lineup_index_list]  # subset team df
-        self.new_season_lineup_df = self.baseball_data.new_season_batting_data.loc[self.cur_lineup_index_list]
+        self.new_season_lineup_df = self.new_season_pos_players_df.loc[self.cur_lineup_index_list]
 
         self.prior_season_bench_pos_df = self.prior_season_pos_players_df.loc[
            ~self.prior_season_pos_players_df.index.isin(self.prior_season_lineup_df.index)]
-        self.new_season_bench_pos_df = self.baseball_data.new_season_batting_data.loc[
-            ~self.baseball_data.new_season_batting_data.index.isin(self.new_season_lineup_df.index)]
+        self.new_season_bench_pos_df = self.new_season_pos_players_df.loc[
+            ~self.new_season_pos_players_df.index.isin(self.new_season_lineup_df.index)]
         return
 
     def set_batting_order(self, force_lineup_dict):
@@ -107,7 +110,7 @@ class Team:
         # loop thru lineup from lead off to last, build lineup list and set player fielding pos in lineup df
         # note cur_lineup_index should be the same as lineup_index_list, but just to be certain we rebuild it.
         for row_num in range(0, len(self.prior_season_lineup_df)):
-            self.cur_lineup_index_list.append(self.prior_season_lineup_df.index[row_num])
+            #     self.cur_lineup_index_list.append(self.prior_season_lineup_df.index[row_num])
             player_index = self.prior_season_lineup_df.index[row_num]  # grab the index of the player
             self.prior_season_lineup_df.Pos[player_index] = pos_index_dict[player_index]  # set fielding pos in lineup
         return
@@ -298,8 +301,11 @@ class Team:
     def swap_player_in_lineup_w_bench(self, pos_player_bench_index, target_pos):
         print(f'gameteam.py swap player with bench {target_pos}, {self.cur_lineup_index_list}')
         cur_player_index = self.cur_lineup_index_list[target_pos - 1]
-        self.insert_player_in_lineup(player_index=pos_player_bench_index, target_pos=target_pos - 1)
-        self.cur_lineup_index_list.remove(cur_player_index)
+        if pos_player_bench_index in self.prior_season_pos_players_df.index:
+            self.insert_player_in_lineup(player_index=pos_player_bench_index, target_pos=target_pos)
+            self.cur_lineup_index_list.remove(cur_player_index)
+        else:
+            print(f'Player Index is {pos_player_bench_index} is not on the team.  No substitution made')
         return
 
     def insert_player_in_lineup(self, player_index, target_pos):

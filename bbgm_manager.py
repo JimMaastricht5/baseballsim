@@ -1,9 +1,22 @@
 import json
-
+import bbstats
+import gameteam
 
 class Manager:
-    def __init__(self, team):
-        self.team = team  # this is the team object from gameteam.py
+    def __init__(self, team_name, load_batter_file, load_pitcher_file,
+                 load_seasons='2023', new_season='2024', baseball_data = None):
+        self.team_name = team_name
+        self.baseball_data = baseball_data
+        if self.baseball_data is None:
+            self.baseball_data = bbstats.BaseballStats(load_seasons=load_seasons, new_season=new_season,
+                                                       load_batter_file=load_batter_file,
+                                                       load_pitcher_file=load_pitcher_file)
+        self.team = gameteam.Team(team_name=self.team_name, baseball_data=self.baseball_data)
+        self.team.set_initial_lineup(show_lineup=True, show_bench=True)  # accept all defaults
+        # self.team.set_initial_batting_order()
+        # self.team.set_starting_rotation()
+        # self.team.set_closers()
+        # self.team.set_mid_relief()
         return
 
     def game_setup(self):
@@ -15,17 +28,21 @@ class Manager:
             print("\nOptions:")
             print("0. Accept the Lineup and Start the Game")
             print("1. Change a Player in the Lineup")
-            print("2. Change Starting Pitcher")
-            print("3. Load Lineup Previous Lineup")
+            print("2. Change a Games Starting Pitcher")
+            print("3. Change the Starting Rotation")
+            print("4. Load Lineup Previous Lineup")
             choice = input("\nEnter your choice: ")
             if choice == "1":
                 # Perform actions for option 1
                 print("Changing lineup....")
-                self.interactive_lineup_changes()
+                self.lineup_changes()
             elif choice == "2":
                 # Perform actions for option 2
-                self.interactive_pitching_changes()
+                self.pitching_changes()
             elif choice == "3":
+                # Perform actions for option 2
+                self.starting_rotation_changes()
+            elif choice == "4":
                 # Perform actions for option 2
                 self.load_lineup()
             elif choice == "0":
@@ -35,18 +52,25 @@ class Manager:
                 print("Invalid choice. Please try again.")
         return
 
-    def interactive_pitching_changes(self):
+    def pitching_changes(self):
         print(f'Please enter the number of the pitcher you would like to enter the game')
         self.team.print_available_pitchers(include_starters=True)
         player_index = int(input("Enter the index of the new player: "))
         self.team.set_starting_rotation(force_starting_pitcher=player_index)
         return
 
-    def interactive_lineup_changes(self):
+    def pitching_rotation_changes(self):
+        print(f'Please enter the number of the pitcher you would like to be in the starting rotation')
+        self.team.print_available_pitchers(include_starters=True)
+        player_index = int(input("Enter the index of the new player: "))
+        self.team.set_starting_rotation(force_starting_pitcher=player_index)
+        return
+
+    def lineup_changes(self):
         # with print lineup and print bench set to true in bbgame it is not necessary to reprint them here
         while True:
-            print(self.team.print_starting_lineups())  # reprint line up and loop to unused pos players at top
-            print(self.team.print_pos_not_in_lineup())  # lineup already printed
+            self.team.print_starting_lineups()
+            self.team.print_pos_not_in_lineup()
             batting_order_number = int(input("\nEnter the batting order number to change (1-9),"
                                              " 0 accepts the lineup: "))
             if batting_order_number == 0 or not isinstance(batting_order_number, (int, float, complex)):  # completed
@@ -76,7 +100,17 @@ class Manager:
         self.team.set_prior_and_new_pos_player_batting_bench_dfs()  # ?? would prefer not to do this
         return
 
-# print(f'Enter player Number and Position for All Players one at a time example, e.g., {"65, LF"}: ')
-#         for line_up_num in range(9):
-#             player_index, fielding_pos = str(input(f'New Lineup {str(lineup_dict)} ')).split(',')
-#             lineup_dict[player_index] = fielding_pos
+    def print_team(self):
+        self.baseball_data.print_prior_season([self.team_name])
+        self.baseball_data.print_current_season([self.team_name])
+        return
+
+
+# Main
+bbgm = Manager(team_name='MIL', load_seasons=2023, new_season=2024,
+                                load_batter_file='player-stats-Batters.csv',
+                                load_pitcher_file='player-stats-Pitching.csv')
+# bbgm.print_team()
+bbgm.game_setup()
+bbgm.team.print_starting_lineups()  # reprint line up and loop to unused pos players at top
+bbgm.team.print_pos_not_in_lineup()  # lineup already printed

@@ -4,7 +4,7 @@ import at_bat
 import numpy as np
 import random
 import bbbaserunners
-import bbmanager
+import bbgm_manager
 import datetime
 
 AWAY = 0
@@ -307,8 +307,7 @@ class Game:
             self.chatty = True
             self.print_box_score_b = True
             if self.interactive:
-                self.manager = bbmanager.Manager(self.teams[self.team_names.index(team_to_follow)])  # interactive input
-                self.manager.game_setup()
+                pass
 
         while self.is_game_end() is False:
             self.sim_half_inning()

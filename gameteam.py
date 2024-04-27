@@ -142,7 +142,7 @@ class Team:
         self.starting_pitchers_df = self.prior_season_pitchers_df.sort_values(['GS', 'IP'], ascending=False).head(5)
         if force_starting_pitcher is None:  # grab the nth row of df
             self.prior_season_pitching_df = self.starting_pitchers_df.iloc[[self.game_num % self.rotation_len]]
-        else:
+        else:  # ???  id list vs. single value here
             self.prior_season_pitching_df = self.prior_season_pitchers_df.loc[[force_starting_pitcher]]
         self.cur_pitcher_index = self.prior_season_pitching_df.index[0] if force_starting_pitcher is None else \
             force_starting_pitcher

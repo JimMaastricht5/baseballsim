@@ -4,7 +4,6 @@ import at_bat
 import numpy as np
 import random
 import bbbaserunners
-import bbgm_manager
 import datetime
 
 AWAY = 0

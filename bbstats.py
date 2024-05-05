@@ -138,6 +138,7 @@ class BaseballStats:
                 else:
                     self.pitching_data = pd.concat([self.pitching_data, pitching_data])
                     self.batting_data = pd.concat([self.batting_data, batting_data])
+
                 if self.only_nl_b:
                     self.pitching_data = self.pitching_data[self.pitching_data['Team'].isin(self.nl)]
                     self.batting_data = self.batting_data[self.batting_data['Team'].isin(self.nl)]
@@ -441,10 +442,21 @@ if __name__ == '__main__':
     print(baseball_data.batting_data.Team.unique())
     # print(baseball_data.batting_data.Mascot.unique())
     # teams_to_print = list(baseball_data.batting_data.Team.unique())
-    teams_to_print = ['MIL']  # MIL, NYM, etc
-    baseball_data.print_prior_season(teams=teams_to_print)
+    # teams_to_print = ['MIL']  # MIL, NYM, etc
+    # baseball_data.print_prior_season(teams=teams_to_print)
     baseball_data.print_prior_season()
     # baseball_data.print_current_season(teams=teams)
     # print(baseball_data.pitching_data.to_string())  # maintains index numbers
     # print(baseball_data.batting_data.to_string())
     # print(team_batting_totals(baseball_data.batting_data, concat=False).to_string())
+
+    # detect and print dups with player and team the same
+    duplicates = baseball_data.batting_data[['Player','Team']].duplicated()
+    duplicates_df=baseball_data.batting_data[duplicates]
+    print(duplicates_df.sort_values(by=['Player', 'Team']))
+
+    duplicates = baseball_data.pitching_data[['Player', 'Team']].duplicated()
+    duplicates_df = baseball_data.pitching_data[duplicates]
+    print(duplicates_df.sort_values(by=['Player', 'Team']))
+
+

@@ -41,6 +41,7 @@ class Team:
         self.prior_season_pitching_df = None  # uses prior season stats
         self.new_season_pitching_df = None  # new / current season stats for printing starting lineup
         self.starting_pitchers_df = None
+        self.starting_pitchers = []
         self.cur_pitcher_index = None
         self.cur_lineup_index_list = []
         self.relievers_df = None  # df of 2 best closers
@@ -141,6 +142,7 @@ class Team:
         # pitcher rotates based on selection above or forced number passed in
         if self.starting_pitchers_df is None:  # init starting pitcher list
             self.starting_pitchers_df = self.prior_season_pitchers_df.sort_values(['GS', 'IP'], ascending=False).head(5)
+            self.starting_pitchers = self.starting_pitchers_df.index.tolist()
 
         # set game starter stats
         if force_starting_pitcher is None:  # grab the default nth row of df
@@ -148,24 +150,27 @@ class Team:
         else:  # user is forcing a rotation change, swap the starter with the new pither
             self.prior_season_pitching_df = self.prior_season_pitchers_df.loc[[force_starting_pitcher]]
 
-        # set the current starting pitcher index
+        # load the stats for the current starting pitcher
         self.cur_pitcher_index = self.prior_season_pitching_df.index[0] if force_starting_pitcher is None else \
             force_starting_pitcher
-        # load the stats for the current starting pitcher
         self.new_season_pitching_df = \
             self.baseball_data.new_season_pitching_data.loc[self.cur_pitcher_index].to_frame().T
         return
 
     def change_starting_rotation(self, starting_pitcher_num, rotation_order_num):
         # insert the new starting pitcher into the lineup spot
-        self.starting_pitchers_df.iloc[rotation_order_num - 1] = \
-            self.prior_season_pitchers_df.loc[[starting_pitcher_num]]
+        self.starting_pitchers[rotation_order_num - 1] = starting_pitcher_num
+        self.starting_pitchers_df = self.prior_season_pitchers_df.loc[self.starting_pitchers]
 
         # reset the starters stats in case the switch impacted the days starter
         self.prior_season_pitching_df = self.starting_pitchers_df.iloc[[self.game_num % self.rotation_len]]
         self.cur_pitcher_index = self.prior_season_pitching_df.index[0]  # grab the first starter for the season
         self.new_season_pitching_df = \
             self.baseball_data.new_season_pitching_data.loc[self.cur_pitcher_index].to_frame().T
+
+        # make old pitcher available as a reliever
+        self.set_closers()
+        self.set_mid_relief()
         return
 
     def print_available_pitchers(self, include_starters=False):

@@ -431,6 +431,22 @@ def team_pitching_totals(pitching_df, team_name='', concat=True):
     return df
 
 
+def find_duplicate_rows(df, column_name):
+  """
+  This function finds duplicate rows in a DataFrame based on a specified column.
+  Args:
+      df (pandas.DataFrame): The DataFrame to analyze.
+      column_name (str): The name of the column containing strings for comparison.
+  Returns:
+      pandas.DataFrame: A new DataFrame containing only the rows with duplicate string values.
+  """
+  filtered_df = df[column_name].dropna()
+  duplicates = filtered_df.duplicated(keep=False)  # keep both rows
+  duplicates_df = df[duplicates]
+  return duplicates_df
+
+
+
 if __name__ == '__main__':
     baseball_data = BaseballStats(load_seasons=[2023], new_season=2024, generate_random_data=False, only_nl_b=False,
                                   load_batter_file='player-stats-Batters.csv',
@@ -444,19 +460,27 @@ if __name__ == '__main__':
     # teams_to_print = list(baseball_data.batting_data.Team.unique())
     # teams_to_print = ['MIL']  # MIL, NYM, etc
     # baseball_data.print_prior_season(teams=teams_to_print)
-    baseball_data.print_prior_season()
+    # baseball_data.print_prior_season()
     # baseball_data.print_current_season(teams=teams)
     # print(baseball_data.pitching_data.to_string())  # maintains index numbers
     # print(baseball_data.batting_data.to_string())
     # print(team_batting_totals(baseball_data.batting_data, concat=False).to_string())
 
     # detect and print dups with player and team the same
-    duplicates = baseball_data.batting_data[['Player','Team']].duplicated()
-    duplicates_df=baseball_data.batting_data[duplicates]
-    print(duplicates_df.sort_values(by=['Player', 'Team']))
+    # duplicates = baseball_data.batting_data[['Player']].duplicated()
+    # duplicates_df=baseball_data.batting_data[duplicates == True]
+    # print(duplicates_df.sort_values(by=['Player']).to_string())
 
-    duplicates = baseball_data.pitching_data[['Player', 'Team']].duplicated()
-    duplicates_df = baseball_data.pitching_data[duplicates]
-    print(duplicates_df.sort_values(by=['Player', 'Team']))
+    # duplicates = baseball_data.pitching_data[['Player']].duplicated()
+    # duplicates_df = baseball_data.pitching_data[duplicates]
+    # print(duplicates_df.sort_values(by=['Player']))
+
+
+
+# Example usage: assuming you have a DataFrame 'baseball_data'
+duplicates_df = find_duplicate_rows(baseball_data.batting_data, 'Player')
+print(duplicates_df.sort_values(by=['Player']).to_string())
+print(baseball_data.batting_data.shape)
+print(duplicates_df.shape)
 
 

@@ -13,7 +13,9 @@ class Manager:
                                                        load_batter_file=load_batter_file,
                                                        load_pitcher_file=load_pitcher_file)
         self.team = gameteam.Team(team_name=self.team_name, baseball_data=self.baseball_data)
-        self.team.set_initial_lineup(show_lineup=True, show_bench=True)  # accept all defaults
+        self.team.set_initial_lineup(show_lineup=False, show_bench=False)  # accept all defaults batting and pitching
+        self.team.print_available_batters(include_starters=True)
+        self.team.print_available_pitchers(include_starters=True)
         # self.team.set_initial_batting_order()
         # self.team.set_starting_rotation()
         # self.team.set_closers()
@@ -27,10 +29,11 @@ class Manager:
     def options(self):
         while True:
             print("\nOptions:")
-            print("0. Accept the Lineup and Start the Game")
-            print("1. Change a Player in the Lineup")
-            print("2. Change the Starting Rotation")
-            print("3. Load Lineup Previous Lineup")
+            print("0. Accept the Team and Start the Game")
+            print("1. Change a Player in the Preferred Lineup")
+            print("2. Change the Preferred Starting Rotation")
+            print("3. Load a Saved Team")
+            print("4. Reset")
             choice = input("\nEnter your choice: ")
             if choice == "1":
                 print("Changing lineup....2")
@@ -39,6 +42,9 @@ class Manager:
                 self.pitching_rotation_changes()
             elif choice == "3":
                 self.load_lineup()
+            elif choice == "4":
+                self.team.set_initial_lineup(show_lineup=True, show_bench=True)  # defaults batting and pitching
+
             elif choice == "0":
                 print("Starting game.")
                 break  # Exit the loop
@@ -89,16 +95,16 @@ class Manager:
     def load_lineup(self):
         # lineup_dict = {}
         try:
-            with open('lineup.json', 'r') as f:
+            with open(self.team_name + '_team.json', 'r') as f:
                 lineup_dict = json.load(f)
-        except FileNotFoundError:
+        except FileNotFoundError:  # create a default file
             lineup_dict = {65: 'LF', 71: 'C', 336: '1B', 369: 'DH', 355: 'CF', 62: 'SS',
                            536: '3B', 154: '2B', 310: 'RF'}
-            with open('lineup.json', 'w') as f:
+            with open(self.team_name + '_team.json', 'w') as f:
                 json.dump(lineup_dict, f)
         print(lineup_dict)
         self.team.set_initial_batting_order(lineup_dict)
-        self.team.set_prior_and_new_pos_player_batting_bench_dfs()  # ?? would prefer not to do this
+        # self.team.set_prior_and_new_pos_player_batting_bench_dfs()  # ?? would prefer not to do this
         return
 
     def print_team(self):

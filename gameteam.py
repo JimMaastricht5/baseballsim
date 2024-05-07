@@ -173,6 +173,12 @@ class Team:
         self.set_mid_relief()
         return
 
+    def print_available_batters(self, current_season_stats=False, include_starters=False):
+        if include_starters:
+            self.print_starting_lineups(current_season_stats=current_season_stats, show_pitching_starter=False)
+        self.print_pos_not_in_lineup(current_season_stats=current_season_stats)
+        return
+
     def print_available_pitchers(self, include_starters=False):
         if include_starters:
             print(self.starting_pitchers_df.to_string(justify='right'))
@@ -304,7 +310,7 @@ class Team:
                                                                                ascending=False).head(count).index
         return list(stat_index)
 
-    def print_starting_lineups(self, current_season_stats=True):
+    def print_starting_lineups(self, current_season_stats=True, show_pitching_starter=True):
         print(f'Starting lineup for the {self.city_name} ({self.team_name}) {self.mascot}:')
         if current_season_stats:
             dfb = bbstats.remove_non_print_cols(self.new_season_lineup_df)
@@ -316,10 +322,11 @@ class Team:
         dfb = dfb[self.b_lineup_cols_to_print]
         print(dfb.to_string(index=True, justify='right'))
         print('')
-        dfp = dfp[self.p_lineup_cols_to_print]
-        print(f'Pitching for {self.team_name}:')
-        print(dfp.to_string(index=True, justify='right'))
-        print('')
+        if show_pitching_starter:
+            dfp = dfp[self.p_lineup_cols_to_print]
+            print(f'Pitching for {self.team_name}:')
+            print(dfp.to_string(index=True, justify='right'))
+            print('')
         return
 
     def print_pos_not_in_lineup(self, current_season_stats=True):

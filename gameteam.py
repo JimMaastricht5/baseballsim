@@ -181,10 +181,13 @@ class Team:
 
     def print_available_pitchers(self, include_starters=False):
         if include_starters:
+            print('Starting Rotation:')
             print(self.starting_pitchers_df.to_string(justify='right'))
             print('')
+        print('Middle Relievers:')
         print(self.middle_relievers_df.to_string(justify='right'))
         print('')
+        print('Closers:')
         print(self.relievers_df.to_string(justify='right'))
         print('')
         return
@@ -363,3 +366,6 @@ class Team:
         self.cur_lineup_index_list.remove(player_index)
         self.cur_lineup_index_list.insert(target_pos - 1, player_index)
         return
+
+    def line_up_dict(self):
+        return dict(self.prior_season_lineup_df.iloc[:, 2])  # get pos col w/o name

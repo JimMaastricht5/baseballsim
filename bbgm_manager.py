@@ -14,8 +14,7 @@ class Manager:
                                                        load_pitcher_file=load_pitcher_file)
         self.team = gameteam.Team(team_name=self.team_name, baseball_data=self.baseball_data)
         self.team.set_initial_lineup(show_lineup=False, show_bench=False)  # accept all defaults batting and pitching
-        self.team.print_available_batters(include_starters=True)
-        self.team.print_available_pitchers(include_starters=True)
+        self.print_team()
         # self.team.set_initial_batting_order()
         # self.team.set_starting_rotation()
         # self.team.set_closers()
@@ -52,13 +51,6 @@ class Manager:
                 print("Invalid choice. Please try again.")
         return
 
-    # def pitching_changes(self):
-    #     print(f'Please enter the number of the pitcher you would like to enter the game')
-    #     self.team.print_available_pitchers(include_starters=True)
-    #     player_index = int(input("Enter the index of the new player: "))
-    #     self.team.set_starting_rotation(force_starting_pitcher=player_index)
-    #     return
-
     def pitching_rotation_changes(self):
         while True:
             self.team.print_available_pitchers(include_starters=True)
@@ -93,13 +85,15 @@ class Manager:
         return
 
     def load_lineup(self):
-        # lineup_dict = {}
+        lineup_dict = {}
         try:
             with open(self.team_name + '_team.json', 'r') as f:
-                lineup_dict = json.load(f)
+                lineup_dict_str = json.load(f)
+                lineup_dict = {int(key): value for key, value in lineup_dict_str.items()}
         except FileNotFoundError:  # create a default file
             lineup_dict = {65: 'LF', 71: 'C', 336: '1B', 369: 'DH', 355: 'CF', 62: 'SS',
                            536: '3B', 154: '2B', 310: 'RF'}
+            # lineup_dict = self.team.line_up_dict()
             with open(self.team_name + '_team.json', 'w') as f:
                 json.dump(lineup_dict, f)
         print(lineup_dict)
@@ -108,8 +102,10 @@ class Manager:
         return
 
     def print_team(self):
-        self.baseball_data.print_prior_season([self.team_name])
-        self.baseball_data.print_current_season([self.team_name])
+        # self.baseball_data.print_prior_season([self.team_name])
+        # self.baseball_data.print_current_season([self.team_name])
+        self.team.print_available_batters(include_starters=True)
+        self.team.print_available_pitchers(include_starters=True)
         return
 
 

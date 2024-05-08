@@ -2,6 +2,7 @@ import pandas as pd
 import random
 import city_names as city
 import numpy as np
+import hashlib
 
 
 class BaseballStats:
@@ -9,6 +10,9 @@ class BaseballStats:
                  load_batter_file='player-stats-Batters.csv', load_pitcher_file='player-stats-Pitching.csv'):
 
         self.rnd = lambda: np.random.default_rng().uniform(low=0.0, high=1.001)  # random generator between 0 and 1
+
+        # create hash from a string, take first x digits and return an integer representation
+        self.create_hash = lambda text: int(hashlib.sha256(text.encode('utf-8')).hexdigest()[:5], 16)
 
         self.numeric_bcols = ['G', 'AB', 'R', 'H', '2B', '3B', 'HR', 'RBI', 'SB', 'CS', 'BB', 'SO', 'SH', 'SF',
                               'HBP', 'Condition']  # these cols will get added to running season total
@@ -99,6 +103,8 @@ class BaseballStats:
                 self.load_seasons = [self.load_seasons]  # convert to list if a single value
             for season in self.load_seasons:
                 pitching_data = pd.read_csv(str(season) + f" {pitcher_file}")
+                pitching_data['Hashcode'] = pitching_data['Player'].apply(self.create_hash)
+                pitching_data.set_index(keys=['Hashcode', 'Team'], drop=False, append=False, inplace=True)
                 pitching_data['AB'] = pitching_data['IP'] * 3 + pitching_data['H']
                 pitching_data['2B'] = 0
                 pitching_data['3B'] = 0
@@ -113,12 +119,14 @@ class BaseballStats:
                 pitching_data['Condition'] = 100
                 pitching_data['Status'] = 'Active'  # DL or active
                 pitching_data['Injured Days'] = 0  # days to spend in IL
-                pitching_data.index += 1
+                # pitching_data.index += 1  # used to avoid 0 index, no longer needed
                 if ('League' in pitching_data.columns) is False:  # if no league set one up
                     pitching_data['League'] = \
                         pitching_data['Team'].apply(lambda x: 'NL' if x in self.nl else 'AL')
 
                 batting_data = pd.read_csv(str(season) + f" {batter_file}")
+                batting_data['Hashcode'] = batting_data['Player'].apply(self.create_hash)
+                batting_data.set_index(keys=['Hashcode', 'Team'], drop=False, append=False, inplace=True)
                 batting_data['Season'] = str(season)
                 batting_data['Total_OB'] = batting_data['H'] + batting_data['BB'] + batting_data['HBP']
                 batting_data['Total_Outs'] = batting_data['AB'] - batting_data['H'] + batting_data['HBP']
@@ -127,7 +135,7 @@ class BaseballStats:
                 batting_data['Condition'] = 100
                 batting_data['Status'] = 'Active'  # DL or active
                 batting_data['Injured Days'] = 0
-                batting_data.index += 1
+                # batting_data.index += 1  # used to avoid zero index no longer needed
                 if ('League' in batting_data.columns) is False:
                     batting_data['League'] = \
                         batting_data['Team'].apply(lambda league: 'NL' if league in self.nl else 'AL')
@@ -136,8 +144,10 @@ class BaseballStats:
                     self.pitching_data = pitching_data
                     self.batting_data = batting_data
                 else:
-                    self.pitching_data = pd.concat([self.pitching_data, pitching_data])
-                    self.batting_data = pd.concat([self.batting_data, batting_data])
+                    # self.pitching_data = pd.concat([self.pitching_data, pitching_data])
+                    # self.batting_data = pd.concat([self.batting_data, batting_data])
+                    self.pitching_data = self.pitching_data[self.numeric_pcols] + pitching_data[self.numeric_pcols]
+                    self.batting_data = self.batting_data[self.numeric_bcols] + batting_data[self.numeric_bcols]
 
                 if self.only_nl_b:
                     self.pitching_data = self.pitching_data[self.pitching_data['Team'].isin(self.nl)]
@@ -434,19 +444,13 @@ def team_pitching_totals(pitching_df, team_name='', concat=True):
 
 
 def find_duplicate_rows(df, column_names):
-  """
-  This function finds duplicate rows in a DataFrame based on a specified column.
-  Args:
-      df (pandas.DataFrame): The DataFrame to analyze.
-      column_name (str): The name of the column containing strings for comparison.
-  Returns:
-      pandas.DataFrame: A new DataFrame containing only the rows with duplicate string values.
-  """
-  filtered_df = df[column_names].dropna()
-  duplicates = filtered_df.duplicated(keep=False)  # keep both rows
-  duplicates_df = df[duplicates]
-  return duplicates_df
-
+    #  This function finds duplicate rows in a DataFrame based on a specified column.
+    # Args: df (pandas.DataFrame): The DataFrame to analyze.
+    #   column_names (list): The name of the column containing strings for comparison.
+    # Returns: pandas.DataFrame: A new DataFrame containing only the rows with duplicate string values.
+    filtered_df = df[column_names].dropna()
+    duplicates = filtered_df.duplicated(keep=False)  # keep both rows
+    return df[duplicates]
 
 
 if __name__ == '__main__':
@@ -473,9 +477,12 @@ if __name__ == '__main__':
     print(baseball_data.batting_data.shape)
     print(duplicates_df.shape)
 
-
-    # Example usage: assuming you have a DataFrame 'baseball_data'
     duplicates_df = find_duplicate_rows(baseball_data.pitching_data, ['Player'])
     print(duplicates_df.sort_values(by=['Player']).to_string())
-    print(baseball_data.batting_data.shape)
+    print(baseball_data.pitching_data.shape)
+    print(duplicates_df.shape)
+
+    duplicates_df = find_duplicate_rows(baseball_data.pitching_data, ['Hashcode'])
+    print(duplicates_df.sort_values(by=['Player']).to_string())
+    print(baseball_data.pitching_data.shape)
     print(duplicates_df.shape)

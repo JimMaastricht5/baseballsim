@@ -72,11 +72,13 @@ class BaseballStats:
                 df = self.batting_data
             else:
                 df = self.batting_data[self.batting_data['Team'] == team_name]
+                # df.set_index(keys=['Hashcode'], drop=False, append=False, inplace=True)
         else:
             if team_name is None:
                 df = self.new_season_batting_data
             else:
                 df = self.new_season_batting_data[self.new_season_batting_data['Team'] == team_name]
+                # df.set_index(keys=['Hashcode'], drop=False, append=False, inplace=True)
         return df
 
     def get_pitching_data(self, team_name=None, prior_season=True):
@@ -85,11 +87,13 @@ class BaseballStats:
                 df = self.pitching_data
             else:
                 df = self.pitching_data[self.pitching_data['Team'] == team_name]
+                # df.set_index(keys=['Hashcode'], drop=False, append=False, inplace=True)
         else:
             if team_name is None:
                 df = self.new_season_pitching_data
             else:
                 df = self.new_season_pitching_data[self.new_season_pitching_data['Team'] == team_name]
+                # df.set_index(keys=['Hashcode'], drop=False, append=False, inplace=True)
         return df
 
     def save_data(self):
@@ -104,7 +108,9 @@ class BaseballStats:
             for season in self.load_seasons:
                 pitching_data = pd.read_csv(str(season) + f" {pitcher_file}")
                 pitching_data['Hashcode'] = pitching_data['Player'].apply(self.create_hash)
-                pitching_data.set_index(keys=['Hashcode', 'Team'], drop=False, append=False, inplace=True)
+                # pitching_data.set_index(keys=['Hashcode', 'Team'], drop=False, append=False, inplace=True)
+                # pitching_data.set_index(keys=['Hashcode'], drop=False, append=False, inplace=True)
+                pitching_data.index += 1  # used to avoid 0 index, no longer needed
                 pitching_data['AB'] = pitching_data['IP'] * 3 + pitching_data['H']
                 pitching_data['2B'] = 0
                 pitching_data['3B'] = 0
@@ -119,14 +125,15 @@ class BaseballStats:
                 pitching_data['Condition'] = 100
                 pitching_data['Status'] = 'Active'  # DL or active
                 pitching_data['Injured Days'] = 0  # days to spend in IL
-                # pitching_data.index += 1  # used to avoid 0 index, no longer needed
                 if ('League' in pitching_data.columns) is False:  # if no league set one up
                     pitching_data['League'] = \
                         pitching_data['Team'].apply(lambda x: 'NL' if x in self.nl else 'AL')
 
                 batting_data = pd.read_csv(str(season) + f" {batter_file}")
                 batting_data['Hashcode'] = batting_data['Player'].apply(self.create_hash)
-                batting_data.set_index(keys=['Hashcode', 'Team'], drop=False, append=False, inplace=True)
+                # batting_data.set_index(keys=['Hashcode', 'Team'], drop=False, append=False, inplace=True)
+                # batting_data.set_index(keys=['Hashcode'], drop=False, append=False, inplace=True)
+                batting_data.index += 1  # used to avoid zero index no longer needed
                 batting_data['Season'] = str(season)
                 batting_data['Total_OB'] = batting_data['H'] + batting_data['BB'] + batting_data['HBP']
                 batting_data['Total_Outs'] = batting_data['AB'] - batting_data['H'] + batting_data['HBP']
@@ -135,7 +142,6 @@ class BaseballStats:
                 batting_data['Condition'] = 100
                 batting_data['Status'] = 'Active'  # DL or active
                 batting_data['Injured Days'] = 0
-                # batting_data.index += 1  # used to avoid zero index no longer needed
                 if ('League' in batting_data.columns) is False:
                     batting_data['League'] = \
                         batting_data['Team'].apply(lambda league: 'NL' if league in self.nl else 'AL')
@@ -486,3 +492,6 @@ if __name__ == '__main__':
     print(duplicates_df.sort_values(by=['Player']).to_string())
     print(baseball_data.pitching_data.shape)
     print(duplicates_df.shape)
+
+    df=duplicates_df[['Hashcode', 'G', 'GS', 'CG', 'SHO', 'IP', 'H', 'ER', 'K', 'BB', 'HR', 'W', 'L', 'SV', 'BS', 'HLD']].groupby('Hashcode').sum()
+    print(df.to_string())

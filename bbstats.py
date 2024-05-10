@@ -102,14 +102,20 @@ class BaseballStats:
         return
 
     def get_seasons(self, batter_file, pitcher_file):
+        stats_bcols_sum = ['Hashcode', 'G', 'AB', 'R', 'H', '2B', '3B', 'HR', 'RBI', 'SB', 'CS', 'BB', 'SO', 'SH', 'SF', 'HBP']
+        stats_pcols_sum = ['Hashcode', 'G', 'GS', 'CG', 'SHO', 'IP', 'H', 'ER', 'K', 'BB', 'HR', 'W', 'L', 'SV', 'BS', 'HLD']
         if self.pitching_data is None or self.batting_data is None:  # need to read data... else skip as cached
             if not isinstance(self.load_seasons, list):
                 self.load_seasons = [self.load_seasons]  # convert to list if a single value
             for season in self.load_seasons:
                 pitching_data = pd.read_csv(str(season) + f" {pitcher_file}")
                 pitching_data['Hashcode'] = pitching_data['Player'].apply(self.create_hash)
-                # pitching_data.set_index(keys=['Hashcode', 'Team'], drop=False, append=False, inplace=True)
+                pitching_data_sum_df = pitching_data[stats_pcols_sum].groupby('Hashcode').sum()
                 # pitching_data.set_index(keys=['Hashcode'], drop=False, append=False, inplace=True)
+                for pcol in stats_pcols_sum[1:]:  #??? need to key hashcode in a loc here
+                    pitching_data[pcol] = pitching_data_sum_df[pcol]
+
+
                 pitching_data.index += 1  # used to avoid 0 index, no longer needed
                 pitching_data['AB'] = pitching_data['IP'] * 3 + pitching_data['H']
                 pitching_data['2B'] = 0

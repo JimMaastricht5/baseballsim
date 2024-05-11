@@ -101,22 +101,42 @@ class BaseballStats:
         self.batting_data.to_csv(f'{self.load_seasons[0]} random-player-stats-Batters.csv', index=False, header=True)
         return
 
+    def find_duplicate_rows(self, df, column_names):
+        #  This function finds duplicate rows in a DataFrame based on a specified column.
+        # Args: df (pandas.DataFrame): The DataFrame to analyze.
+        #   column_names (list): The name of the column containing strings for comparison.
+        # Returns: pandas.DataFrame: A new DataFrame containing only the rows with duplicate string values.
+        filtered_df = df[column_names].dropna()
+        duplicates = filtered_df.duplicated(keep=False)  # keep both rows
+        return df[duplicates]
+
+    def de_dup_df(self, df, key_name, dup_column_names, stats_cols_to_sum):
+        dup_hashcodes = self.find_duplicate_rows(df=df, column_names=dup_column_names)
+        for dfrow_key in dup_hashcodes[key_name].to_list():
+            df_rows = df.loc[df[key_name]==dfrow_key]
+            for dfcol_name in stats_cols_to_sum:
+                df.loc[df[key_name]==dfrow_key, dfcol_name] = df_rows[dfcol_name].sum()
+        return df
+
     def get_seasons(self, batter_file, pitcher_file):
-        stats_bcols_sum = ['Hashcode', 'G', 'AB', 'R', 'H', '2B', '3B', 'HR', 'RBI', 'SB', 'CS', 'BB', 'SO', 'SH', 'SF', 'HBP']
-        stats_pcols_sum = ['Hashcode', 'G', 'GS', 'CG', 'SHO', 'IP', 'H', 'ER', 'K', 'BB', 'HR', 'W', 'L', 'SV', 'BS', 'HLD']
+        stats_bcols_sum = ['G', 'AB', 'R', 'H', '2B', '3B', 'HR', 'RBI', 'SB', 'CS', 'BB', 'SO', 'SH', 'SF', 'HBP']
+        stats_pcols_sum = ['G', 'GS', 'CG', 'SHO', 'IP', 'H', 'ER', 'K', 'BB', 'HR', 'W', 'L', 'SV', 'BS', 'HLD']
         if self.pitching_data is None or self.batting_data is None:  # need to read data... else skip as cached
             if not isinstance(self.load_seasons, list):
                 self.load_seasons = [self.load_seasons]  # convert to list if a single value
             for season in self.load_seasons:
                 pitching_data = pd.read_csv(str(season) + f" {pitcher_file}")
                 pitching_data['Hashcode'] = pitching_data['Player'].apply(self.create_hash)
-                pitching_data_sum_df = pitching_data[stats_pcols_sum].groupby('Hashcode').sum()
+                pitching_data = self.de_dup_df(df=pitching_data, key_name='Hashcode', dup_column_names='Hashcode', stats_cols_to_sum=stats_pcols_sum)
+                # dup_hashcodes = self.find_duplicate_rows(df=pitching_data, column_names=['Hashcode'])
+                # for prow_hashcode in dup_hashcodes['Hashcode'].to_list():
+                #     # print(prow_hashcode)
+                #     df_rows = pitching_data.loc[pitching_data['Hashcode']==prow_hashcode]
+                #     for pcol_name in stats_pcols_sum:
+                #         pitching_data.loc[pitching_data['Hashcode']==prow_hashcode, pcol_name] = df_rows[pcol_name].sum()
+
                 # pitching_data.set_index(keys=['Hashcode'], drop=False, append=False, inplace=True)
-                for pcol in stats_pcols_sum[1:]:  #??? need to key hashcode in a loc here
-                    pitching_data[pcol] = pitching_data_sum_df[pcol]
-
-
-                pitching_data.index += 1  # used to avoid 0 index, no longer needed
+                # pitching_data.index += 1  # used to avoid 0 index, no longer needed
                 pitching_data['AB'] = pitching_data['IP'] * 3 + pitching_data['H']
                 pitching_data['2B'] = 0
                 pitching_data['3B'] = 0
@@ -455,16 +475,6 @@ def team_pitching_totals(pitching_df, team_name='', concat=True):
     return df
 
 
-def find_duplicate_rows(df, column_names):
-    #  This function finds duplicate rows in a DataFrame based on a specified column.
-    # Args: df (pandas.DataFrame): The DataFrame to analyze.
-    #   column_names (list): The name of the column containing strings for comparison.
-    # Returns: pandas.DataFrame: A new DataFrame containing only the rows with duplicate string values.
-    filtered_df = df[column_names].dropna()
-    duplicates = filtered_df.duplicated(keep=False)  # keep both rows
-    return df[duplicates]
-
-
 if __name__ == '__main__':
     baseball_data = BaseballStats(load_seasons=[2023], new_season=2024, generate_random_data=False, only_nl_b=False,
                                   load_batter_file='player-stats-Batters.csv',
@@ -480,24 +490,19 @@ if __name__ == '__main__':
     # baseball_data.print_prior_season(teams=teams_to_print)
     # baseball_data.print_prior_season()
     # baseball_data.print_current_season(teams=teams)
-    # print(baseball_data.pitching_data.to_string())  # maintains index numbers
+    print(baseball_data.pitching_data.to_string())  # maintains index numbers
     # print(baseball_data.batting_data.to_string())
     # print(team_batting_totals(baseball_data.batting_data, concat=False).to_string())
 
-    duplicates_df = find_duplicate_rows(baseball_data.batting_data, ['Player'])
-    print(duplicates_df.sort_values(by=['Player']).to_string())
-    print(baseball_data.batting_data.shape)
-    print(duplicates_df.shape)
+    # duplicates_df = find_duplicate_rows(baseball_data.batting_data, ['Player'])
+    # print(duplicates_df.sort_values(by=['Player']).to_string())
+    # print(baseball_data.batting_data.shape)
+    # print(duplicates_df.shape)
 
-    duplicates_df = find_duplicate_rows(baseball_data.pitching_data, ['Player'])
-    print(duplicates_df.sort_values(by=['Player']).to_string())
-    print(baseball_data.pitching_data.shape)
-    print(duplicates_df.shape)
+    # duplicates_df = find_duplicate_rows(baseball_data.pitching_data, ['Player'])
+    # print(duplicates_df.sort_values(by=['Player']).to_string())
+    # print(baseball_data.pitching_data.shape)
+    # print(duplicates_df.shape)
 
-    duplicates_df = find_duplicate_rows(baseball_data.pitching_data, ['Hashcode'])
-    print(duplicates_df.sort_values(by=['Player']).to_string())
-    print(baseball_data.pitching_data.shape)
-    print(duplicates_df.shape)
-
-    df=duplicates_df[['Hashcode', 'G', 'GS', 'CG', 'SHO', 'IP', 'H', 'ER', 'K', 'BB', 'HR', 'W', 'L', 'SV', 'BS', 'HLD']].groupby('Hashcode').sum()
-    print(df.to_string())
+    # df=duplicates_df[['Hashcode', 'G', 'GS', 'CG', 'SHO', 'IP', 'H', 'ER', 'K', 'BB', 'HR', 'W', 'L', 'SV', 'BS', 'HLD']].groupby('Hashcode').sum()
+    # print(df.to_string())

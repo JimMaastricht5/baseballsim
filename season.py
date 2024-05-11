@@ -153,7 +153,7 @@ if __name__ == '__main__':
     # teams = ['CHC', 'CIN', 'COL', 'MIL', 'PIT', 'STL']  # included COL for balance in scheduling
 
     # full season
-    num_games = 162
+    num_games = 16
     only_national_league_teams = False
     interactive_keyboard_pauses = False
     bbseason23 = BaseballSeason(load_seasons=2023, new_season=2024,

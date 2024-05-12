@@ -110,12 +110,17 @@ class BaseballStats:
         duplicates = filtered_df.duplicated(keep=False)  # keep both rows
         return df[duplicates]
 
-    def de_dup_df(self, df, key_name, dup_column_names, stats_cols_to_sum):
+    def get_teams(self, group):
+        return group['Team'].tolist()  # Convert team Series to list
+
+    def de_dup_df(self, df, key_name, dup_column_names, stats_cols_to_sum, drop_dups=False):
         dup_hashcodes = self.find_duplicate_rows(df=df, column_names=dup_column_names)
         for dfrow_key in dup_hashcodes[key_name].to_list():
             df_rows = df.loc[df[key_name]==dfrow_key]
             for dfcol_name in stats_cols_to_sum:
                 df.loc[df[key_name]==dfrow_key, dfcol_name] = df_rows[dfcol_name].sum()
+        if drop_dups:
+            df = df.drop_duplicates(subset='Hashcode', keep='last')
         return df
 
     def get_seasons(self, batter_file, pitcher_file):
@@ -127,7 +132,12 @@ class BaseballStats:
             for season in self.load_seasons:
                 pitching_data = pd.read_csv(str(season) + f" {pitcher_file}")
                 pitching_data['Hashcode'] = pitching_data['Player'].apply(self.create_hash)
-                pitching_data = self.de_dup_df(df=pitching_data, key_name='Hashcode', dup_column_names='Hashcode', stats_cols_to_sum=stats_pcols_sum)
+                # pitching_data['Teams'] = pitching_data.groupby('Hashcode')['Team'].apply(self.get_teams)
+
+                #
+                # df['teams'] = df.groupby('hashcode')['team'].apply(get_teams)
+                pitching_data = self.de_dup_df(df=pitching_data, key_name='Hashcode', dup_column_names='Hashcode',
+                                               stats_cols_to_sum=stats_pcols_sum, drop_dups=True)
                 # dup_hashcodes = self.find_duplicate_rows(df=pitching_data, column_names=['Hashcode'])
                 # for prow_hashcode in dup_hashcodes['Hashcode'].to_list():
                 #     # print(prow_hashcode)
@@ -490,7 +500,7 @@ if __name__ == '__main__':
     # baseball_data.print_prior_season(teams=teams_to_print)
     # baseball_data.print_prior_season()
     # baseball_data.print_current_season(teams=teams)
-    print(baseball_data.pitching_data.to_string())  # maintains index numbers
+    print(baseball_data.pitching_data.sort_values('Hashcode').to_string())  # maintains index numbers
     # print(baseball_data.batting_data.to_string())
     # print(team_batting_totals(baseball_data.batting_data, concat=False).to_string())
 

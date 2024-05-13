@@ -23,15 +23,20 @@ class BaseballStatsPreProcess:
         self.new_season_pitching_data = None
         self.new_season_batting_data = None
         self.get_seasons(load_batter_file, load_pitcher_file)  # get existing data file
-        if generate_random_data:  # generate new data from existing
+        self.generate_random_data = generate_random_data
+        if self.generate_random_data:  # generate new data from existing
             self.randomize_data()  # generate random data
-            self.save_data()
-        # self.create_new_season_from_existing()
+        self.create_new_season_from_existing()
+        self.save_data()
         return
 
     def save_data(self):
-        self.pitching_data.to_csv(f'{self.load_seasons[0]} random-player-stats-Pitching.csv', index=False, header=True)
-        self.batting_data.to_csv(f'{self.load_seasons[0]} random-player-stats-Batters.csv', index=False, header=True)
+        f_pname = 'random-stats-pp-Pitching.csv' if self.generate_random_data else 'stats-pp-Pitching.csv'
+        f_bname = 'random-stats-pp-Batting.csv' if self.generate_random_data else 'stats-pp-Batting.csv'
+        self.pitching_data.to_csv(f'{self.load_seasons[-1]} {f_pname}', index=False, header=True)
+        self.batting_data.to_csv(f'{self.load_seasons[-1]} {f_bname}', index=False, header=True)
+        self.new_season_pitching_data.to_csv(f'{self.new_season} New-Season-{f_pname}', index=False, header=True)
+        self.new_season_batting_data.to_csv(f'{self.new_season} New-Season-{f_bname}', index=False, header=True)
         return
 
     def group_col_to_list(self, df, key_col, col, new_col):
@@ -72,9 +77,12 @@ class BaseballStatsPreProcess:
         return df
 
     def get_pitching_seasons(self, pitcher_file):
-        season = self.load_seasons[0]
+        pitching_data = None
         stats_pcols_sum = ['G', 'GS', 'CG', 'SHO', 'IP', 'H', 'ER', 'K', 'BB', 'HR', 'W', 'L', 'SV', 'BS', 'HLD']
-        pitching_data = pd.read_csv(str(season) + f" {pitcher_file}")
+        for season in self.load_seasons:
+            df = pd.read_csv(str(season) + f" {pitcher_file}")
+            pitching_data = pd.concat([pitching_data, df], axis=0)
+
         pitching_data['Hashcode'] = pitching_data['Player'].apply(self.create_hash)
         if ('League' in pitching_data.columns) is False:  # if no league set one up
             pitching_data['League'] = pitching_data['Team'].apply(lambda x: 'NL' if x in self.nl else 'AL')
@@ -88,7 +96,7 @@ class BaseballStatsPreProcess:
         pitching_data['2B'] = 0
         pitching_data['3B'] = 0
         pitching_data['HBP'] = 0
-        pitching_data['Season'] = str(season)
+        pitching_data['Season'] = str(self.load_seasons)
         pitching_data['OBP'] = pitching_data['WHIP'] / (3 + pitching_data['WHIP'])  # bat reached / number faced
         pitching_data['Total_OB'] = pitching_data['H'] + pitching_data['BB']  # + pitching_data['HBP']
         pitching_data['Total_Outs'] = pitching_data['IP'] * 3  # 3 outs per inning
@@ -102,9 +110,12 @@ class BaseballStatsPreProcess:
         return
 
     def get_batting_seasons(self, batter_file):
-        season = self.load_seasons[0]
+        batting_data = None
         stats_bcols_sum = ['G', 'AB', 'R', 'H', '2B', '3B', 'HR', 'RBI', 'SB', 'CS', 'BB', 'SO', 'SH', 'SF', 'HBP']
-        batting_data = pd.read_csv(str(season) + f" {batter_file}")
+        for season in self.load_seasons:
+            df = pd.read_csv(str(season) + f" {batter_file}")
+            batting_data = pd.concat([batting_data, df], axis=0)
+
         batting_data['Hashcode'] = batting_data['Player'].apply(self.create_hash)
         if ('League' in batting_data.columns) is False:  # if no league set one up
             batting_data['League'] = batting_data['Team'].apply(lambda x: 'NL' if x in self.nl else 'AL')
@@ -114,7 +125,7 @@ class BaseballStatsPreProcess:
                                       stats_cols_to_sum=stats_bcols_sum, drop_dups=True)
         batting_data.set_index(keys=['Hashcode'], drop=True, append=False, inplace=True)
         # set up additional stats
-        batting_data['Season'] = str(season)
+        batting_data['Season'] = str(self.load_seasons)
         batting_data['Total_OB'] = batting_data['H'] + batting_data['BB'] + batting_data['HBP']
         batting_data['Total_Outs'] = batting_data['AB'] - batting_data['H'] + batting_data['HBP']
         batting_data = batting_data[batting_data['AB'] >= 25]  # drop players without enough AB
@@ -207,7 +218,8 @@ class BaseballStatsPreProcess:
         self.new_season_pitching_data[self.numeric_pcols] = \
             self.new_season_pitching_data[self.numeric_pcols].astype('int')
         self.new_season_pitching_data[self.numeric_pcols] = 0
-        self.new_season_pitching_data[['OBP', 'Total_OB', 'Total_Outs', 'AB', 'Injured Days']] = 0
+        self.new_season_pitching_data[['ERA', 'WHIP', 'OBP', 'AVG_faced', 'Total_OB', 'Total_Outs', 'AB',
+                                       'Injured Days']] = 0
         self.new_season_pitching_data['Condition'] = 100
         self.new_season_pitching_data.drop(['Total_OB', 'Total_Outs'], axis=1)
         self.new_season_pitching_data['Season'] = str(self.new_season)
@@ -217,7 +229,7 @@ class BaseballStatsPreProcess:
 
         self.new_season_batting_data = self.batting_data.copy()
         self.new_season_batting_data[self.numeric_bcols] = 0
-        self.new_season_batting_data[['Total_OB', 'Total_Outs', 'Injured Days']] = 0  # zero out calculated fields
+        self.new_season_batting_data[['AVG', 'OBP', 'SLG', 'OPS', 'Total_OB', 'Total_Outs', 'Injured Days']] = 0
         self.new_season_batting_data['Condition'] = 100
         self.new_season_batting_data.drop(['Total_OB', 'Total_Outs'], axis=1)
         self.new_season_batting_data['Season'] = str(self.new_season)
@@ -236,4 +248,6 @@ if __name__ == '__main__':
     print(*baseball_data.batting_data.columns)
     print(baseball_data.batting_data.Team.unique())
     # print(baseball_data.batting_data.Mascot.unique())
-    print(baseball_data.pitching_data.sort_values('Hashcode').to_string())  # maintains index numbers
+    print(baseball_data.pitching_data.sort_values('Hashcode').to_string())
+    print(baseball_data.batting_data.sort_values('Hashcode').to_string())
+    print(baseball_data.new_season_pitching_data.sort_values('Hashcode').to_string())

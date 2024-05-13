@@ -333,12 +333,8 @@ if __name__ == '__main__':
                     chatty=True, print_lineup=True,
                     print_box_score_b=True,
                     load_seasons=2023, new_season=2024,
-                    # starting_pitchers=[2, 38],
-                    # starting_lineups=[None, MIL_lineup],
-                    load_batter_file='player-stats-Batters.csv',
-                    load_pitcher_file='player-stats-Pitching.csv',
-                    # load_batter_file='random-player-stats-Batters.csv',
-                    # load_pitcher_file='random-player-stats-Pitching.csv'
+                    load_batter_file='stats-pp-Batting.csv',
+                    load_pitcher_file='stats-pp-Pitching.csv',
                     interactive=True,
                     show_bench=True
                     )

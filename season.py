@@ -12,8 +12,8 @@ HOME = 1
 class BaseballSeason:
     def __init__(self, load_seasons, new_season, team_list=None, season_length_limit=0, min_games=0, series_length=1,
                  rotation_len=5, only_nl_b=False, interactive=False,
-                 load_batter_file='player-stats-Batters.csv',
-                 load_pitcher_file='player-stats-Pitching.csv'):
+                 load_batter_file='stats-pp-Batting.csv',
+                 load_pitcher_file='stats-pp-Pitching.csv'):
         self.season_length_limit = season_length_limit  # zero mean there is no limit, based on schedule parameters
         self.min_games = min_games
         self.series_length = series_length
@@ -161,8 +161,8 @@ if __name__ == '__main__':
                                 min_games=num_games, series_length=3, rotation_len=5,
                                 only_nl_b=only_national_league_teams,
                                 interactive=interactive_keyboard_pauses,
-                                load_batter_file='player-stats-Batters.csv',
-                                load_pitcher_file='player-stats-Pitching.csv')
+                                load_batter_file='stats-pp-Batting.csv',
+                                load_pitcher_file='stats-pp-Pitching.csv')
     # team_to_follow = bbseason23.teams[0]  # follow the first team in the random set
     my_teams_to_follow = 'MIL'  # or follow no team
     bbseason23.sim_season(season_chatty=False,

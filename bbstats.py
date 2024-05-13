@@ -2,17 +2,16 @@ import pandas as pd
 import random
 import city_names as city
 import numpy as np
-import hashlib
 
 
 class BaseballStats:
-    def __init__(self, load_seasons, new_season, generate_random_data=False, only_nl_b=False,
-                 load_batter_file='player-stats-Batters.csv', load_pitcher_file='player-stats-Pitching.csv'):
+    def __init__(self, load_seasons, new_season, only_nl_b=False,
+                 load_batter_file='stats-pp-Batting.csv', load_pitcher_file='stats-pp-Pitching.csv'):
 
         self.rnd = lambda: np.random.default_rng().uniform(low=0.0, high=1.001)  # random generator between 0 and 1
 
-        # create hash from a string, take first x digits and return an integer representation
-        self.create_hash = lambda text: int(hashlib.sha256(text.encode('utf-8')).hexdigest()[:5], 16)
+        # # create hash from a string, take first x digits and return an integer representation
+        # self.create_hash = lambda text: int(hashlib.sha256(text.encode('utf-8')).hexdigest()[:5], 16)
 
         self.numeric_bcols = ['G', 'AB', 'R', 'H', '2B', '3B', 'HR', 'RBI', 'SB', 'CS', 'BB', 'SO', 'SH', 'SF',
                               'HBP', 'Condition']  # these cols will get added to running season total
@@ -27,17 +26,13 @@ class BaseballStats:
         self.injury_cols_to_print = ['Player', 'Team', 'Age', 'Status', 'Days Remaining']  # Days Remaining to see time
         self.nl = ['CHC', 'CIN', 'MIL', 'PIT', 'STL', 'ATL', 'MIA', 'NYM', 'PHI', 'WAS', 'AZ', 'COL', 'LA', 'SD', 'SF']
         self.only_nl_b = only_nl_b
-        self.load_seasons = load_seasons  # list of seasons to load from csv files
+        self.load_seasons = [load_seasons] if not isinstance(load_seasons, list) else load_seasons
         self.new_season = new_season
         self.pitching_data = None
         self.batting_data = None
         self.new_season_pitching_data = None
         self.new_season_batting_data = None
         self.get_seasons(load_batter_file, load_pitcher_file)  # get existing data file
-        if generate_random_data:  # generate new data from existing
-            self.randomize_data()  # generate random data
-            self.save_data()
-        self.create_new_season_from_existing()
 
         # ***************** game to game stats and settings for injury and rest
         # condition and injury odds
@@ -96,104 +91,25 @@ class BaseballStats:
                 # df.set_index(keys=['Hashcode'], drop=False, append=False, inplace=True)
         return df
 
-    def save_data(self):
-        self.pitching_data.to_csv(f'{self.load_seasons[0]} random-player-stats-Pitching.csv', index=False, header=True)
-        self.batting_data.to_csv(f'{self.load_seasons[0]} random-player-stats-Batters.csv', index=False, header=True)
-        return
-
-    def find_duplicate_rows(self, df, column_names):
-        #  This function finds duplicate rows in a DataFrame based on a specified column.
-        # Args: df (pandas.DataFrame): The DataFrame to analyze.
-        #   column_names (list): The name of the column containing strings for comparison.
-        # Returns: pandas.DataFrame: A new DataFrame containing only the rows with duplicate string values.
-        filtered_df = df[column_names].dropna()
-        duplicates = filtered_df.duplicated(keep=False)  # keep both rows
-        return df[duplicates]
-
-    def get_teams(self, group):
-        return group['Team'].tolist()  # Convert team Series to list
-
-    def de_dup_df(self, df, key_name, dup_column_names, stats_cols_to_sum, drop_dups=False):
-        dup_hashcodes = self.find_duplicate_rows(df=df, column_names=dup_column_names)
-        for dfrow_key in dup_hashcodes[key_name].to_list():
-            df_rows = df.loc[df[key_name]==dfrow_key]
-            for dfcol_name in stats_cols_to_sum:
-                df.loc[df[key_name]==dfrow_key, dfcol_name] = df_rows[dfcol_name].sum()
-        if drop_dups:
-            df = df.drop_duplicates(subset='Hashcode', keep='last')
-        return df
-
     def get_seasons(self, batter_file, pitcher_file):
-        stats_bcols_sum = ['G', 'AB', 'R', 'H', '2B', '3B', 'HR', 'RBI', 'SB', 'CS', 'BB', 'SO', 'SH', 'SF', 'HBP']
-        stats_pcols_sum = ['G', 'GS', 'CG', 'SHO', 'IP', 'H', 'ER', 'K', 'BB', 'HR', 'W', 'L', 'SV', 'BS', 'HLD']
-        if self.pitching_data is None or self.batting_data is None:  # need to read data... else skip as cached
-            if not isinstance(self.load_seasons, list):
-                self.load_seasons = [self.load_seasons]  # convert to list if a single value
-            for season in self.load_seasons:
-                pitching_data = pd.read_csv(str(season) + f" {pitcher_file}")
-                pitching_data['Hashcode'] = pitching_data['Player'].apply(self.create_hash)
-                # pitching_data['Teams'] = pitching_data.groupby('Hashcode')['Team'].apply(self.get_teams)
+        new_pitcher_file = 'New-Season-' + pitcher_file
+        new_batter_file = 'New-Season-' + batter_file
+        try:
+            if self.pitching_data is None or self.batting_data is None:  # need to read data... else skip as cached
+                self.pitching_data = pd.read_csv(str(self.load_seasons[-1]) + f" {pitcher_file}")
+                self.batting_data = pd.read_csv(str(self.load_seasons[-1]) + f" {batter_file}")
 
-                #
-                # df['teams'] = df.groupby('hashcode')['team'].apply(get_teams)
-                pitching_data = self.de_dup_df(df=pitching_data, key_name='Hashcode', dup_column_names='Hashcode',
-                                               stats_cols_to_sum=stats_pcols_sum, drop_dups=True)
-                # dup_hashcodes = self.find_duplicate_rows(df=pitching_data, column_names=['Hashcode'])
-                # for prow_hashcode in dup_hashcodes['Hashcode'].to_list():
-                #     # print(prow_hashcode)
-                #     df_rows = pitching_data.loc[pitching_data['Hashcode']==prow_hashcode]
-                #     for pcol_name in stats_pcols_sum:
-                #         pitching_data.loc[pitching_data['Hashcode']==prow_hashcode, pcol_name] = df_rows[pcol_name].sum()
+            if self.new_season_pitching_data is None or self.new_season_batting_data is None:
+                self.new_season_pitching_data = pd.read_csv(str(self.new_season) + f" {new_pitcher_file}")
+                self.new_season_batting_data = pd.read_csv(str(self.new_season) + f" {new_batter_file}")
+        except FileNotFoundError as e:
+            print(e)
+            print(f'file was not found, correct spelling or try running bbstats_preprocess.py to setup the data')
+            exit(1)  # stop the program
 
-                # pitching_data.set_index(keys=['Hashcode'], drop=False, append=False, inplace=True)
-                # pitching_data.index += 1  # used to avoid 0 index, no longer needed
-                pitching_data['AB'] = pitching_data['IP'] * 3 + pitching_data['H']
-                pitching_data['2B'] = 0
-                pitching_data['3B'] = 0
-                pitching_data['HBP'] = 0
-                pitching_data['Season'] = str(season)
-                pitching_data['OBP'] = pitching_data['WHIP'] / (3 + pitching_data['WHIP'])  # bat reached / number faced
-                pitching_data['Total_OB'] = pitching_data['H'] + pitching_data['BB']  # + pitching_data['HBP']
-                pitching_data['Total_Outs'] = pitching_data['IP'] * 3  # 3 outs per inning
-                pitching_data = pitching_data[pitching_data['IP'] >= 10]  # drop pitchers without enough innings
-                pitching_data['AVG_faced'] = (pitching_data['Total_OB'] + pitching_data['Total_Outs']) / pitching_data.G
-                pitching_data['Game_Fatigue_Factor'] = 0
-                pitching_data['Condition'] = 100
-                pitching_data['Status'] = 'Active'  # DL or active
-                pitching_data['Injured Days'] = 0  # days to spend in IL
-                if ('League' in pitching_data.columns) is False:  # if no league set one up
-                    pitching_data['League'] = \
-                        pitching_data['Team'].apply(lambda x: 'NL' if x in self.nl else 'AL')
-
-                batting_data = pd.read_csv(str(season) + f" {batter_file}")
-                batting_data['Hashcode'] = batting_data['Player'].apply(self.create_hash)
-                # batting_data.set_index(keys=['Hashcode', 'Team'], drop=False, append=False, inplace=True)
-                # batting_data.set_index(keys=['Hashcode'], drop=False, append=False, inplace=True)
-                batting_data.index += 1  # used to avoid zero index no longer needed
-                batting_data['Season'] = str(season)
-                batting_data['Total_OB'] = batting_data['H'] + batting_data['BB'] + batting_data['HBP']
-                batting_data['Total_Outs'] = batting_data['AB'] - batting_data['H'] + batting_data['HBP']
-                batting_data = batting_data[batting_data['AB'] >= 25]  # drop players without enough AB
-                batting_data['Game_Fatigue_Factor'] = 0
-                batting_data['Condition'] = 100
-                batting_data['Status'] = 'Active'  # DL or active
-                batting_data['Injured Days'] = 0
-                if ('League' in batting_data.columns) is False:
-                    batting_data['League'] = \
-                        batting_data['Team'].apply(lambda league: 'NL' if league in self.nl else 'AL')
-
-                if self.pitching_data is None:
-                    self.pitching_data = pitching_data
-                    self.batting_data = batting_data
-                else:
-                    # self.pitching_data = pd.concat([self.pitching_data, pitching_data])
-                    # self.batting_data = pd.concat([self.batting_data, batting_data])
-                    self.pitching_data = self.pitching_data[self.numeric_pcols] + pitching_data[self.numeric_pcols]
-                    self.batting_data = self.batting_data[self.numeric_bcols] + batting_data[self.numeric_bcols]
-
-                if self.only_nl_b:
-                    self.pitching_data = self.pitching_data[self.pitching_data['Team'].isin(self.nl)]
-                    self.batting_data = self.batting_data[self.batting_data['Team'].isin(self.nl)]
+        if self.only_nl_b:
+            self.pitching_data = self.pitching_data[self.pitching_data['Team'].isin(self.nl)]
+            self.batting_data = self.batting_data[self.batting_data['Team'].isin(self.nl)]
         return
 
     def randomize_data(self):
@@ -249,33 +165,6 @@ class BaseballStats:
         df.reset_index(inplace=True, drop=True)  # clear duplicate index error, should not happen but leave this alone!
         self.batting_data['Player'] = df['Player'][0:self.batting_data.shape[0] + 1]
         self.pitching_data['Player'] = df['Player'][0:self.pitching_data.shape[0] + 1]
-        return
-
-    def create_new_season_from_existing(self):
-        if self.pitching_data is None or self.batting_data is None:
-            raise Exception('load at least one season of pitching and batting')
-
-        self.new_season_pitching_data = self.pitching_data.copy()
-        self.new_season_pitching_data[self.numeric_pcols] = \
-            self.new_season_pitching_data[self.numeric_pcols].astype('int')
-        self.new_season_pitching_data[self.numeric_pcols] = 0
-        self.new_season_pitching_data[['OBP', 'Total_OB', 'Total_Outs', 'AB', 'Injured Days']] = 0
-        self.new_season_pitching_data['Condition'] = 100
-        self.new_season_pitching_data.drop(['Total_OB', 'Total_Outs'], axis=1)
-        self.new_season_pitching_data['Season'] = str(self.new_season)
-        if self.new_season not in self.load_seasons:  # add a year to age if it is the next season
-            self.new_season_pitching_data['Age'] = self.new_season_pitching_data['Age'] + 1  # everyone is a year older
-        self.new_season_pitching_data.fillna(0)
-
-        self.new_season_batting_data = self.batting_data.copy()
-        self.new_season_batting_data[self.numeric_bcols] = 0
-        self.new_season_batting_data[['Total_OB', 'Total_Outs', 'Injured Days']] = 0  # zero out calculated fields
-        self.new_season_batting_data['Condition'] = 100
-        self.new_season_batting_data.drop(['Total_OB', 'Total_Outs'], axis=1)
-        self.new_season_batting_data['Season'] = str(self.new_season)
-        if self.new_season not in self.load_seasons:  # add a year to age if it is the next season
-            self.new_season_batting_data['Age'] = self.new_season_batting_data['Age'] + 1  # everyone is a year older
-        self.new_season_batting_data = self.new_season_batting_data.fillna(0)
         return
 
     def game_results_to_season(self, box_score_class):
@@ -486,9 +375,9 @@ def team_pitching_totals(pitching_df, team_name='', concat=True):
 
 
 if __name__ == '__main__':
-    baseball_data = BaseballStats(load_seasons=[2023], new_season=2024, generate_random_data=False, only_nl_b=False,
-                                  load_batter_file='player-stats-Batters.csv',
-                                  load_pitcher_file='player-stats-Pitching.csv')
+    baseball_data = BaseballStats(load_seasons=[2023], new_season=2024, only_nl_b=False,
+                                  load_batter_file='stats-pp-Batting.csv',
+                                  load_pitcher_file='stats-pp-Pitching.csv')
     # baseball_data.print_season(df_b=baseball_data.batting_data, df_p=baseball_data.pitching_data,
     # teams=['MIL', 'ARI'])
     print(*baseball_data.pitching_data.columns)
@@ -500,19 +389,6 @@ if __name__ == '__main__':
     # baseball_data.print_prior_season(teams=teams_to_print)
     # baseball_data.print_prior_season()
     # baseball_data.print_current_season(teams=teams)
-    print(baseball_data.pitching_data.sort_values('Hashcode').to_string())  # maintains index numbers
+    print(baseball_data.pitching_data.to_string())  # maintains index numbers
     # print(baseball_data.batting_data.to_string())
     # print(team_batting_totals(baseball_data.batting_data, concat=False).to_string())
-
-    # duplicates_df = find_duplicate_rows(baseball_data.batting_data, ['Player'])
-    # print(duplicates_df.sort_values(by=['Player']).to_string())
-    # print(baseball_data.batting_data.shape)
-    # print(duplicates_df.shape)
-
-    # duplicates_df = find_duplicate_rows(baseball_data.pitching_data, ['Player'])
-    # print(duplicates_df.sort_values(by=['Player']).to_string())
-    # print(baseball_data.pitching_data.shape)
-    # print(duplicates_df.shape)
-
-    # df=duplicates_df[['Hashcode', 'G', 'GS', 'CG', 'SHO', 'IP', 'H', 'ER', 'K', 'BB', 'HR', 'W', 'L', 'SV', 'BS', 'HLD']].groupby('Hashcode').sum()
-    # print(df.to_string())

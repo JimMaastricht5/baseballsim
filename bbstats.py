@@ -170,19 +170,20 @@ class BaseballStats:
     def game_results_to_season(self, box_score_class):
         batting_box_score = box_score_class.get_batter_game_stats()
         pitching_box_score = box_score_class.get_pitcher_game_stats()
-        numeric_cols = self.numeric_bcols
+        # numeric_cols = self.numeric_bcols
         for index, row in batting_box_score.iterrows():
-            new_row = batting_box_score.loc[index][numeric_cols] + self.new_season_batting_data.loc[index][numeric_cols]
+            new_row = batting_box_score.loc[index][self.numeric_bcols] + \
+                      self.new_season_batting_data.loc[index][self.numeric_bcols]
             new_row['Condition'] = batting_box_score.loc[index, 'Condition']
             new_row['Injured Days'] = batting_box_score.loc[index, 'Injured Days']
-            self.new_season_batting_data.loc[index, numeric_cols] = new_row
-        numeric_cols = self.numeric_pcols
+            self.new_season_batting_data.loc[index, self.numeric_bcols] = new_row
+        # numeric_cols = self.numeric_pcols
         for index, row in pitching_box_score.iterrows():
-            new_row = pitching_box_score.loc[index][numeric_cols] + \
-                      self.new_season_pitching_data.loc[index][numeric_cols]
+            new_row = pitching_box_score.loc[index][self.numeric_pcols] + \
+                      self.new_season_pitching_data.loc[index][self.numeric_pcols]
             new_row['Condition'] = pitching_box_score.loc[index, 'Condition']
             new_row['Injured Days'] = pitching_box_score.loc[index, 'Injured Days']
-            self.new_season_pitching_data.loc[index, numeric_cols] = new_row
+            self.new_season_pitching_data.loc[index, self.numeric_pcols] = new_row
         return
 
     def is_injured(self):

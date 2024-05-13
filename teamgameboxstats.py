@@ -40,22 +40,16 @@ class TeamBoxScore:
     def pitching_result(self, pitcher_index, outcomes, condition):
         outcomes.convert_k()
         row = self.box_pitching.loc[pitcher_index]
-        if outcomes.score_book_cd != 'BB':  # Handle walks
-            row['AB'] += 1
+        row['AB'] += (outcomes.score_book_cd != 'BB')  # add 1 if true
         if not outcomes.on_base_b:  # Handle outs
             row['Total_Outs'] += outcomes.outs_on_play
             row['IP'] = float(row['Total_Outs'] / 3)
         if outcomes.score_book_cd in ['H', '2B', '3B', 'HR', 'K', 'BB', 'HBP']:  # Handle plate appearance
             row[outcomes.score_book_cd] += 1
-        # Increment hit count if OB, not a walk, and not a single
-        if outcomes.score_book_cd not in ['BB', 'H'] and outcomes.on_base_b:
-            row['H'] += 1
-        # Update runs scored and condition
+        row['H'] += (outcomes.score_book_cd not in ['BB', 'H'] and outcomes.on_base_b)  # add 1 if true else 0
         row['ER'] += outcomes.runs_scored
         row['Condition'] = condition
-        # Write the row back to the DataFrame
-        self.box_pitching.loc[pitcher_index] = row
-        # print(f'teamgameboxstats pitching_results {self.box_pitching.loc[pitcher_index]}')
+        self.box_pitching.loc[pitcher_index] = row  # Write the row back to the DataFrame
         return
 
     def add_pitcher_to_box(self, new_pitcher):

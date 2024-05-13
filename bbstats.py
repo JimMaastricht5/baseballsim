@@ -96,12 +96,12 @@ class BaseballStats:
         new_batter_file = 'New-Season-' + batter_file
         try:
             if self.pitching_data is None or self.batting_data is None:  # need to read data... else skip as cached
-                self.pitching_data = pd.read_csv(str(self.load_seasons[-1]) + f" {pitcher_file}")
-                self.batting_data = pd.read_csv(str(self.load_seasons[-1]) + f" {batter_file}")
+                self.pitching_data = pd.read_csv(str(self.load_seasons[-1]) + f" {pitcher_file}", index_col=0)
+                self.batting_data = pd.read_csv(str(self.load_seasons[-1]) + f" {batter_file}", index_col=0)
 
             if self.new_season_pitching_data is None or self.new_season_batting_data is None:
-                self.new_season_pitching_data = pd.read_csv(str(self.new_season) + f" {new_pitcher_file}")
-                self.new_season_batting_data = pd.read_csv(str(self.new_season) + f" {new_batter_file}")
+                self.new_season_pitching_data = pd.read_csv(str(self.new_season) + f" {new_pitcher_file}", index_col=0)
+                self.new_season_batting_data = pd.read_csv(str(self.new_season) + f" {new_batter_file}", index_col=0)
         except FileNotFoundError as e:
             print(e)
             print(f'file was not found, correct spelling or try running bbstats_preprocess.py to setup the data')

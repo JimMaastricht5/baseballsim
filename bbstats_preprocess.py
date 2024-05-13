@@ -33,10 +33,10 @@ class BaseballStatsPreProcess:
     def save_data(self):
         f_pname = 'random-stats-pp-Pitching.csv' if self.generate_random_data else 'stats-pp-Pitching.csv'
         f_bname = 'random-stats-pp-Batting.csv' if self.generate_random_data else 'stats-pp-Batting.csv'
-        self.pitching_data.to_csv(f'{self.load_seasons[-1]} {f_pname}', index=False, header=True)
-        self.batting_data.to_csv(f'{self.load_seasons[-1]} {f_bname}', index=False, header=True)
-        self.new_season_pitching_data.to_csv(f'{self.new_season} New-Season-{f_pname}', index=False, header=True)
-        self.new_season_batting_data.to_csv(f'{self.new_season} New-Season-{f_bname}', index=False, header=True)
+        self.pitching_data.to_csv(f'{self.load_seasons[-1]} {f_pname}', index=True, header=True)
+        self.batting_data.to_csv(f'{self.load_seasons[-1]} {f_bname}', index=True, header=True)
+        self.new_season_pitching_data.to_csv(f'{self.new_season} New-Season-{f_pname}', index=True, header=True)
+        self.new_season_batting_data.to_csv(f'{self.new_season} New-Season-{f_bname}', index=True, header=True)
         return
 
     def group_col_to_list(self, df, key_col, col, new_col):

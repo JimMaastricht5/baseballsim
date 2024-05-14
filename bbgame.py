@@ -143,14 +143,16 @@ class Game:
         # if switch due to save or close game, don't switch again in same inning
         if (self.teams[self.team_pitching()].is_pitcher_fatigued(pitching.Condition) and self.outs < 3) or \
                 (pitch_switch is False and (self.close_game() or self.save_sit())):
+            prior_pitcher = self.teams[self.team_pitching()]
             self.teams[self.team_pitching()].pitching_change(inning=self.inning[self.team_hitting()],
                                                              score_diff=self.score_difference())
-            pitching = self.teams[self.team_pitching()].cur_pitcher_stats()  # data for new pitcher
-            pitch_switch = True
-            self.is_save_sit[self.team_pitching()] = self.save_sit()
-            if self.chatty:
-                print(f'\tManager has made the call to the bull pen.  Pitching change....')
-                print(f'\t{pitching.Player} has entered the game for {self.team_names[self.team_pitching()]}')
+            if prior_pitcher != self.teams[self.team_pitching()]:  # we are switching pitchers
+                pitching = self.teams[self.team_pitching()].cur_pitcher_stats()  # data for new pitcher
+                pitch_switch = True  # we switched pitcher this inning
+                self.is_save_sit[self.team_pitching()] = self.save_sit()
+                if self.chatty and pitch_switch:
+                    print(f'\tManager has made the call to the bull pen.  Pitching change....')
+                    print(f'\t{pitching.Player} has entered the game for {self.team_names[self.team_pitching()]}')
         return pitch_switch
 
     def stolen_base_sit(self):

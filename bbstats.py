@@ -24,7 +24,7 @@ class BaseballStats:
                                'SB', 'CS', 'BB', 'SO', 'SH', 'SF', 'HBP', 'AVG', 'OBP', 'SLG',
                                'OPS', 'Status', 'Injured Days', 'Condition']
         self.injury_cols_to_print = ['Player', 'Team', 'Age', 'Status', 'Days Remaining']  # Days Remaining to see time
-        self.nl = ['CHC', 'CIN', 'MIL', 'PIT', 'STL', 'ATL', 'MIA', 'NYM', 'PHI', 'WAS', 'AZ', 'COL', 'LA', 'SD', 'SF']
+        self.nl = ['CHC', 'CIN', 'MIL', 'PIT', 'STL', 'ATL', 'MIA', 'NYM', 'PHI', 'WSH', 'AZ', 'COL', 'LA', 'SD', 'SF']
         self.only_nl_b = only_nl_b
         self.load_seasons = [load_seasons] if not isinstance(load_seasons, list) else load_seasons
         self.new_season = new_season
@@ -62,12 +62,16 @@ class BaseballStats:
         return
 
     def get_batting_data(self, team_name=None, prior_season=True):
+        # print(f'bbstats.py get_batting_data')
         if team_name is None:
             df = self.batting_data if prior_season else self.new_season_batting_data
         else:
             df_new = self.new_season_batting_data[self.new_season_batting_data['Team'] == team_name]
             df_cur = self.batting_data[self.batting_data.index.isin(df_new.index)]
             df = df_cur if prior_season else df_new
+            # print(f'bbstats.py get_batting_data new season for {team_name} {df_new}')
+            # print(f'bbstats.py get_batting_data prior season for {team_name} {df_cur}')
+            # print(f'bbstats.py get_batting_data returned df {team_name} {df}')
         return df
 
     def get_pitching_data(self, team_name=None, prior_season=True):

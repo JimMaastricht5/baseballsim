@@ -319,8 +319,8 @@ class Game:
 if __name__ == '__main__':
     startdt = datetime.datetime.now()
 
-    away_team = 'BAL'
-    home_team = 'ATL'
+    away_team = 'WSH'
+    home_team = 'LAD'
     # away_team = 'SAN'
     # home_team = 'TEM'
     # MIL_lineup = {65: 'LF', 71: 'C', 336: '1B', 369: 'DH', 355: 'CF', 62: 'SS', 536: '3B', 154: '2B', 310: 'RF'}

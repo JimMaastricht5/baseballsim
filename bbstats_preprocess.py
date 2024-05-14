@@ -6,7 +6,7 @@ import hashlib
 
 
 class BaseballStatsPreProcess:
-    def __init__(self, load_seasons, new_season=None, generate_random_data=False, only_nl_b=False,
+    def __init__(self, load_seasons, new_season=None, generate_random_data=False,
                  load_batter_file='player-stats-Batters.csv', load_pitcher_file='player-stats-Pitching.csv'):
         self.create_hash = lambda text: int(hashlib.sha256(text.encode('utf-8')).hexdigest()[:5], 16)
 
@@ -14,8 +14,9 @@ class BaseballStatsPreProcess:
                               'HBP', 'Condition']  # these cols will get added to running season total
         self.numeric_pcols = ['G', 'GS', 'CG', 'SHO', 'IP', 'AB', 'H', '2B', '3B', 'HR', 'ER', 'K', 'BB', 'W', 'L',
                               'SV', 'BS', 'HLD', 'Total_Outs', 'Condition']  # cols will add to running season total
-        self.nl = ['CHC', 'CIN', 'MIL', 'PIT', 'STL', 'ATL', 'MIA', 'NYM', 'PHI', 'WAS', 'AZ', 'COL', 'LA', 'SD', 'SF']
-        self.only_nl_b = only_nl_b
+        self.nl = ['CHC', 'CIN', 'MIL', 'PIT', 'STL', 'ATL', 'MIA', 'NYM', 'PHI', 'WAS', 'WSH', 'AZ', 'COL', 'LA',
+                   'SD', 'SF']  # keep old and new abrrev for WAS/WSH
+        self.name_changes = {'WAS': 'WSH'}
         self.load_seasons = [load_seasons] if not isinstance(load_seasons, list) else load_seasons
         self.new_season = new_season
         self.pitching_data = None
@@ -27,7 +28,7 @@ class BaseballStatsPreProcess:
         if self.generate_random_data:  # generate new data from existing
             self.randomize_data()  # generate random data
         if new_season is not None:
-            self.create_new_season_from_existing()
+            self.create_new_season_from_existing(load_batter_file, load_pitcher_file)
         self.save_data()
         return
 
@@ -81,10 +82,10 @@ class BaseballStatsPreProcess:
             df = df.drop_duplicates(subset='Hashcode', keep='last')
         return df
 
-    def get_pitching_seasons(self, pitcher_file):
+    def get_pitching_seasons(self, pitcher_file, load_seasons):
         pitching_data = None
         stats_pcols_sum = ['G', 'GS', 'CG', 'SHO', 'IP', 'H', 'ER', 'K', 'BB', 'HR', 'W', 'L', 'SV', 'BS', 'HLD']
-        for season in self.load_seasons:
+        for season in load_seasons:
             df = pd.read_csv(str(season) + f" {pitcher_file}")
             pitching_data = pd.concat([pitching_data, df], axis=0)
 
@@ -101,7 +102,7 @@ class BaseballStatsPreProcess:
         pitching_data['2B'] = 0
         pitching_data['3B'] = 0
         pitching_data['HBP'] = 0
-        pitching_data['Season'] = str(self.load_seasons)
+        pitching_data['Season'] = str(load_seasons)
         pitching_data['OBP'] = pitching_data['WHIP'] / (3 + pitching_data['WHIP'])  # bat reached / number faced
         pitching_data['Total_OB'] = pitching_data['H'] + pitching_data['BB']  # + pitching_data['HBP']
         pitching_data['Total_Outs'] = pitching_data['IP'] * 3  # 3 outs per inning
@@ -111,13 +112,12 @@ class BaseballStatsPreProcess:
         pitching_data['Condition'] = 100
         pitching_data['Status'] = 'Active'  # DL or active
         pitching_data['Injured Days'] = 0  # days to spend in IL
-        self.pitching_data = pitching_data
-        return
+        return pitching_data
 
-    def get_batting_seasons(self, batter_file):
+    def get_batting_seasons(self, batter_file, load_seasons):
         batting_data = None
         stats_bcols_sum = ['G', 'AB', 'R', 'H', '2B', '3B', 'HR', 'RBI', 'SB', 'CS', 'BB', 'SO', 'SH', 'SF', 'HBP']
-        for season in self.load_seasons:
+        for season in load_seasons:
             df = pd.read_csv(str(season) + f" {batter_file}")
             batting_data = pd.concat([batting_data, df], axis=0)
 
@@ -130,7 +130,7 @@ class BaseballStatsPreProcess:
                                       stats_cols_to_sum=stats_bcols_sum, drop_dups=True)
         batting_data.set_index(keys=['Hashcode'], drop=True, append=False, inplace=True)
         # set up additional stats
-        batting_data['Season'] = str(self.load_seasons)
+        batting_data['Season'] = str(load_seasons)
         batting_data['OBP'] = self.trunc_col(np.nan_to_num(np.divide(batting_data['H'] + batting_data['BB'] +
                                                                      batting_data['HBP'], batting_data['AB'] +
                                                                      batting_data['BB'] + batting_data['HBP']),
@@ -153,15 +153,14 @@ class BaseballStatsPreProcess:
             batting_data['League'] = \
                 batting_data['Team'].apply(lambda league: 'NL' if league in self.nl else 'AL')
 
-        self.batting_data = batting_data
-        return
+        return batting_data
 
     def get_seasons(self, batter_file, pitcher_file):
-        self.get_pitching_seasons(pitcher_file)
-        self.get_batting_seasons(batter_file)
-        if self.only_nl_b:
-            self.pitching_data = self.pitching_data[self.pitching_data['Team'].isin(self.nl)]
-            self.batting_data = self.batting_data[self.batting_data['Team'].isin(self.nl)]
+        self.pitching_data = self.get_pitching_seasons(pitcher_file, self.load_seasons)
+        self.batting_data = self.get_batting_seasons(batter_file, self.load_seasons)
+        for team in self.name_changes.keys():
+            self.pitching_data[self.pitching_data['Team'] == team]['Team'] = self.name_changes[team]
+            self.batting_data[self.batting_data['Team'] == team]['Team'] = self.name_changes[team]
         return
 
     def randomize_data(self):
@@ -226,12 +225,12 @@ class BaseballStatsPreProcess:
         self.pitching_data['Player'] = df['Player'][0:self.pitching_data.shape[0] + 1]
         return
 
-    def create_new_season_from_existing(self):
+    def create_new_season_from_existing(self, load_batter_file, load_pitcher_file):
         if self.pitching_data is None or self.batting_data is None:
             raise Exception('load at least one season of pitching and batting')
-        if self.load_seasons[0] == self.new_season:
-            self.new_season_pitching_data = self.pitching_data
-            self.new_season_batting_data = self.batting_data
+        if self.load_seasons[-1] == self.new_season:  # blend of partial season, load new season from file
+            self.new_season_pitching_data = self.get_pitching_seasons(load_pitcher_file, [self.new_season])
+            self.new_season_batting_data = self.get_batting_seasons(load_batter_file, [self.new_season])
         else:
             self.new_season_pitching_data = self.pitching_data.copy()
             self.new_season_pitching_data[self.numeric_pcols] = \
@@ -264,7 +263,6 @@ class BaseballStatsPreProcess:
 if __name__ == '__main__':
     baseball_data = BaseballStatsPreProcess(load_seasons=[2022, 2023, 2024], new_season=2024,
                                             generate_random_data=False,
-                                            only_nl_b=False,
                                             load_batter_file='player-stats-Batters.csv',
                                             load_pitcher_file='player-stats-Pitching.csv')
     print(*baseball_data.pitching_data.columns)

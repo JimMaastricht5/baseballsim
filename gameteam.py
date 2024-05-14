@@ -305,8 +305,8 @@ class Team:
                 df_player_num = self.search_for_pos('DH', lineup_index_list, stat_criteria)  # do not grab the same player
         except:
             print(f'Error in gameteam.py search_for_pos with pos {position}')
-            print(df_players)
-            print(self.prior_season_pos_players_df)
+            print(f'avaiable players {df_players}')
+            print(f'prior season df {self.prior_season_pos_players_df}')
             exit(1)
         return df_players.head(1).index[0] if df_player_num is None else df_player_num  # pick top player at pos
 

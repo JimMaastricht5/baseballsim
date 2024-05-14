@@ -295,16 +295,20 @@ class Team:
             df_player_num = None
             not_exhausted = ~(self.prior_season_pos_players_df['Condition'] <= self.fatigue_unavailable)
             not_injured = (self.prior_season_pos_players_df['Injured Days'] == 0)
-            df_criteria = (~self.prior_season_pos_players_df.index.isin(lineup_index_list) &
-                           (self.prior_season_pos_players_df['Pos'] == position)) if (
-                        position != 'DH' and position != '1B') else \
+            df_criteria_pos = (~self.prior_season_pos_players_df.index.isin(lineup_index_list) &
+                              (self.prior_season_pos_players_df['Pos'] == position)) if (
+                               position != 'DH' and position != '1B') else \
                 ~self.prior_season_pos_players_df.index.isin(lineup_index_list)
-            df_criteria = df_criteria & not_exhausted & not_injured
+            df_criteria = df_criteria_pos & not_exhausted & not_injured
             df_players = self.prior_season_pos_players_df[df_criteria].sort_values(stat_criteria, ascending=False)
-            if len(df_players) == 0:  # missing player at pos, pick best remaining player
-                df_player_num = self.search_for_pos('DH', lineup_index_list, stat_criteria)  # do not grab the same player
+            if len(df_players) == 0:  # missing player at pos, pick best available stat, or best condition
+                if position != 'DH':
+                    df_player_num = self.search_for_pos('DH', lineup_index_list, stat_criteria)  # dont grab same player
+                else:
+                    df_players = self.prior_season_pos_players_df[df_criteria_pos].sort_values('Condition',
+                                                                                               ascending=False)
         except:
-            print(f'Error in gameteam.py search_for_pos with pos {position}')
+            print(f'***Error in gameteam.py search_for_pos with pos {position}')
             print(f'avaiable players {df_players}')
             print(f'prior season df {self.prior_season_pos_players_df}')
             exit(1)

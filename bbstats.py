@@ -381,7 +381,8 @@ if __name__ == '__main__':
     # baseball_data.print_current_season(teams=teams)
     # print(team_batting_totals(baseball_data.batting_data, concat=False).to_string())
 
-    # print(baseball_data.get_pitching_data(team_name='ATL').to_string())
-    print(baseball_data.get_batting_data(team_name='ATL', prior_season=True).to_string())
-    print(baseball_data.get_batting_data(team_name='ATL', prior_season=False).to_string())
+    print(baseball_data.get_pitching_data(team_name='BAL', prior_season=True).to_string())
+    print(baseball_data.get_pitching_data(team_name='BAL', prior_season=False).to_string())
+    # print(baseball_data.get_batting_data(team_name='ATL', prior_season=True).to_string())
+    # print(baseball_data.get_batting_data(team_name='ATL', prior_season=False).to_string())
 

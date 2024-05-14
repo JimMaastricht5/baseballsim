@@ -82,17 +82,17 @@ class SimAB:
         return
 
     def onbase(self):
-        # print('on base: ' + str(odds_ratio(self.batting.OBP, self.pitching.OBP, self.league_batting_obp)))
-        return self.rng() < odds_ratio(self.batting.OBP + self.pitching.Game_Fatigue_Factor + self.OBP_adjustment,
-                                       self.pitching.OBP + self.pitching.Game_Fatigue_Factor + self.OBP_adjustment,
-                                       self.league_batting_obp + self.OBP_adjustment, stat_type='obp')
+        # print('at_bat.py onbase: ' + str(self.odds_ratio(self.batting.OBP, self.pitching.OBP, self.league_batting_obp)))
+        return self.rng() < self.odds_ratio(self.batting.OBP + self.pitching.Game_Fatigue_Factor + self.OBP_adjustment,
+                                            self.pitching.OBP + self.pitching.Game_Fatigue_Factor + self.OBP_adjustment,
+                                            self.league_batting_obp + self.OBP_adjustment, stat_type='obp')
 
     def bb(self):
-        return self.rng() < odds_ratio(((self.batting.BB + self.BB_adjustment) / self.batting.Total_OB),
-                                       ((self.pitching.BB + self.BB_adjustment) / self.pitching.Total_OB),
-                                       ((self.league_batting_Total_BB + self.BB_adjustment) /
-                                       self.league_batting_Total_OB),
-                                       stat_type='BB')
+        return self.rng() < self.odds_ratio(((self.batting.BB + self.BB_adjustment) / self.batting.Total_OB),
+                                            ((self.pitching.BB + self.BB_adjustment) / self.pitching.Total_OB),
+                                            ((self.league_batting_Total_BB + self.BB_adjustment) /
+                                             self.league_batting_Total_OB),
+                                            stat_type='BB')
 
     def hbp(self):
         return self.rng() < (self.HBP_rate + self.HBP_adjustment)
@@ -104,30 +104,30 @@ class SimAB:
         # stat_type='HBP')
 
     def hr(self):
-        return self.rng() < odds_ratio(((self.batting.HR + self.HR_adjustment) / self.batting.Total_OB),
-                                       ((self.pitching.HR + self.HR_adjustment) / self.pitching.Total_OB),
-                                       ((self.league_batting_Total_HR + self.HR_adjustment) /
-                                       self.league_batting_Total_OB),
-                                       stat_type='HR')
+        return self.rng() < self.odds_ratio(((self.batting.HR + self.HR_adjustment) / self.batting.Total_OB),
+                                            ((self.pitching.HR + self.HR_adjustment) / self.pitching.Total_OB),
+                                            ((self.league_batting_Total_HR + self.HR_adjustment) /
+                                            self.league_batting_Total_OB),
+                                            stat_type='HR')
 
     def triple(self):
         # do not have league pitching total for 3b so push it to zero and make it a neutral factor
-        return self.rng() < odds_ratio(hitter_stat=(self.batting['3B'] / self.batting.Total_OB), pitcher_stat=.016,
-                                       league_stat=(self.league_batting_Total_3B / self.league_batting_Total_OB),
-                                       stat_type='3B')
+        return self.rng() < self.odds_ratio(hitter_stat=(self.batting['3B'] / self.batting.Total_OB), pitcher_stat=.016,
+                                            league_stat=(self.league_batting_Total_3B / self.league_batting_Total_OB),
+                                            stat_type='3B')
 
     def double(self):
         # do not have league pitching total for 2b so push it to zero and make it a neutral factor
-        return self.rng() < odds_ratio(hitter_stat=((self.batting['2B'] + self.DBL_adjustment) /
-                                                    self.batting.Total_OB), pitcher_stat=.200,
-                                       league_stat=((self.league_batting_Total_2B + self.DBL_adjustment) /
-                                                    self.league_batting_Total_OB),
-                                       stat_type='2B')
+        return self.rng() < self.odds_ratio(hitter_stat=((self.batting['2B'] + self.DBL_adjustment) /
+                                                         self.batting.Total_OB), pitcher_stat=.200,
+                                            league_stat=((self.league_batting_Total_2B + self.DBL_adjustment) /
+                                                         self.league_batting_Total_OB),
+                                            stat_type='2B')
 
     def k(self):
-        return self.rng() < odds_ratio((self.batting['SO'] / self.batting.Total_Outs),
-                                       (self.pitching['K'] / self.pitching.Total_Outs),
-                                       self.league_K_rate_per_AB, stat_type='K')
+        return self.rng() < self.odds_ratio((self.batting['SO'] / self.batting.Total_Outs),
+                                            (self.pitching['K'] / self.pitching.Total_Outs),
+                                            self.league_K_rate_per_AB, stat_type='K')
 
     def gb_fo_lo(self, outs=0, runner_on_first=False, runner_on_third=False):
         self.dice_roll = self.rng()
@@ -172,32 +172,34 @@ class SimAB:
                 outcomes.set_score_book_cd(self.gb_fo_lo(outs, runner_on_first, runner_on_third))
         return
 
-
-# start of static functions
-# odds ratio is odds of the hitter * odds of the pitcher over the odds of the league or environment
-# the ratio only works for 2 outcomes, e.g., on base or not on base.
-# additional outcomes need to be chained, e.g., on base was it a hit?
-# example odds ratio.  Hitter with an obp of .400 odds ratio would be .400/(1-.400)
-# hitter with an OBP of .400 in a league of .300 facing a pitcher with an OBP of .250 in a league of .350, and
-# they are both playing in a league ( or park) where the OBP is expected to be .380 for the league average player.
-# Odds(matchup)(.400 / .600) * (.250 / .750)
-# ——————- =————————————-
-# (.380 / .620)(.300 / .700) * (.350 / .650)
-# Odds(matchup) = .590 -> Matchup OBP = .590 / 1.590 = .371
-#
-def odds_ratio(hitter_stat, pitcher_stat, league_stat, stat_type=''):
-    # print(f'at_bat.odds ratio, hitter stat:{hitter_stat}, pitcher stat{pitcher_stat}')
-    odds = 0
-    with warnings.catch_warnings():
-        warnings.filterwarnings("error")
-        try:
-            odds = ((hitter_stat / (1 - hitter_stat)) * (pitcher_stat / (1 - pitcher_stat))) / \
-                         (league_stat / (1 - league_stat))
-        except ZeroDivisionError:
-            print(f'Exception in odds ratio calculation for hitter:{hitter_stat}, pitcher:{pitcher_stat}, '
-                  f'league: {league_stat} {stat_type}')
-        except Warning as warning:
-            print(f'Warning in odds ratio calculation for hitter:{hitter_stat}, pitcher:{pitcher_stat}, '
-                  f'league: {league_stat} {stat_type}')
-            print("Warning caught:", warning)
-    return odds / (1 + odds)
+    # odds ratio is odds of the hitter * odds of the pitcher over the odds of the league or environment
+    # the ratio only works for 2 outcomes, e.g., on base or not on base.
+    # additional outcomes need to be chained, e.g., on base was it a hit?
+    # example odds ratio.  Hitter with an obp of .400 odds ratio would be .400/(1-.400)
+    # hitter with an OBP of .400 in a league of .300 facing a pitcher with an OBP of .250 in a league of .350, and
+    # they are both playing in a league ( or park) where the OBP is expected to be .380 for the league average player.
+    # Odds(matchup)(.400 / .600) * (.250 / .750)
+    # ——————- =————————————-
+    # (.380 / .620)(.300 / .700) * (.350 / .650)
+    # Odds(matchup) = .590 -> Matchup OBP = .590 / 1.590 = .371
+    #
+    def odds_ratio(self, hitter_stat, pitcher_stat, league_stat, stat_type=''):
+        # print(f'at_bat.odds ratio, hitter stat:{hitter_stat}, pitcher stat{pitcher_stat}')
+        odds = 0
+        with warnings.catch_warnings():
+            warnings.filterwarnings("error")
+            try:
+                odds = ((hitter_stat / (1 - hitter_stat)) * (pitcher_stat / (1 - pitcher_stat))) / \
+                             (league_stat / (1 - league_stat))
+            except ZeroDivisionError:
+                print(f'***Exception in odds ratio calculation for hitter:{hitter_stat}, pitcher:{pitcher_stat}, '
+                      f'league: {league_stat} {stat_type}')
+                print(self.batting)
+                print(self.pitching)
+            except Warning as warning:
+                print(f'***Warning in odds ratio calculation for hitter:{hitter_stat}, pitcher:{pitcher_stat}, '
+                      f'league: {league_stat} {stat_type}')
+                print("Warning caught:", warning)
+                print(self.batting)
+                print(self.pitching)
+        return odds / (1 + odds)

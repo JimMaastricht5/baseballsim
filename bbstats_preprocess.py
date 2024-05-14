@@ -131,6 +131,17 @@ class BaseballStatsPreProcess:
         batting_data.set_index(keys=['Hashcode'], drop=True, append=False, inplace=True)
         # set up additional stats
         batting_data['Season'] = str(self.load_seasons)
+        batting_data['OBP'] = self.trunc_col(np.nan_to_num(np.divide(batting_data['H'] + batting_data['BB'] +
+                                                                     batting_data['HBP'], batting_data['AB'] +
+                                                                     batting_data['BB'] + batting_data['HBP']),
+                                                           nan=0.0, posinf=0.0), 3)
+        batting_data['SLG'] = self.trunc_col(np.nan_to_num(np.divide((batting_data['H'] - batting_data['2B'] -
+                                                                      batting_data['3B'] - batting_data['HR']) +
+                                                                     batting_data['2B'] * 2 +
+                                                                     batting_data['3B'] * 3 + batting_data['HR'] * 4,
+                                                                     batting_data['AB']), nan=0.0, posinf=0.0), 3)
+        batting_data['OPS'] = self.trunc_col(np.nan_to_num(batting_data['OBP'] + batting_data['SLG'],
+                                                           nan=0.0, posinf=0.0), 3)
         batting_data['Total_OB'] = batting_data['H'] + batting_data['BB'] + batting_data['HBP']
         batting_data['Total_Outs'] = batting_data['AB'] - batting_data['H'] + batting_data['HBP']
         batting_data = batting_data[batting_data['AB'] >= 25]  # drop players without enough AB
@@ -245,6 +256,9 @@ class BaseballStatsPreProcess:
                 self.new_season_batting_data['Age'] = self.new_season_batting_data['Age'] + 1  # everyone a year older
             self.new_season_batting_data = self.new_season_batting_data.fillna(0)
         return
+
+    def trunc_col(self, df_n, d=3):
+        return (df_n * 10 ** d).astype(int) / 10 ** d
 
 
 if __name__ == '__main__':

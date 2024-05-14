@@ -71,8 +71,10 @@ class BaseballStatsPreProcess:
 
     def de_dup_df(self, df, key_name, dup_column_names, stats_cols_to_sum, drop_dups=False):
         dup_hashcodes = self.find_duplicate_rows(df=df, column_names=dup_column_names)
-        for dfrow_key in dup_hashcodes[key_name].to_list():
+        for dfrow_key in dup_hashcodes[key_name].unique():
             df_rows = df.loc[df[key_name] == dfrow_key]
+            if dfrow_key == 810032:
+                print(f'bbstats preprocess de_dup_df {dfrow_key} {df_rows.to_string()}')
             for dfcol_name in stats_cols_to_sum:
                 df.loc[df[key_name] == dfrow_key, dfcol_name] = df_rows[dfcol_name].sum()
         if drop_dups:

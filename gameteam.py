@@ -291,17 +291,23 @@ class Team:
         # find players not in lineup at specified position, sort by stat descending to find the best
         # if no players at that position make a recursive call to the func and ask for best remaining player
         # if pos is DH open up search to any position.
-        df_player_num = None
-        not_exhausted = ~(self.prior_season_pos_players_df['Condition'] <= self.fatigue_unavailable)
-        not_injured = (self.prior_season_pos_players_df['Injured Days'] == 0)
-        df_criteria = (~self.prior_season_pos_players_df.index.isin(lineup_index_list) &
-                       (self.prior_season_pos_players_df['Pos'] == position)) if (
-                    position != 'DH' and position != '1B') else \
-            ~self.prior_season_pos_players_df.index.isin(lineup_index_list)
-        df_criteria = df_criteria & not_exhausted & not_injured
-        df_players = self.prior_season_pos_players_df[df_criteria].sort_values(stat_criteria, ascending=False)
-        if len(df_players) == 0:  # missing player at pos, pick best remaining player
-            df_player_num = self.search_for_pos('DH', lineup_index_list, stat_criteria)  # do not grab the same player
+        try:
+            df_player_num = None
+            not_exhausted = ~(self.prior_season_pos_players_df['Condition'] <= self.fatigue_unavailable)
+            not_injured = (self.prior_season_pos_players_df['Injured Days'] == 0)
+            df_criteria = (~self.prior_season_pos_players_df.index.isin(lineup_index_list) &
+                           (self.prior_season_pos_players_df['Pos'] == position)) if (
+                        position != 'DH' and position != '1B') else \
+                ~self.prior_season_pos_players_df.index.isin(lineup_index_list)
+            df_criteria = df_criteria & not_exhausted & not_injured
+            df_players = self.prior_season_pos_players_df[df_criteria].sort_values(stat_criteria, ascending=False)
+            if len(df_players) == 0:  # missing player at pos, pick best remaining player
+                df_player_num = self.search_for_pos('DH', lineup_index_list, stat_criteria)  # do not grab the same player
+        except:
+            print(f'Error in gameteam.py search_for_pos with pos {position}')
+            print(df_players)
+            print(self.prior_season_pos_players_df)
+            exit(1)
         return df_players.head(1).index[0] if df_player_num is None else df_player_num  # pick top player at pos
 
     def best_at_stat(self, lineup_index_list, stat_criteria='OPS', count=9, exclude=None):

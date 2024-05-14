@@ -62,42 +62,31 @@ class BaseballStats:
         return
 
     def get_batting_data(self, team_name=None, prior_season=True):
-        if prior_season:
-            if team_name is None:
-                df = self.batting_data
-            else:
-                df = self.batting_data[self.batting_data['Team'] == team_name]
-                # df.set_index(keys=['Hashcode'], drop=False, append=False, inplace=True)
+        if team_name is None:
+            df = self.batting_data if prior_season else self.new_season_batting_data
         else:
-            if team_name is None:
-                df = self.new_season_batting_data
-            else:
-                df = self.new_season_batting_data[self.new_season_batting_data['Team'] == team_name]
-                # df.set_index(keys=['Hashcode'], drop=False, append=False, inplace=True)
+            df_new = self.new_season_batting_data[self.new_season_batting_data['Team'] == team_name]
+            df_cur = self.batting_data[self.batting_data.index.isin(df_new.index)]
+            df = df_cur if prior_season else df_new
         return df
 
     def get_pitching_data(self, team_name=None, prior_season=True):
-        if prior_season:
-            if team_name is None:
-                df = self.pitching_data
-            else:
-                df = self.pitching_data[self.pitching_data['Team'] == team_name]
-                # df.set_index(keys=['Hashcode'], drop=False, append=False, inplace=True)
+        if team_name is None:
+            df = self.pitching_data if prior_season else self.new_season_pitching_data
         else:
-            if team_name is None:
-                df = self.new_season_pitching_data
-            else:
-                df = self.new_season_pitching_data[self.new_season_pitching_data['Team'] == team_name]
-                # df.set_index(keys=['Hashcode'], drop=False, append=False, inplace=True)
+            df_new = self.new_season_pitching_data[self.new_season_pitching_data['Team'] == team_name]
+            df_cur = self.pitching_data[self.pitching_data.index.isin(df_new.index)]
+            df = df_cur if prior_season else df_new
         return df
 
     def get_seasons(self, batter_file, pitcher_file):
         new_pitcher_file = 'New-Season-' + pitcher_file
         new_batter_file = 'New-Season-' + batter_file
+        seasons_str = " ".join(str(season) for season in self.load_seasons)
         try:
             if self.pitching_data is None or self.batting_data is None:  # need to read data... else skip as cached
-                self.pitching_data = pd.read_csv(str(self.load_seasons[-1]) + f" {pitcher_file}", index_col=0)
-                self.batting_data = pd.read_csv(str(self.load_seasons[-1]) + f" {batter_file}", index_col=0)
+                self.pitching_data = pd.read_csv(f'{seasons_str} {pitcher_file}', index_col=0)
+                self.batting_data = pd.read_csv(f'{seasons_str} {batter_file}', index_col=0)
 
             if self.new_season_pitching_data is None or self.new_season_batting_data is None:
                 self.new_season_pitching_data = pd.read_csv(str(self.new_season) + f" {new_pitcher_file}", index_col=0)
@@ -376,7 +365,7 @@ def team_pitching_totals(pitching_df, team_name='', concat=True):
 
 
 if __name__ == '__main__':
-    baseball_data = BaseballStats(load_seasons=[2023], new_season=2024, only_nl_b=False,
+    baseball_data = BaseballStats(load_seasons=[2022, 2023, 2024], new_season=2024, only_nl_b=False,
                                   load_batter_file='stats-pp-Batting.csv',
                                   load_pitcher_file='stats-pp-Pitching.csv')
     # baseball_data.print_season(df_b=baseball_data.batting_data, df_p=baseball_data.pitching_data,
@@ -390,6 +379,8 @@ if __name__ == '__main__':
     # baseball_data.print_prior_season(teams=teams_to_print)
     # baseball_data.print_prior_season()
     # baseball_data.print_current_season(teams=teams)
-    print(baseball_data.pitching_data.to_string())  # maintains index numbers
-    # print(baseball_data.batting_data.to_string())
     # print(team_batting_totals(baseball_data.batting_data, concat=False).to_string())
+
+    # print(baseball_data.get_pitching_data().to_string())
+    print(baseball_data.get_batting_data(team_name='WAS').to_string())
+

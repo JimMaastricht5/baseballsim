@@ -74,19 +74,23 @@ class BaseballStatsPreProcess:
         dup_hashcodes = self.find_duplicate_rows(df=df, column_names=dup_column_names)
         for dfrow_key in dup_hashcodes[key_name].unique():
             df_rows = df.loc[df[key_name] == dfrow_key]
-            if dfrow_key == 810032:
-                print(f'bbstats preprocess de_dup_df {dfrow_key} {df_rows.to_string()}')
+            # if dfrow_key == 810032:
+            #     print(f'bbstats preprocess de_dup_df {dfrow_key} {df_rows.to_string()}')
             for dfcol_name in stats_cols_to_sum:
                 df.loc[df[key_name] == dfrow_key, dfcol_name] = df_rows[dfcol_name].sum()
         if drop_dups:
             df = df.drop_duplicates(subset='Hashcode', keep='last')
         return df
 
+    def update_team_names(self, team):
+        return self.name_changes.get(team, team)
+
     def get_pitching_seasons(self, pitcher_file, load_seasons):
         pitching_data = None
         stats_pcols_sum = ['G', 'GS', 'CG', 'SHO', 'IP', 'H', 'ER', 'K', 'BB', 'HR', 'W', 'L', 'SV', 'BS', 'HLD']
         for season in load_seasons:
             df = pd.read_csv(str(season) + f" {pitcher_file}")
+            df['Team'] = df['Team'].apply(self.update_team_names)
             pitching_data = pd.concat([pitching_data, df], axis=0)
 
         pitching_data['Hashcode'] = pitching_data['Player'].apply(self.create_hash)
@@ -119,6 +123,7 @@ class BaseballStatsPreProcess:
         stats_bcols_sum = ['G', 'AB', 'R', 'H', '2B', '3B', 'HR', 'RBI', 'SB', 'CS', 'BB', 'SO', 'SH', 'SF', 'HBP']
         for season in load_seasons:
             df = pd.read_csv(str(season) + f" {batter_file}")
+            df['Team'] = df['Team'].apply(self.update_team_names)
             batting_data = pd.concat([batting_data, df], axis=0)
 
         batting_data['Hashcode'] = batting_data['Player'].apply(self.create_hash)
@@ -158,9 +163,6 @@ class BaseballStatsPreProcess:
     def get_seasons(self, batter_file, pitcher_file):
         self.pitching_data = self.get_pitching_seasons(pitcher_file, self.load_seasons)
         self.batting_data = self.get_batting_seasons(batter_file, self.load_seasons)
-        for team in self.name_changes.keys():
-            self.pitching_data[self.pitching_data['Team'] == team]['Team'] = self.name_changes[team]
-            self.batting_data[self.batting_data['Team'] == team]['Team'] = self.name_changes[team]
         return
 
     def randomize_data(self):

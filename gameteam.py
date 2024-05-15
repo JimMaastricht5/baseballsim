@@ -51,10 +51,11 @@ class Team:
         self.game_num = game_num
         self.rotation_len = rotation_len
 
-        self.fatigue_start_perc = 70  # 85% of way to avg max is where fatigue starts, adjust factor to inc outing lgth
-        self.fatigue_rate = .001  # at 85% of avg max pitchers have a .014 increase in OBP.  using .001 as proxy
-        self.fatigue_pitching_change_limit = 5  # change pitcher at # or below out of 100
-        self.fatigue_unavailable = 50  # condition must be 51 or higher for a pitcher or pos player to be available
+        # condition and fatigue constants are in bbstats, baseball data object
+        self.fatigue_start_perc = self.baseball_data.fatigue_start_perc
+        self.fatigue_rate = self.baseball_data.fatigue_rate
+        self.fatigue_pitching_change_limit = self.baseball_data.fatigue_pitching_change_limit
+        self.fatigue_unavailable = self.baseball_data.fatigue_unavailable
 
         return
 

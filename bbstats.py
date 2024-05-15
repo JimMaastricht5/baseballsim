@@ -41,6 +41,10 @@ class BaseballStats:
         # 26.3% of pitching injuries affect the throwing elbow results in avg of 74 days lost
         # position player (non-pitcher) longevitiy: https://www.nytimes.com/2007/07/15/sports/baseball/15careers.html
         self.condition_change_per_day = 20  # improve with rest, mid point of normal dist for recovery
+        self.fatigue_start_perc = 70  # 85% of way to avg max is where fatigue starts, adjust factor to inc outing lgth
+        self.fatigue_rate = .001  # at 85% of avg max pitchers have a .014 increase in OBP.  using .001 as proxy
+        self.fatigue_pitching_change_limit = 5  # change pitcher at # or below out of 100
+        self.fatigue_unavailable = 33  # condition must be 33 or higher for a pitcher or pos player to be available
         self.pitching_injury_rate = .275  # 27.5 out of 100 players injured per season-> per game
         # self.pitching_injury_odds_for_season = 1 - (1 - self.pitching_injury_rate) ** (1/162)
         self.pitching_injury_avg_len = 32  # according to mlb avg len is 74 but that cant be a normal dist
@@ -286,8 +290,9 @@ def injured_list_f(idays):
 
 
 def condition_txt_f(condition):
-    return 'Healthy' if condition > 75 else \
-        'Tired' if condition > 51 else \
+    return 'Peak' if condition > 75 else \
+        'Healthy' if condition > 51 else \
+        'Tired' if condition > 33 else \
         'Exhausted'
 
 

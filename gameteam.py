@@ -104,7 +104,7 @@ class Team:
         if force_lineup_dict is None:
             pos_index_dict = self.dynamic_lineup()  # build cur_lineup_index_list
         else:
-            self.cur_lineup_index_list = force_lineup_dict.keys()
+            self.cur_lineup_index_list = list(force_lineup_dict.keys())
             pos_index_dict = force_lineup_dict
 
         # self.prior_season_lineup_df = self.prior_season_pos_players_df.loc[self.cur_lineup_index_list]  # subset df

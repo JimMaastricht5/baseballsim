@@ -321,12 +321,14 @@ class Game:
 if __name__ == '__main__':
     startdt = datetime.datetime.now()
 
-    away_team = 'BOI'
-    home_team = 'RIC'
+    away_team = 'MIL'
+    home_team = 'BOS'
     # away_team = 'SAN'
     # home_team = 'TEM'
-    # MIL_lineup = {65: 'LF', 71: 'C', 336: '1B', 369: 'DH', 355: 'CF', 62: 'SS', 536: '3B', 154: '2B', 310: 'RF'}
-    sims = 1
+    MIL_lineup = {647549: 'LF', 239398: 'C', 224423: '1B', 138309: 'DH', 868055: 'CF', 520723: 'SS', 299454: '3B', 46074: '2B', 752787: 'RF'}
+    BOS_starter = 516876
+    MIL_starter = 993801
+    sims = 10
     season_win_loss = [[0, 0], [0, 0]]  # away record pos 0, home pos 1
     team0_season_df = None
     for sim_game_num in range(1, sims + 1):
@@ -334,11 +336,15 @@ if __name__ == '__main__':
         game = Game(home_team_name=home_team, away_team_name=away_team,
                     chatty=True, print_lineup=True,
                     print_box_score_b=True,
-                    load_seasons=[2023], new_season=2024,
-                    load_batter_file='random-stats-pp-Batting.csv',
-                    load_pitcher_file='random-stats-pp-Pitching.csv',
+                    load_seasons=[2024], new_season=2024,
+                    # load_batter_file='random-stats-pp-Batting.csv',
+                    # load_pitcher_file='random-stats-pp-Pitching.csv',
+                    load_batter_file='stats-pp-Batting.csv',
+                    load_pitcher_file='stats-pp-Pitching.csv',
                     interactive=True,
-                    show_bench=True
+                    show_bench=True,
+                    starting_pitchers=[MIL_starter, BOS_starter]
+                    , starting_lineups=[MIL_lineup, None]
                     )
         score, inning, win_loss = game.sim_game(team_to_follow='MIL')
         season_win_loss[0] = list(np.add(np.array(season_win_loss[0]), np.array(win_loss[0])))

@@ -320,14 +320,15 @@ def team_pitching_totals(pitching_df, team_name='', concat=True):
 
 
 if __name__ == '__main__':
-    baseball_data = BaseballStats(load_seasons=[2023], new_season=2024, only_nl_b=False,
-                                  load_batter_file='random-stats-pp-Batting.csv',
-                                  load_pitcher_file='random-stats-pp-Pitching.csv')
+    baseball_data = BaseballStats(load_seasons=[2024], new_season=2024, only_nl_b=False,
+                                  load_batter_file='stats-pp-Batting.csv',
+                                  load_pitcher_file='stats-pp-Pitching.csv')
     # baseball_data.print_season(df_b=baseball_data.batting_data, df_p=baseball_data.pitching_data,
     # teams=['MIL', 'ARI'])
     print(*baseball_data.pitching_data.columns)
     print(*baseball_data.batting_data.columns)
     print(baseball_data.batting_data.Team.unique())
+    my_team = 'MIL' if 'MIL' in baseball_data.get_all_team_names() else baseball_data.get_all_team_names()[0]
     # print(baseball_data.batting_data.Mascot.unique())
     # teams_to_print = list(baseball_data.batting_data.Team.unique())
     # teams_to_print = ['MIL']  # MIL, NYM, etc
@@ -336,7 +337,7 @@ if __name__ == '__main__':
     # baseball_data.print_current_season(teams=teams)
     # print(team_batting_totals(baseball_data.batting_data, concat=False).to_string())
 
-    print(baseball_data.get_pitching_data(team_name=None, prior_season=True).to_string())
-    print(baseball_data.get_pitching_data(team_name=None, prior_season=False).to_string())
-    # print(baseball_data.get_batting_data(team_name='ATL', prior_season=True).to_string())
-    # print(baseball_data.get_batting_data(team_name='ATL', prior_season=False).to_string())
+    # print(baseball_data.get_pitching_data(team_name=my_team, prior_season=True).to_string())
+    print(baseball_data.get_pitching_data(team_name=my_team, prior_season=False).to_string())
+    # print(baseball_data.get_batting_data(team_name=my_team, prior_season=True).to_string())
+    print(baseball_data.get_batting_data(team_name=my_team, prior_season=False).to_string())

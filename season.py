@@ -164,7 +164,8 @@ if __name__ == '__main__':
                                 # load_batter_file = 'stats-pp-Batting.csv',
                                 # load_pitcher_file = 'stats-pp-Pitching.csv')
     # team_to_follow = bbseason23.teams[0]  # follow the first team in the random set
-    my_teams_to_follow = 'MIL'  # or follow no team
+    # my_teams_to_follow = 'MIL'  # or follow no team
+    my_teams_to_follow = 'MIL' if 'MIL' in bbseason23.teams else bbseason23.teams[0]
     bbseason23.sim_season(season_chatty=False,
                           season_print_lineup_b=False,
                           season_print_box_score_b=False,

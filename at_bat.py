@@ -138,7 +138,7 @@ class SimAB:
             elif runner_on_first and outs <= 1 and self.rng() <= self.league_GB_FC:
                 score_book_cd = 'GB FC'
         elif self.dice_roll <= (self.league_FB + self.league_GB):  # fly out ball
-            if self.rng() <= self.tag_up_chance and runner_on_third:
+            if self.rng() <= self.tag_up_chance and runner_on_third and outs < 2:
                 score_book_cd = 'SF'
             else:
                 score_book_cd = 'FO'

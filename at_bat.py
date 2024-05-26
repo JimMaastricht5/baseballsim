@@ -16,7 +16,7 @@ class OutCome:
                              'SO': False, 'GB': False, 'DP': False, 'GB FC': False, 'FO': False, 'LD': False,
                              'SF': False}
         self.outs_dict = {'BB': 0, 'HBP': 0, 'H': 0, '2B': 0, '3B': 0, 'HR': 0, 'K': 1, 'SO': 1, 'GB': 1, 'DP': 2,
-                          'GB FC': 1, 'FO': 1, 'LD': 1, 'SF': 0}
+                          'GB FC': 1, 'FO': 1, 'LD': 1, 'SF': 1}
         return
 
     def reset(self):

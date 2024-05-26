@@ -161,6 +161,8 @@ if __name__ == '__main__':
                                 interactive=interactive_keyboard_pauses,
                                 load_batter_file='random-stats-pp-Batting.csv',
                                 load_pitcher_file='random-stats-pp-Pitching.csv')
+                                # load_batter_file = 'stats-pp-Batting.csv',
+                                # load_pitcher_file = 'stats-pp-Pitching.csv')
     # team_to_follow = bbseason23.teams[0]  # follow the first team in the random set
     my_teams_to_follow = 'MIL'  # or follow no team
     bbseason23.sim_season(season_chatty=False,

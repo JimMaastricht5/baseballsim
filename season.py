@@ -154,13 +154,13 @@ if __name__ == '__main__':
     num_games = 162 - 42  # 42 games already played
     only_national_league_teams = False
     interactive_keyboard_pauses = False
-    bbseason23 = BaseballSeason(load_seasons=[2022, 2023, 2024], new_season=2024,
+    bbseason23 = BaseballSeason(load_seasons=[2023], new_season=2024,
                                 season_length_limit=num_games,
                                 min_games=num_games, series_length=3, rotation_len=5,
                                 only_nl_b=only_national_league_teams,
                                 interactive=interactive_keyboard_pauses,
-                                load_batter_file='stats-pp-Batting.csv',
-                                load_pitcher_file='stats-pp-Pitching.csv')
+                                load_batter_file='random-stats-pp-Batting.csv',
+                                load_pitcher_file='random-stats-pp-Pitching.csv')
     # team_to_follow = bbseason23.teams[0]  # follow the first team in the random set
     my_teams_to_follow = 'MIL'  # or follow no team
     bbseason23.sim_season(season_chatty=False,

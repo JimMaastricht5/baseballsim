@@ -1,6 +1,6 @@
 import pandas as pd
 import random
-import city_names as city
+# import city_names as city
 import numpy as np
 
 
@@ -33,6 +33,7 @@ class BaseballStats:
         self.new_season_pitching_data = None
         self.new_season_batting_data = None
         self.get_seasons(load_batter_file, load_pitcher_file)  # get existing data file
+        self.get_all_team_names = lambda: self.batting_data.Team.unique()
 
         # ***************** game to game stats and settings for injury and rest
         # condition and injury odds
@@ -107,61 +108,6 @@ class BaseballStats:
         if self.only_nl_b:
             self.pitching_data = self.pitching_data[self.pitching_data['Team'].isin(self.nl)]
             self.batting_data = self.batting_data[self.batting_data['Team'].isin(self.nl)]
-        return
-
-    def randomize_data(self):
-        self.create_leagues()
-        self.randomize_city_names()
-        self.randomize_player_names()
-        if np.min(self.batting_data.index) == 0 or np.min(self.pitching_data.index) == 0:  # last ditch check for error
-            raise Exception('Index value cannot be zero')  # screws up bases where 0 is no runner
-        return
-
-    def create_leagues(self):
-        league_list = ['ACB', 'NBL', 'SOL', 'NNL']  # Armchair Baseball and Nerd Baseball, Some Other League, No Name
-        league_names = random.sample(league_list, 2)  # replace AL and NL
-        self.pitching_data.loc[self.pitching_data['League'] == 'AL', 'League'] = league_names[0]
-        self.pitching_data.loc[self.pitching_data['League'] == 'NL', 'League'] = league_names[1]
-        self.batting_data.loc[self.batting_data['League'] == 'AL', 'League'] = league_names[0]
-        self.batting_data.loc[self.batting_data['League'] == 'NL', 'League'] = league_names[1]
-        return
-
-    def randomize_city_names(self):
-        city_dict = {}
-        current_team_names = self.batting_data.Team.unique()  # get list of current team names
-        city_abbrev = [str(name[:3]).upper() for name in city.names]  # city names are imported
-        mascots = randomize_mascots(len(city.names))
-        for ii, team_abbrev in enumerate(city_abbrev):
-            city_dict.update({city_abbrev[ii]: [city.names[ii], mascots[ii]]})  # update will use the last unique abbrev
-
-        new_teams = list(random.sample(city_abbrev, len(current_team_names)))
-        for ii, team in enumerate(current_team_names):  # do not use a df merge her resets the index, thats bad
-            new_team = new_teams[ii]
-            mascot = city_dict[new_team][1]
-            city_name = city_dict[new_team][0]
-            self.pitching_data.replace([team], [new_team], inplace=True)
-            self.pitching_data.loc[self.pitching_data['Team'] == new_team, 'City'] = city_name
-            self.pitching_data.loc[self.pitching_data['Team'] == new_team, 'Mascot'] = mascot
-            self.batting_data.replace([team], [new_team], inplace=True)
-            self.batting_data.loc[self.batting_data['Team'] == new_team, 'City'] = city_name
-            self.batting_data.loc[self.batting_data['Team'] == new_team, 'Mascot'] = mascot
-        return
-
-    def randomize_player_names(self):
-        # change pitching_data and batting data names, team name, etc
-        df = pd.concat([self.batting_data.Player.str.split(pat=' ', n=1, expand=True),
-                        self.pitching_data.Player.str.split(pat=' ', n=1, expand=True)])
-        first_names = df[0].values.tolist()
-        last_names = df[1].values.tolist()
-        random_names = []
-        for ii in range(1, (df.shape[0] + 1) * 2):  # generate twice as many random names as needed
-            random_names.append(random.choice(first_names) + ' ' + random.choice(last_names))
-        random_names = list(set(random_names))  # drop non-unique names
-        random_names = random.sample(random_names, self.batting_data.shape[0] + self.pitching_data.shape[0])
-        df['Player'] = pd.DataFrame(random_names)
-        df.reset_index(inplace=True, drop=True)  # clear duplicate index error, should not happen but leave this alone!
-        self.batting_data['Player'] = df['Player'][0:self.batting_data.shape[0] + 1]
-        self.pitching_data['Player'] = df['Player'][0:self.pitching_data.shape[0] + 1]
         return
 
     def game_results_to_season(self, box_score_class):
@@ -374,9 +320,9 @@ def team_pitching_totals(pitching_df, team_name='', concat=True):
 
 
 if __name__ == '__main__':
-    baseball_data = BaseballStats(load_seasons=[2022, 2023, 2024], new_season=2024, only_nl_b=False,
-                                  load_batter_file='stats-pp-Batting.csv',
-                                  load_pitcher_file='stats-pp-Pitching.csv')
+    baseball_data = BaseballStats(load_seasons=[2023], new_season=2024, only_nl_b=False,
+                                  load_batter_file='random-stats-pp-Batting.csv',
+                                  load_pitcher_file='random-stats-pp-Pitching.csv')
     # baseball_data.print_season(df_b=baseball_data.batting_data, df_p=baseball_data.pitching_data,
     # teams=['MIL', 'ARI'])
     print(*baseball_data.pitching_data.columns)
@@ -386,12 +332,11 @@ if __name__ == '__main__':
     # teams_to_print = list(baseball_data.batting_data.Team.unique())
     # teams_to_print = ['MIL']  # MIL, NYM, etc
     # baseball_data.print_prior_season(teams=teams_to_print)
-    # baseball_data.print_prior_season()
+    baseball_data.print_prior_season()
     # baseball_data.print_current_season(teams=teams)
     # print(team_batting_totals(baseball_data.batting_data, concat=False).to_string())
 
-    print(baseball_data.get_pitching_data(team_name='BAL', prior_season=True).to_string())
-    print(baseball_data.get_pitching_data(team_name='BAL', prior_season=False).to_string())
+    print(baseball_data.get_pitching_data(team_name=None, prior_season=True).to_string())
+    print(baseball_data.get_pitching_data(team_name=None, prior_season=False).to_string())
     # print(baseball_data.get_batting_data(team_name='ATL', prior_season=True).to_string())
     # print(baseball_data.get_batting_data(team_name='ATL', prior_season=False).to_string())
-

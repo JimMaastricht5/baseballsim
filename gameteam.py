@@ -11,6 +11,10 @@ class Team:
         self.prior_season_pitchers_df = baseball_data.get_pitching_data(team_name=team_name, prior_season=True)
         self.prior_season_pos_players_df = baseball_data.get_batting_data(team_name=team_name, prior_season=True)
         self.new_season_pos_players_df = baseball_data.get_batting_data(team_name=team_name, prior_season=False)
+        if self.prior_season_pitchers_df.shape[0] == 0:
+            print(f'gameteam.py init: team {team_name} does not exist.')
+            print(f'Try one of these teams {self.baseball_data.get_all_team_names()}')
+            exit(1)
 
         self.prior_season_pitchers_df['Condition'] = self.baseball_data.new_season_pitching_data['Condition']
         self.prior_season_pitchers_df['AVG_faced'] = self.prior_season_pitchers_df['AVG_faced'] * \
@@ -26,6 +30,7 @@ class Team:
         self.b_lineup_cols_to_print = ['Player', 'League', 'Team', 'Pos', 'Age', 'G', 'AB', 'R', 'H', '2B', '3B', 'HR',
                                        'RBI', 'SB', 'CS', 'BB', 'SO', 'SH', 'SF', 'HBP', 'AVG', 'OBP', 'SLG', 'OPS',
                                        'Condition']
+        # print(f'gameteam.py init load {self.prior_season_pos_players_df}')
         if ('Mascot' in self.prior_season_pos_players_df.columns) is True:
             self.mascot = self.prior_season_pos_players_df.loc[self.prior_season_pos_players_df["Team"] == team_name,
                                                                "Mascot"].unique()[0]

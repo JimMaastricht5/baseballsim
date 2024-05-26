@@ -321,8 +321,8 @@ class Game:
 if __name__ == '__main__':
     startdt = datetime.datetime.now()
 
-    away_team = 'WSH'
-    home_team = 'LAD'
+    away_team = 'BOI'
+    home_team = 'RIC'
     # away_team = 'SAN'
     # home_team = 'TEM'
     # MIL_lineup = {65: 'LF', 71: 'C', 336: '1B', 369: 'DH', 355: 'CF', 62: 'SS', 536: '3B', 154: '2B', 310: 'RF'}
@@ -334,9 +334,9 @@ if __name__ == '__main__':
         game = Game(home_team_name=home_team, away_team_name=away_team,
                     chatty=True, print_lineup=True,
                     print_box_score_b=True,
-                    load_seasons=[2022, 2023, 2024], new_season=2024,
-                    load_batter_file='stats-pp-Batting.csv',
-                    load_pitcher_file='stats-pp-Pitching.csv',
+                    load_seasons=[2023], new_season=2024,
+                    load_batter_file='random-stats-pp-Batting.csv',
+                    load_pitcher_file='random-stats-pp-Pitching.csv',
                     interactive=True,
                     show_bench=True
                     )

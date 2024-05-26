@@ -169,20 +169,24 @@ class BaseballStatsPreProcess:
         self.create_leagues()
         self.randomize_city_names()
         self.randomize_player_names()
-        if np.min(self.batting_data.index) == 0 or np.min(self.pitching_data.index) == 0:  # last ditch check for error
+        if np.min(self.batting_data.index) == 0 or np.min(self.pitching_data.index) == 0:  # last ditch check key error
             raise Exception('Index value cannot be zero')  # screws up bases where 0 is no runner
         return
 
     def create_leagues(self):
+        # replace AL and NL with random league names, set leagues column to match
         league_list = ['ACB', 'NBL', 'SOL', 'NNL']  # Armchair Baseball and Nerd Baseball, Some Other League, No Name
-        league_names = random.sample(league_list, 2)  # replace AL and NL
+        league_names = random.sample(league_list, 2)
         self.pitching_data.loc[self.pitching_data['League'] == 'AL', 'League'] = league_names[0]
         self.pitching_data.loc[self.pitching_data['League'] == 'NL', 'League'] = league_names[1]
+        self.pitching_data['Leagues'] = self.pitching_data['League'].apply(lambda x: [x])
         self.batting_data.loc[self.batting_data['League'] == 'AL', 'League'] = league_names[0]
         self.batting_data.loc[self.batting_data['League'] == 'NL', 'League'] = league_names[1]
+        self.batting_data['Leagues'] = self.batting_data['League'].apply(lambda x: [x])
         return
 
     def randomize_city_names(self):
+        # create team name and mascots, set teams column to match
         city_dict = {}
         current_team_names = self.batting_data.Team.unique()  # get list of current team names
         city_abbrev = [str(name[:3]).upper() for name in city.names]  # city names are imported
@@ -197,9 +201,11 @@ class BaseballStatsPreProcess:
             city_name = city_dict[new_team][0]
             self.pitching_data.replace([team], [new_team], inplace=True)
             self.pitching_data.loc[self.pitching_data['Team'] == new_team, 'City'] = city_name
+            self.pitching_data['Teams'] = self.pitching_data['Team'].apply(lambda x: [x])
             self.pitching_data.loc[self.pitching_data['Team'] == new_team, 'Mascot'] = mascot
             self.batting_data.replace([team], [new_team], inplace=True)
             self.batting_data.loc[self.batting_data['Team'] == new_team, 'City'] = city_name
+            self.batting_data['Teams'] = self.batting_data['Team'].apply(lambda x: [x])
             self.batting_data.loc[self.batting_data['Team'] == new_team, 'Mascot'] = mascot
         return
 
@@ -221,19 +227,27 @@ class BaseballStatsPreProcess:
             random_names.append(random.choice(first_names) + ' ' + random.choice(last_names))
         random_names = list(set(random_names))  # drop non-unique names
         random_names = random.sample(random_names, self.batting_data.shape[0] + self.pitching_data.shape[0])
-        df['Player'] = pd.DataFrame(random_names)
-        df.reset_index(inplace=True, drop=True)  # clear duplicate index error, should not happen but leave this alone!
-        self.batting_data['Player'] = df['Player'][0:self.batting_data.shape[0] + 1]
-        self.pitching_data['Player'] = df['Player'][0:self.pitching_data.shape[0] + 1]
+
+        # load new names and reset hashcode index
+        self.batting_data['Player'] = random_names[: len(self.batting_data)]  # grab first x rows of list
+        self.batting_data = self.batting_data.reset_index()
+        self.batting_data['Hashcode'] = self.batting_data['Player'].apply(self.create_hash)
+        self.batting_data = self.batting_data.set_index('Hashcode')
+
+        self.pitching_data['Player'] = random_names[-len(self.pitching_data):]  # next x rows list
+        self.pitching_data = self.pitching_data.reset_index()
+        self.pitching_data['Hashcode'] = self.pitching_data['Player'].apply(self.create_hash)
+        self.pitching_data = self.pitching_data.set_index('Hashcode')
         return
 
     def create_new_season_from_existing(self, load_batter_file, load_pitcher_file):
         if self.pitching_data is None or self.batting_data is None:
             raise Exception('load at least one season of pitching and batting')
-        if self.load_seasons[-1] == self.new_season:  # blend of partial season, load new season from file
+        # blend of actual partial season, load org new season from file
+        if self.load_seasons[-1] == self.new_season and self.generate_random_data is False:
             self.new_season_pitching_data = self.get_pitching_seasons(load_pitcher_file, [self.new_season])
             self.new_season_batting_data = self.get_batting_seasons(load_batter_file, [self.new_season])
-        else:
+        else:  # handle random league data and or consecutive seasons
             self.new_season_pitching_data = self.pitching_data.copy()
             self.new_season_pitching_data[self.numeric_pcols] = \
                 self.new_season_pitching_data[self.numeric_pcols].astype('int')
@@ -263,8 +277,8 @@ class BaseballStatsPreProcess:
 
 
 if __name__ == '__main__':
-    baseball_data = BaseballStatsPreProcess(load_seasons=[2022, 2023, 2024], new_season=2024,
-                                            generate_random_data=False,
+    baseball_data = BaseballStatsPreProcess(load_seasons=[2023], new_season=2024,
+                                            generate_random_data=True,
                                             load_batter_file='player-stats-Batters.csv',
                                             load_pitcher_file='player-stats-Pitching.csv')
     print(*baseball_data.pitching_data.columns)

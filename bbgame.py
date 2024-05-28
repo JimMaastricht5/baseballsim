@@ -143,10 +143,10 @@ class Game:
         # if switch due to save or close game, don't switch again in same inning
         if (self.teams[self.team_pitching()].is_pitcher_fatigued(pitching.Condition) and self.outs < 3) or \
                 (pitch_switch is False and (self.close_game() or self.save_sit())):
-            prior_pitcher = self.teams[self.team_pitching()]
+            prior_pitcher = self.teams[self.team_pitching()].is_pitching_index()
             self.teams[self.team_pitching()].pitching_change(inning=self.inning[self.team_hitting()],
                                                              score_diff=self.score_difference())
-            if prior_pitcher != self.teams[self.team_pitching()]:  # we are switching pitchers
+            if prior_pitcher != self.teams[self.team_pitching()].is_pitching_index():  # we are switching pitchers
                 pitching = self.teams[self.team_pitching()].cur_pitcher_stats()  # data for new pitcher
                 pitch_switch = True  # we switched pitcher this inning
                 self.is_save_sit[self.team_pitching()] = self.save_sit()
@@ -322,15 +322,15 @@ if __name__ == '__main__':
     startdt = datetime.datetime.now()
 
     away_team = 'MIL'
-    home_team = 'BOS'
+    home_team = 'CHC'
     # away_team = 'SAN'
     # home_team = 'TEM'
     MIL_lineup = {647549: 'LF', 239398: 'C', 224423: '1B', 138309: 'DH', 868055: 'CF', 520723: 'SS', 299454: '3B', 46074: '2B', 752787: 'RF'}
     BOS_starter = 516876
     MIL_starter = 993801
-    sims = 10
+    sims = 1
     season_win_loss = [[0, 0], [0, 0]]  # away record pos 0, home pos 1
-    team0_season_df = None
+    # team0_season_df = None
     for sim_game_num in range(1, sims + 1):
         print(f'Game number {sim_game_num}: from bbgame.py test code')
         game = Game(home_team_name=home_team, away_team_name=away_team,
@@ -342,21 +342,21 @@ if __name__ == '__main__':
                     load_batter_file='stats-pp-Batting.csv',
                     load_pitcher_file='stats-pp-Pitching.csv',
                     interactive=True,
-                    show_bench=True,
-                    starting_pitchers=[MIL_starter, BOS_starter]
-                    , starting_lineups=[MIL_lineup, None]
+                    show_bench=True
+                    # , starting_pitchers=[MIL_starter, BOS_starter]
+                    # , starting_lineups=[MIL_lineup, None]
                     )
         score, inning, win_loss = game.sim_game(team_to_follow='MIL')
         season_win_loss[0] = list(np.add(np.array(season_win_loss[0]), np.array(win_loss[0])))
         season_win_loss[1] = list(np.add(np.array(season_win_loss[1]), np.array(win_loss[1])))
-        if team0_season_df is None:
-            team0_season_df = game.teams[AWAY].box_score.team_box_batting
-        else:
-            col_list = ['G', 'AB', 'R', 'H', '2B', '3B', 'HR', 'RBI', 'SB', 'CS', 'BB', 'SO', 'SH', 'SF', 'HBP']
-            team0_season_df = team0_season_df[col_list].add(game.teams[AWAY].box_score.box_batting[col_list])
-            team0_season_df['Player'] = game.teams[AWAY].box_score.box_batting['Player']
-            team0_season_df['Team'] = game.teams[AWAY].box_score.box_batting['Team']
-            team0_season_df['Pos'] = game.teams[AWAY].box_score.box_batting['Pos']
+        # if team0_season_df is None:
+        team0_season_df = game.teams[AWAY].box_score.team_box_batting
+        # else:
+        #     col_list = ['G', 'AB', 'R', 'H', '2B', '3B', 'HR', 'RBI', 'SB', 'CS', 'BB', 'SO', 'SH', 'SF', 'HBP']
+        #     team0_season_df = team0_season_df[col_list].add(game.teams[AWAY].box_score.box_batting[col_list])
+        #     team0_season_df['Player'] = game.teams[AWAY].box_score.box_batting['Player']
+        #     team0_season_df['Team'] = game.teams[AWAY].box_score.box_batting['Team']
+        #     team0_season_df['Pos'] = game.teams[AWAY].box_score.box_batting['Pos']
         print('')
         print(f'{away_team} season : {season_win_loss[0][0]} W and {season_win_loss[0][1]} L')
         print(f'{home_team} season : {season_win_loss[1][0]} W and {season_win_loss[1][1]} L')

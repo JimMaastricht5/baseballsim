@@ -9,6 +9,7 @@ class BaseballStatsPreProcess:
     def __init__(self, load_seasons, new_season=None, generate_random_data=False,
                  load_batter_file='player-stats-Batters.csv', load_pitcher_file='player-stats-Pitching.csv'):
         self.create_hash = lambda text: int(hashlib.sha256(text.encode('utf-8')).hexdigest()[:5], 16)
+        self.jigger_data = lambda x: x + int(np.abs(np.random.normal(loc=x * .10, scale=2, size=1)))
 
         self.numeric_bcols = ['G', 'AB', 'R', 'H', '2B', '3B', 'HR', 'RBI', 'SB', 'CS', 'BB', 'SO', 'SH', 'SF',
                               'HBP', 'Condition']  # these cols will get added to running season total
@@ -23,6 +24,8 @@ class BaseballStatsPreProcess:
         self.batting_data = None
         self.new_season_pitching_data = None
         self.new_season_batting_data = None
+        self.generate_random_data = generate_random_data
+
         self.get_seasons(load_batter_file, load_pitcher_file)  # get existing data file
         self.generate_random_data = generate_random_data
         if self.generate_random_data:  # generate new data from existing
@@ -102,6 +105,10 @@ class BaseballStatsPreProcess:
                                        stats_cols_to_sum=stats_pcols_sum, drop_dups=True)
         pitching_data.set_index(keys=['Hashcode'], drop=True, append=False, inplace=True)
         # set up additional stats
+        if self.generate_random_data:
+            for stats_col in stats_pcols_sum:
+                pitching_data[stats_col] = pitching_data[stats_col].apply(self.jigger_data)
+
         pitching_data['AB'] = pitching_data['IP'] * 3 + pitching_data['H']
         pitching_data['2B'] = 0
         pitching_data['3B'] = 0
@@ -135,6 +142,10 @@ class BaseballStatsPreProcess:
                                       stats_cols_to_sum=stats_bcols_sum, drop_dups=True)
         batting_data.set_index(keys=['Hashcode'], drop=True, append=False, inplace=True)
         # set up additional stats
+        if self.generate_random_data:
+            for stats_col in stats_bcols_sum:
+                batting_data[stats_col] = batting_data[stats_col].apply(self.jigger_data)
+
         batting_data['Season'] = str(load_seasons)
         batting_data['OBP'] = self.trunc_col(np.nan_to_num(np.divide(batting_data['H'] + batting_data['BB'] +
                                                                      batting_data['HBP'], batting_data['AB'] +

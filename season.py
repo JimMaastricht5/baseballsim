@@ -152,6 +152,7 @@ if __name__ == '__main__':
 
     # full season
     num_games = 162 - 42  # 42 games already played
+    num_games = 10
     only_national_league_teams = False
     interactive_keyboard_pauses = False
     bbseason23 = BaseballSeason(load_seasons=[2023], new_season=2024,

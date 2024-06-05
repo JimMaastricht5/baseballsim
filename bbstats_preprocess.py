@@ -18,7 +18,7 @@ class BaseballStatsPreProcess:
         self.nl = ['CHC', 'CIN', 'MIL', 'PIT', 'STL', 'ATL', 'MIA', 'NYM', 'PHI', 'WAS', 'WSH', 'AZ', 'COL', 'LA',
                    'SD', 'SF']  # keep old and new abrrev for WAS/WSH
         self.name_changes = {'WAS': 'WSH'}
-        self.load_seasons = [load_seasons] if not isinstance(load_seasons, list) else load_seasons
+        self.load_seasons = [load_seasons] if not isinstance(load_seasons, list) else load_seasons  # convert to list
         self.new_season = new_season
         self.pitching_data = None
         self.batting_data = None

@@ -289,7 +289,7 @@ class BaseballStatsPreProcess:
 
 if __name__ == '__main__':
     baseball_data = BaseballStatsPreProcess(load_seasons=[2023], new_season=2024,
-                                            generate_random_data=True,
+                                            generate_random_data=False,
                                             load_batter_file='player-stats-Batters.csv',
                                             load_pitcher_file='player-stats-Pitching.csv')
     print(*baseball_data.pitching_data.columns)

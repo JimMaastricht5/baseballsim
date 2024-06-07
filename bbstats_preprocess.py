@@ -3,6 +3,7 @@ import random
 import city_names as city
 import numpy as np
 import hashlib
+import salary
 
 
 class BaseballStatsPreProcess:
@@ -89,14 +90,19 @@ class BaseballStatsPreProcess:
         return self.name_changes.get(team, team)
 
     def get_pitching_seasons(self, pitcher_file, load_seasons):
+        # caution war and salary cols will get aggregated across multiple seasons
         pitching_data = None
+        p_salary = None
         stats_pcols_sum = ['G', 'GS', 'CG', 'SHO', 'IP', 'H', 'ER', 'K', 'BB', 'HR', 'W', 'L', 'SV', 'BS', 'HLD']
         for season in load_seasons:
             df = pd.read_csv(str(season) + f" {pitcher_file}")
             df['Team'] = df['Team'].apply(self.update_team_names)
             pitching_data = pd.concat([pitching_data, df], axis=0)
+            p_salary = pd.concat([p_salary, salary.retrieve_salary(season, pitcher_file, self.create_hash)], axis=0)
 
         pitching_data['Hashcode'] = pitching_data['Player'].apply(self.create_hash)
+        pitching_data = pd.merge(pitching_data, p_salary, on='Hashcode', how='left')  # war and salary cols
+
         if ('League' in pitching_data.columns) is False:  # if no league set one up
             pitching_data['League'] = pitching_data['Team'].apply(lambda x: 'NL' if x in self.nl else 'AL')
         pitching_data = self.group_col_to_list(df=pitching_data, key_col='Hashcode', col='Team', new_col='Teams')
@@ -127,13 +133,17 @@ class BaseballStatsPreProcess:
 
     def get_batting_seasons(self, batter_file, load_seasons):
         batting_data = None
+        b_salary = None
         stats_bcols_sum = ['G', 'AB', 'R', 'H', '2B', '3B', 'HR', 'RBI', 'SB', 'CS', 'BB', 'SO', 'SH', 'SF', 'HBP']
         for season in load_seasons:
             df = pd.read_csv(str(season) + f" {batter_file}")
             df['Team'] = df['Team'].apply(self.update_team_names)
             batting_data = pd.concat([batting_data, df], axis=0)
+            b_salary = pd.concat([b_salary, salary.retrieve_salary(season, batter_file, self.create_hash)], axis=0)
 
         batting_data['Hashcode'] = batting_data['Player'].apply(self.create_hash)
+        batting_data = pd.merge(batting_data, b_salary, on='Hashcode', how='left')  # war and salary cols
+
         if ('League' in batting_data.columns) is False:  # if no league set one up
             batting_data['League'] = batting_data['Team'].apply(lambda x: 'NL' if x in self.nl else 'AL')
         batting_data = self.group_col_to_list(df=batting_data, key_col='Hashcode', col='Team', new_col='Teams')

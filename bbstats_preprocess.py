@@ -4,6 +4,7 @@ import city_names as city
 import numpy as np
 import hashlib
 import salary
+import numpy as np
 
 
 class BaseballStatsPreProcess:
@@ -129,6 +130,7 @@ class BaseballStatsPreProcess:
         pitching_data['Condition'] = 100
         pitching_data['Status'] = 'Active'  # DL or active
         pitching_data['Injured Days'] = 0  # days to spend in IL
+        salary.impute_salary(pitching_data)
         return pitching_data
 
     def get_batting_seasons(self, batter_file, load_seasons):

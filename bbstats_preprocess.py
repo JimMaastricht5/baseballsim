@@ -1,7 +1,6 @@
 import pandas as pd
 import random
 import city_names as city
-import numpy as np
 import hashlib
 import salary
 import numpy as np
@@ -99,10 +98,11 @@ class BaseballStatsPreProcess:
             df = pd.read_csv(str(season) + f" {pitcher_file}")
             df['Team'] = df['Team'].apply(self.update_team_names)
             pitching_data = pd.concat([pitching_data, df], axis=0)
-            p_salary = pd.concat([p_salary, salary.retrieve_salary(season, pitcher_file, self.create_hash)], axis=0)
+            p_salary = pd.concat([p_salary, salary.build_war_salary(season, pitcher_file, self.create_hash)], axis=0)
 
         pitching_data['Hashcode'] = pitching_data['Player'].apply(self.create_hash)
         pitching_data = pd.merge(pitching_data, p_salary, on='Hashcode', how='left')  # war and salary cols
+        pitching_data = salary.set_league_min_salary(pitching_data)  # set league min for players not in salary set
 
         if ('League' in pitching_data.columns) is False:  # if no league set one up
             pitching_data['League'] = pitching_data['Team'].apply(lambda x: 'NL' if x in self.nl else 'AL')
@@ -130,7 +130,6 @@ class BaseballStatsPreProcess:
         pitching_data['Condition'] = 100
         pitching_data['Status'] = 'Active'  # DL or active
         pitching_data['Injured Days'] = 0  # days to spend in IL
-        salary.impute_salary(pitching_data)
         return pitching_data
 
     def get_batting_seasons(self, batter_file, load_seasons):
@@ -141,10 +140,11 @@ class BaseballStatsPreProcess:
             df = pd.read_csv(str(season) + f" {batter_file}")
             df['Team'] = df['Team'].apply(self.update_team_names)
             batting_data = pd.concat([batting_data, df], axis=0)
-            b_salary = pd.concat([b_salary, salary.retrieve_salary(season, batter_file, self.create_hash)], axis=0)
+            b_salary = pd.concat([b_salary, salary.build_war_salary(season, batter_file, self.create_hash)], axis=0)
 
         batting_data['Hashcode'] = batting_data['Player'].apply(self.create_hash)
         batting_data = pd.merge(batting_data, b_salary, on='Hashcode', how='left')  # war and salary cols
+        batting_data = salary.set_league_min_salary(batting_data)  # set league min for players not in salary set
 
         if ('League' in batting_data.columns) is False:  # if no league set one up
             batting_data['League'] = batting_data['Team'].apply(lambda x: 'NL' if x in self.nl else 'AL')

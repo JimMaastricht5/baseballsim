@@ -336,7 +336,7 @@ if __name__ == '__main__':
         game = Game(home_team_name=home_team, away_team_name=away_team,
                     chatty=True, print_lineup=True,
                     print_box_score_b=True,
-                    load_seasons=[2024], new_season=2024,
+                    load_seasons=[2023], new_season=2024,
                     # load_batter_file='random-stats-pp-Batting.csv',
                     # load_pitcher_file='random-stats-pp-Pitching.csv',
                     load_batter_file='stats-pp-Batting.csv',

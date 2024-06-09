@@ -7,7 +7,10 @@ from sklearn.model_selection import train_test_split
 
 def retrieve_war(war_season, war_file_name, hashfunc, debug=False):
     # war files include full seasons up to and including 2023
-    df = pd.read_csv(f'{str(war_season)} war-{war_file_name}')
+    try:
+        df = pd.read_csv(f'{str(war_season)} war-{war_file_name}')
+    except FileNotFoundError:
+        return None
     df = df[df['year_ID'] == war_season]
     df['Hashcode'] = df['name_common'].apply(hashfunc)
     df.set_index(keys=['Hashcode'], drop=True, append=False, inplace=True)
@@ -16,15 +19,19 @@ def retrieve_war(war_season, war_file_name, hashfunc, debug=False):
     return df
 
 def set_league_min_salary(df):
-    league_min_salary_2013 = 720000
-    league_min_salary = np.min(df['salary'].where(df['salary'] > 0))
-    league_min_salary = league_min_salary if league_min_salary >= league_min_salary_2013 else league_min_salary_2013
-    df = df.fillna(0)
-    df['salary'] = df['salary'].apply(lambda x: league_min_salary if x < league_min_salary else x)
+    if df is not None:
+        league_min_salary_2013 = 720000
+        league_min_salary = np.min(df['salary'].where(df['salary'] > 0))
+        league_min_salary = league_min_salary if league_min_salary >= league_min_salary_2013 else league_min_salary_2013
+        df = df.fillna(0)
+        df['salary'] = df['salary'].apply(lambda x: league_min_salary if x < league_min_salary else x)
     return df
 
 def impute_war_salary(df, debug=False):
     # na must be replaced with zero before this call
+    if df is None:
+        return None
+
     df_fit = df[df['salary'] > 0]  # drop rows that are missing salary data
     x = df_fit['WAR'].to_numpy().reshape(-1, 1)  # create X for model, using only WAR
     y = df_fit['salary'].to_numpy().reshape(-1, 1)

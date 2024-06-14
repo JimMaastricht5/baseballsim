@@ -4,16 +4,17 @@ import pandas as pd
 import bbgame
 import bbstats
 import numpy as np
+from typing import List
 
 AWAY = 0
 HOME = 1
 
 
 class BaseballSeason:
-    def __init__(self, load_seasons, new_season, team_list=None, season_length_limit=0, min_games=0, series_length=1,
-                 rotation_len=5, only_nl_b=False, interactive=False,
-                 load_batter_file='stats-pp-Batting.csv',
-                 load_pitcher_file='stats-pp-Pitching.csv'):
+    def __init__(self, load_seasons: List[int], new_season: int, team_list: None=None, season_length_limit: int=0, min_games: int=0, series_length: int=1,
+                 rotation_len: int=5, only_nl_b: bool=False, interactive: bool=False,
+                 load_batter_file: str='stats-pp-Batting.csv',
+                 load_pitcher_file: str='stats-pp-Pitching.csv') -> None:
         self.season_length_limit = season_length_limit  # zero mean there is no limit, based on schedule parameters
         self.min_games = min_games
         self.series_length = series_length
@@ -38,7 +39,7 @@ class BaseballSeason:
             self.team_win_loss.update({team: [0, 0]})  # set team win loss to 0, 0
         return
 
-    def create_schedule(self):
+    def create_schedule(self) -> None:
         # day schedule in format  ([['MIL', 'COL'], ['PIT', 'CIN'], ['CHC', 'STL']])  # test schedule
         # if there were an off number of teams there may be an "OFF" day
         for game_day in range(0, len(self.teams)-1):  # setup each team play all other teams one time
@@ -55,7 +56,7 @@ class BaseballSeason:
             self.create_schedule()  # recursive call to add more games to get over minimum
         return
 
-    def print_day_schedule(self, day):
+    def print_day_schedule(self, day: int) -> None:
         game_str = ''
         day_schedule = self.schedule[day]
         print(f'Games for day {day + 1}:')
@@ -69,7 +70,7 @@ class BaseballSeason:
         print('')
         return
 
-    def print_standings(self):
+    def print_standings(self) -> None:
         teaml, winl, lossl = [], [], []
         for team in self.team_win_loss:
             if team != 'OFF DAY':
@@ -82,15 +83,15 @@ class BaseballSeason:
         print('')
         return
 
-    def update_win_loss(self, away_team_name, home_team_name, win_loss):
+    def update_win_loss(self, away_team_name: str, home_team_name: str, win_loss: List[List[int]]) -> None:
         self.team_win_loss[away_team_name] = list(
             np.add(np.array(self.team_win_loss[away_team_name]), np.array(win_loss[0])))
         self.team_win_loss[home_team_name] = list(
             np.add(np.array(self.team_win_loss[home_team_name]), np.array(win_loss[1])))
         return
 
-    def sim_season(self, season_chatty=False, season_print_lineup_b=False, season_print_box_score_b=False,
-                   summary_only_b=False, team_to_follow=''):
+    def sim_season(self, season_chatty: bool=False, season_print_lineup_b: bool=False, season_print_box_score_b: bool=False,
+                   summary_only_b: bool=False, team_to_follow: str='') -> None:
         print(f'{self.new_season} will have '
               f'{self.season_length_limit if self.season_length_limit != 0 else len(self.schedule)} games per team.')
         # print(f'Full schedule of games: {self.schedule}')

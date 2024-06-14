@@ -5,17 +5,19 @@ import numpy as np
 import random
 import bbbaserunners
 import datetime
+from pandas.core.series import Series
+from typing import List, Tuple
 
 AWAY = 0
 HOME = 1
 
 
 class Game:
-    def __init__(self, away_team_name='', home_team_name='', baseball_data=None, game_num=1, rotation_len=5,
-                 print_lineup=False, chatty=False, print_box_score_b=False, load_seasons=2023, new_season=2024,
-                 starting_pitchers=None, starting_lineups=None,
-                 load_batter_file='player-stats-Batters.csv', load_pitcher_file='player-stats-Pitching.csv',
-                 interactive=False, show_bench=False):
+    def __init__(self, away_team_name: str='', home_team_name: str='', baseball_data: None=None, game_num: int=1, rotation_len: int=5,
+                 print_lineup: bool=False, chatty: bool=False, print_box_score_b: bool=False, load_seasons: List[int]=2023, new_season: int=2024,
+                 starting_pitchers: None=None, starting_lineups: None=None,
+                 load_batter_file: str='player-stats-Batters.csv', load_pitcher_file: str='player-stats-Pitching.csv',
+                 interactive: bool=False, show_bench: bool=False) -> None:
         if baseball_data is None:
             self.baseball_data = bbstats.BaseballStats(load_seasons=load_seasons, new_season=new_season,
                                                        load_batter_file=load_batter_file,
@@ -78,27 +80,27 @@ class Game:
         self.manager = None
         return
 
-    def team_pitching(self):
+    def team_pitching(self) -> int:
         return (self.top_bottom + 1) % 2
 
-    def team_hitting(self):
+    def team_hitting(self) -> int:
         return self.top_bottom
 
-    def score_diff(self):
+    def score_diff(self) -> int:
         # team pitching with lead will be positive, team pitching behind will be neg
         return self.total_score[self.team_pitching()] - self.total_score[self.team_hitting()]
 
-    def save_sit(self):
+    def save_sit(self) -> bool:
         # can go two innings for a save so start measure in the 8th inning
         # if pitching team is leading and runners + ab + on deck is equal to score diff
         return (self.score_diff() > 0 and (self.score_diff() <= self.bases.count_runners() + 2) and
                 self.inning[self.team_hitting()] >= 8)
 
-    def close_game(self):
+    def close_game(self) -> bool:
         return self.score_diff() >= 0 and self.inning[self.team_hitting()] >= 7
 
     # noinspection PyTypeChecker
-    def update_inning_score(self, number_of_runs=0):
+    def update_inning_score(self, number_of_runs: int=0) -> None:
         if len(self.inning_score) <= self.inning[self.team_hitting()]:  # header rows + rows in score must = innings
             self.inning_score.append([self.inning[self.team_hitting()], '', ''])  # expand scores by new inning
 
@@ -119,7 +121,7 @@ class Game:
         self.total_score[self.team_hitting()] += number_of_runs  # update total score
         return
 
-    def print_inning_score(self):
+    def print_inning_score(self) -> None:
         print_inning_score = self.inning_score.copy()
         print_inning_score.append(['R', self.total_score[AWAY], self.total_score[HOME]])
         print_inning_score.append(['H', self.teams[AWAY].box_score.total_hits, self.teams[HOME].box_score.total_hits])
@@ -134,10 +136,10 @@ class Game:
         print('')
         return
 
-    def score_difference(self):
+    def score_difference(self) -> int:
         return self.total_score[self.team_pitching()] - self.total_score[self.team_hitting()]
 
-    def pitching_sit(self, pitching, pitch_switch):
+    def pitching_sit(self, pitching: Series, pitch_switch: bool) -> bool:
         # switch pitchers based on fatigue or close game
         # close game is hitting inning >= 7 and, pitching team winning or tied and runners on = save sit
         # if switch due to save or close game, don't switch again in same inning
@@ -155,7 +157,7 @@ class Game:
                     print(f'\t{pitching.Player} has entered the game for {self.team_names[self.team_pitching()]}')
         return pitch_switch
 
-    def stolen_base_sit(self):
+    def stolen_base_sit(self) -> None:
         if self.bases.is_eligible_for_stolen_base():
             runner_key = self.bases.get_runner_key(1)
             runner_stats = self.teams[self.team_hitting()].pos_player_prior_year_stats(runner_key)
@@ -175,10 +177,10 @@ class Game:
                         print(f'\t{runner_stats.Player} was caught stealing for out number {self.outs}')
         return
 
-    def is_extra_innings(self):
+    def is_extra_innings(self) -> bool:
         return self.inning[self.team_hitting()] > 9
 
-    def extra_innings(self):
+    def extra_innings(self) -> None:
         # ignores player name, is already in lookup table if he was the last batter / out
         if self.is_extra_innings():
             self.bases.add_runner_to_base(base_num=2, batter_num=self.prior_batter_out_num[self.team_hitting()],
@@ -187,7 +189,7 @@ class Game:
                 print(f'Extra innings: {self.prior_batter_out_name[self.team_hitting()]} will start at 2nd base.')
         return
 
-    def sim_ab(self):
+    def sim_ab(self) -> Tuple[Series, Series]:
         cur_pitcher_index = self.teams[self.team_pitching()].cur_pitcher_index
         pitching = self.teams[self.team_pitching()].cur_pitcher_stats()  # data for pitcher
         pitching.Game_Fatigue_Factor, cur_percentage = \
@@ -221,7 +223,7 @@ class Game:
         self.prior_batter_out_num[self.team_hitting()] = cur_batter_index
         return pitching, batting
 
-    def sim_half_inning(self):
+    def sim_half_inning(self) -> None:
         pitch_switch = False  # did we switch pitchers this inning, don't sub if closer came in
         top_or_bottom = 'top' if self.top_bottom == 0 else 'bottom'
         if self.chatty:
@@ -268,12 +270,12 @@ class Game:
         self.outs = 0  # rest outs to zero
         return
 
-    def is_game_end(self):
+    def is_game_end(self) -> bool:
         return False if self.inning[AWAY] <= 9 or self.inning[HOME] <= 8 or \
                         (self.inning[AWAY] != self.inning[HOME] and self.total_score[AWAY] >= self.total_score[HOME]) \
                         or self.total_score[AWAY] == self.total_score[HOME] else True
 
-    def win_loss_record(self):
+    def win_loss_record(self) -> None:
         home_win = 0 if self.total_score[0] > self.total_score[1] else 1
         self.win_loss.append([abs(home_win - 1), home_win])  # if home win away team is 0, 1
         self.win_loss.append([home_win, abs(home_win - 1)])  # if home win home team is  1, 0
@@ -289,7 +291,7 @@ class Game:
                                                               save_b=self.is_save_sit[HOME])
         return
 
-    def end_game(self):
+    def end_game(self) -> None:
         self.teams[AWAY].set_batting_condition()
         self.teams[HOME].set_batting_condition()
         self.win_loss_record()
@@ -302,7 +304,7 @@ class Game:
         self.print_inning_score()
         return
 
-    def sim_game(self, team_to_follow=''):
+    def sim_game(self, team_to_follow: str='') -> Tuple[List[int], List[int], List[List[int]]]:
         if team_to_follow in self.team_names:
             print(f'Following team: {team_to_follow}')
             self.chatty = True

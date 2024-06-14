@@ -4,11 +4,14 @@ import city_names as city
 import hashlib
 import salary
 import numpy as np
+from numpy import ndarray
+from pandas.core.frame import DataFrame
+from typing import List, Optional
 
 
 class BaseballStatsPreProcess:
-    def __init__(self, load_seasons, new_season=None, generate_random_data=False,
-                 load_batter_file='player-stats-Batters.csv', load_pitcher_file='player-stats-Pitching.csv'):
+    def __init__(self, load_seasons: List[int], new_season: Optional[int]=None, generate_random_data: bool=False,
+                 load_batter_file: str='player-stats-Batters.csv', load_pitcher_file: str='player-stats-Pitching.csv') -> None:
         self.create_hash = lambda text: int(hashlib.sha256(text.encode('utf-8')).hexdigest()[:5], 16)
         self.jigger_data = lambda x: x + int(np.abs(np.random.normal(loc=x * .10, scale=2, size=1)))
 
@@ -36,7 +39,7 @@ class BaseballStatsPreProcess:
         self.save_data()
         return
 
-    def save_data(self):
+    def save_data(self) -> None:
         f_pname = 'random-stats-pp-Pitching.csv' if self.generate_random_data else 'stats-pp-Pitching.csv'
         f_bname = 'random-stats-pp-Batting.csv' if self.generate_random_data else 'stats-pp-Batting.csv'
         seasons_str = " ".join(str(season) for season in self.load_seasons)
@@ -47,7 +50,7 @@ class BaseballStatsPreProcess:
             self.new_season_batting_data.to_csv(f'{self.new_season} New-Season-{f_bname}', index=True, header=True)
         return
 
-    def group_col_to_list(self, df, key_col, col, new_col):
+    def group_col_to_list(self, df: DataFrame, key_col: str, col: str, new_col: str) -> DataFrame:
         # Groups unique values in a column by a key column
         # Args: df (pd.DataFrame): The dataframe containing the columns.
         #    key_col (str): The name of the column containing the key.
@@ -65,7 +68,7 @@ class BaseballStatsPreProcess:
         df[new_col] = df[new_col].apply(list)  # Convert sets to lists for easier handling in DataFrame
         return df
 
-    def find_duplicate_rows(self, df, column_names):
+    def find_duplicate_rows(self, df: DataFrame, column_names: str) -> DataFrame:
         #  This function finds duplicate rows in a DataFrame based on a specified column.
         # Args: df (pandas.DataFrame): The DataFrame to analyze.
         #   column_names (list): The name of the column containing strings for comparison.
@@ -74,7 +77,7 @@ class BaseballStatsPreProcess:
         duplicates = filtered_df.duplicated(keep=False)  # keep both rows
         return df[duplicates]
 
-    def de_dup_df(self, df, key_name, dup_column_names, stats_cols_to_sum, drop_dups=False):
+    def de_dup_df(self, df: DataFrame, key_name: str, dup_column_names: str, stats_cols_to_sum: List[str], drop_dups: bool=False) -> DataFrame:
         dup_hashcodes = self.find_duplicate_rows(df=df, column_names=dup_column_names)
         for dfrow_key in dup_hashcodes[key_name].unique():
             df_rows = df.loc[df[key_name] == dfrow_key]
@@ -86,10 +89,10 @@ class BaseballStatsPreProcess:
             df = df.drop_duplicates(subset='Hashcode', keep='last')
         return df
 
-    def update_team_names(self, team):
+    def update_team_names(self, team: str) -> str:
         return self.name_changes.get(team, team)
 
-    def get_pitching_seasons(self, pitcher_file, load_seasons):
+    def get_pitching_seasons(self, pitcher_file: str, load_seasons: List[int]) -> DataFrame:
         # caution war and salary cols will get aggregated across multiple seasons
         pitching_data = None
         p_salary = None
@@ -135,7 +138,7 @@ class BaseballStatsPreProcess:
         pitching_data['Injured Days'] = 0  # days to spend in IL
         return pitching_data
 
-    def get_batting_seasons(self, batter_file, load_seasons):
+    def get_batting_seasons(self, batter_file: str, load_seasons: List[int]) -> DataFrame:
         batting_data = None
         b_salary = None
         stats_bcols_sum = ['G', 'AB', 'R', 'H', '2B', '3B', 'HR', 'RBI', 'SB', 'CS', 'BB', 'SO', 'SH', 'SF', 'HBP']
@@ -189,7 +192,7 @@ class BaseballStatsPreProcess:
 
         return batting_data
 
-    def get_seasons(self, batter_file, pitcher_file):
+    def get_seasons(self, batter_file: str, pitcher_file: str) -> None:
         self.pitching_data = self.get_pitching_seasons(pitcher_file, self.load_seasons)
         self.batting_data = self.get_batting_seasons(batter_file, self.load_seasons)
         return
@@ -269,7 +272,7 @@ class BaseballStatsPreProcess:
         self.pitching_data = self.pitching_data.set_index('Hashcode')
         return
 
-    def create_new_season_from_existing(self, load_batter_file, load_pitcher_file):
+    def create_new_season_from_existing(self, load_batter_file: str, load_pitcher_file: str) -> None:
         if self.pitching_data is None or self.batting_data is None:
             raise Exception('load at least one season of pitching and batting')
         # blend of actual partial season, load org new season from file
@@ -301,7 +304,7 @@ class BaseballStatsPreProcess:
             self.new_season_batting_data = self.new_season_batting_data.fillna(0)
         return
 
-    def trunc_col(self, df_n, d=3):
+    def trunc_col(self, df_n: ndarray, d: int=3) -> ndarray:
         return (df_n * 10 ** d).astype(int) / 10 ** d
 
 

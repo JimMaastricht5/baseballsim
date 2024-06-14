@@ -1,7 +1,9 @@
 import numpy as np
+from numpy import bool_, int32
+from typing import Union
 
 class Bases:
-    def __init__(self):
+    def __init__(self) -> None:
         self.baserunners = None
         self.baserunners_names = {}
         self.player_scored = None
@@ -9,7 +11,7 @@ class Bases:
         self.runs_scored = 0
         return
 
-    def handle_runners(self, score_book_cd, bases_to_advance, on_base_b, outs):
+    def handle_runners(self, score_book_cd: str, bases_to_advance: int, on_base_b: bool, outs: int) -> None:
         if outs >= 3:
             return
         if score_book_cd in ['BB', 'HBP']:
@@ -32,7 +34,7 @@ class Bases:
         self.baserunners[4:] = [0] * 4  # reset based without list comprehension
         return
 
-    def ground_out(self, score_book_cd):
+    def ground_out(self, score_book_cd: str) -> int:
         if score_book_cd in ['GB']:  # batter is out
             self.remove_runner(0)
         elif score_book_cd in ['DP']:  # runner at first is out and batter are out
@@ -42,7 +44,7 @@ class Bases:
             self.remove_runner(1)
         return 1  # advance remaining runners and batter on an GB FC one base
 
-    def new_ab(self, batter_num=1, player_name=''):
+    def new_ab(self, batter_num: int=1, player_name: str='') -> None:
         self.add_runner_to_base(0, batter_num, player_name)
         # self.baserunners[0] = batter_num  # put a player ab
         # self.baserunners_names[batter_num] = player_name  # add player name to lookup table
@@ -53,13 +55,13 @@ class Bases:
         self.runs_scored = 0
         return
 
-    def add_runner_to_base(self, base_num, batter_num, player_name=''):
+    def add_runner_to_base(self, base_num: int, batter_num: int, player_name: str='') -> None:
         self.baserunners[base_num] = batter_num
         if player_name != '':
             self.baserunners_names[batter_num] = player_name  # add name to look up table
         return
 
-    def clear_bases(self):
+    def clear_bases(self) -> None:
         # index 0 is ab, 1st = 1, 2nd =2 , 3rd=3, 4th=home, pos 5-7 scored
         # if a value is non-zero it is the index number of the player
         # 0 indicates an empty base
@@ -69,7 +71,7 @@ class Bases:
         self.player_scored = {}
         return
 
-    def remove_runner(self, bases):
+    def remove_runner(self, bases: int) -> None:
         # remove runner from 1st, 2nd, or 3rd for DP or FC
         # index pos 1 is 1b so base # is used as offset
         if isinstance(bases, list):
@@ -81,14 +83,14 @@ class Bases:
             self.baserunners_names[bases] = ''
         return
 
-    def is_runner_on_base_num(self, base_num):
+    def is_runner_on_base_num(self, base_num: int) -> Union[bool, bool_]:
         return self.baserunners[base_num] != 0
 
-    def is_eligible_for_stolen_base(self):
+    def is_eligible_for_stolen_base(self) -> Union[bool, bool_]:
         return self.is_runner_on_base_num(1) and \
                 not self.is_runner_on_base_num(2) and not self.is_runner_on_base_num(3)
 
-    def get_runner_key(self, base_num):
+    def get_runner_key(self, base_num: int) -> int32:
         return self.baserunners[base_num]  # non zero if there is a runner
 
     def tag_up(self, outs):
@@ -100,20 +102,20 @@ class Bases:
         self.remove_runner(0)  # batter is out
         return 0  # bases to advance
 
-    def move_a_runner(self, basenum_from, basenum_to):
+    def move_a_runner(self, basenum_from: int, basenum_to: int) -> None:
         self.baserunners[basenum_to] = self.baserunners[basenum_from]
         self.baserunners[basenum_from] = 0
         if basenum_from == 3 and basenum_to == 4:
             self.runs_scored += 1
         return
 
-    def push_a_runner(self, basenum_from, basenum_to):
+    def push_a_runner(self, basenum_from: int, basenum_to: int) -> None:
         if self.is_runner_on_base_num(basenum_to):
             self.push_a_runner(basenum_from + 1, basenum_to + 1)
         self.move_a_runner(basenum_from, basenum_to)
         return
 
-    def walk_or_hbp(self, bases_to_move_all_runners):
+    def walk_or_hbp(self, bases_to_move_all_runners: int) -> int:
         # default is move all runners on base, that works unless there is a hole
         if self.count_runners() < 3 and self.count_runners() != 0:  # not loaded or empty
             # bases are not loaded so move runners up a base when forced
@@ -121,10 +123,10 @@ class Bases:
             bases_to_move_all_runners = 0
         return bases_to_move_all_runners
 
-    def count_runners(self):
+    def count_runners(self) -> int:
         return np.count_nonzero(self.baserunners[1:3+1])  # add the number of people on base 1st, 2b, and 3rd
 
-    def describe_runners(self):
+    def describe_runners(self) -> str:
         desc = ''
         base_names = ['AB', '1st', '2nd', '3rd', 'home', 'scored', 'scored', 'scored']  # leave this for sort order
         base_names_zip = set(zip(base_names, self.baserunners))

@@ -2,11 +2,16 @@ import pandas as pd
 import random
 # import city_names as city
 import numpy as np
+from numpy import ndarray
+from pandas.core.frame import DataFrame
+from pandas.core.series import Series
+from typing import List, Optional, Union
 
 
 class BaseballStats:
-    def __init__(self, load_seasons, new_season, only_nl_b=False,
-                 load_batter_file='stats-pp-Batting.csv', load_pitcher_file='stats-pp-Pitching.csv'):
+    def __init__(self, load_seasons: List[int], new_season: int, only_nl_b: bool = False,
+                 load_batter_file: str = 'stats-pp-Batting.csv',
+                 load_pitcher_file: str = 'stats-pp-Pitching.csv') -> None:
 
         self.rnd = lambda: np.random.default_rng().uniform(low=0.0, high=1.001)  # random generator between 0 and 1
 
@@ -66,7 +71,7 @@ class BaseballStats:
                                                           scale=self.batting_injury_avg_len / 2, size=1)[0])
         return
 
-    def get_batting_data(self, team_name=None, prior_season=True):
+    def get_batting_data(self, team_name: Optional[str] = None, prior_season: bool = True) -> DataFrame:
         # print(f'bbstats.py get_batting_data')
         if team_name is None:
             df = self.batting_data if prior_season else self.new_season_batting_data
@@ -79,7 +84,7 @@ class BaseballStats:
             # print(f'bbstats.py get_batting_data returned df {team_name} {df}')
         return df
 
-    def get_pitching_data(self, team_name=None, prior_season=True):
+    def get_pitching_data(self, team_name: Optional[str] = None, prior_season: bool = True) -> DataFrame:
         if team_name is None:
             df = self.pitching_data if prior_season else self.new_season_pitching_data
         else:
@@ -88,7 +93,7 @@ class BaseballStats:
             df = df_cur if prior_season else df_new
         return df
 
-    def get_seasons(self, batter_file, pitcher_file):
+    def get_seasons(self, batter_file: str, pitcher_file: str) -> None:
         new_pitcher_file = 'New-Season-' + pitcher_file
         new_batter_file = 'New-Season-' + batter_file
         seasons_str = " ".join(str(season) for season in self.load_seasons)
@@ -181,20 +186,20 @@ class BaseballStats:
         print(f'bbstats update season stats {self.new_season_pitching_data.to_string(justify="right")}')
         return
 
-    def print_current_season(self, teams=None, summary_only_b=False):
+    def print_current_season(self, teams: Optional[List[str]]=None, summary_only_b: bool=False) -> None:
         teams = list(self.batting_data.Team.unique()) if teams is None else teams
         self.print_season(team_batting_stats(self.new_season_batting_data),
                           team_pitching_stats(self.new_season_pitching_data), teams=teams,
                           summary_only_b=summary_only_b)
         return
 
-    def print_prior_season(self, teams=None, summary_only_b=False):
+    def print_prior_season(self, teams: None=None, summary_only_b: bool=False) -> None:
         teams = list(self.batting_data.Team.unique()) if teams is None else teams
         self.print_season(team_batting_stats(self.batting_data), team_pitching_stats(self.pitching_data), teams=teams,
                           summary_only_b=summary_only_b)
         return
 
-    def print_season(self, df_b, df_p, teams, summary_only_b=False, condition_text=True):
+    def print_season(self, df_b: DataFrame, df_p: DataFrame, teams: List[str], summary_only_b: bool=False, condition_text: bool=True) -> None:
         teams.append('')  # add blank team for totals
         if condition_text:
             df_p['Condition'] = df_p['Condition'].apply(condition_txt_f)  # apply condition_txt static func
@@ -221,28 +226,28 @@ class BaseballStats:
 
 
 # static function start
-def randomize_mascots(length):
-    with open('animals.txt', 'r') as f:
-        animals = f.readlines()
-    animals = [animal.strip() for animal in animals]
-    mascots = random.sample(animals, length)
-    return mascots
+# def randomize_mascots(length: int) -> list:
+#     with open('animals.txt', 'r') as f:
+#         animals = f.readlines()
+#     animals = [animal.strip() for animal in animals]
+#     mascots = random.sample(animals, length)
+#     return mascots
 
 
-def injured_list_f(idays):
+def injured_list_f(idays: int) -> str:
     # mlb is 10 for pos min, 15 for pitcher min, and 60 day
     return 'Active' if idays == 0 else \
         '10 Day DL' if idays <= 10 else '15 Day DL' if idays <= 15 else '60 Day DL'
 
 
-def condition_txt_f(condition):
+def condition_txt_f(condition: int) -> str:
     return 'Peak' if condition > 75 else \
         'Healthy' if condition > 51 else \
         'Tired' if condition > 33 else \
         'Exhausted'
 
 
-def remove_non_print_cols(df):
+def remove_non_print_cols(df: DataFrame) -> DataFrame:
     non_print_cols = {'Season', 'Total_OB', 'AVG_faced', 'Game_Fatigue_Factor'}  # 'Total_Outs',
     cols_to_drop = non_print_cols.intersection(df.columns)
     if cols_to_drop:
@@ -250,11 +255,11 @@ def remove_non_print_cols(df):
     return df
 
 
-def trunc_col(df_n, d=3):
+def trunc_col(df_n: Union[ndarray, Series], d: int = 3) -> Union[ndarray, Series]:
     return (df_n * 10 ** d).astype(int) / 10 ** d
 
 
-def team_batting_stats(df):
+def team_batting_stats(df: DataFrame) -> DataFrame:
     df = df[df['AB'] > 0]
     df['AVG'] = trunc_col(np.nan_to_num(np.divide(df['H'], df['AB']), nan=0.0, posinf=0.0), 3)
     df['OBP'] = trunc_col(np.nan_to_num(np.divide(df['H'] + df['BB'] + df['HBP'], df['AB'] + df['BB'] + df['HBP']),
@@ -266,7 +271,7 @@ def team_batting_stats(df):
     return df
 
 
-def team_pitching_stats(df):
+def team_pitching_stats(df: DataFrame) -> DataFrame:
     # hbp is 0, 2b are 0, 3b are 0
     df = df[(df['IP'] > 0) & (df['AB'] > 0)]
     df['AB'] = trunc_col(df['AB'], 0)
@@ -287,7 +292,7 @@ def team_pitching_stats(df):
     return df
 
 
-def team_batting_totals(batting_df, team_name='', concat=True):
+def team_batting_totals(batting_df: DataFrame, team_name: str = '', concat: bool = True) -> DataFrame:
     df = batting_df[['AB', 'R', 'H', '2B', '3B', 'HR', 'RBI', 'SB', 'CS', 'BB', 'SO', 'SH', 'SF', 'HBP']].sum()
     df['Player'] = 'Totals'
     df['Team'] = team_name
@@ -304,7 +309,7 @@ def team_batting_totals(batting_df, team_name='', concat=True):
     return df
 
 
-def team_pitching_totals(pitching_df, team_name='', concat=True):
+def team_pitching_totals(pitching_df: DataFrame, team_name: str = '', concat: bool = True) -> DataFrame:
     df = pitching_df[['GS', 'CG', 'SHO', 'IP', 'AB', 'H', '2B', '3B', 'ER', 'K', 'BB', 'HR', 'W', 'L', 'SV', 'BS',
                       'HLD', 'Total_Outs']].sum()
     df = df.to_frame().T
@@ -330,8 +335,7 @@ if __name__ == '__main__':
     # baseball_data.print_prior_season()
     # baseball_data.print_current_season(teams=teams)
     my_teams = []
-    my_teams.append('MIL' if 'MIL' in baseball_data.get_all_team_names() else \
-        baseball_data.get_all_team_names()[0])
+    my_teams.append('MIL' if 'MIL' in baseball_data.get_all_team_names() else baseball_data.get_all_team_names()[0])
     # my_teams.append('BOS')
     for team in my_teams:
         print(baseball_data.get_pitching_data(team_name=team, prior_season=True).to_string())

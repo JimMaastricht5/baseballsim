@@ -13,11 +13,14 @@ HOME = 1
 
 
 class Game:
-    def __init__(self, away_team_name: str='', home_team_name: str='', baseball_data: None=None, game_num: int=1, rotation_len: int=5,
-                 print_lineup: bool=False, chatty: bool=False, print_box_score_b: bool=False, load_seasons: List[int]=2023, new_season: int=2024,
-                 starting_pitchers: None=None, starting_lineups: None=None,
-                 load_batter_file: str='player-stats-Batters.csv', load_pitcher_file: str='player-stats-Pitching.csv',
-                 interactive: bool=False, show_bench: bool=False) -> None:
+    def __init__(self, away_team_name: str = '', home_team_name: str = '', baseball_data: None = None,
+                 game_num: int = 1, rotation_len: int = 5,
+                 print_lineup: bool = False, chatty: bool = False, print_box_score_b: bool = False,
+                 load_seasons: List[int] = 2023, new_season: int = 2024,
+                 starting_pitchers: None = None, starting_lineups: None = None,
+                 load_batter_file: str = 'player-stats-Batters.csv',
+                 load_pitcher_file: str = 'player-stats-Pitching.csv',
+                 interactive: bool = False, show_bench: bool = False) -> None:
         if baseball_data is None:
             self.baseball_data = bbstats.BaseballStats(load_seasons=load_seasons, new_season=new_season,
                                                        load_batter_file=load_batter_file,
@@ -100,7 +103,7 @@ class Game:
         return self.score_diff() >= 0 and self.inning[self.team_hitting()] >= 7
 
     # noinspection PyTypeChecker
-    def update_inning_score(self, number_of_runs: int=0) -> None:
+    def update_inning_score(self, number_of_runs: int = 0) -> None:
         if len(self.inning_score) <= self.inning[self.team_hitting()]:  # header rows + rows in score must = innings
             self.inning_score.append([self.inning[self.team_hitting()], '', ''])  # expand scores by new inning
 
@@ -163,7 +166,8 @@ class Game:
             runner_stats = self.teams[self.team_hitting()].pos_player_prior_year_stats(runner_key)
             # scale steal attempts with frequency of stealing when on base
             # runner_stats.SB + runner_stats.CS >= self.min_steal_attempts and \
-            if self.rng() <= (runner_stats.SB + runner_stats.CS) / (runner_stats.H + runner_stats.BB) * self.steal_multiplier:
+            if self.rng() <= (runner_stats.SB + runner_stats.CS) / (runner_stats.H + runner_stats.BB) \
+                    * self.steal_multiplier:
                 if self.rng() <= (runner_stats.SB / (runner_stats.SB + runner_stats.CS)):  # successful steal
                     self.bases.push_a_runner(1, 2)  # move runner from 1st to second
                     self.teams[self.team_hitting()].box_score.steal_result(runner_key, True)  # stole the base
@@ -304,7 +308,7 @@ class Game:
         self.print_inning_score()
         return
 
-    def sim_game(self, team_to_follow: str='') -> Tuple[List[int], List[int], List[List[int]]]:
+    def sim_game(self, team_to_follow: str = '') -> Tuple[List[int], List[int], List[List[int]]]:
         if team_to_follow in self.team_names:
             print(f'Following team: {team_to_follow}')
             self.chatty = True
@@ -327,7 +331,8 @@ if __name__ == '__main__':
     home_team = 'CHC'
     # away_team = 'SAN'
     # home_team = 'TEM'
-    MIL_lineup = {647549: 'LF', 239398: 'C', 224423: '1B', 138309: 'DH', 868055: 'CF', 520723: 'SS', 299454: '3B', 46074: '2B', 752787: 'RF'}
+    MIL_lineup = {647549: 'LF', 239398: 'C', 224423: '1B', 138309: 'DH', 868055: 'CF', 520723: 'SS',
+                  299454: '3B', 46074: '2B', 752787: 'RF'}
     BOS_starter = 516876
     MIL_starter = 993801
     sims = 1

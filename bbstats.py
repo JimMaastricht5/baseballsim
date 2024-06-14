@@ -1,6 +1,4 @@
 import pandas as pd
-import random
-# import city_names as city
 import numpy as np
 from numpy import ndarray
 from pandas.core.frame import DataFrame
@@ -186,20 +184,21 @@ class BaseballStats:
         print(f'bbstats update season stats {self.new_season_pitching_data.to_string(justify="right")}')
         return
 
-    def print_current_season(self, teams: Optional[List[str]]=None, summary_only_b: bool=False) -> None:
+    def print_current_season(self, teams: Optional[List[str]] = None, summary_only_b: bool = False) -> None:
         teams = list(self.batting_data.Team.unique()) if teams is None else teams
         self.print_season(team_batting_stats(self.new_season_batting_data),
                           team_pitching_stats(self.new_season_pitching_data), teams=teams,
                           summary_only_b=summary_only_b)
         return
 
-    def print_prior_season(self, teams: None=None, summary_only_b: bool=False) -> None:
+    def print_prior_season(self, teams: Optional[List[str]] = None, summary_only_b: bool = False) -> None:
         teams = list(self.batting_data.Team.unique()) if teams is None else teams
         self.print_season(team_batting_stats(self.batting_data), team_pitching_stats(self.pitching_data), teams=teams,
                           summary_only_b=summary_only_b)
         return
 
-    def print_season(self, df_b: DataFrame, df_p: DataFrame, teams: List[str], summary_only_b: bool=False, condition_text: bool=True) -> None:
+    def print_season(self, df_b: DataFrame, df_p: DataFrame, teams: List[str],
+                     summary_only_b: bool = False, condition_text: bool = True) -> None:
         teams.append('')  # add blank team for totals
         if condition_text:
             df_p['Condition'] = df_p['Condition'].apply(condition_txt_f)  # apply condition_txt static func
@@ -223,15 +222,6 @@ class BaseballStats:
         print(df_totals[self.numeric_bcols].to_string(justify='right', index=False))
         print('\n\n')
         return
-
-
-# static function start
-# def randomize_mascots(length: int) -> list:
-#     with open('animals.txt', 'r') as f:
-#         animals = f.readlines()
-#     animals = [animal.strip() for animal in animals]
-#     mascots = random.sample(animals, length)
-#     return mascots
 
 
 def injured_list_f(idays: int) -> str:

@@ -10,8 +10,9 @@ from typing import List, Optional
 
 
 class BaseballStatsPreProcess:
-    def __init__(self, load_seasons: List[int], new_season: Optional[int]=None, generate_random_data: bool=False,
-                 load_batter_file: str='player-stats-Batters.csv', load_pitcher_file: str='player-stats-Pitching.csv') -> None:
+    def __init__(self, load_seasons: List[int], new_season: Optional[int] = None, generate_random_data: bool = False,
+                 load_batter_file: str = 'player-stats-Batters.csv',
+                 load_pitcher_file: str = 'player-stats-Pitching.csv') -> None:
         self.create_hash = lambda text: int(hashlib.sha256(text.encode('utf-8')).hexdigest()[:5], 16)
         self.jigger_data = lambda x: x + int(np.abs(np.random.normal(loc=x * .10, scale=2, size=1)))
 
@@ -77,7 +78,8 @@ class BaseballStatsPreProcess:
         duplicates = filtered_df.duplicated(keep=False)  # keep both rows
         return df[duplicates]
 
-    def de_dup_df(self, df: DataFrame, key_name: str, dup_column_names: str, stats_cols_to_sum: List[str], drop_dups: bool=False) -> DataFrame:
+    def de_dup_df(self, df: DataFrame, key_name: str, dup_column_names: str,
+                  stats_cols_to_sum: List[str], drop_dups: bool = False) -> DataFrame:
         dup_hashcodes = self.find_duplicate_rows(df=df, column_names=dup_column_names)
         for dfrow_key in dup_hashcodes[key_name].unique():
             df_rows = df.loc[df[key_name] == dfrow_key]
@@ -304,7 +306,7 @@ class BaseballStatsPreProcess:
             self.new_season_batting_data = self.new_season_batting_data.fillna(0)
         return
 
-    def trunc_col(self, df_n: ndarray, d: int=3) -> ndarray:
+    def trunc_col(self, df_n: ndarray, d: int = 3) -> ndarray:
         return (df_n * 10 ** d).astype(int) / 10 ** d
 
 

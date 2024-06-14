@@ -3,7 +3,6 @@ import warnings
 import bbstats
 from numpy import bool_, float64
 from pandas.core.series import Series
-from typing import Union
 
 
 class OutCome:
@@ -47,7 +46,7 @@ class OutCome:
 
 
 class SimAB:
-    def __init__(self, baseball_data:     bbstats.BaseballStats) -> None:
+    def __init__(self, baseball_data: bbstats.BaseballStats) -> None:
         self.rng = lambda: np.random.default_rng().uniform(low=0.0, high=1.001)  # random generator between 0 and 1
         self.dice_roll = None
         self.pitching = None
@@ -84,13 +83,12 @@ class SimAB:
         self.tag_up_chance = .20  # 20% chance of tagging up and scoring, per mlb
         return
 
-    def onbase(self) -> bool_:
-        # print('at_bat.py onbase: ' + str(self.odds_ratio(self.batting.OBP, self.pitching.OBP, self.league_batting_obp)))
+    def onbase(self) -> bool:
         return self.rng() < self.odds_ratio(self.batting.OBP + self.pitching.Game_Fatigue_Factor + self.OBP_adjustment,
                                             self.pitching.OBP + self.pitching.Game_Fatigue_Factor + self.OBP_adjustment,
                                             self.league_batting_obp + self.OBP_adjustment, stat_type='obp')
 
-    def bb(self) -> bool_:
+    def bb(self) -> bool:
         return self.rng() < self.odds_ratio(((self.batting.BB + self.BB_adjustment) / self.batting.Total_OB),
                                             ((self.pitching.BB + self.BB_adjustment) / self.pitching.Total_OB),
                                             ((self.league_batting_Total_BB + self.BB_adjustment) /
@@ -106,14 +104,14 @@ class SimAB:
         # self.league_batting_Total_OB),
         # stat_type='HBP')
 
-    def hr(self) -> bool_:
+    def hr(self) -> bool:
         return self.rng() < self.odds_ratio(((self.batting.HR + self.HR_adjustment) / self.batting.Total_OB),
                                             ((self.pitching.HR + self.HR_adjustment) / self.pitching.Total_OB),
                                             ((self.league_batting_Total_HR + self.HR_adjustment) /
                                             self.league_batting_Total_OB),
                                             stat_type='HR')
 
-    def triple(self) -> bool_:
+    def triple(self) -> bool:
         # do not have league pitching total for 3b so push it to zero and make it a neutral factor
         return self.rng() < self.odds_ratio(hitter_stat=(self.batting['3B'] / self.batting.Total_OB), pitcher_stat=.016,
                                             league_stat=(self.league_batting_Total_3B / self.league_batting_Total_OB),
@@ -127,12 +125,12 @@ class SimAB:
                                                          self.league_batting_Total_OB),
                                             stat_type='2B')
 
-    def k(self) -> bool_:
+    def k(self) -> bool:
         return self.rng() < self.odds_ratio((self.batting['SO'] / self.batting.Total_Outs),
                                             (self.pitching['K'] / self.pitching.Total_Outs),
                                             self.league_K_rate_per_AB, stat_type='K')
 
-    def gb_fo_lo(self, outs: int=0, runner_on_first: Union[bool, bool_]=False, runner_on_third: Union[bool, bool_]=False) -> str:
+    def gb_fo_lo(self, outs: int = 0, runner_on_first: bool = False, runner_on_third: bool = False) -> str:
         self.dice_roll = self.rng()
         if self.dice_roll <= self.league_GB:  # ground out
             score_book_cd = 'GB'
@@ -149,7 +147,8 @@ class SimAB:
             score_book_cd = 'LD'  # line drive
         return score_book_cd
 
-    def outcome(self, pitching: Series, batting: Series, outcomes: OutCome, outs: int=0, runner_on_first: Union[bool, bool_]=False, runner_on_third: Union[bool, bool_]=False) -> None:
+    def outcome(self, pitching: Series, batting: Series, outcomes: OutCome, outs: int = 0,
+                runner_on_first: bool = False, runner_on_third: bool = False) -> None:
         # tree of the various odds of an event, each event is yes/no.  Onbase? Yes -> BB? no -> Hit yes (stop)
         # outcome: on base or out pos 0, how in pos 1, bases to advance in pos 2, rbis in pos 3
         self.pitching = pitching
@@ -186,7 +185,8 @@ class SimAB:
     # (.380 / .620)(.300 / .700) * (.350 / .650)
     # Odds(matchup) = .590 -> Matchup OBP = .590 / 1.590 = .371
     #
-    def odds_ratio(self, hitter_stat: float64, pitcher_stat: Union[float64, float], league_stat: float64, stat_type: str='') -> float64:
+    def odds_ratio(self, hitter_stat: float64, pitcher_stat: float64,
+                   league_stat: float64, stat_type: str = '') -> float64:
         # print(f'at_bat.odds ratio, hitter stat:{hitter_stat}, pitcher stat{pitcher_stat}')
         odds = 0
         with warnings.catch_warnings():
@@ -205,4 +205,4 @@ class SimAB:
                 print("Warning caught:", warning)
                 print(self.batting)
                 print(self.pitching)
-        return odds / (1 + odds)
+        return float64(odds / (1 + odds))

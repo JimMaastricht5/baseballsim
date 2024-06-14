@@ -4,17 +4,19 @@ import pandas as pd
 import bbgame
 import bbstats
 import numpy as np
-from typing import List
+from typing import List, Optional
 
 AWAY = 0
 HOME = 1
 
 
 class BaseballSeason:
-    def __init__(self, load_seasons: List[int], new_season: int, team_list: None=None, season_length_limit: int=0, min_games: int=0, series_length: int=1,
-                 rotation_len: int=5, only_nl_b: bool=False, interactive: bool=False,
-                 load_batter_file: str='stats-pp-Batting.csv',
-                 load_pitcher_file: str='stats-pp-Pitching.csv') -> None:
+    def __init__(self, load_seasons: List[int], new_season: int, team_list: Optional[list] = None,
+                 season_length_limit: int = 0,
+                 min_games: int = 0, series_length: int = 1,
+                 rotation_len: int = 5, only_nl_b: bool = False, interactive: bool = False,
+                 load_batter_file: str = 'stats-pp-Batting.csv',
+                 load_pitcher_file: str = 'stats-pp-Pitching.csv') -> None:
         self.season_length_limit = season_length_limit  # zero mean there is no limit, based on schedule parameters
         self.min_games = min_games
         self.series_length = series_length
@@ -90,8 +92,9 @@ class BaseballSeason:
             np.add(np.array(self.team_win_loss[home_team_name]), np.array(win_loss[1])))
         return
 
-    def sim_season(self, season_chatty: bool=False, season_print_lineup_b: bool=False, season_print_box_score_b: bool=False,
-                   summary_only_b: bool=False, team_to_follow: str='') -> None:
+    def sim_season(self, season_chatty: bool = False, season_print_lineup_b: bool = False,
+                   season_print_box_score_b: bool = False,
+                   summary_only_b: bool = False, team_to_follow: str = '') -> None:
         print(f'{self.new_season} will have '
               f'{self.season_length_limit if self.season_length_limit != 0 else len(self.schedule)} games per team.')
         # print(f'Full schedule of games: {self.schedule}')
@@ -152,7 +155,7 @@ if __name__ == '__main__':
     startdt = datetime.datetime.now()
 
     # full season
-    num_games = 162 - 42  # 42 games already played
+    # num_games = 162 - 42  # 42 games already played
     num_games = 10
     only_national_league_teams = False
     interactive_keyboard_pauses = False
@@ -161,10 +164,8 @@ if __name__ == '__main__':
                                 min_games=num_games, series_length=3, rotation_len=5,
                                 only_nl_b=only_national_league_teams,
                                 interactive=interactive_keyboard_pauses,
-                                load_batter_file='random-stats-pp-Batting.csv',
-                                load_pitcher_file='random-stats-pp-Pitching.csv')
-                                # load_batter_file = 'stats-pp-Batting.csv',
-                                # load_pitcher_file = 'stats-pp-Pitching.csv')
+                                load_batter_file='random-stats-pp-Batting.csv',  # 'stats-pp-Batting.csv',
+                                load_pitcher_file='random-stats-pp-Pitching.csv')  # 'stats-pp-Pitching.csv'
     # team_to_follow = bbseason23.teams[0]  # follow the first team in the random set
     # my_teams_to_follow = 'MIL'  # or follow no team
     my_teams_to_follow = 'MIL' if 'MIL' in bbseason23.teams else bbseason23.teams[0]

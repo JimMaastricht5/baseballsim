@@ -2,6 +2,7 @@ import numpy as np
 from numpy import bool_, int32
 from typing import Union
 
+
 class Bases:
     def __init__(self) -> None:
         self.baserunners = None
@@ -44,7 +45,7 @@ class Bases:
             self.remove_runner(1)
         return 1  # advance remaining runners and batter on an GB FC one base
 
-    def new_ab(self, batter_num: int=1, player_name: str='') -> None:
+    def new_ab(self, batter_num: int = 1, player_name: str = '') -> None:
         self.add_runner_to_base(0, batter_num, player_name)
         # self.baserunners[0] = batter_num  # put a player ab
         # self.baserunners_names[batter_num] = player_name  # add player name to lookup table
@@ -55,7 +56,7 @@ class Bases:
         self.runs_scored = 0
         return
 
-    def add_runner_to_base(self, base_num: int, batter_num: int, player_name: str='') -> None:
+    def add_runner_to_base(self, base_num: int, batter_num: int, player_name: str = '') -> None:
         self.baserunners[base_num] = batter_num
         if player_name != '':
             self.baserunners_names[batter_num] = player_name  # add name to look up table

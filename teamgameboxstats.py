@@ -82,7 +82,7 @@ class TeamBoxScore:
         self.box_pitching.loc[pitcher_index, ['BS']] = 1
         return
 
-    def steal_result(self, runner_index: int32, steal: bool=True) -> None:
+    def steal_result(self, runner_index: int32, steal: bool = True) -> None:
         runner_stats = self.box_batting.loc[runner_index].copy()
         if steal:
             runner_stats['SB'] += 1

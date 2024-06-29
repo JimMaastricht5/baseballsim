@@ -111,6 +111,8 @@ class BaseballStats:
         if self.only_nl_b:
             self.pitching_data = self.pitching_data[self.pitching_data['Team'].isin(self.nl)]
             self.batting_data = self.batting_data[self.batting_data['Team'].isin(self.nl)]
+        self.pitching_data['Condition'] = self.pitching_data['Condition'].astype(float)  # cast float for game fraction
+        self.batting_data['Condition'] = self.batting_data['Condition'].astype(float)  # cast float for game fraction
         return
 
     def game_results_to_season(self, box_score_class):

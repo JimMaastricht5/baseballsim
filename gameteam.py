@@ -123,7 +123,7 @@ class Team:
         for row_num in range(0, len(self.prior_season_lineup_df)):
             #     self.cur_lineup_index_list.append(self.prior_season_lineup_df.index[row_num])
             player_index = self.prior_season_lineup_df.index[row_num]  # grab the index of the player
-            self.prior_season_lineup_df.Pos[player_index] = pos_index_dict[player_index]  # set fielding pos in lineup
+            self.prior_season_lineup_df[player_index, 'Pos'] = pos_index_dict[player_index]  # set fielding pos in lineup
         return
 
     def dynamic_lineup(self) -> Dict[int64, str]:

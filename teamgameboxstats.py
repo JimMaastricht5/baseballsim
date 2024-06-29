@@ -13,9 +13,10 @@ class TeamBoxScore:
         # self.rnd = lambda: np.random.default_rng().uniform(low=0.0, high=1.001)  # random generator between 0 and 1
         self.box_pitching = pitching.copy()
         self.box_pitching[['G', 'GS']] = 1
-        self.box_pitching[['CG', 'SHO', 'IP', 'AB', 'H', '2B', '3B', 'ER', 'K', 'BB', 'HR', 'W', 'L', 'SV', 'BS',
-                           'HLD', 'ERA', 'WHIP',
-                           'OBP', 'SLG', 'OPS', 'Total_Outs']] = 0
+        self.box_pitching[['CG', 'SHO', 'AB', 'H', '2B', '3B', 'ER', 'K', 'BB', 'HR', 'W', 'L', 'SV', 'BS',
+                           'HLD']] = 0
+        self.box_pitching[['IP', 'ERA', 'WHIP', 'OBP', 'SLG', 'OPS', 'Total_Outs']] = 0.0
+        self.box_pitching['Condition'] = self.box_pitching['Condition'].astype(float)
         # self.box_pitching.drop(['Season', 'Total_OB', 'Total_Outs'], axis=1, inplace=True)
         self.box_pitching = bbstats.remove_non_print_cols(self.box_pitching)
         self.team_box_pitching = None
@@ -23,8 +24,9 @@ class TeamBoxScore:
 
         self.box_batting = lineup.copy()
         self.box_batting[['G']] = 1
-        self.box_batting[['AB', 'R', 'H', '2B', '3B', 'HR', 'RBI', 'SB', 'CS', 'BB', 'SO', 'SH', 'SF', 'HBP', 'AVG',
-                          'OBP', 'SLG', 'OPS']] = 0
+        self.box_batting[['AB', 'R', 'H', '2B', '3B', 'HR', 'RBI', 'SB', 'CS', 'BB', 'SO', 'SH', 'SF', 'HBP']] = 0
+        self.box_batting[['AVG', 'OBP', 'SLG', 'OPS']] = 0.0
+        self.box_batting['Condition'] = self.box_batting['Condition'].astype(float)
         self.box_batting = bbstats.remove_non_print_cols(self.box_batting)
         self.team_box_batting = None
         self.game_batting_stats = None
@@ -53,7 +55,7 @@ class TeamBoxScore:
             row[outcomes.score_book_cd] += 1
         row['H'] += (outcomes.score_book_cd not in ['BB', 'H'] and outcomes.on_base_b)  # add 1 if true else 0
         row['ER'] += outcomes.runs_scored
-        row['Condition'] = condition
+        row['Condition'] = float(condition)
         self.box_pitching.loc[pitcher_index] = row  # Write the row back to the DataFrame
         return
 
@@ -61,7 +63,7 @@ class TeamBoxScore:
         new_pitcher = new_pitcher if isinstance(new_pitcher, pd.DataFrame) else new_pitcher.to_frame().T
         new_pitcher = new_pitcher.assign(G=1, GS=0, CG=0, SHO=0, IP=0, AB=0, H=0, ER=0, K=0, BB=0, HR=0,
                                          W=0, L=0, SV=0, BS=0, HLD=0, ERA=0,
-                                         WHIP=0, OBP=0, SLG=0, OPS=0, Total_Outs=0, Condition=100)  # ?? ISSUE!!!
+                                         WHIP=0, OBP=0, SLG=0, OPS=0, Total_Outs=0, Condition=100.0)  # ?? ISSUE!!!
         self.box_pitching = pd.concat([self.box_pitching, new_pitcher], ignore_index=False)
         return
 
@@ -73,8 +75,10 @@ class TeamBoxScore:
             self.box_pitching.loc[pitcher_index, ['L']] += 1
         if save_b:  # add one to save col for last row in box for team is save boolean is true
             self.box_pitching.loc[self.box_pitching.index[-1], ['SV']] += 1
-            if float(self.box_pitching.loc[self.box_pitching.index[-1], ['IP']]) < 2.0 and \
-                    float(self.box_pitching.loc[self.box_pitching.index[-2], ['IP']]) > 0:  # if save was not 2 innings
+            ip_last_pitcher = self.box_pitching.loc[self.box_pitching.index[-1], ['IP']]
+            ip_second_to_last_pitcher = self.box_pitching.loc[self.box_pitching.index[-2], ['IP']]
+            print(f'pitching_win_loss_save {ip_last_pitcher}')
+            if float(ip_last_pitcher) < 2.0 and ip_second_to_last_pitcher > 0:  # if save was not 2 innings
                 self.box_pitching.loc[self.box_pitching.index[-2], ['HLD']] += 1,
         return
 

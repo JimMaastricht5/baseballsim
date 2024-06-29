@@ -18,6 +18,7 @@ def retrieve_war(war_season, war_file_name, hashfunc, debug=False):
     df = df.fillna(0)
     return df
 
+
 def set_league_min_salary(df):
     if df is not None:
         league_min_salary_2013 = 720000
@@ -26,6 +27,7 @@ def set_league_min_salary(df):
         df = df.fillna(0)
         df['salary'] = df['salary'].apply(lambda x: league_min_salary if x < league_min_salary else x)
     return df
+
 
 def impute_war_salary(df, debug=False):
     # na must be replaced with zero before this call

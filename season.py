@@ -164,8 +164,8 @@ if __name__ == '__main__':
                                 min_games=num_games, series_length=3, rotation_len=5,
                                 only_nl_b=only_national_league_teams,
                                 interactive=interactive_keyboard_pauses,
-                                load_batter_file='random-stats-pp-Batting.csv',  # 'stats-pp-Batting.csv',
-                                load_pitcher_file='random-stats-pp-Pitching.csv')  # 'stats-pp-Pitching.csv'
+                                load_batter_file='stats-pp-Batting.csv',  # 'random-stats-pp-Batting.csv',
+                                load_pitcher_file='stats-pp-Pitching.csv')  # 'random-stats-pp-Pitching.csv'
     # team_to_follow = bbseason23.teams[0]  # follow the first team in the random set
     # my_teams_to_follow = 'MIL'  # or follow no team
     my_teams_to_follow = 'MIL' if 'MIL' in bbseason23.teams else bbseason23.teams[0]

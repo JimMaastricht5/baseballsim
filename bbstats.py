@@ -131,6 +131,7 @@ class BaseballStats:
                       self.new_season_pitching_data.loc[index][self.numeric_pcols]
             new_row['Condition'] = pitching_box_score.loc[index, 'Condition']
             new_row['Injured Days'] = pitching_box_score.loc[index, 'Injured Days']
+            # print(f'game_results_to_season bbstats.py new pitching row {new_row.to_string()}')
             self.new_season_pitching_data.loc[index, self.numeric_pcols] = new_row
         return
 

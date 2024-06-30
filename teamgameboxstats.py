@@ -75,11 +75,12 @@ class TeamBoxScore:
             self.box_pitching.loc[pitcher_index, ['L']] += 1
         if save_b:  # add one to save col for last row in box for team is save boolean is true
             self.box_pitching.loc[self.box_pitching.index[-1], ['SV']] += 1
-            ip_last_pitcher = self.box_pitching.loc[self.box_pitching.index[-1], ['IP']]
-            ip_second_to_last_pitcher = self.box_pitching.loc[self.box_pitching.index[-2], ['IP']]
-            print(f'pitching_win_loss_save {ip_last_pitcher}')
-            if float(ip_last_pitcher) < 2.0 and ip_second_to_last_pitcher > 0:  # if save was not 2 innings
-                self.box_pitching.loc[self.box_pitching.index[-2], ['HLD']] += 1,
+            # ip_last_pitcher = self.box_pitching.loc[self.box_pitching.index[-1], ['IP']]
+            # ip_second_to_last_pitcher = self.box_pitching.loc[self.box_pitching.index[-2], ['IP']]
+            # print(f'pitching_win_loss_save {ip_last_pitcher}')
+            if (float(self.box_pitching.loc[self.box_pitching.index[-1], 'IP']) < 2.0 and
+                    float(self.box_pitching.loc[self.box_pitching.index[-2], 'IP']) > 0):  # if save was not 2 innings
+                self.box_pitching.loc[self.box_pitching.index[-2], 'HLD'] += 1
         return
 
     def pitching_blown_save(self, pitcher_index):

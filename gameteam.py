@@ -1,5 +1,5 @@
 import pandas as pd
-import teamgameboxstats
+import gameteamboxstats
 import bbstats
 from numpy import bool_, float64, int32, int64
 from pandas.core.series import Series
@@ -88,7 +88,7 @@ class Team:
             self.print_starting_lineups(current_season_stats=current_season_stats)
         if show_bench:
             self.print_pos_not_in_lineup(current_season_stats=current_season_stats)
-        self.box_score = teamgameboxstats.TeamBoxScore(self.prior_season_lineup_df, self.prior_season_pitching_df,
+        self.box_score = gameteamboxstats.TeamBoxScore(self.prior_season_lineup_df, self.prior_season_pitching_df,
                                                        self.team_name)
         return
 
@@ -371,7 +371,7 @@ class Team:
             self.insert_player_in_lineup(player_index=pos_player_bench_index, target_pos=target_pos)
             self.cur_lineup_index_list.remove(cur_player_index)
             self.set_prior_and_new_pos_player_batting_bench_dfs()
-            self.box_score = teamgameboxstats.TeamBoxScore(self.prior_season_lineup_df, self.prior_season_pitching_df,
+            self.box_score = gameteamboxstats.TeamBoxScore(self.prior_season_lineup_df, self.prior_season_pitching_df,
                                                            self.team_name)  # update box score
         else:
             print(f'Player Index is {pos_player_bench_index} is not on the team.  No substitution made')

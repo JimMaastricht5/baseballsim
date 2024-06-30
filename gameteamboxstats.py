@@ -16,8 +16,9 @@ class TeamBoxScore:
         self.box_pitching[['CG', 'SHO', 'AB', 'H', '2B', '3B', 'ER', 'K', 'BB', 'HR', 'W', 'L', 'SV', 'BS',
                            'HLD']] = 0
         self.box_pitching[['IP', 'ERA', 'WHIP', 'OBP', 'SLG', 'OPS', 'Total_Outs']] = 0.0
-        self.box_pitching['Condition'] = self.box_pitching['Condition'].astype(float)
-        # self.box_pitching.drop(['Season', 'Total_OB', 'Total_Outs'], axis=1, inplace=True)
+        pcols_to_convert = ['IP', 'ERA', 'WHIP', 'OBP', 'SLG', 'OPS', 'Total_Outs', 'Condition',
+                            'AVG_faced', 'Game_Fatigue_Factor']  # make sure these are floats
+        self.box_pitching[pcols_to_convert] = self.box_pitching[pcols_to_convert].astype(float)
         self.box_pitching = bbstats.remove_non_print_cols(self.box_pitching)
         self.team_box_pitching = None
         self.game_pitching_stats = None

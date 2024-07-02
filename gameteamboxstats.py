@@ -149,4 +149,6 @@ class TeamBoxScore:
         return self.game_batting_stats
 
     def get_pitcher_game_stats(self):
+        # 2b and 3b slide toward object types, make sure they are ints
+        self.game_pitching_stats[['2B', '3B']] = self.game_pitching_stats[['2B', '3B']].astype(int)
         return self.game_pitching_stats

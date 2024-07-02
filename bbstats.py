@@ -113,7 +113,7 @@ class BaseballStats:
             self.batting_data = self.batting_data[self.batting_data['Team'].isin(self.nl)]
 
         # cast cols to float, may not be needed, best to be certain
-        pcols_to_convert = ['Condition', 'ERA', 'WHIP', 'OBP', 'AVG_faced', 'Game_Fatigue_Factor']
+        pcols_to_convert = ['Condition', 'IP', 'ERA', 'WHIP', 'OBP', 'AVG_faced', 'Game_Fatigue_Factor']
         self.pitching_data[pcols_to_convert] = self.pitching_data[pcols_to_convert].astype(float)
         self.batting_data['Condition'] = self.batting_data['Condition'].astype(float)
         self.new_season_pitching_data[pcols_to_convert] = self.new_season_pitching_data[pcols_to_convert].astype(float)
@@ -133,6 +133,9 @@ class BaseballStats:
             self.new_season_batting_data.loc[index, 'Condition'] = batting_box_score.loc[index, 'Condition']
             self.new_season_batting_data.loc[index, 'Injured Days'] = batting_box_score.loc[index, 'Injured Days']
 
+        # print(pitching_box_score[self.numeric_pcols].to_string())
+        # print(pitching_box_score[self.numeric_pcols].dtypes)
+        # print(self.new_season_pitching_data[self.numeric_pcols].dtypes)
         for index, row in pitching_box_score.iterrows():
 
             self.new_season_pitching_data.loc[index, self.numeric_pcols] = (
@@ -256,7 +259,7 @@ def remove_non_print_cols(df: DataFrame) -> DataFrame:
 
 
 def trunc_col(df_n: Union[ndarray, Series], d: int = 3) -> Union[ndarray, Series]:
-    return (df_n * 10 ** d).astype(int) / 10 ** d
+    return (df_n * 10 ** d) / 10 ** d
 
 
 def team_batting_stats(df: DataFrame) -> DataFrame:
@@ -339,6 +342,7 @@ if __name__ == '__main__':
     # my_teams.append('BOS')
     for team in my_teams:
         print(baseball_data.get_pitching_data(team_name=team, prior_season=True).to_string())
+        print(baseball_data.get_pitching_data(team_name=team, prior_season=True).dtypes)
         # print(baseball_data.get_pitching_data(team_name=team, prior_season=False).to_string())
-        print(baseball_data.get_batting_data(team_name=team, prior_season=True).to_string())
+        # print(baseball_data.get_batting_data(team_name=team, prior_season=True).to_string())
         # print(baseball_data.get_batting_data(team_name=team, prior_season=False).to_string())

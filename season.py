@@ -159,7 +159,7 @@ if __name__ == '__main__':
     num_games = 162
     only_national_league_teams = False
     interactive_keyboard_pauses = False
-    bbseason23 = BaseballSeason(load_seasons=[2023], new_season=2024,
+    bbseason23 = BaseballSeason(load_seasons=[2024], new_season=2024,
                                 season_length_limit=num_games,
                                 min_games=num_games, series_length=3, rotation_len=5,
                                 only_nl_b=only_national_league_teams,

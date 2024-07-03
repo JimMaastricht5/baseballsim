@@ -184,9 +184,12 @@ class BaseballStats:
 
         # copy over results in new season to prior season for game management
         self.pitching_data.loc[:, 'Condition'] = self.new_season_pitching_data.loc[:, 'Condition']
-        self.pitching_data.loc[:, 'Injured Days'] = self.new_season_pitching_data.loc[:, 'Injured Days']
+        # self.pitching_data.loc[:, 'Injured Days'] = self.new_season_pitching_data.loc[:, 'Injured Days']
+        self.pitching_data = update_column_with_other_df(self.pitching_data, 'Injured Days',
+                                                         self.new_season_pitching_data, 'Injured Days')
         self.batting_data.loc[:, 'Condition'] = self.new_season_batting_data.loc[:, 'Condition']
-        self.batting_data.loc[:, 'Injured Days'] = self.new_season_batting_data.loc[:, 'Injured Days']
+        self.batting_data = update_column_with_other_df(self.batting_data, 'Injured Days',
+                                                        self.new_season_batting_data, 'Injured Days')
         return
 
     def update_season_stats(self):
@@ -325,6 +328,18 @@ def team_pitching_totals(pitching_df: DataFrame, team_name: str = '', concat: bo
     cols_to_trunc = ['GS', 'CG', 'SHO', 'H', 'AB', 'ER', 'K', 'BB', 'HR', 'W', 'L', 'SV', 'BS', 'HLD', 'Total_Outs']
     df[cols_to_trunc] = df[cols_to_trunc].apply(np.floor)
     return df
+
+
+def update_column_with_other_df(df1, col1, df2, col2):
+    # Updates a column in df1 with values from df2 based on the index.
+    # Args:
+    #   df1 (pd.DataFrame): The DataFrame containing the column to update.
+    #   col1 (str): The name of the column in df1 to update.
+    #   df2 (pd.DataFrame): The DataFrame containing the reference values.
+    #   col2 (str): The name of the column in df2 to use for updates.
+    # Returns: pd.DataFrame: The updated DataFrame with the modified column.
+  df1.loc[df1.index, col1] = df1[col1].apply(lambda x: df2.loc[x, col2] if x in df2.index else 0)
+  return df1
 
 
 if __name__ == '__main__':

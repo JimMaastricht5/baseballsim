@@ -10,10 +10,14 @@ class BaseballStats:
     def __init__(self, load_seasons: List[int], new_season: int, only_nl_b: bool = False,
                  load_batter_file: str = 'stats-pp-Batting.csv',
                  load_pitcher_file: str = 'stats-pp-Pitching.csv') -> None:
-
+        """
+        :param load_seasons: list of seasons to load, each season is an integer year
+        :param new_season: integer value of year for new season
+        :param only_nl_b: keep on the national leagues data
+        :param load_batter_file: file name of the batting stats, year will be added as a prefix
+        :param load_pitcher_file: file name of the pitching stats, year will be added as a prefix
+        """
         self.rnd = lambda: np.random.default_rng().uniform(low=0.0, high=1.001)  # random generator between 0 and 1
-
-        # # create hash from a string, take first x digits and return an integer representation
         # self.create_hash = lambda text: int(hashlib.sha256(text.encode('utf-8')).hexdigest()[:5], 16)
 
         self.numeric_bcols = ['G', 'AB', 'R', 'H', '2B', '3B', 'HR', 'RBI', 'SB', 'CS', 'BB', 'SO', 'SH', 'SF',
@@ -44,7 +48,7 @@ class BaseballStats:
         # 27.5% of pitchers w > 5 in will spend time on IL per season (188 out of 684)
         # 26.3% of pitching injuries affect the throwing elbow results in avg of 74 days lost
         # position player (non-pitcher) longevitiy: https://www.nytimes.com/2007/07/15/sports/baseball/15careers.html
-        self.condition_change_per_day = 20  # improve with rest, mid point of normal dist for recovery
+        self.condition_change_per_day = 20  # improve with rest, mid-point of normal dist for recovery
         self.fatigue_start_perc = 70  # 85% of way to avg max is where fatigue starts, adjust factor to inc outing lgth
         self.fatigue_rate = .001  # at 85% of avg max pitchers have a .014 increase in OBP.  using .001 as proxy
         self.fatigue_pitching_change_limit = 5  # change pitcher at # or below out of 100
@@ -70,19 +74,27 @@ class BaseballStats:
         return
 
     def get_batting_data(self, team_name: Optional[str] = None, prior_season: bool = True) -> DataFrame:
-        # print(f'bbstats.py get_batting_data')
+        """
+        loads data for batters
+        :param team_name: single team name is optional, alt is full league
+        :param prior_season: is this data from a prior season or the current one?
+        :return: dataframe of seasons data
+        """
         if team_name is None:
             df = self.batting_data if prior_season else self.new_season_batting_data
         else:
             df_new = self.new_season_batting_data[self.new_season_batting_data['Team'] == team_name]
             df_cur = self.batting_data[self.batting_data.index.isin(df_new.index)]
             df = df_cur if prior_season else df_new
-            # print(f'bbstats.py get_batting_data new season for {team_name} {df_new}')
-            # print(f'bbstats.py get_batting_data prior season for {team_name} {df_cur}')
-            # print(f'bbstats.py get_batting_data returned df {team_name} {df}')
         return df
 
     def get_pitching_data(self, team_name: Optional[str] = None, prior_season: bool = True) -> DataFrame:
+        """
+        loads data for pitchers
+        :param team_name: single team name is optional, alt is full league
+        :param prior_season: is this data from a prior season or the current one?
+        :return: df with seasons data
+        """
         if team_name is None:
             df = self.pitching_data if prior_season else self.new_season_pitching_data
         else:
@@ -92,6 +104,13 @@ class BaseballStats:
         return df
 
     def get_seasons(self, batter_file: str, pitcher_file: str) -> None:
+        """
+        loads a full season of data for pitching and hitting and casts cols to proper values, loads values into
+        internal df to class
+        :param batter_file: batter file name
+        :param pitcher_file: pitcher file name
+        :return: None
+        """
         new_pitcher_file = 'New-Season-' + pitcher_file
         new_batter_file = 'New-Season-' + batter_file
         seasons_str = " ".join(str(season) for season in self.load_seasons)
@@ -121,7 +140,12 @@ class BaseballStats:
 
         return
 
-    def game_results_to_season(self, box_score_class):
+    def game_results_to_season(self, box_score_class) -> None:
+        """
+        adds the game results to a season df to accumulate stats
+        :param box_score_class: box score from game to add to season stats
+        :return: None
+        """
         batting_box_score = box_score_class.get_batter_game_stats()
         pitching_box_score = box_score_class.get_pitcher_game_stats()
 
@@ -145,7 +169,13 @@ class BaseballStats:
             self.new_season_pitching_data.loc[index, 'Injured Days'] = pitching_box_score.loc[index, 'Injured Days']
         return
 
-    def is_injured(self):
+    def is_injured(self) -> None:
+        """
+        determine if a pitcher or hitter is injured and severity.  older players get injured more often
+        add that data to the active seasons df
+        ??? should condition be a factor
+        :return: None
+        """
         self.new_season_pitching_data['Injured Days'] = self.new_season_pitching_data.\
             apply(lambda row: 0 if self.rnd() > self.pitcher_injury_odds_for_season(row['Age']) and
                   row['Injured Days'] == 0 else
@@ -173,7 +203,11 @@ class BaseballStats:
             print(f'{df[self.injury_cols_to_print].to_string(justify="right")}\n')
         return
 
-    def new_game_day(self):
+    def new_game_day(self) -> None:
+        """
+        Set up the next day, check if injured and reduce number of days on dl.  improve player condition
+        :return: None
+        """
         self.is_injured()
         self.new_season_pitching_data['Condition'] = self.new_season_pitching_data.\
             apply(lambda row: self.rnd_condition_chg(row['Age']) + row['Condition'], axis=1)
@@ -192,7 +226,12 @@ class BaseballStats:
                                                         self.new_season_batting_data, 'Injured Days')
         return
 
-    def update_season_stats(self):
+    def update_season_stats(self) -> None:
+        """
+        drop players with no IP or AB from the df
+        ??? does not appear to be used
+        :return: None
+        """
         self.new_season_pitching_data = \
             team_pitching_stats(self.new_season_pitching_data[self.new_season_pitching_data['IP'] > 0].fillna(0))
         self.new_season_batting_data = \
@@ -201,6 +240,12 @@ class BaseballStats:
         return
 
     def print_current_season(self, teams: Optional[List[str]] = None, summary_only_b: bool = False) -> None:
+        """
+        prints the current season being played
+        :param teams: option list of team names
+        :param summary_only_b: print team totals or entire roster stats
+        :return: None
+        """
         teams = list(self.batting_data.Team.unique()) if teams is None else teams
         self.print_season(team_batting_stats(self.new_season_batting_data),
                           team_pitching_stats(self.new_season_pitching_data), teams=teams,
@@ -208,6 +253,13 @@ class BaseballStats:
         return
 
     def print_prior_season(self, teams: Optional[List[str]] = None, summary_only_b: bool = False) -> None:
+        """
+        useful to look back at the prior season to see the trend in the current one or just look at last years to
+        start the season
+        :param teams: option list of team names
+        :param summary_only_b: print team totals or entire roster stats
+        :return: None
+        """
         teams = list(self.batting_data.Team.unique()) if teams is None else teams
         self.print_season(team_batting_stats(self.batting_data), team_pitching_stats(self.pitching_data), teams=teams,
                           summary_only_b=summary_only_b)
@@ -215,6 +267,15 @@ class BaseballStats:
 
     def print_season(self, df_b: DataFrame, df_p: DataFrame, teams: List[str],
                      summary_only_b: bool = False, condition_text: bool = True) -> None:
+        """
+        print a season either in flight or prior season, called from current and prior season methods
+        :param df_b: batter data
+        :param df_p: pitcher data
+        :param teams: list of team names
+        :param summary_only_b: print team totals or entire roster stats
+        :param condition_text: print the condition of the player as text
+        :return:
+        """
         teams.append('')  # add blank team for totals
         if condition_text:
             df_p['Condition'] = df_p['Condition'].apply(condition_txt_f)  # apply condition_txt static func
@@ -241,12 +302,22 @@ class BaseballStats:
 
 
 def injured_list_f(idays: int) -> str:
+    """
+    generate text for dl list if player is injured
+    :param idays: number of day that player is injured
+    :return: string with name of the DL list player should be placed on
+    """
     # mlb is 10 for pos min, 15 for pitcher min, and 60 day
     return 'Active' if idays == 0 else \
         '10 Day DL' if idays <= 10 else '15 Day DL' if idays <= 15 else '60 Day DL'
 
 
 def condition_txt_f(condition: int) -> str:
+    """
+    generate text to describe players health
+    :param condition: condition level, 100 is perfect, 0 is dead tired
+    :return:
+    """
     return 'Peak' if condition > 75 else \
         'Healthy' if condition > 51 else \
         'Tired' if condition > 33 else \
@@ -254,6 +325,11 @@ def condition_txt_f(condition: int) -> str:
 
 
 def remove_non_print_cols(df: DataFrame) -> DataFrame:
+    """
+    Remove df columns that are for internal use only
+    :param df: df to clean
+    :return: df cleaned up
+    """
     non_print_cols = {'Season', 'Total_OB', 'AVG_faced', 'Game_Fatigue_Factor'}  # 'Total_Outs',
     cols_to_drop = list(non_print_cols.intersection(df.columns))
     if cols_to_drop:
@@ -262,10 +338,21 @@ def remove_non_print_cols(df: DataFrame) -> DataFrame:
 
 
 def trunc_col(df_n: Union[ndarray, Series], d: int = 3) -> Union[ndarray, Series]:
+    """
+    truncate the values in columns in a df to clean up for print
+    :param df_n: df to truncate
+    :param d: number of places to keep
+    :return: new df
+    """
     return (df_n * 10 ** d) / 10 ** d
 
 
 def team_batting_stats(df: DataFrame) -> DataFrame:
+    """
+    calculate stats based on underlying values for things like OBP
+    :param df: current df
+    :return: data with calc cols updated
+    """
     df = df[df['AB'] > 0]
     df['AVG'] = trunc_col(np.nan_to_num(np.divide(df['H'], df['AB']), nan=0.0, posinf=0.0), 3)
     df['OBP'] = trunc_col(np.nan_to_num(np.divide(df['H'] + df['BB'] + df['HBP'], df['AB'] + df['BB'] + df['HBP']),
@@ -278,7 +365,12 @@ def team_batting_stats(df: DataFrame) -> DataFrame:
 
 
 def team_pitching_stats(df: DataFrame) -> DataFrame:
-    # hbp is 0, 2b are 0, 3b are 0
+    """
+    build up pitcher stats.  Note initial values for some cols are 0. hbp is 0, 2b are 0, 3b are 0
+    :param df: data set to calc
+    :return: df with new cols / updated cols
+    """
+
     df = df[(df['IP'] > 0) & (df['AB'] > 0)]
     df['AB'] = trunc_col(df['AB'], 0)
     df['IP'] = trunc_col(df['IP'], 2)
@@ -299,6 +391,13 @@ def team_pitching_stats(df: DataFrame) -> DataFrame:
 
 
 def team_batting_totals(batting_df: DataFrame, team_name: str = '', concat: bool = True) -> DataFrame:
+    """
+    team totals for batting
+    :param batting_df: ind batting data
+    :param team_name: name of team to calc
+    :param concat: should this be concatenated onto the existing dataframe
+    :return: df with team totals
+    """
     df = batting_df[['AB', 'R', 'H', '2B', '3B', 'HR', 'RBI', 'SB', 'CS', 'BB', 'SO', 'SH', 'SF', 'HBP']].sum()
     df['Player'] = 'Totals'
     df['Team'] = team_name
@@ -316,6 +415,13 @@ def team_batting_totals(batting_df: DataFrame, team_name: str = '', concat: bool
 
 
 def team_pitching_totals(pitching_df: DataFrame, team_name: str = '', concat: bool = True) -> DataFrame:
+    """
+      team totals for pitching
+      :param pitching_df: ind pitcher data
+      :param team_name: name of team to calc
+      :param concat: should this be concatenated onto the existing dataframe
+      :return: df with team totals
+      """
     df = pitching_df[['GS', 'CG', 'SHO', 'IP', 'AB', 'H', '2B', '3B', 'ER', 'K', 'BB', 'HR', 'W', 'L', 'SV', 'BS',
                       'HLD', 'Total_Outs']].sum()
     df = df.to_frame().T
@@ -332,20 +438,13 @@ def team_pitching_totals(pitching_df: DataFrame, team_name: str = '', concat: bo
 
 def update_column_with_other_df(df1, col1, df2, col2):
     """
-
-    :param df1:
-    :param col1:
-    :param df2:
-    :param col2:
-    :return:
+    Updates a column in df1 with values from df2 based on the index.
+    :param df1: The DataFrame containing the column to update.
+    :param col1: The name of the column in df1 to update.
+    :param df2: The DataFrame containing the reference values.
+    :param col2: The name of the column in df2 to use for updates.
+    :return: The updated DataFrame with the modified column.
     """
-    # Updates a column in df1 with values from df2 based on the index.
-    # Args:
-    #   df1 (pd.DataFrame): The DataFrame containing the column to update.
-    #   col1 (str): The name of the column in df1 to update.
-    #   df2 (pd.DataFrame): The DataFrame containing the reference values.
-    #   col2 (str): The name of the column in df2 to use for updates.
-    # Returns: pd.DataFrame: The updated DataFrame with the modified column.
     df1.loc[df1.index, col1] = df1[col1].apply(lambda x: df2.loc[x, col2] if x in df2.index else 0)
     return df1
 

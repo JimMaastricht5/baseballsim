@@ -255,7 +255,7 @@ def condition_txt_f(condition: int) -> str:
 
 def remove_non_print_cols(df: DataFrame) -> DataFrame:
     non_print_cols = {'Season', 'Total_OB', 'AVG_faced', 'Game_Fatigue_Factor'}  # 'Total_Outs',
-    cols_to_drop = non_print_cols.intersection(df.columns)
+    cols_to_drop = list(non_print_cols.intersection(df.columns))
     if cols_to_drop:
         df = df.drop(cols_to_drop, axis=1)
     return df
@@ -331,6 +331,14 @@ def team_pitching_totals(pitching_df: DataFrame, team_name: str = '', concat: bo
 
 
 def update_column_with_other_df(df1, col1, df2, col2):
+    """
+
+    :param df1:
+    :param col1:
+    :param df2:
+    :param col2:
+    :return:
+    """
     # Updates a column in df1 with values from df2 based on the index.
     # Args:
     #   df1 (pd.DataFrame): The DataFrame containing the column to update.
@@ -338,8 +346,8 @@ def update_column_with_other_df(df1, col1, df2, col2):
     #   df2 (pd.DataFrame): The DataFrame containing the reference values.
     #   col2 (str): The name of the column in df2 to use for updates.
     # Returns: pd.DataFrame: The updated DataFrame with the modified column.
-  df1.loc[df1.index, col1] = df1[col1].apply(lambda x: df2.loc[x, col2] if x in df2.index else 0)
-  return df1
+    df1.loc[df1.index, col1] = df1[col1].apply(lambda x: df2.loc[x, col2] if x in df2.index else 0)
+    return df1
 
 
 if __name__ == '__main__':
@@ -352,8 +360,7 @@ if __name__ == '__main__':
 
     # baseball_data.print_prior_season()
     # baseball_data.print_current_season(teams=teams)
-    my_teams = []
-    my_teams.append('MIL' if 'MIL' in baseball_data.get_all_team_names() else baseball_data.get_all_team_names()[0])
+    my_teams = [('MIL' if 'MIL' in baseball_data.get_all_team_names() else baseball_data.get_all_team_names()[0])]
     # my_teams.append('BOS')
     for team in my_teams:
         print(baseball_data.get_pitching_data(team_name=team, prior_season=True).to_string())

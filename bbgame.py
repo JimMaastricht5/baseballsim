@@ -13,7 +13,7 @@ HOME = 1
 
 
 class Game:
-    def __init__(self, away_team_name: str = '', home_team_name: str = '', baseball_data: None = None,
+    def __init__(self, away_team_name: str = '', home_team_name: str = '', baseball_data=None,
                  game_num: int = 1, rotation_len: int = 5,
                  print_lineup: bool = False, chatty: bool = False, print_box_score_b: bool = False,
                  load_seasons: List[int] = 2023, new_season: int = 2024,

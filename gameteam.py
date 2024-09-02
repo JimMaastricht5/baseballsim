@@ -51,9 +51,12 @@ class Team:
         self.prior_season_pitchers_df['AVG_faced'] = self.prior_season_pitchers_df['AVG_faced'] * \
             self.prior_season_pitchers_df['Condition']
         self.prior_season_pos_players_df['Condition'] = self.baseball_data.new_season_batting_data['Condition']
-        if len(self.prior_season_pitchers_df) == 0:
+        # test for empty or insufficient number of players generally need 5 starting pitchers and 9 players
+        if (len(self.prior_season_pitchers_df) == 0 or len(self.prior_season_pitchers_df) < 5 or
+                len(self.prior_season_pos_players_df) == 0 or len(self.prior_season_pos_players_df) < 9):
             print(f'Teams available are {self.baseball_data.pitching_data["Team"].unique()}')
-            raise ValueError(f'Pitching or batting data was empty for {team_name}')
+            raise ValueError(f'Pitching did not contain enough pitchers for {team_name} with length'
+                             f' {len(self.prior_season_pitchers_df)}')
 
         self.p_lineup_cols_to_print = ['Player', 'League', 'Team', 'Age', 'G', 'GS', 'CG', 'SHO', 'IP', 'H', '2B', '3B',
                                        'ER', 'K', 'BB', 'HR', 'W', 'L', 'SV', 'BS', 'HLD', 'ERA', 'WHIP',
@@ -96,7 +99,8 @@ class Team:
 
     def batter_index_in_lineup(self, lineup_pos: int = 1) -> int:
         # lineup numbers are from 1 to 9
-        # print(f'batter_index_in_lineup {lineup_pos}, {self.cur_lineup_index_list}')
+        if self.debug:
+            print(f'batter_index_in_lineup {lineup_pos}, {self.cur_lineup_index_list}')
         cur_batter_index = self.cur_lineup_index_list[lineup_pos - 1]
         return cur_batter_index
 
@@ -119,7 +123,8 @@ class Team:
         return
 
     def set_prior_and_new_pos_player_batting_bench_dfs(self) -> None:
-        # print(f'gameteam.py set_prior_and_new....  {self.cur_lineup_index_list}')
+        if self.debug:
+            print(f'gameteam.py set_prior_and_new....  {self.cur_lineup_index_list}')
         self.prior_season_lineup_df = self.prior_season_pos_players_df.loc[self.cur_lineup_index_list]  # subset team df
         self.new_season_lineup_df = self.new_season_pos_players_df.loc[self.cur_lineup_index_list]
 
@@ -137,17 +142,11 @@ class Team:
             self.cur_lineup_index_list = list(force_lineup_dict.keys())
             pos_index_dict = force_lineup_dict
 
-        # self.prior_season_lineup_df = self.prior_season_pos_players_df.loc[self.cur_lineup_index_list]  # subset df
         self.set_prior_and_new_pos_player_batting_bench_dfs()
-        # self.new_season_bench_pos_df = self.prior_season_pos_players_df.
-        # loc[~self.prior_season_pos_players_df.index.isin(self.prior_season_lineup_df.index)]
-        # self.new_season_lineup_df = self.baseball_data.new_season_batting_data.loc[self.cur_lineup_index_list]
-
         # lineup and lineup new season dfs contain all player data and in the correct order
         # loop thru lineup from lead off to last, build lineup list and set player fielding pos in lineup df
         # note cur_lineup_index should be the same as lineup_index_list, but just to be certain we rebuild it.
         for row_num in range(0, len(self.prior_season_lineup_df)):
-            #     self.cur_lineup_index_list.append(self.prior_season_lineup_df.index[row_num])
             player_index = self.prior_season_lineup_df.index[row_num]  # grab the index of the player
             self.prior_season_lineup_df[player_index, 'Pos'] = pos_index_dict[player_index]  # fielding pos in lineup
         return
@@ -161,8 +160,8 @@ class Team:
             pos_index_list.append(pos_index)  # list of indices into the pos player master df
             pos_index_dict[pos_index] = position  # keep track of the player index and position for this game in a dict
 
-            # select player best at each stat to slot into lead off, cleanup, etc.
-            # exclude players prev selected for SLG and ordering remaining players by OPS
+        # select player best at each stat to slot into lead off, cleanup, etc.
+        # exclude players prev selected for SLG and ordering remaining players by OPS
         sb_index_list = self.best_at_stat(pos_index_list, 'SB', count=1)  # takes list of index nums and scans master df
         slg_index_list = self.best_at_stat(pos_index_list, 'SLG', count=2, exclude=sb_index_list)  # exclude sb
         self.cur_lineup_index_list = self.best_at_stat(pos_index_list, 'OPS', count=6,
@@ -178,7 +177,8 @@ class Team:
         # pitcher rotates based on selection above or forced number passed in
         try:
             if self.starting_pitchers_df is None:  # init starting pitcher list
-                self.starting_pitchers_df = self.prior_season_pitchers_df.sort_values(['GS', 'IP'], ascending=False).head(5)
+                self.starting_pitchers_df = (
+                    self.prior_season_pitchers_df.sort_values(['GS', 'IP'], ascending=False).head(5))
                 self.starting_pitchers = self.starting_pitchers_df.index.tolist()
 
             # set game starter stats
@@ -257,11 +257,6 @@ class Team:
     def batter_stats_in_lineup(self, player_index: int = 0) -> Series:
         batting_series = self.prior_season_lineup_df.loc[player_index]
         return batting_series
-
-    # def cur_batter_stats(self, loc_in_lineup):
-    #     # loc is zero to whatever, this is a row count
-    #     batting = self.prior_season_lineup_df.iloc[loc_in_lineup]  # data for batter
-    #     return batting  # should be a series with a single row
 
     def pos_player_prior_year_stats(self, index: int32) -> Series:
         pos_player_stats = self.prior_season_pos_players_df.loc[index]  # data for pos player
@@ -348,9 +343,9 @@ class Team:
             df_criteria = df_criteria_pos & not_exhausted & not_injured
             df_players = self.prior_season_pos_players_df[df_criteria].sort_values(stat_criteria, ascending=False)
             if len(df_players) == 0:  # missing player at pos, pick best available stat, or best condition
-                if position != 'DH':
+                if position != 'DH':  # if we are not looking for a DH use the DH criteria to just grab one
                     df_player_num = self.search_for_pos('DH', lineup_index_list, stat_criteria)
-                else:
+                else:  # try if the DH criteria fails try grabbing tired players
                     df_players = self.prior_season_pos_players_df[df_criteria_pos].sort_values('Condition',
                                                                                                ascending=False)
             if debug:

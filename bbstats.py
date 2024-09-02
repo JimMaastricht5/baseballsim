@@ -472,20 +472,20 @@ def update_column_with_other_df(df1, col1, df2, col2):
 
 
 if __name__ == '__main__':
-    baseball_data = BaseballStats(load_seasons=[2023], new_season=2024, only_nl_b=False,
-                                  load_batter_file='random-stats-pp-Batting.csv',
-                                  load_pitcher_file='random-stats-pp-Pitching.csv')
+    baseball_data = BaseballStats(load_seasons=[2024], new_season=2024, only_nl_b=True,
+                                  load_batter_file='stats-pp-Batting.csv',
+                                  load_pitcher_file='stats-pp-Pitching.csv')
     print(*baseball_data.pitching_data.columns)
     print(*baseball_data.batting_data.columns)
     print(baseball_data.get_all_team_names())
 
     # baseball_data.print_prior_season()
     # baseball_data.print_current_season(teams=teams)
-    my_teams = [('MIL' if 'MIL' in baseball_data.get_all_team_names() else baseball_data.get_all_team_names()[0])]
-    # my_teams.append('BOS')
+    # my_teams = [('MIL' if 'MIL' in baseball_data.get_all_team_names() else baseball_data.get_all_team_names()[0])]
+    my_teams = ['WSH']
     for team in my_teams:
         print(baseball_data.get_pitching_data(team_name=team, prior_season=True).to_string())
-        print(baseball_data.get_pitching_data(team_name=team, prior_season=True).dtypes)
+        # print(baseball_data.get_pitching_data(team_name=team, prior_season=True).dtypes)
         # print(baseball_data.get_pitching_data(team_name=team, prior_season=False).to_string())
-        # print(baseball_data.get_batting_data(team_name=team, prior_season=True).to_string())
+        print(baseball_data.get_batting_data(team_name=team, prior_season=True).to_string())
         # print(baseball_data.get_batting_data(team_name=team, prior_season=False).to_string())

@@ -31,13 +31,17 @@ from typing import Any, Dict, List, Optional, Tuple, Union
 
 class Team:
     def __init__(self, team_name: str, baseball_data:     bbstats.BaseballStats, game_num: int = 1,
-                 rotation_len: int = 5) -> None:
+                 rotation_len: int = 5, debug: bool = False) -> None:
         pd.options.mode.chained_assignment = None  # suppresses chained assignment warning for lineup pos setting
+        self.debug = debug
         self.team_name = team_name
         self.baseball_data = baseball_data
         self.prior_season_pitchers_df = baseball_data.get_pitching_data(team_name=team_name, prior_season=True)
         self.prior_season_pos_players_df = baseball_data.get_batting_data(team_name=team_name, prior_season=True)
         self.new_season_pos_players_df = baseball_data.get_batting_data(team_name=team_name, prior_season=False)
+        if self.debug:
+            print(f'gameteam.py init prior season data')
+            print(self.prior_season_pos_players_df.to_string())
         if self.prior_season_pitchers_df.shape[0] == 0:
             print(f'gameteam.py init: team {team_name} does not exist.')
             print(f'Try one of these teams {self.baseball_data.get_all_team_names()}')
@@ -57,7 +61,6 @@ class Team:
         self.b_lineup_cols_to_print = ['Player', 'League', 'Team', 'Pos', 'Age', 'G', 'AB', 'R', 'H', '2B', '3B', 'HR',
                                        'RBI', 'SB', 'CS', 'BB', 'SO', 'SH', 'SF', 'HBP', 'AVG', 'OBP', 'SLG', 'OPS',
                                        'Condition']
-        # print(f'gameteam.py init load {self.prior_season_pos_players_df}')
         if ('Mascot' in self.prior_season_pos_players_df.columns) is True:
             self.mascot = self.prior_season_pos_players_df.loc[self.prior_season_pos_players_df["Team"] == team_name,
                                                                "Mascot"].unique()[0]
@@ -146,7 +149,7 @@ class Team:
         for row_num in range(0, len(self.prior_season_lineup_df)):
             #     self.cur_lineup_index_list.append(self.prior_season_lineup_df.index[row_num])
             player_index = self.prior_season_lineup_df.index[row_num]  # grab the index of the player
-            self.prior_season_lineup_df[player_index, 'Pos'] = pos_index_dict[player_index]  # set fielding pos in lineup
+            self.prior_season_lineup_df[player_index, 'Pos'] = pos_index_dict[player_index]  # fielding pos in lineup
         return
 
     def dynamic_lineup(self) -> Dict[int64, str]:
@@ -173,21 +176,26 @@ class Team:
 
     def set_initial_starting_rotation(self, force_starting_pitcher: None = None) -> None:
         # pitcher rotates based on selection above or forced number passed in
-        if self.starting_pitchers_df is None:  # init starting pitcher list
-            self.starting_pitchers_df = self.prior_season_pitchers_df.sort_values(['GS', 'IP'], ascending=False).head(5)
-            self.starting_pitchers = self.starting_pitchers_df.index.tolist()
+        try:
+            if self.starting_pitchers_df is None:  # init starting pitcher list
+                self.starting_pitchers_df = self.prior_season_pitchers_df.sort_values(['GS', 'IP'], ascending=False).head(5)
+                self.starting_pitchers = self.starting_pitchers_df.index.tolist()
 
-        # set game starter stats
-        if force_starting_pitcher is None:  # grab the default nth row of df
-            self.prior_season_pitching_df = self.starting_pitchers_df.iloc[[self.game_num % self.rotation_len]]
-        else:  # user is forcing a rotation change, swap the starter with the new pither
-            self.prior_season_pitching_df = self.prior_season_pitchers_df.loc[[force_starting_pitcher]]
+            # set game starter stats
+            if force_starting_pitcher is None:  # grab the default nth row of df
+                self.prior_season_pitching_df = self.starting_pitchers_df.iloc[[self.game_num % self.rotation_len]]
+            else:  # user is forcing a rotation change, swap the starter with the new pither
+                self.prior_season_pitching_df = self.prior_season_pitchers_df.loc[[force_starting_pitcher]]
 
-        # load the stats for the current starting pitcher
-        self.cur_pitcher_index = self.prior_season_pitching_df.index[0] if force_starting_pitcher is None else \
-            force_starting_pitcher
-        self.new_season_pitching_df = \
-            self.baseball_data.new_season_pitching_data.loc[self.cur_pitcher_index].to_frame().T
+            # load the stats for the current starting pitcher
+            self.cur_pitcher_index = self.prior_season_pitching_df.index[0] if force_starting_pitcher is None else \
+                force_starting_pitcher
+            self.new_season_pitching_df = \
+                self.baseball_data.new_season_pitching_data.loc[self.cur_pitcher_index].to_frame().T
+        except:
+            print('****gameteam.py set_initial_starting_rotation error')
+            print(self.starting_pitchers)
+            print(self.prior_season_pitchers_df)
         return
 
     def change_starting_rotation(self, starting_pitcher_num, rotation_order_num):
@@ -321,11 +329,14 @@ class Team:
         return
 
     def search_for_pos(self, position: str, lineup_index_list: List[Union[Any, int64]],
-                       stat_criteria: str = 'OPS') -> int64:
+                       stat_criteria: str = 'OPS', debug: bool = False) -> int64:
         # find players not in lineup at specified position, sort by stat descending to find the best
         # if no players at that position make a recursive call to the func and ask for best remaining player
         # if pos is DH open up search to any position.
         df_players = None
+        if debug:
+            print(f'gameteam.py search_for_pos with pos {position}')
+            print(f'prior season df {self.prior_season_pos_players_df}')
         try:
             df_player_num = None
             not_exhausted = ~(self.prior_season_pos_players_df['Condition'] <= self.fatigue_unavailable)
@@ -338,12 +349,15 @@ class Team:
             df_players = self.prior_season_pos_players_df[df_criteria].sort_values(stat_criteria, ascending=False)
             if len(df_players) == 0:  # missing player at pos, pick best available stat, or best condition
                 if position != 'DH':
-                    df_player_num = self.search_for_pos('DH', lineup_index_list, stat_criteria)  # dont grab same player
+                    df_player_num = self.search_for_pos('DH', lineup_index_list, stat_criteria)
                 else:
                     df_players = self.prior_season_pos_players_df[df_criteria_pos].sort_values('Condition',
                                                                                                ascending=False)
+            if debug:
+                print(f'top player at pos {df_players.head(1).index[0] if df_player_num is None else df_player_num}')
         except:
             print(f'***Error in gameteam.py search_for_pos with pos {position}')
+            print(f'with criteria {df_criteria}')
             print(f'available players {df_players}')
             print(f'prior season df {self.prior_season_pos_players_df}')
             exit(1)

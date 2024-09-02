@@ -156,7 +156,7 @@ class BaseballStatsPreProcess:
         pitching_data['OBP'] = pitching_data['WHIP'] / (3 + pitching_data['WHIP'])  # bat reached / number faced
         pitching_data['Total_OB'] = pitching_data['H'] + pitching_data['BB']  # + pitching_data['HBP']
         pitching_data['Total_Outs'] = pitching_data['IP'] * 3  # 3 outs per inning
-        pitching_data = pitching_data[pitching_data['IP'] >= 10]  # drop pitchers without enough innings
+        pitching_data = pitching_data[pitching_data['IP'] >= 5]  # drop pitchers without enough innings
         pitching_data['AVG_faced'] = (pitching_data['Total_OB'] + pitching_data['Total_Outs']) / pitching_data.G
         pitching_data['Game_Fatigue_Factor'] = 0
         pitching_data['Condition'] = 100
@@ -207,7 +207,7 @@ class BaseballStatsPreProcess:
                                                            nan=0.0, posinf=0.0), 3)
         batting_data['Total_OB'] = batting_data['H'] + batting_data['BB'] + batting_data['HBP']
         batting_data['Total_Outs'] = batting_data['AB'] - batting_data['H'] + batting_data['HBP']
-        batting_data = batting_data[batting_data['AB'] >= 25]  # drop players without enough AB
+        batting_data = batting_data[batting_data['AB'] >= 10]  # drop players without enough AB
         batting_data['Game_Fatigue_Factor'] = 0
         batting_data['Condition'] = 100
         batting_data['Status'] = 'Active'  # DL or active
@@ -342,6 +342,7 @@ if __name__ == '__main__':
     print(*baseball_data.pitching_data.columns)
     print(*baseball_data.batting_data.columns)
     print(baseball_data.batting_data.Team.unique())
+    print(baseball_data.batting_data[baseball_data.batting_data['Team'] == 'WSH'])
     # print(baseball_data.batting_data.Mascot.unique())
     print(baseball_data.pitching_data.sort_values('Hashcode').to_string())
     print(baseball_data.batting_data.sort_values('Hashcode').to_string())

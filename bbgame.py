@@ -1,3 +1,26 @@
+# MIT License
+#
+# 2024 Jim Maastricht
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
+#
+# JimMaastricht5@gmail.com
 import bbstats
 import gameteam
 import at_bat
@@ -205,7 +228,7 @@ class Game:
         # batting = self.teams[self.team_hitting()].cur_batter_stats(self.batting_num[self.team_hitting()]-1)  # lineup
         batting = self.teams[self.team_hitting()].batter_stats_in_lineup(cur_batter_index)
         self.bases.new_ab(batter_num=cur_batter_index, player_name=batting.Player)
-        self.at_bat.outcome(pitching, batting, self.outcomes, self.outs, self.bases.is_runner_on_base_num(1),
+        self.at_bat.ab_outcome(pitching, batting, self.outcomes, self.outs, self.bases.is_runner_on_base_num(1),
                             self.bases.is_runner_on_base_num(3))
         self.outs = self.outs + self.outcomes.outs_on_play
         self.bases.handle_runners(score_book_cd=self.outcomes.score_book_cd,

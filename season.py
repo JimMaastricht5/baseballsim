@@ -49,7 +49,7 @@ class BaseballSeason:
         :param series_length: series is usually 3, the default is one for testing
         :param rotation_len: number of starters to rotate, default is 5
         :param only_nl_b: use only the nl teams
-        :param interactive: if true the sim will pauses after each day
+        :param interactive: if true the sim pauses after each day
         :param load_batter_file: name of the file with batter data, year will be added to the front of the text
         :param load_pitcher_file: name of the file for the pitcher data, year will be added to the front of the text
         :return: None
@@ -81,7 +81,7 @@ class BaseballSeason:
     def create_schedule(self) -> None:
         """
         set the schedule for the seasons using the teams, series length, min games in season, and limit of games
-        conflicts sometimes occur between the params so it is possible for a team to play an extra game
+        conflicts sometimes occur between the params, so it is possible for a team to play an extra game
         day schedule in format  ([['MIL', 'COL'], ['PIT', 'CIN'], ['CHC', 'STL']])  # test schedule
         if there are an odd number of teams there may be an "OFF" day in the schedule
         :return: None
@@ -183,8 +183,8 @@ class BaseballSeason:
         return
 
     def sim_full_season(self, season_chatty: bool = False, season_print_lineup_b: bool = False,
-                   season_print_box_score_b: bool = False,
-                   team_to_follow: str = '', team_to_follow_detail: bool = False) -> None:
+                        season_print_box_score_b: bool = False,
+                        team_to_follow: str = '', team_to_follow_detail: bool = False) -> None:
         """
         function drives overall sim for the season
         :param season_chatty: prints more or less text to console
@@ -243,10 +243,10 @@ if __name__ == '__main__':
     # my_teams_to_follow = 'MIL'  # or follow no team
     my_teams_to_follow = 'MIL' if 'MIL' in bbseason23.teams else bbseason23.teams[0]
     bbseason23.sim_full_season(season_chatty=False,
-                          season_print_lineup_b=False,
-                          season_print_box_score_b=False,
-                          team_to_follow_detail=False,
-                          team_to_follow=my_teams_to_follow)
+                               season_print_lineup_b=False,
+                               season_print_box_score_b=False,
+                               team_to_follow_detail=False,
+                               team_to_follow=my_teams_to_follow)
 
     print(startdt)
     print(datetime.datetime.now())

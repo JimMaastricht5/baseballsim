@@ -32,6 +32,17 @@ from typing import Any, Dict, List, Optional, Tuple, Union
 class Team:
     def __init__(self, team_name: str, baseball_data:     bbstats.BaseballStats, game_num: int = 1,
                  rotation_len: int = 5, debug: bool = False) -> None:
+        """
+        class handles a single team within a game including all prev year and current year stats, rosters,
+        available players, in game fatigue for pitchers, provides stats to in game requests.  sets, maintains, and
+        changes the lineup for a team in game
+        :param team_name: 3 character abbrev for team
+        :param baseball_data: baseball data class
+        :param game_num: number of game in season
+        :param rotation_len: length of stating rotations, typically 5
+        :param debug: are we debugging?
+        :return: None
+        """
         pd.options.mode.chained_assignment = None  # suppresses chained assignment warning for lineup pos setting
         self.debug = debug
         self.team_name = team_name
@@ -94,22 +105,40 @@ class Team:
         self.fatigue_rate = self.baseball_data.fatigue_rate
         self.fatigue_pitching_change_limit = self.baseball_data.fatigue_pitching_change_limit
         self.fatigue_unavailable = self.baseball_data.fatigue_unavailable
-
         return
 
     def batter_index_in_lineup(self, lineup_pos: int = 1) -> int:
-        # lineup numbers are from 1 to 9
+        """
+        returns the batters hashcode key for a pos in the lineup.
+        :param lineup_pos: order in lineup numbers are from 1 to 9
+        :return: hashcode of the current batter in the lineup
+        """
         if self.debug:
             print(f'batter_index_in_lineup {lineup_pos}, {self.cur_lineup_index_list}')
-        cur_batter_index = self.cur_lineup_index_list[lineup_pos - 1]
-        return cur_batter_index
+        cur_batter_hash_code = self.cur_lineup_index_list[lineup_pos - 1]
+        return cur_batter_hash_code
 
     def is_pitching_index(self) -> int64:
+        """
+        returns hashcode of the current pitcher
+        :return:
+        """
         return self.cur_pitcher_index
 
     def set_initial_lineup(self, show_lineup: bool = False, show_bench: bool = False,
                            current_season_stats: bool = True, force_starting_pitcher: None = None,
                            force_lineup_dict: None = None) -> None:
+        """
+        sets the initial lineup pre-game for pitchers and hitters
+        :param show_lineup: print the lineup upon completion?
+        :param show_bench:  print the bench post lineup construction?
+        :param current_season_stats: use current seasons stats for printing when no games are played in new season
+        :param force_starting_pitcher: optional int hashcode to force the starting pitcher
+        :param force_lineup_dict: optional dictionary of players to use for lineup for example
+            {647549: 'LF', 239398: 'C', 224423: '1B', 138309: 'DH', 868055: 'CF', 520723: 'SS',
+                  299454: '3B', 46074: '2B', 752787: 'RF'}
+        :return: None
+        """
         self.set_initial_batting_order(force_lineup_dict=force_lineup_dict)
         self.set_initial_starting_rotation(force_starting_pitcher=force_starting_pitcher)
         self.set_closers()
@@ -123,6 +152,10 @@ class Team:
         return
 
     def set_prior_and_new_pos_player_batting_bench_dfs(self) -> None:
+        """
+        set the dfs used for prior season team data as well as new season team data.
+        :return: None
+        """
         if self.debug:
             print(f'gameteam.py set_prior_and_new....  {self.cur_lineup_index_list}')
         self.prior_season_lineup_df = self.prior_season_pos_players_df.loc[self.cur_lineup_index_list]  # subset team df
@@ -135,6 +168,13 @@ class Team:
         return
 
     def set_initial_batting_order(self, force_lineup_dict: Optional[dict] = None) -> None:
+        """
+        sets the initial batting order and lineup for pos players
+        :param force_lineup_dict: optional dictionary of player pos and hashcode.  like this...
+        {647549: 'LF', 239398: 'C', 224423: '1B', 138309: 'DH', 868055: 'CF', 520723: 'SS',
+                  299454: '3B', 46074: '2B', 752787: 'RF'}
+        :return: None
+        """
         # force_lineup is a dictionary in batting order with fielding pos
         if force_lineup_dict is None:
             pos_index_dict = self.dynamic_lineup()  # build cur_lineup_index_list
@@ -152,6 +192,10 @@ class Team:
         return
 
     def dynamic_lineup(self) -> Dict[int64, str]:
+        """
+        if no batting order is provided create one
+        :return: dictionary containing lineup with pos and hashcode for player
+        """
         position_list = ['C', '2B', '3B', 'SS', 'OF', 'OF', 'OF', '1B', 'DH']
         pos_index_list = []
         pos_index_dict = {}
@@ -174,6 +218,11 @@ class Team:
         return pos_index_dict
 
     def set_initial_starting_rotation(self, force_starting_pitcher: None = None) -> None:
+        """
+        set the initial starting rotation or use the pitcher provided
+        :param force_starting_pitcher: optional hashcode of pitcher to pitch this game
+        :return: None
+        """
         # pitcher rotates based on selection above or forced number passed in
         try:
             if self.starting_pitchers_df is None:  # init starting pitcher list
@@ -198,7 +247,13 @@ class Team:
             print(self.prior_season_pitchers_df)
         return
 
-    def change_starting_rotation(self, starting_pitcher_num, rotation_order_num):
+    def change_starting_rotation(self, starting_pitcher_num: int, rotation_order_num: int) -> None:
+        """
+        change the default starting pitching rotation
+        :param starting_pitcher_num: hashcode of new pitcher to insert into rotation
+        :param rotation_order_num: pos in rotation usually 1 to 5
+        :return: None
+        """
         # insert the new starting pitcher into the lineup spot
         self.starting_pitchers[rotation_order_num - 1] = starting_pitcher_num
         self.starting_pitchers_df = self.prior_season_pitchers_df.loc[self.starting_pitchers]
@@ -209,18 +264,29 @@ class Team:
         self.new_season_pitching_df = \
             self.baseball_data.new_season_pitching_data.loc[self.cur_pitcher_index].to_frame().T
 
-        # make old pitcher available as a reliever
+        # reset relievers available
         self.set_closers()
         self.set_mid_relief()
         return
 
-    def print_available_batters(self, current_season_stats=False, include_starters=False):
+    def print_available_batters(self, current_season_stats: bool = False, include_starters: bool = False) -> None:
+        """
+        prints the available position players on the bench
+        :param current_season_stats: use the prior (current) or new seasons stats for printing
+        :param include_starters: include the starters not just the bench players
+        :return: None
+        """
         if include_starters:
             self.print_starting_lineups(current_season_stats=current_season_stats, show_pitching_starter=False)
         self.print_pos_not_in_lineup(current_season_stats=current_season_stats)
         return
 
-    def print_available_pitchers(self, include_starters=False):
+    def print_available_pitchers(self, include_starters: bool = False) -> None:
+        """
+        prints the available pitchers in the bullpen
+        :param include_starters: include the starters not just the bench players
+        :return: None
+        """
         if include_starters:
             print('Starting Rotation:')
             print(self.starting_pitchers_df.to_string(justify='right'))
@@ -234,11 +300,19 @@ class Team:
         return
 
     def cur_pitcher_stats(self) -> Series:
+        """
+        :return: returns a pandas series containing the current pitchers stats
+        """
         if isinstance(self.prior_season_pitching_df, pd.Series) is not pd.Series:  # this should never happen
             self.prior_season_pitching_df = self.prior_season_pitching_df.squeeze()
         return self.prior_season_pitching_df  # should be a series with a single row
 
     def set_pitching_condition(self, cur_ratio: float64) -> None:
+        """
+        set the condition of the pitcher in the team df, used for fatigue management in game
+        :param cur_ratio: is the value of cur_game_faced / avg_faced * 100
+        :return: None
+        """
         # percent of max includes starting condition of player
         try:
             # condition = 100 - percent_of_max if (100 - percent_of_max) >= 0 else 0
@@ -251,35 +325,61 @@ class Team:
         return
 
     def set_batting_condition(self) -> None:
+        """
+        set the condition of the batter in the box score for transfer to season stats, happens post game
+        :return: None
+        """
         self.box_score.set_box_batting_condition()
         return
 
-    def batter_stats_in_lineup(self, player_index: int = 0) -> Series:
-        batting_series = self.prior_season_lineup_df.loc[player_index]
+    def batter_stats_in_lineup(self, lineup_order_num: int = 0) -> Series:
+        """
+        return a pandas series containing the stats for the batter with the position in the lineup provided
+        :param lineup_order_num:  lineup pos to request stats for 0 to 8 for positions 1 to 9
+        :return: pandas series with data
+        """
+        batting_series = self.prior_season_lineup_df.loc[lineup_order_num]
         return batting_series
 
     def pos_player_prior_year_stats(self, index: int32) -> Series:
+        """
+        prior year stats for batter given the hashcode key for the player
+        :param index: hashcode index for the player in the df
+        :return: pandas series with player data
+        """
         pos_player_stats = self.prior_season_pos_players_df.loc[index]  # data for pos player
         return pos_player_stats  # should be a series with a single row
 
     def update_fatigue(self, cur_pitching_index: int64) -> Tuple[int, float64]:
-        # number of batters faced in game vs. historic avg with fatigue start as a ratio
-        # bring in game starting condition by mult
+        """
+        calcs the ratio of batters the pitcher has faced in game against historic avg
+        so if a pitcher faces 10 batters per game, and they have faced 8 the pitcher is 80% of the way to their
+        max outing.
+        :param cur_pitching_index: hashcode of current pitcher
+        :return: returns the impact to obp for pitcher fatigue, if tired they give up more hits
+                also returns the new cur_ratio
+        """
         in_game_fatigue = 0
         cur_game_faced = self.box_score.batters_faced(cur_pitching_index)
-        # avg_faced = self.cur_pitcher_stats().AVG_faced  # data for pitcher perf prior year
         avg_faced = self.prior_season_pitching_df.AVG_faced  # avg adjusted for starting condition
         cur_ratio = cur_game_faced / avg_faced * 100
-        # print(f'gameteam update fatigue {100 - (cur_ratio * 100)}')
+        if self.debug:
+            print(f'gameteam update fatigue {100 - (cur_ratio * 100)}')
         if cur_ratio >= self.fatigue_start_perc:
             in_game_fatigue = (cur_ratio - self.fatigue_start_perc) * self.fatigue_rate
         self.set_pitching_condition(cur_ratio)
         return in_game_fatigue, cur_ratio  # obp impact to pitcher of fatigue
 
     def pitching_change(self, inning: int, score_diff: int) -> int64:
-        # if the score difference is between zero and 3 (pitching team leading) consider a short term reliever
-        # check the number of available relievers against the inning, if the current pitcher is tired and
-        # have available short-term relievers grab one.
+        """
+        should we make a pitching change?  if so make one
+        if the score difference is between zero and 3 (pitching team leading) consider a short term reliever
+        check the number of available relievers against the inning, if the current pitcher is tired and
+        have available short-term relievers grab one.
+        :param inning: what inning is it?
+        :param score_diff: what is the score difference? positive number means the team pitching is winning
+        :return: hashcode for new pitcher or hashcode for current pitcher
+        """
         if 0 <= score_diff <= 3 and \
            (inning <= 9 and len(self.relievers_df) >= (9 - (inning - 1))) or \
                 (inning > 9 and len(self.relievers_df) >= 1):
@@ -300,10 +400,17 @@ class Team:
         return self.cur_pitcher_index
 
     def is_pitcher_fatigued(self, condition: Union[int, int64, float64]) -> Union[bool, bool_]:
+        """
+        :param condition: current condition of the pitcher expressed from 0 to 100.
+        :return: boolean true if the pitcher is below the set limit.  limits is set in bbstats.py
+        """
         return condition <= self.fatigue_pitching_change_limit
 
     def set_closers(self) -> None:
-        # grab top closers for setup and final close
+        """
+        set relievers_df with top closers for setup and final close
+        :return: None
+        """
         not_selected_criteria = ~self.prior_season_pitchers_df.index.isin(self.starting_pitchers_df.index)
         not_exhausted = ~(self.prior_season_pitchers_df['Condition'] <= self.fatigue_unavailable)
         not_injured = (self.prior_season_pitchers_df['Injured Days'] == 0)
@@ -314,6 +421,10 @@ class Team:
         return
 
     def set_mid_relief(self) -> None:
+        """
+        if you're not a start or a closer you must be a .... df_middle_relievers_df
+        :return: None
+        """
         not_selected_criteria = ~self.prior_season_pitchers_df.index.isin(self.starting_pitchers_df.index)
         not_reliever_criteria = ~self.prior_season_pitchers_df.index.isin(self.relievers_df.index)
         not_exhausted = ~(self.prior_season_pitchers_df['Condition'] <= self.fatigue_unavailable)
@@ -325,10 +436,17 @@ class Team:
 
     def search_for_pos(self, position: str, lineup_index_list: List[Union[Any, int64]],
                        stat_criteria: str = 'OPS', debug: bool = False) -> int64:
-        # find players not in lineup at specified position, sort by stat descending to find the best
-        # if no players at that position make a recursive call to the func and ask for best remaining player
-        # if pos is DH open up search to any position.
-        df_players = None
+        """
+        find players not in lineup at specified position, sort by stat descending to find the best
+        if no players at that position make a recursive call to the func and ask for best remaining player
+        if pos is DH open up search to any position.
+        :param position: position to search for C, 1B, 2B, SS, 3B, OF, DH
+        :param lineup_index_list: place in the lineup, clean up hitters should have high SLG
+        :param stat_criteria: criteria to select player with, could be AVG, OBP, OBS, SB, etc
+        :param debug: are we debugging?
+        :return: hashcode with player number select at the request position
+        """
+        df_players, df_criteria = None, None
         if debug:
             print(f'gameteam.py search_for_pos with pos {position}')
             print(f'prior season df {self.prior_season_pos_players_df}')
@@ -360,7 +478,14 @@ class Team:
 
     def best_at_stat(self, lineup_index_list: List[int64], stat_criteria: str = 'OPS',
                      count: int = 9, exclude: Optional[List[int]] = None) -> List[int]:
-        # find players in lineup, sort by stat descending to find the best
+        """
+        find the best available player using a given stat as the selection criteria
+        :param lineup_index_list: current lineup, we need to exclude these players since they are already in the lineup
+        :param stat_criteria: criteria to sort by
+        :param count: how many players to add to list?  default is 9
+        :param exclude: optional list of players (hashcode) to exclude, useful for DL players
+        :return: list of players that are best at the given stat in descending order
+        """
         exclude = [] if exclude is None else exclude
         df_criteria = self.prior_season_pos_players_df.index.isin(lineup_index_list) &\
             ~self.prior_season_pos_players_df.index.isin(exclude)

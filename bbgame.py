@@ -177,9 +177,9 @@ class Game:
 
         # inning score is a list of lists with inning number and away and home scores
         # add one to top bottom to account for inning header
-        self.inning_score[self.inning[self.team_hitting()]][self.team_hitting() + 1] = number_of_runs \
+        self.inning_score[self.inning[self.team_hitting()]][self.team_hitting() + 1] = str(number_of_runs) \
             if self.inning_score[self.inning[self.team_hitting()]][self.team_hitting() + 1] == '' \
-            else int(self.inning_score[self.inning[self.team_hitting()]][self.team_hitting() + 1]) + number_of_runs
+            else str(int(self.inning_score[self.inning[self.team_hitting()]][self.team_hitting() + 1]) + number_of_runs)
 
         # pitcher of record tracking, look for lead change
         if self.total_score[self.team_hitting()] <= self.total_score[self.team_pitching()] \

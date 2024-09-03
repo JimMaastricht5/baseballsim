@@ -37,7 +37,9 @@ class BaseballSeason:
     def __init__(self, load_seasons: List[int], new_season: int, team_list: Optional[list] = None,
                  season_length_limit: int = 0,
                  min_games: int = 0, series_length: int = 1,
-                 rotation_len: int = 5, only_nl_b: bool = False, interactive: bool = False,
+                 rotation_len: int = 5, only_nl_b: bool = False, season_interactive: bool = False,
+                 season_print_lineup_b: bool = False, season_print_box_score_b: bool = False,
+                 season_chatty: bool = False, season_team_to_follow: str = None,
                  load_batter_file: str = 'stats-pp-Batting.csv',
                  load_pitcher_file: str = 'stats-pp-Pitching.csv') -> None:
         """
@@ -49,7 +51,11 @@ class BaseballSeason:
         :param series_length: series is usually 3, the default is one for testing
         :param rotation_len: number of starters to rotate, default is 5
         :param only_nl_b: use only the nl teams
-        :param interactive: if true the sim pauses after each day
+        :param season_interactive: if true the sim pauses after each day
+        :param season_print_lineup_b: if true print lineups
+        :param season_print_box_score_b: if true print box scores
+        :param season_chatty: if true provide more detail
+        :param season_team_to_follow: if none skip otherwise follow this team in gory detail
         :param load_batter_file: name of the file with batter data, year will be added to the front of the text
         :param load_pitcher_file: name of the file for the pitcher data, year will be added to the front of the text
         :return: None
@@ -64,7 +70,11 @@ class BaseballSeason:
         self.load_seasons = load_seasons  # pull base data across for what seasons
         self.new_season = new_season
         self.schedule = []
-        self.interactive = interactive
+        self.interactive = season_interactive
+        self.print_lineup_b = season_print_lineup_b
+        self.print_box_score_b = season_print_box_score_b
+        self.season_chatty = season_chatty
+        self.team_to_follow = season_team_to_follow
         self.baseball_data = bbstats.BaseballStats(load_seasons=self.load_seasons, new_season=new_season,
                                                    only_nl_b=only_nl_b, load_batter_file=load_batter_file,
                                                    load_pitcher_file=load_pitcher_file)
@@ -149,8 +159,7 @@ class BaseballSeason:
             np.add(np.array(self.team_win_loss[home_team_name]), np.array(win_loss[1])))
         return
 
-    def sim_day(self, season_day_num: int, print_lineup_b: bool = False, print_box_score_b: bool = False,
-                game_chatty: bool = False, team_to_follow: str = '') -> None:
+    def sim_day(self, season_day_num: int) -> None:
         """
         sim one day of games across the league
         :return: None
@@ -163,10 +172,10 @@ class BaseballSeason:
                 print(f'Playing day #{season_day_num + 1}: {match_up[0]} away against {match_up[1]}')
                 game = bbgame.Game(away_team_name=match_up[0], home_team_name=match_up[1],
                                    baseball_data=self.baseball_data, game_num=season_day_num,
-                                   rotation_len=self.rotation_len, print_lineup=print_lineup_b,
-                                   chatty=game_chatty, print_box_score_b=print_box_score_b,
+                                   rotation_len=self.rotation_len, print_lineup=self.print_lineup_b,
+                                   chatty=self.season_chatty, print_box_score_b=self.print_box_score_b,
                                    interactive=self.interactive)
-                score, inning, win_loss_list = game.sim_game(team_to_follow=team_to_follow)
+                score, inning, win_loss_list = game.sim_game(team_to_follow=self.team_to_follow)
                 self.update_win_loss(away_team_name=match_up[0], home_team_name=match_up[1], win_loss=win_loss_list)
                 print(f'Final: {match_up[0]} {score[0]} {match_up[1]} {score[1]}')
                 self.baseball_data.game_results_to_season(box_score_class=game.teams[AWAY].box_score)
@@ -176,36 +185,36 @@ class BaseballSeason:
             # end of all games for one day
         return
 
-    def sim_full_season(self, season_chatty: bool = False, season_print_lineup_b: bool = False,
-                        season_print_box_score_b: bool = False,
-                        team_to_follow: str = '', team_to_follow_detail: bool = False) -> bool:
+    def sim_next_day(self) -> None:
         """
-        function drives overall sim for the season, if interactive it will run one day at a time
-        :param season_chatty: prints more or less text to console
-        :param season_print_lineup_b: prints the lineup at the start of the game for every game
-        :param season_print_box_score_b: prints the box score at the end of every game
-        :param team_to_follow: allows the user to follow a team in more detail, overrides the lineup and box bool
-        :param team_to_follow_detail: prints entire teams stats for followed teams vs summary level at end of season
+        sims the next day for a season
+        :return: end of season
+        """
+        if self.season_length_limit == 0 or self.season_day_num + 1 <= self.season_length_limit:  # run a day
+            self.sim_day(season_day_num=self.season_day_num)
+            print(f'Standings for Day {self.season_day_num + 1}:')
+            self.print_standings()
+            self.season_day_num = self.season_day_num + 1
+        return
+
+    def sim_full_season(self) -> bool:
+        """
+        function drives overall sim for the season
         :return: end of season
         """
         if self.season_day_num == 0:  # start of season
             print(f'{self.new_season} will have '
                   f'{self.season_length_limit if self.season_length_limit != 0 else len(self.schedule)} '
                   f'games per team. \n')
-            if season_chatty:
+            if self.season_chatty:
                 print(f'Full schedule of games: {self.schedule}')
 
         # loop over every day and every game scheduled that day
         # this is setup as a while statement to allow for single game play at a time for interatice gaming
         play_a_day = True
         while play_a_day:
-            if self.season_length_limit == 0 or self.season_day_num + 1 <= self.season_length_limit:  # run a day
-                self.sim_day(season_day_num=self.season_day_num, print_lineup_b=season_print_lineup_b,
-                             print_box_score_b=season_print_box_score_b, game_chatty=season_chatty,
-                             team_to_follow=team_to_follow)
-                print(f'Standings for Day {self.season_day_num + 1}:')
-                self.print_standings()
-            self.season_day_num = self.season_day_num + 1
+            self.sim_next_day()
+
             # stop if played all games in season, hit the limit, or if we are playing one game at a time
             if (self.season_day_num > len(self.schedule) - 1 or
                     (self.season_length_limit != 0 and self.season_day_num + 1 > self.season_length_limit) or
@@ -220,9 +229,9 @@ class BaseballSeason:
             print(f'{self.new_season} Season Standings:')
             self.print_standings()
             print(f'\n{self.new_season} Season Stats')
-            if team_to_follow != '':
-                self.baseball_data.print_current_season(teams=[team_to_follow], summary_only_b=False)  # season for team
-            self.baseball_data.print_current_season(teams=self.teams, summary_only_b=team_to_follow_detail)  # all teams
+            if self.team_to_follow != '':
+                self.baseball_data.print_current_season(teams=[self.team_to_follow], summary_only_b=False)
+            self.baseball_data.print_current_season(teams=self.teams, summary_only_b=False)  # prints detail all teams
         else:
             end_of_season = False
         return end_of_season
@@ -236,22 +245,28 @@ if __name__ == '__main__':
     # num_games = 162 - 42  # 42 games already played
     num_games = 162 - 42
     only_national_league_teams = False
-    interactive_keyboard_pauses = False
+    interactive = True
+    # team_to_follow = bbseason23.teams[0]  # follow the first team in the random set
+    # my_teams_to_follow = 'MIL'  # or follow no team
+    my_teams_to_follow = 'MIL'
     bbseason23 = BaseballSeason(load_seasons=[2024], new_season=2024,
                                 season_length_limit=num_games,
                                 min_games=num_games, series_length=3, rotation_len=5,
                                 only_nl_b=only_national_league_teams,
-                                interactive=interactive_keyboard_pauses,
+                                season_interactive=interactive,
+                                season_chatty=False, season_print_lineup_b=False,
+                                season_print_box_score_b=False, season_team_to_follow=my_teams_to_follow,
                                 load_batter_file='stats-pp-Batting.csv',  # 'random-stats-pp-Batting.csv',
                                 load_pitcher_file='stats-pp-Pitching.csv')  # 'random-stats-pp-Pitching.csv'
-    # team_to_follow = bbseason23.teams[0]  # follow the first team in the random set
-    # my_teams_to_follow = 'MIL'  # or follow no team
-    my_teams_to_follow = 'MIL' if 'MIL' in bbseason23.teams else bbseason23.teams[0]
-    _ = bbseason23.sim_full_season(season_chatty=False,
-                                   season_print_lineup_b=False,
-                                   season_print_box_score_b=False,
-                                   team_to_follow_detail=False,
-                                   team_to_follow=my_teams_to_follow)
 
+    bbseason23.sim_next_day()
+    bbseason23.sim_next_day()
+
+    # handle full season in interactive mode
+    # _ = bbseason23.sim_full_season(season_chatty=False,
+    #                                season_print_lineup_b=False,
+    #                                season_print_box_score_b=False,
+    #                                team_to_follow_detail=False,
+    #                                team_to_follow=my_teams_to_follow)
     print(startdt)
     print(datetime.datetime.now())

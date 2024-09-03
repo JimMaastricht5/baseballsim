@@ -212,9 +212,9 @@ class Team:
                                                        exclude=sb_index_list + slg_index_list)  # setup initial list
 
         # insert players into lineup. 1st spot is best SB, 4th and 5th are best SLG
-        self.insert_player_in_lineup(player_index=sb_index_list[0], target_pos=1)
-        self.insert_player_in_lineup(player_index=slg_index_list[0], target_pos=4)
-        self.insert_player_in_lineup(player_index=slg_index_list[1], target_pos=5)
+        self.insert_player_in_lineup(player_hashcode=sb_index_list[0], target_batting_order_pos=1)
+        self.insert_player_in_lineup(player_hashcode=slg_index_list[0], target_batting_order_pos=4)
+        self.insert_player_in_lineup(player_hashcode=slg_index_list[1], target_batting_order_pos=5)
         return pos_index_dict
 
     def set_initial_starting_rotation(self, force_starting_pitcher: None = None) -> None:
@@ -241,7 +241,7 @@ class Team:
                 force_starting_pitcher
             self.new_season_pitching_df = \
                 self.baseball_data.new_season_pitching_data.loc[self.cur_pitcher_index].to_frame().T
-        except:
+        except IndexError:
             print('****gameteam.py set_initial_starting_rotation error')
             print(self.starting_pitchers)
             print(self.prior_season_pitchers_df)
@@ -468,7 +468,7 @@ class Team:
                                                                                                ascending=False)
             if debug:
                 print(f'top player at pos {df_players.head(1).index[0] if df_player_num is None else df_player_num}')
-        except:
+        except IndexError:
             print(f'***Error in gameteam.py search_for_pos with pos {position}')
             print(f'with criteria {df_criteria}')
             print(f'available players {df_players}')
@@ -494,6 +494,12 @@ class Team:
         return list(stat_index)
 
     def print_starting_lineups(self, current_season_stats: bool = True, show_pitching_starter: bool = True) -> None:
+        """
+        print the teams starting lineup
+        :param current_season_stats: use the current seasons stats
+        :param show_pitching_starter: true prints the starting pitcher
+        :return: None
+        """
         print(f'Starting lineup for the {self.city_name} ({self.team_name}) {self.mascot}:')
         if current_season_stats:
             dfb = bbstats.remove_non_print_cols(self.new_season_lineup_df)
@@ -513,6 +519,11 @@ class Team:
         return
 
     def print_pos_not_in_lineup(self, current_season_stats: bool = True) -> None:
+        """
+        prints the players not in the lineup, bench warmers
+        :param current_season_stats: use the prior seasons stats, not the current season
+        :return: None
+        """
         print('bench players:')
         if current_season_stats:
             print(self.new_season_bench_pos_df.to_string(index=True, justify='right'))
@@ -521,31 +532,48 @@ class Team:
         print('')
         return
 
-    def change_lineup(self, pos_player_bench_index: int, target_pos: int):
-        print(f'gameteam.py swap player with bench {target_pos}, {self.cur_lineup_index_list}')
-        cur_player_index = self.cur_lineup_index_list[target_pos - 1]
-        if pos_player_bench_index in self.prior_season_pos_players_df.index:
-            self.insert_player_in_lineup(player_index=pos_player_bench_index, target_pos=target_pos)
-            self.cur_lineup_index_list.remove(cur_player_index)
+    def change_lineup(self, pos_player_bench_hashcode: int, target_batting_order_pos: int) -> None:
+        """
+        sub a bench player into the lineup, remove player from bench, add to box score
+        :param pos_player_bench_hashcode: the hashcode of the player that is subbing into the lineup
+        :param target_batting_order_pos: batting order number to sub, 1 would be the first pos in the lineup
+        :return: None
+        """
+        print(f'gameteam.py swap player with bench {target_batting_order_pos}, {self.cur_lineup_index_list}')
+        cur_player_index = self.cur_lineup_index_list[target_batting_order_pos - 1]
+        if pos_player_bench_hashcode in self.prior_season_pos_players_df.index:
+            self.insert_player_in_lineup(player_hashcode=pos_player_bench_hashcode,
+                                         target_batting_order_pos=target_batting_order_pos)  # insert new player
+            self.cur_lineup_index_list.remove(cur_player_index)  # remove old player
             self.set_prior_and_new_pos_player_batting_bench_dfs()
             self.box_score = gameteamboxstats.TeamBoxScore(self.prior_season_lineup_df, self.prior_season_pitching_df,
                                                            self.team_name)  # update box score
         else:
-            print(f'Player Index is {pos_player_bench_index} is not on the team.  No substitution made')
+            print(f'Player Index is {pos_player_bench_hashcode} is not on the team.  No substitution made')
         return
 
-    def insert_player_in_lineup(self, player_index: int, target_pos: int) -> None:
-        # target pos is position in line up not pos in life, works if you insert from front to back
-        # so dont insert at pos 3 or pos 4 or it will shift pos 4 to pos 5
-        self.cur_lineup_index_list.insert(target_pos - 1, player_index)
+    def insert_player_in_lineup(self, player_hashcode: int, target_batting_order_pos: int) -> None:
+        """
+        insert a player into a spot in the lineup, in front of the old player
+        :param player_hashcode: hashcode of player to insert
+        :param target_batting_order_pos: batting order pos to insert into
+        :return: None
+        """
+        self.cur_lineup_index_list.insert(target_batting_order_pos - 1, player_hashcode)
         return
 
-    def move_player_in_lineup(self, player_index, target_pos):
-        # target pos is position in line up not pos in life
-        # note this will shift the lineup back at that pos
-        self.cur_lineup_index_list.remove(player_index)
-        self.cur_lineup_index_list.insert(target_pos - 1, player_index)
+    def move_player_in_lineup(self, player_hashcode, new_target_batter_order_num) -> None:
+        """
+        :param player_hashcode: hashcode of player to move
+        :param new_target_batter_order_num: new spot in the lineup, 9 would be the last spot
+        :return: None
+        """
+        self.cur_lineup_index_list.remove(player_hashcode)  # remove the player and collapse the list
+        self.cur_lineup_index_list.insert(new_target_batter_order_num - 1, player_hashcode)  # insert at the target spot
         return
 
-    def line_up_dict(self):
+    def line_up_dict(self) -> dict:
+        """
+        :return: the dictionary of pos and hashcode in lineup order
+        """
         return dict(self.prior_season_lineup_df.iloc[:, 2])  # get pos col w/o name

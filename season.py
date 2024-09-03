@@ -245,7 +245,7 @@ if __name__ == '__main__':
     # num_games = 162 - 42  # 42 games already played
     num_games = 162 - 42
     only_national_league_teams = False
-    interactive = True
+    interactive = False
     # team_to_follow = bbseason23.teams[0]  # follow the first team in the random set
     # my_teams_to_follow = 'MIL'  # or follow no team
     my_teams_to_follow = 'MIL'
@@ -259,14 +259,10 @@ if __name__ == '__main__':
                                 load_batter_file='stats-pp-Batting.csv',  # 'random-stats-pp-Batting.csv',
                                 load_pitcher_file='stats-pp-Pitching.csv')  # 'random-stats-pp-Pitching.csv'
 
-    bbseason23.sim_next_day()
-    bbseason23.sim_next_day()
+    # bbseason23.sim_next_day()
+    # bbseason23.sim_next_day()
 
     # handle full season in interactive mode
-    # _ = bbseason23.sim_full_season(season_chatty=False,
-    #                                season_print_lineup_b=False,
-    #                                season_print_box_score_b=False,
-    #                                team_to_follow_detail=False,
-    #                                team_to_follow=my_teams_to_follow)
+    _ = bbseason23.sim_full_season()
     print(startdt)
     print(datetime.datetime.now())

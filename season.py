@@ -183,7 +183,7 @@ class BaseballSeason:
         print(f'\n{self.new_season} Season Stats')
         if self.team_to_follow != '':
             self.baseball_data.print_current_season(teams=[self.team_to_follow], summary_only_b=False)
-        self.baseball_data.print_current_season(teams=self.teams, summary_only_b=False)  # prints detail all teams
+        self.baseball_data.print_current_season(teams=self.teams, summary_only_b=not self.season_chatty)
         return
 
     def sim_day(self, season_day_num: int) -> None:
@@ -256,7 +256,7 @@ if __name__ == '__main__':
                                 season_print_box_score_b=False, season_team_to_follow=my_teams_to_follow,
                                 load_batter_file='stats-pp-Batting.csv',  # 'random-stats-pp-Batting.csv',
                                 load_pitcher_file='stats-pp-Pitching.csv',  # 'random-stats-pp-Pitching.csv'
-                                debug=True)
+                                debug=False)
 
     # handle full season
     # bbseason23.sim_full_season()

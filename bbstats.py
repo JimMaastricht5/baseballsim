@@ -65,6 +65,12 @@ class BaseballStats:
         self.get_seasons(load_batter_file, load_pitcher_file)  # get existing data file
         self.get_all_team_names = lambda: self.batting_data.Team.unique()
 
+        # output format for df print
+        pd.set_option('display.max_rows', None)  # Show all rows
+        pd.set_option('display.max_columns', None)  # Show all columns
+        pd.set_option('display.width', None)  # Adjust the display width
+        pd.set_option('display.precision', 3)  # Set the number of decimal places
+
         # ***************** game to game stats and settings for injury and rest
         # condition and injury odds
         # 64% of injuries are to pitchers (188 of 684); 26% position players (87 of 634)

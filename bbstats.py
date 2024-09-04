@@ -264,7 +264,8 @@ class BaseballStats:
             team_pitching_stats(self.new_season_pitching_data[self.new_season_pitching_data['IP'] > 0].fillna(0))
         self.new_season_batting_data = \
             team_batting_stats(self.new_season_batting_data[self.new_season_batting_data['AB'] > 0].fillna(0))
-        print(f'bbstats update season stats {self.new_season_pitching_data.to_string(justify="right")}')
+        if self.debug:
+            print(f'bbstats update season stats {self.new_season_pitching_data.to_string(justify="right")}')
         return
 
     def print_current_season(self, teams: Optional[List[str]] = None, summary_only_b: bool = False) -> None:

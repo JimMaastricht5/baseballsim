@@ -236,6 +236,93 @@ class BaseballSeason:
         return
 
 
+class MultiBaseballSeason:
+    def __init__(self, load_seasons: List[int], new_season: int, team_list: Optional[list] = None,
+                 season_length: int = 6, series_length: int = 3,
+                 rotation_len: int = 5, only_nl_b: bool = False, season_interactive: bool = False,
+                 season_print_lineup_b: bool = False, season_print_box_score_b: bool = False,
+                 season_chatty: bool = False, season_team_to_follow: str = None,
+                 load_batter_file: str = 'stats-pp-Batting.csv',
+                 load_pitcher_file: str = 'stats-pp-Pitching.csv',
+                 debug: bool = False) -> None:
+        """
+                :param load_seasons: list of seasons to load for stats, can blend multiple seasons
+                :param new_season: int value representing the year of the new season can be the same as one of the loads
+                :param team_list: list of teams to use in the simulations, optional param
+                :param season_length: number of games to be played for the season
+                :param series_length: series is usually 3, the default is one for testing
+                :param rotation_len: number of starters to rotate, default is 5
+                :param only_nl_b: use only the nl teams
+                :param season_interactive: if true the sim pauses after each day
+                :param season_print_lineup_b: if true print lineups
+                :param season_print_box_score_b: if true print box scores
+                :param season_chatty: if true provide more detail
+                :param season_team_to_follow: if none skip otherwise follow this team in gory detail
+                :param load_batter_file: name of the file with batter data, year will be added to the front of the text
+                :param load_pitcher_file: name of the file for the pitcher data, year will be added to the front of name
+                :param debug: like the name says.... True prints more stuff
+                :return: None
+                """
+        self.season_day_num = 0  # set to first day of the season
+        self.load_seasons = load_seasons  # pull base data across for what seasons
+        self.new_season = new_season
+        self.team_list = team_list
+        self.season_length = season_length
+        self.series_length = series_length
+        self.rotation_len = rotation_len
+        self.only_nl_b = only_nl_b
+        self.interactive = season_interactive
+        self.print_lineup_b = season_print_lineup_b
+        self.print_box_score_b = season_print_box_score_b
+        self.season_chatty = season_chatty
+        self.team_to_follow = season_team_to_follow
+        self.load_batter_file = load_batter_file
+        self.load_pitcher_file = load_pitcher_file
+        self.debug = debug
+
+        self.bbseason_a = BaseballSeason(load_seasons=self.load_seasons, new_season=self.new_season,
+                                         season_length=self.season_length, series_length=self.season_length,
+                                         rotation_len=self.rotation_len,
+                                         only_nl_b=self.only_nl_b,
+                                         season_interactive=self.interactive,
+                                         season_chatty=self.season_chatty, season_print_lineup_b=self.print_lineup_b,
+                                         season_print_box_score_b=self.print_box_score_b,
+                                         season_team_to_follow=self.team_to_follow,
+                                         load_batter_file=self.load_batter_file,
+                                         load_pitcher_file=self.load_pitcher_file,
+                                         debug=self.debug)
+
+        self.bbseason_b = BaseballSeason(load_seasons=self.load_seasons, new_season=self.new_season,
+                                         season_length=self.season_length, series_length=self.season_length,
+                                         rotation_len=self.rotation_len,
+                                         only_nl_b=self.only_nl_b,
+                                         season_interactive=self.interactive,
+                                         season_chatty=self.season_chatty, season_print_lineup_b=self.print_lineup_b,
+                                         season_print_box_score_b=self.print_box_score_b,
+                                         season_team_to_follow=self.team_to_follow,
+                                         load_batter_file=self.load_batter_file,
+                                         load_pitcher_file=self.load_pitcher_file,
+                                         debug=self.debug)
+        return
+
+    def sim_day_for_both_seasons(self):
+        self.bbseason_a.sim_start()
+        self.bbseason_b.sim_start()
+
+        self.bbseason_a.sim_next_day()
+        self.bbseason_b.sim_next_day()
+
+        self.bbseason_a.sim_next_day()
+        self.bbseason_b.sim_next_day()
+
+        self.bbseason_a.sim_next_day()
+        self.bbseason_b.sim_next_day()
+
+        self.bbseason_a.sim_end()
+        self.bbseason_b.sim_end()
+        return
+
+
 # test a number of games
 if __name__ == '__main__':
     startdt = datetime.datetime.now()
@@ -248,25 +335,26 @@ if __name__ == '__main__':
     # team_to_follow = bbseason23.teams[0]  # follow the first team in the random set
     # my_teams_to_follow = 'MIL'  # or follow no team
     my_teams_to_follow = 'MIL'
-    bbseason23 = BaseballSeason(load_seasons=[2024], new_season=2024,
-                                season_length=num_games, series_length=3, rotation_len=5,
-                                only_nl_b=only_national_league_teams,
-                                season_interactive=interactive,
-                                season_chatty=False, season_print_lineup_b=False,
-                                season_print_box_score_b=False, season_team_to_follow=my_teams_to_follow,
-                                load_batter_file='stats-pp-Batting.csv',  # 'random-stats-pp-Batting.csv',
-                                load_pitcher_file='stats-pp-Pitching.csv',  # 'random-stats-pp-Pitching.csv'
-                                debug=False)
+    bbseason23 = MultiBaseballSeason(load_seasons=[2024], new_season=2024,
+                                     season_length=num_games, series_length=3, rotation_len=5,
+                                     only_nl_b=only_national_league_teams,
+                                     season_interactive=interactive,
+                                     season_chatty=False, season_print_lineup_b=False,
+                                     season_print_box_score_b=False, season_team_to_follow=my_teams_to_follow,
+                                     load_batter_file='stats-pp-Batting.csv',  # 'random-stats-pp-Batting.csv',
+                                     load_pitcher_file='stats-pp-Pitching.csv',  # 'random-stats-pp-Pitching.csv'
+                                     debug=False)
 
+    bbseason23.sim_day_for_both_seasons()
     # handle full season
     # bbseason23.sim_full_season()
 
     # or do it yourself for 3 days
-    bbseason23.sim_start()
-    bbseason23.sim_next_day()
-    bbseason23.sim_next_day()
-    bbseason23.sim_next_day()
-    bbseason23.sim_end()
+    # bbseason23.sim_start()
+    # bbseason23.sim_next_day()
+    # bbseason23.sim_next_day()
+    # bbseason23.sim_next_day()
+    # bbseason23.sim_end()
 
     print(startdt)
     print(datetime.datetime.now())

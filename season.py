@@ -35,19 +35,18 @@ HOME = 1
 
 class BaseballSeason:
     def __init__(self, load_seasons: List[int], new_season: int, team_list: Optional[list] = None,
-                 season_length_limit: int = 0,
-                 min_games: int = 0, series_length: int = 1,
+                 season_length: int = 6, series_length: int = 3,
                  rotation_len: int = 5, only_nl_b: bool = False, season_interactive: bool = False,
                  season_print_lineup_b: bool = False, season_print_box_score_b: bool = False,
                  season_chatty: bool = False, season_team_to_follow: str = None,
                  load_batter_file: str = 'stats-pp-Batting.csv',
-                 load_pitcher_file: str = 'stats-pp-Pitching.csv') -> None:
+                 load_pitcher_file: str = 'stats-pp-Pitching.csv',
+                 debug: bool = False) -> None:
         """
         :param load_seasons: list of seasons to load for stats, can blend multiple seasons
         :param new_season: int value representing the year of the new season can be the same as one of the loads
         :param team_list: list of teams to use in the simulations, optional param
-        :param season_length_limit: max number of games to sim for the season, hard stop after this day of games
-        :param min_games: number of games to be played for the season, can exceed season length, season len overrides
+        :param season_length: number of games to be played for the season
         :param series_length: series is usually 3, the default is one for testing
         :param rotation_len: number of starters to rotate, default is 5
         :param only_nl_b: use only the nl teams
@@ -58,11 +57,11 @@ class BaseballSeason:
         :param season_team_to_follow: if none skip otherwise follow this team in gory detail
         :param load_batter_file: name of the file with batter data, year will be added to the front of the text
         :param load_pitcher_file: name of the file for the pitcher data, year will be added to the front of the text
+        :param debug: like the name says.... True prints more stuff
         :return: None
         """
         self.season_day_num = 0  # set to first day of the season
-        self.season_length_limit = season_length_limit  # zero mean there is no limit, based on schedule parameters
-        self.min_games = min_games
+        self.season_length = season_length
         self.series_length = series_length
         self.rotation_len = rotation_len
         self.team_season_df = None
@@ -75,6 +74,7 @@ class BaseballSeason:
         self.print_box_score_b = season_print_box_score_b
         self.season_chatty = season_chatty
         self.team_to_follow = season_team_to_follow
+        self.debug = debug
         self.baseball_data = bbstats.BaseballStats(load_seasons=self.load_seasons, new_season=new_season,
                                                    only_nl_b=only_nl_b, load_batter_file=load_batter_file,
                                                    load_pitcher_file=load_pitcher_file)
@@ -106,8 +106,10 @@ class BaseballSeason:
             for series_game in range(0, self.series_length):  # repeat day schedule to build series
                 self.schedule.append(day_schedule)  # add day schedule to full schedule
         # schedule is built, check against minimums and repeat if needed, recursive call to build out further
-        if len(self.schedule) < self.min_games:
+        if len(self.schedule) < self.season_length:
             self.create_schedule()  # recursive call to add more games to get over minimum
+        elif len(self.schedule) > self.season_length:
+            self.schedule = self.schedule[0:self.season_length]
         return
 
     def print_day_schedule(self, day: int) -> None:
@@ -159,6 +161,31 @@ class BaseballSeason:
             np.add(np.array(self.team_win_loss[home_team_name]), np.array(win_loss[1])))
         return
 
+    def sim_start(self) -> None:
+        """
+        Print start of season info
+        :return: None
+        """
+        print(f'{self.new_season} will have {len(self.schedule)} games per team. \n')
+        if self.season_chatty:
+            print(f'Full schedule of games: {self.schedule}')
+        return
+
+    def sim_end(self) -> None:
+        """
+        print end of season info and update end of season stats
+        :return: None
+        """
+        self.baseball_data.update_season_stats()
+        print(f'\n\n****** End of {self.new_season} season ******')
+        print(f'{self.new_season} Season Standings:')
+        self.print_standings()
+        print(f'\n{self.new_season} Season Stats')
+        if self.team_to_follow != '':
+            self.baseball_data.print_current_season(teams=[self.team_to_follow], summary_only_b=False)
+        self.baseball_data.print_current_season(teams=self.teams, summary_only_b=False)  # prints detail all teams
+        return
+
     def sim_day(self, season_day_num: int) -> None:
         """
         sim one day of games across the league
@@ -188,53 +215,25 @@ class BaseballSeason:
     def sim_next_day(self) -> None:
         """
         sims the next day for a season
-        :return: end of season
+        :return: None
         """
-        if self.season_length_limit == 0 or self.season_day_num + 1 <= self.season_length_limit:  # run a day
-            self.sim_day(season_day_num=self.season_day_num)
-            print(f'Standings for Day {self.season_day_num + 1}:')
-            self.print_standings()
-            self.season_day_num = self.season_day_num + 1
+        self.sim_day(season_day_num=self.season_day_num)
+        print(f'Standings for Day {self.season_day_num + 1}:')
+        self.print_standings()
+        self.season_day_num = self.season_day_num + 1
         return
 
-    def sim_full_season(self) -> bool:
+    def sim_full_season(self) -> None:
         """
-        function drives overall sim for the season
-        :return: end of season
+        function drives overall sim for entire season
+        :return: None
         """
-        if self.season_day_num == 0:  # start of season
-            print(f'{self.new_season} will have '
-                  f'{self.season_length_limit if self.season_length_limit != 0 else len(self.schedule)} '
-                  f'games per team. \n')
-            if self.season_chatty:
-                print(f'Full schedule of games: {self.schedule}')
-
-        # loop over every day and every game scheduled that day
-        # this is setup as a while statement to allow for single game play at a time for interatice gaming
-        play_a_day = True
-        while play_a_day:
+        self.sim_start()
+        while self.season_day_num <= len(self.schedule) - 1:  # loop over every day and every game scheduled that day
             self.sim_next_day()
 
-            # stop if played all games in season, hit the limit, or if we are playing one game at a time
-            if (self.season_day_num > len(self.schedule) - 1 or
-                    (self.season_length_limit != 0 and self.season_day_num + 1 > self.season_length_limit) or
-                    self.interactive):
-                play_a_day = False
-
-        # end season
-        if self.season_length_limit != 0 and self.season_day_num + 1 > self.season_length_limit:  # stop limit
-            end_of_season = True
-            self.baseball_data.update_season_stats()
-            print(f'\n\n****** End of {self.new_season} season ******')
-            print(f'{self.new_season} Season Standings:')
-            self.print_standings()
-            print(f'\n{self.new_season} Season Stats')
-            if self.team_to_follow != '':
-                self.baseball_data.print_current_season(teams=[self.team_to_follow], summary_only_b=False)
-            self.baseball_data.print_current_season(teams=self.teams, summary_only_b=False)  # prints detail all teams
-        else:
-            end_of_season = False
-        return end_of_season
+        self.sim_end()
+        return
 
 
 # test a number of games
@@ -243,26 +242,31 @@ if __name__ == '__main__':
 
     # full season
     # num_games = 162 - 42  # 42 games already played
-    num_games = 162 - 42
-    only_national_league_teams = False
+    num_games = 3
+    only_national_league_teams = True
     interactive = False
     # team_to_follow = bbseason23.teams[0]  # follow the first team in the random set
     # my_teams_to_follow = 'MIL'  # or follow no team
     my_teams_to_follow = 'MIL'
     bbseason23 = BaseballSeason(load_seasons=[2024], new_season=2024,
-                                season_length_limit=num_games,
-                                min_games=num_games, series_length=3, rotation_len=5,
+                                season_length=num_games, series_length=3, rotation_len=5,
                                 only_nl_b=only_national_league_teams,
                                 season_interactive=interactive,
                                 season_chatty=False, season_print_lineup_b=False,
                                 season_print_box_score_b=False, season_team_to_follow=my_teams_to_follow,
                                 load_batter_file='stats-pp-Batting.csv',  # 'random-stats-pp-Batting.csv',
-                                load_pitcher_file='stats-pp-Pitching.csv')  # 'random-stats-pp-Pitching.csv'
+                                load_pitcher_file='stats-pp-Pitching.csv',  # 'random-stats-pp-Pitching.csv'
+                                debug=True)
 
-    # bbseason23.sim_next_day()
-    # bbseason23.sim_next_day()
+    # handle full season
+    # bbseason23.sim_full_season()
 
-    # handle full season in interactive mode
-    _ = bbseason23.sim_full_season()
+    # or do it yourself for 3 days
+    bbseason23.sim_start()
+    bbseason23.sim_next_day()
+    bbseason23.sim_next_day()
+    bbseason23.sim_next_day()
+    bbseason23.sim_end()
+
     print(startdt)
     print(datetime.datetime.now())

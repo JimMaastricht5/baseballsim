@@ -141,6 +141,7 @@ class BaseballSeason:
         for team in self.team_win_loss:
             if team != 'OFF DAY':
                 win_loss = self.team_win_loss[team]
+                team = team if self.team_city_dict[team] == team else f'{self.team_city_dict[team]} ({team})'
                 teaml.append(team)
                 winl.append(win_loss[0])
                 lossl.append(win_loss[1])
@@ -167,7 +168,12 @@ class BaseballSeason:
         Print start of season info
         :return: None
         """
-        print(f'{self.new_season} will have {len(self.schedule)} games per team. \n')
+        teams_paragraph = ''
+        print(f'{self.new_season} will have {len(self.schedule)} games per team with {len(self.teams)} teams.')
+        for team in self.team_city_dict.keys():
+            teams_paragraph = teams_paragraph + ', ' if len(teams_paragraph) > 0 else ''
+            teams_paragraph = teams_paragraph + f'{self.team_city_dict[team]} ({team})'
+        print(f'{teams_paragraph} \n')
         if self.season_chatty:
             print(f'Full schedule of games: {self.schedule}')
         return
@@ -271,7 +277,8 @@ class MultiBaseballSeason:
         self.season_length = season_length
         self.series_length = series_length
         self.rotation_len = rotation_len
-        self.include_leagues = include_leagues
+        self.majors = [include_leagues[0]]
+        self.minors = [include_leagues[1]]
         self.interactive = season_interactive
         self.print_lineup_b = season_print_lineup_b
         self.print_box_score_b = season_print_box_score_b
@@ -280,11 +287,10 @@ class MultiBaseballSeason:
         self.load_batter_file = load_batter_file
         self.load_pitcher_file = load_pitcher_file
         self.debug = debug
-
         self.bbseason_a = BaseballSeason(load_seasons=self.load_seasons, new_season=self.new_season,
                                          season_length=self.season_length, series_length=self.season_length,
                                          rotation_len=self.rotation_len,
-                                         include_leagues=['NL'],
+                                         include_leagues=self.majors,
                                          season_interactive=self.interactive,
                                          season_chatty=self.season_chatty, season_print_lineup_b=self.print_lineup_b,
                                          season_print_box_score_b=self.print_box_score_b,
@@ -296,7 +302,7 @@ class MultiBaseballSeason:
         self.bbseason_b = BaseballSeason(load_seasons=self.load_seasons, new_season=self.new_season,
                                          season_length=self.season_length, series_length=self.season_length,
                                          rotation_len=self.rotation_len,
-                                         include_leagues=['AL'],
+                                         include_leagues=self.minors,
                                          season_interactive=self.interactive,
                                          season_chatty=self.season_chatty, season_print_lineup_b=self.print_lineup_b,
                                          season_print_box_score_b=self.print_box_score_b,

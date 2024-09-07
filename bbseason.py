@@ -36,7 +36,7 @@ HOME = 1
 class BaseballSeason:
     def __init__(self, load_seasons: List[int], new_season: int, team_list: Optional[list] = None,
                  season_length: int = 6, series_length: int = 3,
-                 rotation_len: int = 5, only_nl_b: bool = False, season_interactive: bool = False,
+                 rotation_len: int = 5, include_leagues: list = None, season_interactive: bool = False,
                  season_print_lineup_b: bool = False, season_print_box_score_b: bool = False,
                  season_chatty: bool = False, season_team_to_follow: str = None,
                  load_batter_file: str = 'stats-pp-Batting.csv',
@@ -49,7 +49,7 @@ class BaseballSeason:
         :param season_length: number of games to be played for the season
         :param series_length: series is usually 3, the default is one for testing
         :param rotation_len: number of starters to rotate, default is 5
-        :param only_nl_b: use only the nl teams
+        :param include_leagues: list of leagues to include in the season
         :param season_interactive: if true the sim pauses after each day
         :param season_print_lineup_b: if true print lineups
         :param season_print_box_score_b: if true print box scores
@@ -76,7 +76,7 @@ class BaseballSeason:
         self.team_to_follow = season_team_to_follow
         self.debug = debug
         self.baseball_data = bbstats.BaseballStats(load_seasons=self.load_seasons, new_season=new_season,
-                                                   only_nl_b=only_nl_b, load_batter_file=load_batter_file,
+                                                   include_leagues=include_leagues, load_batter_file=load_batter_file,
                                                    load_pitcher_file=load_pitcher_file)
         self.teams = list(self.baseball_data.batting_data.Team.unique()) if team_list == [] or team_list is None \
             else team_list
@@ -239,7 +239,7 @@ class BaseballSeason:
 class MultiBaseballSeason:
     def __init__(self, load_seasons: List[int], new_season: int, team_list: Optional[list] = None,
                  season_length: int = 6, series_length: int = 3,
-                 rotation_len: int = 5, only_nl_b: bool = False, season_interactive: bool = False,
+                 rotation_len: int = 5, include_leagues: list = None, season_interactive: bool = False,
                  season_print_lineup_b: bool = False, season_print_box_score_b: bool = False,
                  season_chatty: bool = False, season_team_to_follow: str = None,
                  load_batter_file: str = 'stats-pp-Batting.csv',
@@ -252,7 +252,7 @@ class MultiBaseballSeason:
                 :param season_length: number of games to be played for the season
                 :param series_length: series is usually 3, the default is one for testing
                 :param rotation_len: number of starters to rotate, default is 5
-                :param only_nl_b: use only the nl teams
+                :param include_leagues: leagues to include in season, each league will get its own season
                 :param season_interactive: if true the sim pauses after each day
                 :param season_print_lineup_b: if true print lineups
                 :param season_print_box_score_b: if true print box scores
@@ -270,7 +270,7 @@ class MultiBaseballSeason:
         self.season_length = season_length
         self.series_length = series_length
         self.rotation_len = rotation_len
-        self.only_nl_b = only_nl_b
+        self.include_leagues = include_leagues
         self.interactive = season_interactive
         self.print_lineup_b = season_print_lineup_b
         self.print_box_score_b = season_print_box_score_b
@@ -283,7 +283,7 @@ class MultiBaseballSeason:
         self.bbseason_a = BaseballSeason(load_seasons=self.load_seasons, new_season=self.new_season,
                                          season_length=self.season_length, series_length=self.season_length,
                                          rotation_len=self.rotation_len,
-                                         only_nl_b=self.only_nl_b,
+                                         include_leagues=['NL'],
                                          season_interactive=self.interactive,
                                          season_chatty=self.season_chatty, season_print_lineup_b=self.print_lineup_b,
                                          season_print_box_score_b=self.print_box_score_b,
@@ -295,7 +295,7 @@ class MultiBaseballSeason:
         self.bbseason_b = BaseballSeason(load_seasons=self.load_seasons, new_season=self.new_season,
                                          season_length=self.season_length, series_length=self.season_length,
                                          rotation_len=self.rotation_len,
-                                         only_nl_b=self.only_nl_b,
+                                         include_leagues=['AL'],
                                          season_interactive=self.interactive,
                                          season_chatty=self.season_chatty, season_print_lineup_b=self.print_lineup_b,
                                          season_print_box_score_b=self.print_box_score_b,
@@ -330,14 +330,13 @@ if __name__ == '__main__':
     # full season
     # num_games = 162 - 42  # 42 games already played
     num_games = 3
-    only_national_league_teams = True
     interactive = False
     # team_to_follow = bbseason23.teams[0]  # follow the first team in the random set
     # my_teams_to_follow = 'MIL'  # or follow no team
     my_teams_to_follow = 'MIL'
     bbseason23 = MultiBaseballSeason(load_seasons=[2024], new_season=2024,
                                      season_length=num_games, series_length=3, rotation_len=5,
-                                     only_nl_b=only_national_league_teams,
+                                     include_leagues=['AL', 'NL'],
                                      season_interactive=interactive,
                                      season_chatty=False, season_print_lineup_b=False,
                                      season_print_box_score_b=False, season_team_to_follow=my_teams_to_follow,

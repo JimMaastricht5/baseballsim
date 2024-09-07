@@ -30,15 +30,17 @@ from typing import List, Optional, Union
 
 
 class BaseballStats:
-    def __init__(self, load_seasons: List[int], new_season: int, only_nl_b: bool = False,
+    def __init__(self, load_seasons: List[int], new_season: int, include_leagues: list = None,
                  load_batter_file: str = 'stats-pp-Batting.csv',
-                 load_pitcher_file: str = 'stats-pp-Pitching.csv') -> None:
+                 load_pitcher_file: str = 'stats-pp-Pitching.csv',
+                 debug: bool = False) -> None:
         """
         :param load_seasons: list of seasons to load, each season is an integer year
         :param new_season: integer value of year for new season
-        :param only_nl_b: keep on the national leagues data
+        :param include_leagues: list of leagues to include in season
         :param load_batter_file: file name of the batting stats, year will be added as a prefix
         :param load_pitcher_file: file name of the pitching stats, year will be added as a prefix
+        :param debug: boolean to control extra printing
         """
         self.rnd = lambda: np.random.default_rng().uniform(low=0.0, high=1.001)  # random generator between 0 and 1
         # self.create_hash = lambda text: int(hashlib.sha256(text.encode('utf-8')).hexdigest()[:5], 16)
@@ -54,8 +56,8 @@ class BaseballStats:
                                'SB', 'CS', 'BB', 'SO', 'SH', 'SF', 'HBP', 'AVG', 'OBP', 'SLG',
                                'OPS', 'Status', 'Injured Days', 'Condition']
         self.injury_cols_to_print = ['Player', 'Team', 'Age', 'Status', 'Days Remaining']  # Days Remaining to see time
-        self.nl = ['CHC', 'CIN', 'MIL', 'PIT', 'STL', 'ATL', 'MIA', 'NYM', 'PHI', 'WSH', 'AZ', 'COL', 'LA', 'SD', 'SF']
-        self.only_nl_b = only_nl_b
+        self.include_leagues = include_leagues
+        self.debug = debug
         self.load_seasons = [load_seasons] if not isinstance(load_seasons, list) else load_seasons
         self.new_season = new_season
         self.pitching_data = None
@@ -156,9 +158,9 @@ class BaseballStats:
             print(f'file was not found, correct spelling or try running bbstats_preprocess.py to setup the data')
             exit(1)  # stop the program
 
-        if self.only_nl_b:
-            self.pitching_data = self.pitching_data[self.pitching_data['Team'].isin(self.nl)]
-            self.batting_data = self.batting_data[self.batting_data['Team'].isin(self.nl)]
+        if self.include_leagues is not None:
+            self.pitching_data = self.pitching_data[self.pitching_data['League'].isin(self.include_leagues)]
+            self.batting_data = self.batting_data[self.batting_data['League'].isin(self.include_leagues)]
 
         # cast cols to float, may not be needed, best to be certain
         pcols_to_convert = ['Condition', 'IP', 'ERA', 'WHIP', 'OBP', 'AVG_faced', 'Game_Fatigue_Factor']
@@ -479,20 +481,20 @@ def update_column_with_other_df(df1, col1, df2, col2):
 
 
 if __name__ == '__main__':
-    baseball_data = BaseballStats(load_seasons=[2024], new_season=2024, only_nl_b=True,
+    baseball_data = BaseballStats(load_seasons=[2024], new_season=2024, include_leagues=['AL', 'NL'],
                                   load_batter_file='stats-pp-Batting.csv',
                                   load_pitcher_file='stats-pp-Pitching.csv')
     print(*baseball_data.pitching_data.columns)
     print(*baseball_data.batting_data.columns)
     print(baseball_data.get_all_team_names())
 
-    # baseball_data.print_prior_season()
+    baseball_data.print_prior_season()
     # baseball_data.print_current_season(teams=teams)
     # my_teams = [('MIL' if 'MIL' in baseball_data.get_all_team_names() else baseball_data.get_all_team_names()[0])]
-    my_teams = ['WSH']
-    for team in my_teams:
-        print(baseball_data.get_pitching_data(team_name=team, prior_season=True).to_string())
-        # print(baseball_data.get_pitching_data(team_name=team, prior_season=True).dtypes)
-        # print(baseball_data.get_pitching_data(team_name=team, prior_season=False).to_string())
-        print(baseball_data.get_batting_data(team_name=team, prior_season=True).to_string())
-        # print(baseball_data.get_batting_data(team_name=team, prior_season=False).to_string())
+    # my_teams = ['WSH']
+    # for team in my_teams:
+    #     print(baseball_data.get_pitching_data(team_name=team, prior_season=True).to_string())
+    #     print(baseball_data.get_pitching_data(team_name=team, prior_season=True).dtypes)
+    #     print(baseball_data.get_pitching_data(team_name=team, prior_season=False).to_string())
+    #     print(baseball_data.get_batting_data(team_name=team, prior_season=True).to_string())
+    #     print(baseball_data.get_batting_data(team_name=team, prior_season=False).to_string())

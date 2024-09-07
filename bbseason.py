@@ -181,7 +181,7 @@ class BaseballSeason:
         print(f'{self.new_season} Season Standings:')
         self.print_standings()
         print(f'\n{self.new_season} Season Stats')
-        if self.team_to_follow != '':
+        if self.team_to_follow != '' and self.team_to_follow in self.baseball_data.get_all_team_names():
             self.baseball_data.print_current_season(teams=[self.team_to_follow], summary_only_b=False)
         self.baseball_data.print_current_season(teams=self.teams, summary_only_b=not self.season_chatty)
         return

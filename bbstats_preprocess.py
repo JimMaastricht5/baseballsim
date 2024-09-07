@@ -342,7 +342,7 @@ if __name__ == '__main__':
     print(*baseball_data.pitching_data.columns)
     print(*baseball_data.batting_data.columns)
     print(baseball_data.batting_data.Team.unique())
-    print(baseball_data.batting_data[baseball_data.batting_data['Team'] == 'WSH'])
+    # print(baseball_data.batting_data[baseball_data.batting_data['Team'] == 'WSH'])
     # print(baseball_data.batting_data.Mascot.unique())
     print(baseball_data.pitching_data.sort_values('Hashcode').to_string())
     print(baseball_data.batting_data.sort_values('Hashcode').to_string())

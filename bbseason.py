@@ -87,6 +87,7 @@ class BaseballSeason:
         self.team_win_loss = {}
         for team in self.teams:
             self.team_win_loss.update({team: [0, 0]})  # set team win loss to 0, 0
+        self.team_city_dict = self.baseball_data.get_all_team_city_names()
         return
 
     def create_schedule(self) -> None:
@@ -114,20 +115,20 @@ class BaseballSeason:
 
     def print_day_schedule(self, day: int) -> None:
         """
-        prints the schedule for the day passed in
+        prints the schedule for the day passed in, prints days off last
         :param day: integer of the day in season, e.g., 161
         :return: None
         """
-        game_str = ''
+        game_day_off = ''
         day_schedule = self.schedule[day]
         print(f'Games for day {day + 1}:')
         for game in day_schedule:
             if 'OFF DAY' not in game:
                 print(f'{game[0]} vs. {game[1]}')
             else:
-                game_str = game[0] if game[0] != 'OFF DAY' else game[1]
-        if game_str != '':
-            print(f'{game_str} has the day off')
+                game_day_off = game[0] if game[0] != 'OFF DAY' else game[1]  # find the team with the off game
+        if game_day_off != '':
+            print(f'{game_day_off} has the day off')
         print('')
         return
 
@@ -309,14 +310,9 @@ class MultiBaseballSeason:
         self.bbseason_a.sim_start()
         self.bbseason_b.sim_start()
 
-        self.bbseason_a.sim_next_day()
-        self.bbseason_b.sim_next_day()
-
-        self.bbseason_a.sim_next_day()
-        self.bbseason_b.sim_next_day()
-
-        self.bbseason_a.sim_next_day()
-        self.bbseason_b.sim_next_day()
+        for day in range(self.season_length):
+            self.bbseason_a.sim_next_day()
+            self.bbseason_b.sim_next_day()
 
         self.bbseason_a.sim_end()
         self.bbseason_b.sim_end()
@@ -329,19 +325,19 @@ if __name__ == '__main__':
 
     # full season
     # num_games = 162 - 42  # 42 games already played
-    num_games = 3
+    num_games = 81
     interactive = False
     # team_to_follow = bbseason23.teams[0]  # follow the first team in the random set
     # my_teams_to_follow = 'MIL'  # or follow no team
     my_teams_to_follow = 'MIL'
-    bbseason23 = MultiBaseballSeason(load_seasons=[2024], new_season=2024,
+    bbseason23 = MultiBaseballSeason(load_seasons=[2023], new_season=2024,
                                      season_length=num_games, series_length=3, rotation_len=5,
-                                     include_leagues=['AL', 'NL'],
+                                     include_leagues=['ACB', 'SOL'],
                                      season_interactive=interactive,
                                      season_chatty=False, season_print_lineup_b=False,
                                      season_print_box_score_b=False, season_team_to_follow=my_teams_to_follow,
-                                     load_batter_file='stats-pp-Batting.csv',  # 'random-stats-pp-Batting.csv',
-                                     load_pitcher_file='stats-pp-Pitching.csv',  # 'random-stats-pp-Pitching.csv'
+                                     load_batter_file='random-stats-pp-Batting.csv',  # 'random-stats-pp-Batting.csv',
+                                     load_pitcher_file='random-stats-pp-Pitching.csv',  # 'random-stats-pp-Pitching.csv'
                                      debug=False)
 
     bbseason23.sim_day_for_both_seasons()

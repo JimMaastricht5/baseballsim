@@ -66,6 +66,10 @@ class BaseballStats:
         self.new_season_batting_data = None
         self.get_seasons(load_batter_file, load_pitcher_file)  # get existing data file
         self.get_all_team_names = lambda: self.batting_data.Team.unique()
+        self.get_all_league_names = lambda: self.batting_data.League.unique()
+        self.get_all_city_names = lambda: self.batting_data.City.unique()
+        self.get_all_team_city_names = lambda: None if len(self.get_all_city_names()) <= 1 \
+            else dict(zip(self.get_all_team_names(), self.get_all_city_names()))
 
         # output format for df print
         pd.set_option('display.max_rows', None)  # Show all rows
@@ -117,6 +121,9 @@ class BaseballStats:
             df_new = self.new_season_batting_data[self.new_season_batting_data['Team'] == team_name]
             df_cur = self.batting_data[self.batting_data.index.isin(df_new.index)]
             df = df_cur if prior_season else df_new
+        if 'City' not in df.columns:
+            df['City'] = df['Team']
+            df['Mascot'] = ''
         return df
 
     def get_pitching_data(self, team_name: Optional[str] = None, prior_season: bool = True) -> DataFrame:
@@ -132,6 +139,9 @@ class BaseballStats:
             df_new = self.new_season_pitching_data[self.new_season_pitching_data['Team'] == team_name]
             df_cur = self.pitching_data[self.pitching_data.index.isin(df_new.index)]
             df = df_cur if prior_season else df_new
+        if 'City' not in df.columns:
+            df['City'] = df['Team']
+            df['Mascot'] = ''
         return df
 
     def get_seasons(self, batter_file: str, pitcher_file: str) -> None:
@@ -158,7 +168,8 @@ class BaseballStats:
             print(f'file was not found, correct spelling or try running bbstats_preprocess.py to setup the data')
             exit(1)  # stop the program
 
-        if self.include_leagues is not None:
+        # limit the league if include leagues is not none and at least one league is in the list
+        if self.include_leagues is not None and sum(self.pitching_data['League'].isin(self.include_leagues)) >= 1:
             self.pitching_data = self.pitching_data[self.pitching_data['League'].isin(self.include_leagues)]
             self.batting_data = self.batting_data[self.batting_data['League'].isin(self.include_leagues)]
 
@@ -481,14 +492,15 @@ def update_column_with_other_df(df1, col1, df2, col2):
 
 
 if __name__ == '__main__':
-    baseball_data = BaseballStats(load_seasons=[2024], new_season=2024, include_leagues=['AL', 'NL'],
-                                  load_batter_file='stats-pp-Batting.csv',
-                                  load_pitcher_file='stats-pp-Pitching.csv')
+    baseball_data = BaseballStats(load_seasons=[2023], new_season=2024, include_leagues=['ACB', 'SOL'],
+                                  load_batter_file='random-stats-pp-Batting.csv',
+                                  load_pitcher_file='random-stats-pp-Pitching.csv')
     print(*baseball_data.pitching_data.columns)
     print(*baseball_data.batting_data.columns)
     print(baseball_data.get_all_team_names())
+    print(baseball_data.get_all_team_city_names())
 
-    baseball_data.print_prior_season()
+    # baseball_data.print_prior_season()
     # baseball_data.print_current_season(teams=teams)
     # my_teams = [('MIL' if 'MIL' in baseball_data.get_all_team_names() else baseball_data.get_all_team_names()[0])]
     # my_teams = ['WSH']

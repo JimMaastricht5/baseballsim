@@ -47,8 +47,12 @@ class BaseballStats:
 
         self.numeric_bcols = ['G', 'AB', 'R', 'H', '2B', '3B', 'HR', 'RBI', 'SB', 'CS', 'BB', 'SO', 'SH', 'SF',
                               'HBP', 'Condition']  # these cols will get added to running season total
+        self.numeric_bcols_to_print = ['G', 'AB', 'R', 'H', '2B', '3B', 'HR', 'RBI', 'SB', 'CS', 'BB', 'SO', 'SH', 'SF',
+                              'HBP']
         self.numeric_pcols = ['G', 'GS', 'CG', 'SHO', 'IP', 'AB', 'H', '2B', '3B', 'HR', 'ER', 'K', 'BB', 'W', 'L',
                               'SV', 'BS', 'HLD', 'Total_Outs', 'Condition']  # cols will add to running season total
+        self.numeric_pcols_to_print = ['G', 'GS', 'CG', 'SHO', 'IP', 'AB', 'H', '2B', '3B', 'HR', 'ER', 'K', 'BB',
+                                       'W', 'L', 'SV', 'BS', 'HLD']
         self.pcols_to_print = ['Player', 'League', 'Team', 'Age', 'G', 'GS', 'CG', 'SHO', 'IP', 'H', '2B', '3B', 'ER',
                                'K', 'BB', 'HR', 'W', 'L', 'SV', 'BS', 'HLD', 'ERA', 'WHIP', 'AVG', 'OBP', 'SLG', 'OPS',
                                'Status', 'Injured Days', 'Condition']
@@ -331,7 +335,7 @@ class BaseballStats:
             print(df[self.pcols_to_print].to_string(justify='right'))  # print entire team
 
         print('\nTeam Pitching Totals:')
-        print(df_totals[self.numeric_pcols].to_string(justify='right', index=False))
+        print(df_totals[self.numeric_pcols_to_print].to_string(justify='right', index=False))
         print('\n\n')
 
         df = df_b[df_b['Team'].isin(teams)]
@@ -340,7 +344,7 @@ class BaseballStats:
             print(df[self.bcols_to_print].to_string(justify='right'))  # print entire team
 
         print('\nTeam Batting Totals:')
-        print(df_totals[self.numeric_bcols].to_string(justify='right', index=False))
+        print(df_totals[self.numeric_bcols_to_print].to_string(justify='right', index=False))
         print('\n\n')
         return
 
@@ -374,7 +378,7 @@ def remove_non_print_cols(df: DataFrame) -> DataFrame:
     :param df: df to clean
     :return: df cleaned up
     """
-    non_print_cols = {'Season', 'Total_OB', 'AVG_faced', 'Game_Fatigue_Factor'}  # 'Total_Outs',
+    non_print_cols = {'Season', 'Total_OB', 'AVG_faced', 'Game_Fatigue_Factor', 'Total_Outs', 'Condition'}  # 'Total_Outs',
     cols_to_drop = list(non_print_cols.intersection(df.columns))
     if cols_to_drop:
         df = df.drop(cols_to_drop, axis=1)
@@ -467,7 +471,7 @@ def team_pitching_totals(pitching_df: DataFrame, team_name: str = '', concat: bo
       :return: df with team totals
       """
     df = pitching_df[['GS', 'CG', 'SHO', 'IP', 'AB', 'H', '2B', '3B', 'ER', 'K', 'BB', 'HR', 'W', 'L', 'SV', 'BS',
-                      'HLD', 'Total_Outs']].sum()
+                      'HLD']].sum()
     df = df.to_frame().T
     df = df.assign(Player='Totals', Team=team_name, Age='', Status='', Injured_Days='',
                    G=np.max(pitching_df['G']), Condition=0)
@@ -475,7 +479,7 @@ def team_pitching_totals(pitching_df: DataFrame, team_name: str = '', concat: bo
         df = pd.concat([pitching_df, df], ignore_index=True)
     df = team_pitching_stats(df)
     # Vectorized the truncation operation using pandas' apply function
-    cols_to_trunc = ['GS', 'CG', 'SHO', 'H', 'AB', 'ER', 'K', 'BB', 'HR', 'W', 'L', 'SV', 'BS', 'HLD', 'Total_Outs']
+    cols_to_trunc = ['GS', 'CG', 'SHO', 'H', 'AB', 'ER', 'K', 'BB', 'HR', 'W', 'L', 'SV', 'BS', 'HLD']
     df[cols_to_trunc] = df[cols_to_trunc].apply(np.floor)
     return df
 
@@ -503,8 +507,8 @@ if __name__ == '__main__':
     print(baseball_data.get_all_team_city_names())
     # print(baseball_data.batting_data.to_string())
     # baseball_data.print_prior_season()
-    # baseball_data.print_prior_season(teams=['LAK'])
-    print(baseball_data.get_pitching_data(team_name=baseball_data.get_all_team_names()[0]).to_string())
+    baseball_data.print_prior_season(teams=[baseball_data.get_all_team_names()[0]])
+    # print(baseball_data.get_pitching_data(team_name=baseball_data.get_all_team_names()[0]).to_string())
     # my_teams = [('MIL' if 'MIL' in baseball_data.get_all_team_names() else baseball_data.get_all_team_names()[0])]
     # my_teams = ['WSH']
     # for team in my_teams:

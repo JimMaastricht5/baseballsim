@@ -48,11 +48,11 @@ class BaseballStats:
         self.numeric_bcols = ['G', 'AB', 'R', 'H', '2B', '3B', 'HR', 'RBI', 'SB', 'CS', 'BB', 'SO', 'SH', 'SF',
                               'HBP', 'Condition']  # these cols will get added to running season total
         self.numeric_bcols_to_print = ['G', 'AB', 'R', 'H', '2B', '3B', 'HR', 'RBI', 'SB', 'CS', 'BB', 'SO', 'SH', 'SF',
-                              'HBP']
+                              'HBP', 'AVG', 'OBP', 'SLG', 'OPS']
         self.numeric_pcols = ['G', 'GS', 'CG', 'SHO', 'IP', 'AB', 'H', '2B', '3B', 'HR', 'ER', 'K', 'BB', 'W', 'L',
                               'SV', 'BS', 'HLD', 'Total_Outs', 'Condition']  # cols will add to running season total
-        self.numeric_pcols_to_print = ['G', 'GS', 'CG', 'SHO', 'IP', 'AB', 'H', '2B', '3B', 'HR', 'ER', 'K', 'BB',
-                                       'W', 'L', 'SV', 'BS', 'HLD']
+        self.numeric_pcols_to_print = ['G', 'GS', 'CG', 'SHO', 'IP', 'H', '2B', '3B', 'HR', 'ER', 'K', 'BB',
+                                       'W', 'L', 'SV', 'BS', 'HLD', 'ERA', 'WHIP', 'AVG', 'OBP', 'SLG', 'OPS']
         self.pcols_to_print = ['Player', 'League', 'Team', 'Age', 'G', 'GS', 'CG', 'SHO', 'IP', 'H', '2B', '3B', 'ER',
                                'K', 'BB', 'HR', 'W', 'L', 'SV', 'BS', 'HLD', 'ERA', 'WHIP', 'AVG', 'OBP', 'SLG', 'OPS',
                                'Status', 'Injured Days', 'Condition']
@@ -330,7 +330,7 @@ class BaseballStats:
             df_p['Condition'] = df_p['Condition'].apply(condition_txt_f)  # apply condition_txt static func
             df_b['Condition'] = df_b['Condition'].apply(condition_txt_f)  # apply condition_txt static func
         df = df_p[df_p['Team'].isin(teams)]
-        df_totals = team_pitching_totals(df, team_name='', concat=False)
+        df_totals = team_pitching_totals(df, team_name='')
         if summary_only_b is False:
             print(df[self.pcols_to_print].to_string(justify='right'))  # print entire team
 
@@ -339,7 +339,7 @@ class BaseballStats:
         print('\n\n')
 
         df = df_b[df_b['Team'].isin(teams)]
-        df_totals = team_batting_totals(df, team_name='', concat=False)
+        df_totals = team_batting_totals(df, team_name='')
         if summary_only_b is False:
             print(df[self.bcols_to_print].to_string(justify='right'))  # print entire team
 
@@ -408,7 +408,6 @@ def team_batting_stats(df: DataFrame) -> DataFrame:
     df['SLG'] = trunc_col(np.nan_to_num(np.divide((df['H'] - df['2B'] - df['3B'] - df['HR']) + df['2B'] * 2 +
                           df['3B'] * 3 + df['HR'] * 4, df['AB']), nan=0.0, posinf=0.0), 3)
     df['OPS'] = trunc_col(np.nan_to_num(df['OBP'] + df['SLG'], nan=0.0, posinf=0.0), 3)
-    df['Condition'] = (df['Condition'] * 10 ** 0).astype(int) / 10 ** 0
     return df
 
 
@@ -433,54 +432,35 @@ def team_pitching_stats(df: DataFrame) -> DataFrame:
     # Calculate 'WHIP' and 'ERA' columns
     df['WHIP'] = trunc_col((df['BB'] + df['H']) / df['IP'], 3)
     df['ERA'] = trunc_col((df['ER'] / df['IP']) * 9, 2)
-    # Truncate 'Condition' column
-    df['Condition'] = trunc_col(df['Condition'], 0)
     return df
 
 
-def team_batting_totals(batting_df: DataFrame, team_name: str = '', concat: bool = True) -> DataFrame:
+def team_batting_totals(batting_df: DataFrame, team_name: str = '') -> DataFrame:
     """
     team totals for batting
     :param batting_df: ind batting data
     :param team_name: name of team to calc
-    :param concat: should this be concatenated onto the existing dataframe
     :return: df with team totals
     """
-    df = batting_df[['AB', 'R', 'H', '2B', '3B', 'HR', 'RBI', 'SB', 'CS', 'BB', 'SO', 'SH', 'SF', 'HBP']].sum()
-    df['Player'] = 'Totals'
-    df['Team'] = team_name
-    df['Age'] = ''
-    df['Pos'] = ''
-    df['Status'] = ''
-    df['Injured Days'] = ''
+    df = batting_df[['AB', 'R', 'H', '2B', '3B', 'HR', 'RBI', 'SB', 'CS', 'BB', 'SO', 'SH', 'SF', 'HBP']].sum().astype(int)
     df['G'] = np.max(batting_df['G'])
-    df['Condition'] = 0
     df = df.to_frame().T
-    if concat:
-        df = pd.concat([batting_df, df], ignore_index=True)
     df = team_batting_stats(df)
     return df
 
 
-def team_pitching_totals(pitching_df: DataFrame, team_name: str = '', concat: bool = True) -> DataFrame:
+def team_pitching_totals(pitching_df: DataFrame, team_name: str = '') -> DataFrame:
     """
       team totals for pitching
       :param pitching_df: ind pitcher data
       :param team_name: name of team to calc
-      :param concat: should this be concatenated onto the existing dataframe
       :return: df with team totals
       """
     df = pitching_df[['GS', 'CG', 'SHO', 'IP', 'AB', 'H', '2B', '3B', 'ER', 'K', 'BB', 'HR', 'W', 'L', 'SV', 'BS',
-                      'HLD']].sum()
+                      'HLD']].sum().astype(int)
     df = df.to_frame().T
-    df = df.assign(Player='Totals', Team=team_name, Age='', Status='', Injured_Days='',
-                   G=np.max(pitching_df['G']), Condition=0)
-    if concat:
-        df = pd.concat([pitching_df, df], ignore_index=True)
+    df = df.assign(G=np.max(pitching_df['G']))
     df = team_pitching_stats(df)
-    # Vectorized the truncation operation using pandas' apply function
-    cols_to_trunc = ['GS', 'CG', 'SHO', 'H', 'AB', 'ER', 'K', 'BB', 'HR', 'W', 'L', 'SV', 'BS', 'HLD']
-    df[cols_to_trunc] = df[cols_to_trunc].apply(np.floor)
     return df
 
 
@@ -498,14 +478,14 @@ def update_column_with_other_df(df1, col1, df2, col2):
 
 
 if __name__ == '__main__':
-    baseball_data = BaseballStats(load_seasons=[2023], new_season=2024, # include_leagues=['NBL', 'SOL'],
+    baseball_data = BaseballStats(load_seasons=[2023], new_season=2024,  # include_leagues=['NBL', 'SOL'],
                                   load_batter_file='random-stats-pp-Batting.csv',
                                   load_pitcher_file='random-stats-pp-Pitching.csv')
     print(*baseball_data.pitching_data.columns)
     print(*baseball_data.batting_data.columns)
     print(baseball_data.get_all_team_names())
     print(baseball_data.get_all_team_city_names())
-    # print(baseball_data.batting_data.to_string())
+    # print(baseball_data.pitching_data.to_string())
     # baseball_data.print_prior_season()
     baseball_data.print_prior_season(teams=[baseball_data.get_all_team_names()[0]])
     # print(baseball_data.get_pitching_data(team_name=baseball_data.get_all_team_names()[0]).to_string())

@@ -335,7 +335,7 @@ if __name__ == '__main__':
 
     # full season
     # num_games = 162 - 42  # 42 games already played
-    num_games = 81
+    num_games = 3
     interactive = False
     # team_to_follow = bbseason23.teams[0]  # follow the first team in the random set
     # my_teams_to_follow = 'MIL'  # or follow no team

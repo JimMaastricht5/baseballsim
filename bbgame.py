@@ -43,7 +43,7 @@ class Game:
                  starting_pitchers: None = None, starting_lineups: None = None,
                  load_batter_file: str = 'player-stats-Batters.csv',
                  load_pitcher_file: str = 'player-stats-Pitching.csv',
-                 interactive: bool = False, show_bench: bool = False) -> None:
+                 interactive: bool = False, show_bench: bool = False, debug: bool = False) -> None:
         """
         class manages the details of an individual game
         :param away_team_name: away team name is a 3 character all caps abbreviation
@@ -64,6 +64,7 @@ class Game:
         :param load_pitcher_file: name of files with pitcher data, will prefix years
         :param interactive: allows for gaming of the sim, pauses sim at appropriate times for input
         :param show_bench: show the players not in game along with the lineup
+        :param debug: prints extra info
         """
         if baseball_data is None:
             self.baseball_data = bbstats.BaseballStats(load_seasons=load_seasons, new_season=new_season,
@@ -71,7 +72,7 @@ class Game:
                                                        load_pitcher_file=load_pitcher_file)
         else:
             self.baseball_data = baseball_data
-        if away_team_name != '' or home_team_name != '':
+        if away_team_name != '' and home_team_name != '':
             self.team_names = [away_team_name, home_team_name]
         else:
             self.team_names = random.sample(list(self.baseball_data.batting_data.Team.unique()), 2)
@@ -79,6 +80,7 @@ class Game:
         self.rotation_len = rotation_len  # number of starting pitchers to rotate thru
         self.chatty = chatty
         self.print_box_score_b = print_box_score_b
+        self.debug = debug
         if starting_pitchers is None:
             starting_pitchers = [None, None]
         self.starting_pitchers = starting_pitchers  # can use if you want to sim the same two starters repeatedly
@@ -87,16 +89,18 @@ class Game:
         self.starting_lineups = starting_lineups  # is a list of two dict, each dict is in batting order with field pos
 
         self.teams = []  # keep track of away in pos 0 and home team in pos 1
-        self.teams.insert(AWAY, gameteam.Team(self.team_names[AWAY], self.baseball_data, self.game_num,
-                                              self.rotation_len))  # init away team class
+        self.teams.insert(AWAY, gameteam.Team(team_name=self.team_names[AWAY], baseball_data=self.baseball_data,
+                                              game_num=self.game_num, rotation_len= self.rotation_len,
+                                              debug=self.debug))  # init away team class
         self.teams[AWAY].set_initial_lineup(show_lineup=print_lineup, show_bench=show_bench,
                                             current_season_stats=(True if game_num > 1 else False),
                                             force_starting_pitcher=starting_pitchers[AWAY],
                                             force_lineup_dict=starting_lineups[AWAY])
 
         # print(f'Setting home team as {self.team_names[1]}')
-        self.teams.insert(HOME, gameteam.Team(self.team_names[HOME], self.baseball_data, self.game_num,
-                                              self.rotation_len))  # init away team class
+        self.teams.insert(HOME, gameteam.Team(team_name=self.team_names[HOME], baseball_data=self.baseball_data,
+                                              game_num=self.game_num, rotation_len=self.rotation_len,
+                                              debug=self.debug))  # init away team class
         self.teams[HOME].set_initial_lineup(show_lineup=print_lineup, show_bench=show_bench,
                                             current_season_stats=(True if game_num > 1 else False),
                                             force_starting_pitcher=starting_pitchers[HOME],
@@ -441,14 +445,14 @@ class Game:
 if __name__ == '__main__':
     startdt = datetime.datetime.now()
 
-    away_team = 'MIL'
-    home_team = 'CHC'
+    away_team = 'AUG'
+    home_team = 'ELK'
     # away_team = 'SAN'
     # home_team = 'TEM'
-    MIL_lineup = {647549: 'LF', 239398: 'C', 224423: '1B', 138309: 'DH', 868055: 'CF', 520723: 'SS',
-                  299454: '3B', 46074: '2B', 752787: 'RF'}
-    BOS_starter = 516876
-    MIL_starter = 993801
+    # MIL_lineup = {647549: 'LF', 239398: 'C', 224423: '1B', 138309: 'DH', 868055: 'CF', 520723: 'SS',
+    #               299454: '3B', 46074: '2B', 752787: 'RF'}
+    # BOS_starter = 516876
+    # MIL_starter = 993801
     sims = 1
     season_win_loss = [[0, 0], [0, 0]]  # away record pos 0, home pos 1
     # team0_season_df = None
@@ -460,14 +464,15 @@ if __name__ == '__main__':
                     load_seasons=[2023], new_season=2024,
                     # load_batter_file='random-stats-pp-Batting.csv',
                     # load_pitcher_file='random-stats-pp-Pitching.csv',
-                    load_batter_file='stats-pp-Batting.csv',
-                    load_pitcher_file='stats-pp-Pitching.csv',
+                    load_batter_file='random-stats-pp-Batting.csv',
+                    load_pitcher_file='random-stats-pp-Pitching.csv',
                     interactive=True,
-                    show_bench=True
+                    show_bench=True,
+                    debug=False
                     # , starting_pitchers=[MIL_starter, BOS_starter]
                     # , starting_lineups=[MIL_lineup, None]
                     )
-        score, inning, win_loss = game.sim_game(team_to_follow='MIL')
+        score, inning, win_loss = game.sim_game(team_to_follow=away_team)
         season_win_loss[0] = list(np.add(np.array(season_win_loss[0]), np.array(win_loss[0])))
         season_win_loss[1] = list(np.add(np.array(season_win_loss[1]), np.array(win_loss[1])))
         # if team0_season_df is None:

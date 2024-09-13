@@ -208,7 +208,7 @@ class BaseballSeason:
                                    baseball_data=self.baseball_data, game_num=season_day_num,
                                    rotation_len=self.rotation_len, print_lineup=self.print_lineup_b,
                                    chatty=self.season_chatty, print_box_score_b=self.print_box_score_b,
-                                   interactive=self.interactive)
+                                   interactive=self.interactive, debug=self.debug)
                 score, inning, win_loss_list = game.sim_game(team_to_follow=self.team_to_follow)
                 self.update_win_loss(away_team_name=match_up[0], home_team_name=match_up[1], win_loss=win_loss_list)
                 print(f'Final: {match_up[0]} {score[0]} {match_up[1]} {score[1]}')
@@ -277,8 +277,12 @@ class MultiBaseballSeason:
         self.season_length = season_length
         self.series_length = series_length
         self.rotation_len = rotation_len
-        self.majors = [include_leagues[0]]
-        self.minors = [include_leagues[1]]
+        if include_leagues is not None:
+            self.majors = [include_leagues[0]]
+            self.minors = [include_leagues[1]]
+        else:
+            self.majors = None
+            self.minors = None
         self.interactive = season_interactive
         self.print_lineup_b = season_print_lineup_b
         self.print_box_score_b = season_print_box_score_b
@@ -335,10 +339,10 @@ if __name__ == '__main__':
     interactive = False
     # team_to_follow = bbseason23.teams[0]  # follow the first team in the random set
     # my_teams_to_follow = 'MIL'  # or follow no team
-    my_teams_to_follow = 'MIL'
+    my_teams_to_follow = 'AUG'
     bbseason23 = MultiBaseballSeason(load_seasons=[2023], new_season=2024,
                                      season_length=num_games, series_length=3, rotation_len=5,
-                                     include_leagues=['ACB', 'SOL'],
+                                     include_leagues=['NBL', 'SOL'],
                                      season_interactive=interactive,
                                      season_chatty=False, season_print_lineup_b=False,
                                      season_print_box_score_b=False, season_team_to_follow=my_teams_to_follow,

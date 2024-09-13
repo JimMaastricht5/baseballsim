@@ -325,7 +325,6 @@ class BaseballStats:
         if condition_text:
             df_p['Condition'] = df_p['Condition'].apply(condition_txt_f)  # apply condition_txt static func
             df_b['Condition'] = df_b['Condition'].apply(condition_txt_f)  # apply condition_txt static func
-
         df = df_p[df_p['Team'].isin(teams)]
         df_totals = team_pitching_totals(df, team_name='', concat=False)
         if summary_only_b is False:
@@ -495,16 +494,17 @@ def update_column_with_other_df(df1, col1, df2, col2):
 
 
 if __name__ == '__main__':
-    baseball_data = BaseballStats(load_seasons=[2023], new_season=2024, include_leagues=['ACB'],
+    baseball_data = BaseballStats(load_seasons=[2023], new_season=2024, # include_leagues=['NBL', 'SOL'],
                                   load_batter_file='random-stats-pp-Batting.csv',
                                   load_pitcher_file='random-stats-pp-Pitching.csv')
     print(*baseball_data.pitching_data.columns)
     print(*baseball_data.batting_data.columns)
     print(baseball_data.get_all_team_names())
     print(baseball_data.get_all_team_city_names())
-
-    baseball_data.print_prior_season()
-    # baseball_data.print_current_season(teams=teams)
+    # print(baseball_data.batting_data.to_string())
+    # baseball_data.print_prior_season()
+    # baseball_data.print_prior_season(teams=['LAK'])
+    print(baseball_data.get_pitching_data(team_name=baseball_data.get_all_team_names()[0]).to_string())
     # my_teams = [('MIL' if 'MIL' in baseball_data.get_all_team_names() else baseball_data.get_all_team_names()[0])]
     # my_teams = ['WSH']
     # for team in my_teams:

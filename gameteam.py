@@ -30,7 +30,7 @@ from typing import Any, Dict, List, Optional, Tuple, Union
 
 
 class Team:
-    def __init__(self, team_name: str, baseball_data:     bbstats.BaseballStats, game_num: int = 1,
+    def __init__(self, team_name: str, baseball_data: bbstats.BaseballStats, game_num: int = 1,
                  rotation_len: int = 5, debug: bool = False) -> None:
         """
         class handles a single team within a game including all prev year and current year stats, rosters,
@@ -53,6 +53,8 @@ class Team:
         if self.debug:
             print(f'gameteam.py init prior season data')
             print(self.prior_season_pos_players_df.to_string())
+            print(f'gameteam.py init baseball data df')
+            print(self.baseball_data.batting_data.to_string())
         if self.prior_season_pitchers_df.shape[0] == 0:
             print(f'gameteam.py init: team {team_name} does not exist.')
             print(f'Try one of these teams {self.baseball_data.get_all_team_names()}')

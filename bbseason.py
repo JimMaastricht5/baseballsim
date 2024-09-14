@@ -310,7 +310,8 @@ class MultiBaseballSeason:
                                              rotation_len=self.rotation_len,
                                              include_leagues=self.minors,
                                              season_interactive=self.interactive,
-                                             season_chatty=self.season_chatty, season_print_lineup_b=self.print_lineup_b,
+                                             season_chatty=self.season_chatty,
+                                             season_print_lineup_b=self.print_lineup_b,
                                              season_print_box_score_b=self.print_box_score_b,
                                              season_team_to_follow=self.team_to_follow,
                                              load_batter_file=self.load_batter_file,
@@ -320,19 +321,43 @@ class MultiBaseballSeason:
             self.bbseason_b = None
         return
 
-    def sim_all_days_for_seasons(self):
+    def sim_start(self) -> None:
+        """
+        starts simulations for both seasons
+        :return: None
+        """
         self.bbseason_a.sim_start()
         if self.bbseason_b is not None:
             self.bbseason_b.sim_start()
+        return
 
-        for day in range(self.season_length):
-            self.bbseason_a.sim_next_day()
-            if self.bbseason_b is not None:
-                self.bbseason_b.sim_next_day()
-
+    def sim_end(self) -> None:
+        """
+        ends simulations for both seasons
+        :return: None
+        """
         self.bbseason_a.sim_end()
         if self.bbseason_b is not None:
             self.bbseason_b.sim_end()
+        return
+
+    def sim_next_day(self) -> None:
+        """
+        runs one day of the sim for both seasons
+        :return:
+        """
+        self.bbseason_a.sim_next_day()
+        if self.bbseason_b is not None:
+            self.bbseason_b.sim_next_day()
+        return
+
+    def sim_all_days_for_seasons(self) -> None:
+        """
+        run all days across both seasons
+        :return: None
+        """
+        for day in range(self.season_length):
+            self.sim_next_day()
         return
 
 
@@ -357,7 +382,9 @@ if __name__ == '__main__':
                                      load_pitcher_file='random-stats-pp-Pitching.csv',  # 'random-stats-pp-Pitching.csv'
                                      debug=False)
 
+    bbseason23.sim_start()
     bbseason23.sim_all_days_for_seasons()
+    bbseason23.sim_end()
     # handle full season
     # bbseason23.sim_full_season()
 

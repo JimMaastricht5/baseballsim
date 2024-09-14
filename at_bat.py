@@ -107,8 +107,8 @@ class SimAB:
         self.batting = None
         self.baseball_data = baseball_data
 
-        self.league_batting_totals_df = bbstats.team_batting_totals(self.baseball_data.batting_data, concat=False)
-        self.league_pitching_totals_df = bbstats.team_pitching_totals(self.baseball_data.pitching_data, concat=False)
+        self.league_batting_totals_df = bbstats.team_batting_totals(self.baseball_data.batting_data)
+        self.league_pitching_totals_df = bbstats.team_pitching_totals(self.baseball_data.pitching_data)
 
         # set league totals for odds ratio
         self.league_batting_obp = self.league_batting_totals_df.at[0, 'OBP']

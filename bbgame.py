@@ -90,7 +90,7 @@ class Game:
 
         self.teams = []  # keep track of away in pos 0 and home team in pos 1
         self.teams.insert(AWAY, gameteam.Team(team_name=self.team_names[AWAY], baseball_data=self.baseball_data,
-                                              game_num=self.game_num, rotation_len= self.rotation_len,
+                                              game_num=self.game_num, rotation_len=self.rotation_len,
                                               debug=self.debug))  # init away team class
         self.teams[AWAY].set_initial_lineup(show_lineup=print_lineup, show_bench=show_bench,
                                             current_season_stats=(True if game_num > 1 else False),
@@ -445,10 +445,9 @@ class Game:
 if __name__ == '__main__':
     startdt = datetime.datetime.now()
 
-    away_team = 'AUG'
-    home_team = 'ELK'
-    # away_team = 'SAN'
-    # home_team = 'TEM'
+    away_team = 'NEW'
+    home_team = 'LOS'
+
     # MIL_lineup = {647549: 'LF', 239398: 'C', 224423: '1B', 138309: 'DH', 868055: 'CF', 520723: 'SS',
     #               299454: '3B', 46074: '2B', 752787: 'RF'}
     # BOS_starter = 516876

@@ -42,7 +42,7 @@ class TeamBoxScore:
         pcols_to_convert = ['IP', 'ERA', 'WHIP', 'OBP', 'SLG', 'OPS', 'Total_Outs', 'Condition',
                             'AVG_faced', 'Game_Fatigue_Factor']  # make sure these are floats
         self.box_pitching[pcols_to_convert] = self.box_pitching[pcols_to_convert].astype(float)
-        self.box_pitching = bbstats.remove_non_print_cols(self.box_pitching)
+        # self.box_pitching = bbstats.remove_non_print_cols(self.box_pitching)
         self.team_box_pitching = None
         self.game_pitching_stats = None
 
@@ -51,9 +51,11 @@ class TeamBoxScore:
         self.box_batting[['AB', 'R', 'H', '2B', '3B', 'HR', 'RBI', 'SB', 'CS', 'BB', 'SO', 'SH', 'SF', 'HBP']] = 0
         self.box_batting[['AVG', 'OBP', 'SLG', 'OPS']] = 0.0
         self.box_batting['Condition'] = self.box_batting['Condition'].astype(float)
-        self.box_batting = bbstats.remove_non_print_cols(self.box_batting)
+        # self.box_batting = bbstats.remove_non_print_cols(self.box_batting)
         self.team_box_batting = None
         self.game_batting_stats = None
+        self.box_batting_totals = None
+        self.box_pitching_totals = None
 
         self.team_name = team_name
         self.total_hits = 0
@@ -149,21 +151,21 @@ class TeamBoxScore:
     def totals(self) -> None:
         self.game_batting_stats = self.box_batting.copy()  # make a copy w/o totals for season accumulations
         self.game_pitching_stats = self.box_pitching.copy()  # make a copy w/o totals for season accumulations
-        self.box_batting = bbstats.team_batting_totals(self.box_batting, team_name=self.team_name, concat=True)
-        self.box_pitching = bbstats.team_pitching_totals(self.box_pitching, team_name=self.team_name, concat=True)
+        self.box_batting_totals = bbstats.team_batting_totals(self.box_batting, team_name=self.team_name)
+        self.box_pitching_totals = bbstats.team_pitching_totals(self.box_pitching, team_name=self.team_name)
         return
 
     def print_boxes(self) -> None:
-        df = self.box_batting[['Player', 'Team', 'Pos', 'Age', 'G', 'AB', 'R', 'H', '2B', '3B', 'HR', 'RBI',
-                               'SB', 'CS', 'BB', 'SO', 'SH', 'SF', 'HBP']]
-        # , 'AVG', 'OBP', 'SLG', 'OPS', 'Condition', 'Status']]
-        # df = df.apply(bbstats.condition_txt_f)  # throws a conversion error, col not int
+        batting_cols = ['Player', 'Team', 'Pos', 'Age', 'G', 'AB', 'R', 'H', '2B', '3B', 'HR', 'RBI',
+                        'SB', 'CS', 'BB', 'SO', 'SH', 'SF', 'HBP']
+        pitching_cols = ['Player', 'Team', 'Age', 'G', 'GS', 'CG', 'SHO', 'IP', 'H', '2B', '3B',
+                         'ER', 'K', 'BB', 'HR', 'W', 'L', 'SV', 'BS', 'HLD']
+        df = self.box_batting[batting_cols]
+        df = pd.concat([df, self.box_batting_totals.assign(Player='Totals', Team='', Pos='', Age='')[batting_cols]])
         print(df.to_string(index=False, justify='right'))
         print('')
-        df = self.box_pitching[['Player', 'Team', 'Age', 'G', 'GS', 'CG', 'SHO', 'IP', 'H', '2B', '3B',
-                                'ER', 'K', 'BB', 'HR', 'W', 'L', 'SV', 'BS', 'HLD']]  #
-        # , 'ERA', 'WHIP', 'AVG', 'OBP', 'SLG', 'OPS', 'Condition', 'Status']]
-        # df = df.apply(bbstats.condition_txt_f)
+        df = self.box_pitching[pitching_cols]
+        df = pd.concat([df, self.box_pitching_totals.assign(Player='Totals', Team='', Pos='', Age='')[pitching_cols]])
         print(df.to_string(index=False, justify='right'))
         print('')
         return

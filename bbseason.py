@@ -246,7 +246,7 @@ class BaseballSeason:
 class MultiBaseballSeason:
     def __init__(self, load_seasons: List[int], new_season: int, team_list: Optional[list] = None,
                  season_length: int = 6, series_length: int = 3,
-                 rotation_len: int = 5, include_leagues: list = None, season_interactive: bool = False,
+                 rotation_len: int = 5, majors_minors: list = None, season_interactive: bool = False,
                  season_print_lineup_b: bool = False, season_print_box_score_b: bool = False,
                  season_chatty: bool = False, season_team_to_follow: str = None,
                  load_batter_file: str = 'stats-pp-Batting.csv',
@@ -259,7 +259,7 @@ class MultiBaseballSeason:
                 :param season_length: number of games to be played for the season
                 :param series_length: series is usually 3, the default is one for testing
                 :param rotation_len: number of starters to rotate, default is 5
-                :param include_leagues: leagues to include in season, each league will get its own season
+                :param majors_minors: majors and minors leagues to include in season, each league gets its own season
                 :param season_interactive: if true the sim pauses after each day
                 :param season_print_lineup_b: if true print lineups
                 :param season_print_box_score_b: if true print box scores
@@ -277,9 +277,9 @@ class MultiBaseballSeason:
         self.season_length = season_length
         self.series_length = series_length
         self.rotation_len = rotation_len
-        if include_leagues is not None:
-            self.majors = [include_leagues[0]]
-            self.minors = [include_leagues[1]]
+        if majors_minors is not None:
+            self.majors = [majors_minors[0]]  # convert to a list for input to  single season class
+            self.minors = [majors_minors[1]]
         else:
             self.majors = None
             self.minors = None
@@ -291,6 +291,7 @@ class MultiBaseballSeason:
         self.load_batter_file = load_batter_file
         self.load_pitcher_file = load_pitcher_file
         self.debug = debug
+        # if no major and minor league settings is passed bbseason_a will run all teams in all leagues
         self.bbseason_a = BaseballSeason(load_seasons=self.load_seasons, new_season=self.new_season,
                                          season_length=self.season_length, series_length=self.season_length,
                                          rotation_len=self.rotation_len,
@@ -303,29 +304,35 @@ class MultiBaseballSeason:
                                          load_pitcher_file=self.load_pitcher_file,
                                          debug=self.debug)
 
-        self.bbseason_b = BaseballSeason(load_seasons=self.load_seasons, new_season=self.new_season,
-                                         season_length=self.season_length, series_length=self.season_length,
-                                         rotation_len=self.rotation_len,
-                                         include_leagues=self.minors,
-                                         season_interactive=self.interactive,
-                                         season_chatty=self.season_chatty, season_print_lineup_b=self.print_lineup_b,
-                                         season_print_box_score_b=self.print_box_score_b,
-                                         season_team_to_follow=self.team_to_follow,
-                                         load_batter_file=self.load_batter_file,
-                                         load_pitcher_file=self.load_pitcher_file,
-                                         debug=self.debug)
+        if self.minors is not None:
+            self.bbseason_b = BaseballSeason(load_seasons=self.load_seasons, new_season=self.new_season,
+                                             season_length=self.season_length, series_length=self.season_length,
+                                             rotation_len=self.rotation_len,
+                                             include_leagues=self.minors,
+                                             season_interactive=self.interactive,
+                                             season_chatty=self.season_chatty, season_print_lineup_b=self.print_lineup_b,
+                                             season_print_box_score_b=self.print_box_score_b,
+                                             season_team_to_follow=self.team_to_follow,
+                                             load_batter_file=self.load_batter_file,
+                                             load_pitcher_file=self.load_pitcher_file,
+                                             debug=self.debug)
+        else:
+            self.bbseason_b = None
         return
 
-    def sim_day_for_both_seasons(self):
+    def sim_all_days_for_seasons(self):
         self.bbseason_a.sim_start()
-        self.bbseason_b.sim_start()
+        if self.bbseason_b is not None:
+            self.bbseason_b.sim_start()
 
         for day in range(self.season_length):
             self.bbseason_a.sim_next_day()
-            self.bbseason_b.sim_next_day()
+            if self.bbseason_b is not None:
+                self.bbseason_b.sim_next_day()
 
         self.bbseason_a.sim_end()
-        self.bbseason_b.sim_end()
+        if self.bbseason_b is not None:
+            self.bbseason_b.sim_end()
         return
 
 
@@ -342,7 +349,7 @@ if __name__ == '__main__':
     my_teams_to_follow = 'AUG'
     bbseason23 = MultiBaseballSeason(load_seasons=[2023], new_season=2024,
                                      season_length=num_games, series_length=3, rotation_len=5,
-                                     include_leagues=['NBL', 'SOL'],
+                                     majors_minors=['NBL', 'SOL'],
                                      season_interactive=interactive,
                                      season_chatty=False, season_print_lineup_b=False,
                                      season_print_box_score_b=False, season_team_to_follow=my_teams_to_follow,
@@ -350,7 +357,7 @@ if __name__ == '__main__':
                                      load_pitcher_file='random-stats-pp-Pitching.csv',  # 'random-stats-pp-Pitching.csv'
                                      debug=False)
 
-    bbseason23.sim_day_for_both_seasons()
+    bbseason23.sim_all_days_for_seasons()
     # handle full season
     # bbseason23.sim_full_season()
 

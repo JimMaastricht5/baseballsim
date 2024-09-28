@@ -367,33 +367,38 @@ if __name__ == '__main__':
 
     # full season
     # num_games = 162 - 42  # 42 games already played
-    num_games = 3
+    num_games = 162
     interactive = False
-    # team_to_follow = bbseason23.teams[0]  # follow the first team in the random set
-    # my_teams_to_follow = 'MIL'  # or follow no team
-    my_teams_to_follow = 'AUG'
-    bbseason23 = MultiBaseballSeason(load_seasons=[2023], new_season=2024,
+
+    # multiple seasons for majors and minors of random league
+    # my_teams_to_follow = 'AUG'
+    # bbseasonMS = MultiBaseballSeason(load_seasons=[2023], new_season=2024,
+    #                                  season_length=num_games, series_length=3, rotation_len=5,
+    #                                  majors_minors=['NBL', 'SOL'],
+    #                                  season_interactive=interactive,
+    #                                  season_chatty=False, season_print_lineup_b=False,
+    #                                  season_print_box_score_b=False, season_team_to_follow=my_teams_to_follow,
+    #                                  load_batter_file='random-stats-pp-Batting.csv',  # 'random-stats-pp-Batting.csv',
+    #                                  load_pitcher_file='random-stats-pp-Pitching.csv',  # 'random-stats-pp-Pitching.csv'
+    #                                  debug=False)
+    #
+    # bbseasonMS.sim_start()
+    # bbseasonMS.sim_all_days_for_seasons()
+    # bbseasonMS.sim_end()
+
+    # handle a single full season of MLB
+    my_teams_to_follow = 'MIL'  # or follow no team
+    bbseasonSS = BaseballSeason(load_seasons=[2023], new_season=2024,
                                      season_length=num_games, series_length=3, rotation_len=5,
-                                     majors_minors=['NBL', 'SOL'],
                                      season_interactive=interactive,
                                      season_chatty=False, season_print_lineup_b=False,
                                      season_print_box_score_b=False, season_team_to_follow=my_teams_to_follow,
-                                     load_batter_file='random-stats-pp-Batting.csv',  # 'random-stats-pp-Batting.csv',
-                                     load_pitcher_file='random-stats-pp-Pitching.csv',  # 'random-stats-pp-Pitching.csv'
+                                     load_batter_file='stats-pp-Batting.csv',  # 'random-stats-pp-Batting.csv',
+                                     load_pitcher_file='stats-pp-Pitching.csv',  # 'random-stats-pp-Pitching.csv'
                                      debug=False)
 
-    bbseason23.sim_start()
-    bbseason23.sim_all_days_for_seasons()
-    bbseason23.sim_end()
-    # handle full season
-    # bbseason23.sim_full_season()
+    bbseasonSS.sim_full_season()
 
-    # or do it yourself for 3 days
-    # bbseason23.sim_start()
-    # bbseason23.sim_next_day()
-    # bbseason23.sim_next_day()
-    # bbseason23.sim_next_day()
-    # bbseason23.sim_end()
-
+    # how long did that take?
     print(startdt)
     print(datetime.datetime.now())

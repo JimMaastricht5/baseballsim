@@ -335,14 +335,14 @@ class BaseballStatsPreProcess:
 
 
 if __name__ == '__main__':
-    baseball_data = BaseballStatsPreProcess(load_seasons=[2023], new_season=2024,
-                                            generate_random_data=True,
+    baseball_data = BaseballStatsPreProcess(load_seasons=[2024], new_season=2024,
+                                            generate_random_data=False,
                                             load_batter_file='player-stats-Batters.csv',
                                             load_pitcher_file='player-stats-Pitching.csv')
     print(*baseball_data.pitching_data.columns)
     print(*baseball_data.batting_data.columns)
     print(baseball_data.batting_data.Team.unique())
-    # print(baseball_data.batting_data[baseball_data.batting_data['Team'] == 'WSH'])
+    print(baseball_data.batting_data[baseball_data.batting_data['Team'] == 'MIL'].to_string())
     # print(baseball_data.batting_data.Mascot.unique())
     print(baseball_data.pitching_data.sort_values('Hashcode').to_string())
     print(baseball_data.batting_data.sort_values('Hashcode').to_string())

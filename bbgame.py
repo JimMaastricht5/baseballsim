@@ -445,35 +445,38 @@ class Game:
 if __name__ == '__main__':
     startdt = datetime.datetime.now()
 
-    away_team = 'NEW'
-    home_team = 'LOS'
+    away_team = 'NYM'
+    home_team = 'MIL'
 
     # MIL_lineup = {647549: 'LF', 239398: 'C', 224423: '1B', 138309: 'DH', 868055: 'CF', 520723: 'SS',
     #               299454: '3B', 46074: '2B', 752787: 'RF'}
-    # BOS_starter = 516876
-    # MIL_starter = 993801
-    sims = 1
+    NYM_starter = 111891
+    MIL_starter = 974670
+    sims = 1000
     season_win_loss = [[0, 0], [0, 0]]  # away record pos 0, home pos 1
+    score_total = [0, 0]
     # team0_season_df = None
     for sim_game_num in range(1, sims + 1):
-        print(f'Game number {sim_game_num}: from bbgame.py test code')
+        print(f'Game number {sim_game_num}: from bbgame.py sims {sims}')
         game = Game(home_team_name=home_team, away_team_name=away_team,
-                    chatty=True, print_lineup=True,
-                    print_box_score_b=True,
-                    load_seasons=[2023], new_season=2024,
+                    chatty=False, print_lineup=False,
+                    print_box_score_b=False,
+                    load_seasons=[2024], new_season=2024,
                     # load_batter_file='random-stats-pp-Batting.csv',
                     # load_pitcher_file='random-stats-pp-Pitching.csv',
-                    load_batter_file='random-stats-pp-Batting.csv',
-                    load_pitcher_file='random-stats-pp-Pitching.csv',
-                    interactive=True,
-                    show_bench=True,
+                    load_batter_file='stats-pp-Batting.csv',
+                    load_pitcher_file='stats-pp-Pitching.csv',
+                    interactive=False,
+                    show_bench=False,
                     debug=False
                     # , starting_pitchers=[MIL_starter, BOS_starter]
                     # , starting_lineups=[MIL_lineup, None]
                     )
-        score, inning, win_loss = game.sim_game(team_to_follow=away_team)
+        score, inning, win_loss = game.sim_game(team_to_follow=None)
         season_win_loss[0] = list(np.add(np.array(season_win_loss[0]), np.array(win_loss[0])))
         season_win_loss[1] = list(np.add(np.array(season_win_loss[1]), np.array(win_loss[1])))
+        score_total[0] = score_total[0] + score[0]
+        score_total[1] = score_total[1] + score[1]
         # if team0_season_df is None:
         team0_season_df = game.teams[AWAY].box_score.team_box_batting
         # else:
@@ -482,9 +485,10 @@ if __name__ == '__main__':
         #     team0_season_df['Player'] = game.teams[AWAY].box_score.box_batting['Player']
         #     team0_season_df['Team'] = game.teams[AWAY].box_score.box_batting['Team']
         #     team0_season_df['Pos'] = game.teams[AWAY].box_score.box_batting['Pos']
-        print('')
-        print(f'{away_team} season : {season_win_loss[0][0]} W and {season_win_loss[0][1]} L')
-        print(f'{home_team} season : {season_win_loss[1][0]} W and {season_win_loss[1][1]} L')
-
-        print(startdt)
-        print(datetime.datetime.now())
+    print('')
+    print(f'{away_team} season : {season_win_loss[0][0]} W and {season_win_loss[0][1]} L')
+    print(f'{home_team} season : {season_win_loss[1][0]} W and {season_win_loss[1][1]} L')
+    print(f'away team scored {score_total[0]} for an average of {score_total[0]/sims}')
+    print(f'home team scored {score_total[1]} for an average of {score_total[1] / sims}')
+    print(startdt)
+    print(datetime.datetime.now())

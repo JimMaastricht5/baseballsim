@@ -48,7 +48,7 @@ class BaseballStats:
         self.numeric_bcols = ['G', 'AB', 'R', 'H', '2B', '3B', 'HR', 'RBI', 'SB', 'CS', 'BB', 'SO', 'SH', 'SF',
                               'HBP', 'Condition']  # these cols will get added to running season total
         self.numeric_bcols_to_print = ['G', 'AB', 'R', 'H', '2B', '3B', 'HR', 'RBI', 'SB', 'CS', 'BB', 'SO', 'SH', 'SF',
-                              'HBP', 'AVG', 'OBP', 'SLG', 'OPS']
+                                       'HBP', 'AVG', 'OBP', 'SLG', 'OPS']
         self.numeric_pcols = ['G', 'GS', 'CG', 'SHO', 'IP', 'AB', 'H', '2B', '3B', 'HR', 'ER', 'K', 'BB', 'W', 'L',
                               'SV', 'BS', 'HLD', 'Total_Outs', 'Condition']  # cols will add to running season total
         self.numeric_pcols_to_print = ['G', 'GS', 'CG', 'SHO', 'IP', 'H', '2B', '3B', 'HR', 'ER', 'K', 'BB',
@@ -112,6 +112,14 @@ class BaseballStats:
                                                           scale=self.batting_injury_avg_len / 2, size=1)[0])
         return
 
+    @staticmethod
+    def add_missing_cols(df):
+        # add missing data for random vs. historical
+        if 'City' not in df.columns:
+            df['City'] = df['Team']
+            df['Mascot'] = ''
+        return df
+
     def get_batting_data(self, team_name: Optional[str] = None, prior_season: bool = True) -> DataFrame:
         """
         loads data for batters
@@ -125,9 +133,7 @@ class BaseballStats:
             df_new = self.new_season_batting_data[self.new_season_batting_data['Team'] == team_name]
             df_cur = self.batting_data[self.batting_data.index.isin(df_new.index)]
             df = df_cur if prior_season else df_new
-        if 'City' not in df.columns:
-            df['City'] = df['Team']
-            df['Mascot'] = ''
+        df = self.add_missing_cols(df)
         return df
 
     def get_pitching_data(self, team_name: Optional[str] = None, prior_season: bool = True) -> DataFrame:
@@ -143,9 +149,7 @@ class BaseballStats:
             df_new = self.new_season_pitching_data[self.new_season_pitching_data['Team'] == team_name]
             df_cur = self.pitching_data[self.pitching_data.index.isin(df_new.index)]
             df = df_cur if prior_season else df_new
-        if 'City' not in df.columns:
-            df['City'] = df['Team']
-            df['Mascot'] = ''
+        df = self.add_missing_cols(df)
         return df
 
     def get_seasons(self, batter_file: str, pitcher_file: str) -> None:
@@ -161,12 +165,16 @@ class BaseballStats:
         seasons_str = " ".join(str(season) for season in self.load_seasons)
         try:
             if self.pitching_data is None or self.batting_data is None:  # need to read data... else skip as cached
-                self.pitching_data = pd.read_csv(f'{seasons_str} {pitcher_file}', index_col=0)
-                self.batting_data = pd.read_csv(f'{seasons_str} {batter_file}', index_col=0)
+                self.pitching_data = self.add_missing_cols(
+                    pd.read_csv(f'{seasons_str} {pitcher_file}', index_col=0))
+                self.batting_data = self.add_missing_cols(
+                    pd.read_csv(f'{seasons_str} {batter_file}', index_col=0))
 
             if self.new_season_pitching_data is None or self.new_season_batting_data is None:
-                self.new_season_pitching_data = pd.read_csv(str(self.new_season) + f" {new_pitcher_file}", index_col=0)
-                self.new_season_batting_data = pd.read_csv(str(self.new_season) + f" {new_batter_file}", index_col=0)
+                self.new_season_pitching_data = self.add_missing_cols(pd.read_csv(str(self.new_season) +
+                                                                                  f" {new_pitcher_file}", index_col=0))
+                self.new_season_batting_data = self.add_missing_cols(pd.read_csv(str(self.new_season) +
+                                                                                 f" {new_batter_file}", index_col=0))
         except FileNotFoundError as e:
             print(e)
             print(f'file was not found, correct spelling or try running bbstats_preprocess.py to setup the data')
@@ -378,7 +386,7 @@ def remove_non_print_cols(df: DataFrame) -> DataFrame:
     :param df: df to clean
     :return: df cleaned up
     """
-    non_print_cols = {'Season', 'Total_OB', 'AVG_faced', 'Game_Fatigue_Factor', 'Total_Outs', 'Condition'}  # 'Total_Outs',
+    non_print_cols = {'Season', 'Total_OB', 'AVG_faced', 'Game_Fatigue_Factor', 'Total_Outs', 'Condition'}  # Total_Outs
     cols_to_drop = list(non_print_cols.intersection(df.columns))
     if cols_to_drop:
         df = df.drop(cols_to_drop, axis=1)
@@ -442,7 +450,8 @@ def team_batting_totals(batting_df: DataFrame, team_name: str = '') -> DataFrame
     :param team_name: name of team to calc
     :return: df with team totals
     """
-    df = batting_df[['AB', 'R', 'H', '2B', '3B', 'HR', 'RBI', 'SB', 'CS', 'BB', 'SO', 'SH', 'SF', 'HBP']].sum().astype(int)
+    df = batting_df[['AB', 'R', 'H', '2B', '3B', 'HR', 'RBI', 'SB', 'CS', 'BB', 'SO',
+                     'SH', 'SF', 'HBP']].sum().astype(int)
     df['G'] = np.max(batting_df['G'])
     df = df.to_frame().T
     df = team_batting_stats(df)
@@ -478,22 +487,22 @@ def update_column_with_other_df(df1, col1, df2, col2):
 
 
 if __name__ == '__main__':
-    baseball_data = BaseballStats(load_seasons=[2023], new_season=2024,  # include_leagues=['NBL', 'SOL'],
-                                  load_batter_file='random-stats-pp-Batting.csv',
-                                  load_pitcher_file='random-stats-pp-Pitching.csv')
-    print(*baseball_data.pitching_data.columns)
-    print(*baseball_data.batting_data.columns)
+    baseball_data = BaseballStats(load_seasons=[2024], new_season=2024,  # include_leagues=['NBL', 'SOL'],
+                                  load_batter_file='stats-pp-Batting.csv',
+                                  load_pitcher_file='stats-pp-Pitching.csv')
+    # print(*baseball_data.pitching_data.columns)
+    # print(*baseball_data.batting_data.columns)
     print(baseball_data.get_all_team_names())
     print(baseball_data.get_all_team_city_names())
     # print(baseball_data.pitching_data.to_string())
     # baseball_data.print_prior_season()
-    baseball_data.print_prior_season(teams=[baseball_data.get_all_team_names()[0]])
+    # baseball_data.print_prior_season(teams=[baseball_data.get_all_team_names()[0]])
     # print(baseball_data.get_pitching_data(team_name=baseball_data.get_all_team_names()[0]).to_string())
-    # my_teams = [('MIL' if 'MIL' in baseball_data.get_all_team_names() else baseball_data.get_all_team_names()[0])]
-    # my_teams = ['WSH']
-    # for team in my_teams:
-    #     print(baseball_data.get_pitching_data(team_name=team, prior_season=True).to_string())
+    my_teams = [('MIL' if 'MIL' in baseball_data.get_all_team_names() else baseball_data.get_all_team_names()[0])]
+    my_teams.append('NYM')
+    for team in my_teams:
+        print(baseball_data.get_pitching_data(team_name=team, prior_season=True).to_string())
     #     print(baseball_data.get_pitching_data(team_name=team, prior_season=True).dtypes)
     #     print(baseball_data.get_pitching_data(team_name=team, prior_season=False).to_string())
-    #     print(baseball_data.get_batting_data(team_name=team, prior_season=True).to_string())
+        print(baseball_data.get_batting_data(team_name=team, prior_season=True).to_string())
     #     print(baseball_data.get_batting_data(team_name=team, prior_season=False).to_string())

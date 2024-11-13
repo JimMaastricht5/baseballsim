@@ -22,12 +22,14 @@
 #
 # JimMaastricht5@gmail.com
 import datetime
+import queue
 import random
 import pandas as pd
 import bbgame
 import bbstats
 import numpy as np
 from typing import List, Optional
+import threading
 
 AWAY = 0
 HOME = 1
@@ -219,12 +221,52 @@ class BaseballSeason:
             # end of all games for one day
         return
 
+    def sim_day_threaded(self, season_day_num: int) -> None:
+        """
+        sim one day of games across the league
+        :return: None
+        """
+        threads = []
+        queues = []
+        match_ups = []
+        self.print_day_schedule(season_day_num)
+        todays_games = self.schedule[season_day_num]
+        self.baseball_data.new_game_day()  # update rest and injury data for a new day, print DL injury list
+        print('')  # insert blank line prior to playing all games
+        for match_up in todays_games:  # run all games for a day, day starts at zero
+            if 'OFF DAY' not in match_up:  # not an off day
+                print(f'Playing day #{season_day_num + 1}: {match_up[0]} away against {match_up[1]}')
+                game = bbgame.Game(away_team_name=match_up[0], home_team_name=match_up[1],
+                                   baseball_data=self.baseball_data, game_num=season_day_num,
+                                   rotation_len=self.rotation_len, print_lineup=self.print_lineup_b,
+                                   chatty=self.season_chatty, print_box_score_b=self.print_box_score_b,
+                                   interactive=self.interactive, debug=self.debug)
+                q = queue.Queue()
+                q.put(self.team_to_follow)
+                thread = threading.Thread(target=game.sim_game_threaded, args=(q,))
+                threads.append(thread)
+                queues.append(q)
+                match_ups.append(match_up)
+                thread.start()
+
+        for ii, thread in enumerate(threads):  # wait for all results, loop over games played, no off days
+            thread.join()
+            (score, inning, win_loss_list, away_box_score, home_box_score) = queues[ii].get()
+            match_up = match_ups[ii]
+            self.update_win_loss(away_team_name=match_up[0], home_team_name=match_up[1], win_loss=win_loss_list)
+            print(f'Final: {match_up[0]} {score[0]} {match_up[1]} {score[1]}')
+            self.baseball_data.game_results_to_season(box_score_class=away_box_score)
+            self.baseball_data.game_results_to_season(box_score_class=home_box_score)
+        # end of all games for one day
+        return
+
     def sim_next_day(self) -> None:
         """
         sims the next day for a season
         :return: None
         """
         self.sim_day(season_day_num=self.season_day_num)
+        # self.sim_day_threaded(season_day_num=self.season_day_num)
         print(f'Standings for Day {self.season_day_num + 1}:')
         self.print_standings()
         self.season_day_num = self.season_day_num + 1
@@ -379,7 +421,8 @@ if __name__ == '__main__':
     #                                  season_chatty=False, season_print_lineup_b=False,
     #                                  season_print_box_score_b=False, season_team_to_follow=my_teams_to_follow,
     #                                  load_batter_file='random-stats-pp-Batting.csv',  # 'random-stats-pp-Batting.csv',
-    #                                  load_pitcher_file='random-stats-pp-Pitching.csv',  # 'random-stats-pp-Pitching.csv'
+    #                                  load_pitcher_file='random-stats-pp-Pitching.csv',
+    #                                  'random-stats-pp-Pitching.csv'
     #                                  debug=False)
     #
     # bbseasonMS.sim_start()
@@ -389,13 +432,13 @@ if __name__ == '__main__':
     # handle a single full season of MLB
     my_teams_to_follow = 'MIL'  # or follow no team
     bbseasonSS = BaseballSeason(load_seasons=[2023], new_season=2024,
-                                     season_length=num_games, series_length=3, rotation_len=5,
-                                     season_interactive=interactive,
-                                     season_chatty=False, season_print_lineup_b=False,
-                                     season_print_box_score_b=False, season_team_to_follow=my_teams_to_follow,
-                                     load_batter_file='stats-pp-Batting.csv',  # 'random-stats-pp-Batting.csv',
-                                     load_pitcher_file='stats-pp-Pitching.csv',  # 'random-stats-pp-Pitching.csv'
-                                     debug=False)
+                                season_length=num_games, series_length=3, rotation_len=5,
+                                season_interactive=interactive,
+                                season_chatty=False, season_print_lineup_b=False,
+                                season_print_box_score_b=False, season_team_to_follow=my_teams_to_follow,
+                                load_batter_file='stats-pp-Batting.csv',  # 'random-stats-pp-Batting.csv',
+                                load_pitcher_file='stats-pp-Pitching.csv',  # 'random-stats-pp-Pitching.csv'
+                                debug=False)
 
     bbseasonSS.sim_full_season()
 

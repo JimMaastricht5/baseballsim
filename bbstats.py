@@ -27,6 +27,7 @@ from numpy import ndarray
 from pandas.core.frame import DataFrame
 from pandas.core.series import Series
 from typing import List, Optional, Union
+import threading
 
 
 class BaseballStats:
@@ -42,6 +43,7 @@ class BaseballStats:
         :param load_pitcher_file: file name of the pitching stats, year will be added as a prefix
         :param debug: boolean to control extra printing
         """
+        self.semaphore = threading.Semaphore(1)  # one thread can update games stats at a time
         self.rnd = lambda: np.random.default_rng().uniform(low=0.0, high=1.001)  # random generator between 0 and 1
         # self.create_hash = lambda text: int(hashlib.sha256(text.encode('utf-8')).hexdigest()[:5], 16)
 
@@ -199,31 +201,33 @@ class BaseballStats:
 
     def game_results_to_season(self, box_score_class) -> None:
         """
-        adds the game results to a season df to accumulate stats
+        adds the game results to a season df to accumulate stats, thread safe for shared df across game threads
         :param box_score_class: box score from game to add to season stats
         :return: None
         """
-        batting_box_score = box_score_class.get_batter_game_stats()
-        pitching_box_score = box_score_class.get_pitcher_game_stats()
+        with self.semaphore:
+            # print(f'bbstats.py game_results_to_season, got the semaphore')
+            batting_box_score = box_score_class.get_batter_game_stats()
+            pitching_box_score = box_score_class.get_pitcher_game_stats()
 
-        # add results to season accumulation, double brackets after box score keep data as df not series
-        for index, row in batting_box_score.iterrows():
-            self.new_season_batting_data.loc[index, self.numeric_bcols] = (
-                    batting_box_score.loc[index, self.numeric_bcols] +
-                    self.new_season_batting_data.loc[index, self.numeric_bcols])
-            self.new_season_batting_data.loc[index, 'Condition'] = batting_box_score.loc[index, 'Condition']
-            self.new_season_batting_data.loc[index, 'Injured Days'] = batting_box_score.loc[index, 'Injured Days']
+            # add results to season accumulation, double brackets after box score keep data as df not series
+            for index, row in batting_box_score.iterrows():
+                self.new_season_batting_data.loc[index, self.numeric_bcols] = (
+                        batting_box_score.loc[index, self.numeric_bcols] +
+                        self.new_season_batting_data.loc[index, self.numeric_bcols])
+                self.new_season_batting_data.loc[index, 'Condition'] = batting_box_score.loc[index, 'Condition']
+                self.new_season_batting_data.loc[index, 'Injured Days'] = batting_box_score.loc[index, 'Injured Days']
 
-        # print(pitching_box_score[self.numeric_pcols].to_string())
-        # print(pitching_box_score[self.numeric_pcols].dtypes)
-        # print(self.new_season_pitching_data[self.numeric_pcols].dtypes)
-        for index, row in pitching_box_score.iterrows():
-
-            self.new_season_pitching_data.loc[index, self.numeric_pcols] = (
-                    pitching_box_score.loc[index, self.numeric_pcols] +
-                    self.new_season_pitching_data.loc[index, self.numeric_pcols])
-            self.new_season_pitching_data.loc[index, 'Condition'] = pitching_box_score.loc[index, 'Condition']
-            self.new_season_pitching_data.loc[index, 'Injured Days'] = pitching_box_score.loc[index, 'Injured Days']
+            # print(pitching_box_score[self.numeric_pcols].to_string())
+            # print(pitching_box_score[self.numeric_pcols].dtypes)
+            # print(self.new_season_pitching_data[self.numeric_pcols].dtypes)
+            for index, row in pitching_box_score.iterrows():
+                self.new_season_pitching_data.loc[index, self.numeric_pcols] = (
+                        pitching_box_score.loc[index, self.numeric_pcols] +
+                        self.new_season_pitching_data.loc[index, self.numeric_pcols])
+                self.new_season_pitching_data.loc[index, 'Condition'] = pitching_box_score.loc[index, 'Condition']
+                self.new_season_pitching_data.loc[index, 'Injured Days'] = pitching_box_score.loc[index, 'Injured Days']
+            # print(f'bbstats.py game_results_to_season, critical section completed')
         return
 
     def is_injured(self) -> None:
@@ -263,37 +267,45 @@ class BaseballStats:
     def new_game_day(self) -> None:
         """
         Set up the next day, check if injured and reduce number of days on dl.  improve player condition
+        make thread safe, should only be called by season controller once
         :return: None
         """
-        self.is_injured()
-        self.new_season_pitching_data['Condition'] = self.new_season_pitching_data.\
-            apply(lambda row: self.rnd_condition_chg(row['Age']) + row['Condition'], axis=1)
-        self.new_season_pitching_data['Condition'] = self.new_season_pitching_data['Condition'].clip(lower=0, upper=100)
-        self.new_season_batting_data['Condition'] = self.new_season_batting_data.\
-            apply(lambda row: self.rnd_condition_chg(row['Age']) + row['Condition'], axis=1)
-        self.new_season_batting_data['Condition'] = self.new_season_batting_data['Condition'].clip(lower=0, upper=100)
+        with self.semaphore:
+            # print(f'bbstats.py in new_game_day, got semaphore')
+            self.is_injured()
+            self.new_season_pitching_data['Condition'] = self.new_season_pitching_data.\
+                apply(lambda row: self.rnd_condition_chg(row['Age']) + row['Condition'], axis=1)
+            self.new_season_pitching_data['Condition'] = self.new_season_pitching_data['Condition'].clip(lower=0, upper=100)
+            self.new_season_batting_data['Condition'] = self.new_season_batting_data.\
+                apply(lambda row: self.rnd_condition_chg(row['Age']) + row['Condition'], axis=1)
+            self.new_season_batting_data['Condition'] = self.new_season_batting_data['Condition'].clip(lower=0, upper=100)
 
-        # copy over results in new season to prior season for game management
-        self.pitching_data.loc[:, 'Condition'] = self.new_season_pitching_data.loc[:, 'Condition']
-        # self.pitching_data.loc[:, 'Injured Days'] = self.new_season_pitching_data.loc[:, 'Injured Days']
-        self.pitching_data = update_column_with_other_df(self.pitching_data, 'Injured Days',
-                                                         self.new_season_pitching_data, 'Injured Days')
-        self.batting_data.loc[:, 'Condition'] = self.new_season_batting_data.loc[:, 'Condition']
-        self.batting_data = update_column_with_other_df(self.batting_data, 'Injured Days',
-                                                        self.new_season_batting_data, 'Injured Days')
+            # copy over results in new season to prior season for game management
+            self.pitching_data.loc[:, 'Condition'] = self.new_season_pitching_data.loc[:, 'Condition']
+            # self.pitching_data.loc[:, 'Injured Days'] = self.new_season_pitching_data.loc[:, 'Injured Days']
+            self.pitching_data = update_column_with_other_df(self.pitching_data, 'Injured Days',
+                                                             self.new_season_pitching_data, 'Injured Days')
+            self.batting_data.loc[:, 'Condition'] = self.new_season_batting_data.loc[:, 'Condition']
+            self.batting_data = update_column_with_other_df(self.batting_data, 'Injured Days',
+                                                            self.new_season_batting_data, 'Injured Days')
+            # print(f'bbstats.py in new_game_day, released semaphore')
         return
 
     def update_season_stats(self) -> None:
         """
         fill na with zeros for players with no IP or AB from the df and update season stats
+        make thread safe, should only be called by season controller once
         :return: None
         """
-        self.new_season_pitching_data = \
-            team_pitching_stats(self.new_season_pitching_data[self.new_season_pitching_data['IP'] > 0].fillna(0))
-        self.new_season_batting_data = \
-            team_batting_stats(self.new_season_batting_data[self.new_season_batting_data['AB'] > 0].fillna(0))
-        if self.debug:
-            print(f'bbstats update season stats {self.new_season_pitching_data.to_string(justify="right")}')
+        with self.semaphore:
+            print(f'bbstats.py in update_season_stats, got semaphore')
+            self.new_season_pitching_data = \
+                team_pitching_stats(self.new_season_pitching_data[self.new_season_pitching_data['IP'] > 0].fillna(0))
+            self.new_season_batting_data = \
+                team_batting_stats(self.new_season_batting_data[self.new_season_batting_data['AB'] > 0].fillna(0))
+            if self.debug:
+                print(f'bbstats update season stats {self.new_season_pitching_data.to_string(justify="right")}')
+            print(f'bbstats.py in update_season_stats, release semaphore')
         return
 
     def print_current_season(self, teams: Optional[List[str]] = None, summary_only_b: bool = False) -> None:

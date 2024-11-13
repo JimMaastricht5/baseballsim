@@ -30,6 +30,7 @@ import bbbaserunners
 import datetime
 from pandas.core.series import Series
 from typing import List, Tuple
+import queue
 
 AWAY = 0
 HOME = 1
@@ -48,7 +49,7 @@ class Game:
         class manages the details of an individual game
         :param away_team_name: away team name is a 3 character all caps abbreviation
         :param home_team_name: home team
-        :param baseball_data: class with all of the baseball data for the league. prior and current season
+        :param baseball_data: class with all the baseball data for the league. prior and current season
         :param game_num: game number in season
         :param rotation_len: len of rotation for team or series.  typically 5
         :param print_lineup: true will print the lineup prior to the game
@@ -225,8 +226,8 @@ class Game:
 
     def pitching_sit(self, pitching: Series, pitch_switch: bool) -> bool:
         """
-        switches pitchers based on fatigue or close game
-        close game is hitting inning >= 7 and, pitching team winning or tied and runners on = save sit
+        switches pitchers based on fatigue or
+        close game which is hitting inning >= 7 and, pitching team winning or tied and runners on = save sit
         if switch due to save or close game, don't switch again in same inning
         :param pitching: current pitchers data in a df series
         :param pitch_switch: did we already switch pitchers this inning?  Do not sub too fast
@@ -440,6 +441,15 @@ class Game:
         self.end_game()
         return self.total_score, self.inning, self.win_loss
 
+    def sim_game_threaded(self, q: queue) -> None:
+        """
+        handles input and output using the queue for multi-threading
+        :param q: queue for data exchange
+        :return: None
+        """
+        g_score, g_innings, g_win_loss = self.sim_game(team_to_follow=q.get())
+        q.put((g_score, g_innings, g_win_loss, self.teams[AWAY].box_score, self.teams[HOME].box_score))  # results on q
+        return
 
 # test a number of games
 if __name__ == '__main__':
@@ -450,9 +460,9 @@ if __name__ == '__main__':
 
     # MIL_lineup = {647549: 'LF', 239398: 'C', 224423: '1B', 138309: 'DH', 868055: 'CF', 520723: 'SS',
     #               299454: '3B', 46074: '2B', 752787: 'RF'}
-    NYM_starter = 111891
-    MIL_starter = 974670
-    sims = 1000
+    NYM_starter = 626858
+    MIL_starter = 288650
+    sims = 1
     season_win_loss = [[0, 0], [0, 0]]  # away record pos 0, home pos 1
     score_total = [0, 0]
     # team0_season_df = None
@@ -485,9 +495,9 @@ if __name__ == '__main__':
         #     team0_season_df['Player'] = game.teams[AWAY].box_score.box_batting['Player']
         #     team0_season_df['Team'] = game.teams[AWAY].box_score.box_batting['Team']
         #     team0_season_df['Pos'] = game.teams[AWAY].box_score.box_batting['Pos']
-    print('')
-    print(f'{away_team} season : {season_win_loss[0][0]} W and {season_win_loss[0][1]} L')
-    print(f'{home_team} season : {season_win_loss[1][0]} W and {season_win_loss[1][1]} L')
+        print('')
+        print(f'{away_team} season : {season_win_loss[0][0]} W and {season_win_loss[0][1]} L')
+        print(f'{home_team} season : {season_win_loss[1][0]} W and {season_win_loss[1][1]} L')
     print(f'away team scored {score_total[0]} for an average of {score_total[0]/sims}')
     print(f'home team scored {score_total[1]} for an average of {score_total[1] / sims}')
     print(startdt)

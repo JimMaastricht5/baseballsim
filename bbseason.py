@@ -115,24 +115,29 @@ class BaseballSeason:
             self.schedule = self.schedule[0:self.season_length]
         return
 
-    def print_day_schedule(self, day: int) -> None:
+    def print_day_schedule(self, day: int) -> str:
         """
         prints the schedule for the day passed in, prints days off last
         :param day: integer of the day in season, e.g., 161
-        :return: None
+        :return: str with printed schedule text
         """
+        schedule_str = ''
         game_day_off = ''
         day_schedule = self.schedule[day]
-        print(f'Games for day {day + 1}:')
+        schedule_str += (f'Games for day {day + 1}:\n')
+        # print(f'Games for day {day + 1}:')
         for game in day_schedule:
             if 'OFF DAY' not in game:
-                print(f'{game[0]} vs. {game[1]}')
+                schedule_str += (f'{game[0]} vs. {game[1]}\n')
+                # print(f'{game[0]} vs. {game[1]}')
             else:
                 game_day_off = game[0] if game[0] != 'OFF DAY' else game[1]  # find the team with the off game
         if game_day_off != '':
-            print(f'{game_day_off} has the day off')
-        print('')
-        return
+            schedule_str += (f'{game_day_off} has the day off\n\n')
+            # print(f'{game_day_off} has the day off')
+        # print('')
+        # print(schedule_str)
+        return schedule_str
 
     def print_standings(self) -> None:
         """
@@ -200,7 +205,7 @@ class BaseballSeason:
         sim one day of games across the league
         :return: None
         """
-        self.print_day_schedule(season_day_num)
+        print(self.print_day_schedule(season_day_num))
         todays_games = self.schedule[season_day_num]
         self.baseball_data.new_game_day()  # update rest and injury data for a new day, print DL injury list
         for match_up in todays_games:  # run all games for a day, day starts at zero
@@ -229,13 +234,12 @@ class BaseballSeason:
         threads = []
         queues = []
         match_ups = []
-        self.print_day_schedule(season_day_num)
+        print(self.print_day_schedule(season_day_num) + '\n')
         todays_games = self.schedule[season_day_num]
         self.baseball_data.new_game_day()  # update rest and injury data for a new day, print DL injury list
-        print('')  # insert blank line prior to playing all games
         for match_up in todays_games:  # run all games for a day, day starts at zero
             if 'OFF DAY' not in match_up:  # not an off day
-                print(f'Playing day #{season_day_num + 1}: {match_up[0]} away against {match_up[1]}')
+                print(f'in sim day threaded: Playing day #{season_day_num + 1}: {match_up[0]} away against {match_up[1]}')
                 game = bbgame.Game(away_team_name=match_up[0], home_team_name=match_up[1],
                                    baseball_data=self.baseball_data, game_num=season_day_num,
                                    rotation_len=self.rotation_len, print_lineup=self.print_lineup_b,
@@ -251,10 +255,11 @@ class BaseballSeason:
 
         for ii, thread in enumerate(threads):  # wait for all results, loop over games played, no off days
             thread.join()
-            (score, inning, win_loss_list, away_box_score, home_box_score) = queues[ii].get()
+            (score, inning, win_loss_list, away_box_score, home_box_score, game_recap) = queues[ii].get()
             match_up = match_ups[ii]
             self.update_win_loss(away_team_name=match_up[0], home_team_name=match_up[1], win_loss=win_loss_list)
-            print(f'Final: {match_up[0]} {score[0]} {match_up[1]} {score[1]}')
+            print(game_recap)
+            # print(f'Final: {match_up[0]} {score[0]} {match_up[1]} {score[1]}')
             self.baseball_data.game_results_to_season(box_score_class=away_box_score)
             self.baseball_data.game_results_to_season(box_score_class=home_box_score)
         # end of all games for one day
@@ -265,8 +270,8 @@ class BaseballSeason:
         sims the next day for a season
         :return: None
         """
-        self.sim_day(season_day_num=self.season_day_num)
-        # self.sim_day_threaded(season_day_num=self.season_day_num)
+        # self.sim_day(season_day_num=self.season_day_num)
+        self.sim_day_threaded(season_day_num=self.season_day_num)
         print(f'Standings for Day {self.season_day_num + 1}:')
         self.print_standings()
         self.season_day_num = self.season_day_num + 1

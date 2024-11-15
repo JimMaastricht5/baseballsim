@@ -23,7 +23,7 @@
 # JimMaastricht5@gmail.com
 import json
 import bbstats
-import gameteam
+import bbteam
 
 
 class Manager:

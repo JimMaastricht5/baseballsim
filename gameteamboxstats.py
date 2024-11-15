@@ -34,6 +34,7 @@ from typing import Dict, Union
 class TeamBoxScore:
     def __init__(self, lineup: DataFrame, pitching: DataFrame, team_name: str) -> None:
         # self.rnd = lambda: np.random.default_rng().uniform(low=0.0, high=1.001)  # random generator between 0 and 1
+        self.box_printed = ''
         self.box_pitching = pitching.copy()
         self.box_pitching[['G', 'GS']] = 1
         self.box_pitching[['CG', 'SHO', 'AB', 'H', '2B', '3B', 'ER', 'K', 'BB', 'HR', 'W', 'L', 'SV', 'BS',
@@ -155,20 +156,22 @@ class TeamBoxScore:
         self.box_pitching_totals = bbstats.team_pitching_totals(self.box_pitching, team_name=self.team_name)
         return
 
-    def print_boxes(self) -> None:
+    def print_boxes(self) -> str:
         batting_cols = ['Player', 'Team', 'Pos', 'Age', 'G', 'AB', 'R', 'H', '2B', '3B', 'HR', 'RBI',
                         'SB', 'CS', 'BB', 'SO', 'SH', 'SF', 'HBP']
         pitching_cols = ['Player', 'Team', 'Age', 'G', 'GS', 'CG', 'SHO', 'IP', 'H', '2B', '3B',
                          'ER', 'K', 'BB', 'HR', 'W', 'L', 'SV', 'BS', 'HLD']
         df = self.box_batting[batting_cols]
         df = pd.concat([df, self.box_batting_totals.assign(Player='Totals', Team='', Pos='', Age='')[batting_cols]])
-        print(df.to_string(index=False, justify='right'))
-        print('')
+        self.box_printed += df.to_string(index=False, justify='right') + '\n\n'
+        # print(df.to_string(index=False, justify='right'))
+        # print('')
         df = self.box_pitching[pitching_cols]
         df = pd.concat([df, self.box_pitching_totals.assign(Player='Totals', Team='', Pos='', Age='')[pitching_cols]])
-        print(df.to_string(index=False, justify='right'))
-        print('')
-        return
+        self.box_printed += df.to_string(index=False, justify='right') + '\n\n'
+        # print(df.to_string(index=False, justify='right'))
+        # print('')
+        return self.box_printed
 
     def get_batter_game_stats(self):
         return self.game_batting_stats

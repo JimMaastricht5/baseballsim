@@ -22,7 +22,7 @@
 #
 # JimMaastricht5@gmail.com
 import bbstats
-import gameteam
+import bbteam
 import at_bat
 import numpy as np
 import random
@@ -67,6 +67,7 @@ class Game:
         :param show_bench: show the players not in game along with the lineup
         :param debug: prints extra info
         """
+        self.game_recap = ''
         if baseball_data is None:
             self.baseball_data = bbstats.BaseballStats(load_seasons=load_seasons, new_season=new_season,
                                                        load_batter_file=load_batter_file,
@@ -78,7 +79,7 @@ class Game:
         else:
             self.team_names = random.sample(list(self.baseball_data.batting_data.Team.unique()), 2)
         self.game_num = game_num  # number of games into season
-        self.rotation_len = rotation_len  # number of starting pitchers to rotate thru
+        self.rotation_len = rotation_len  # number of starting pitchers to rotate over
         self.chatty = chatty
         self.print_box_score_b = print_box_score_b
         self.debug = debug
@@ -90,23 +91,21 @@ class Game:
         self.starting_lineups = starting_lineups  # is a list of two dict, each dict is in batting order with field pos
 
         self.teams = []  # keep track of away in pos 0 and home team in pos 1
-        self.teams.insert(AWAY, gameteam.Team(team_name=self.team_names[AWAY], baseball_data=self.baseball_data,
+        self.teams.insert(AWAY, bbteam.Team(team_name=self.team_names[AWAY], baseball_data=self.baseball_data,
                                               game_num=self.game_num, rotation_len=self.rotation_len,
                                               debug=self.debug))  # init away team class
-        self.teams[AWAY].set_initial_lineup(show_lineup=print_lineup, show_bench=show_bench,
-                                            current_season_stats=(True if game_num > 1 else False),
-                                            force_starting_pitcher=starting_pitchers[AWAY],
-                                            force_lineup_dict=starting_lineups[AWAY])
-
-        # print(f'Setting home team as {self.team_names[1]}')
-        self.teams.insert(HOME, gameteam.Team(team_name=self.team_names[HOME], baseball_data=self.baseball_data,
+        alineup_card = self.teams[AWAY].set_initial_lineup(show_lineup=print_lineup, show_bench=show_bench,
+                                                          current_season_stats=(True if game_num > 1 else False),
+                                                          force_starting_pitcher=starting_pitchers[AWAY],
+                                                          force_lineup_dict=starting_lineups[AWAY])
+        self.teams.insert(HOME, bbteam.Team(team_name=self.team_names[HOME], baseball_data=self.baseball_data,
                                               game_num=self.game_num, rotation_len=self.rotation_len,
                                               debug=self.debug))  # init away team class
-        self.teams[HOME].set_initial_lineup(show_lineup=print_lineup, show_bench=show_bench,
-                                            current_season_stats=(True if game_num > 1 else False),
-                                            force_starting_pitcher=starting_pitchers[HOME],
-                                            force_lineup_dict=starting_lineups[HOME])
-
+        hlineup_card = self.teams[HOME].set_initial_lineup(show_lineup=print_lineup, show_bench=show_bench,
+                                                           current_season_stats=(True if game_num > 1 else False),
+                                                           force_starting_pitcher=starting_pitchers[HOME],
+                                                           force_lineup_dict=starting_lineups[HOME])
+        self.game_recap += alineup_card + hlineup_card
         self.win_loss = []
         self.is_save_sit = [False, False]
         self.total_score = [0, 0]  # total score
@@ -213,16 +212,11 @@ class Game:
             print_line = ''
             for jj in range(0, len(row_to_col[ii])):
                 print_line = print_line + str(row_to_col[ii][jj]) + '\t'
-            print(print_line)
-        print('')
+            self.game_recap += print_line + '\n'
+            # print(print_line)
+        self.game_recap += '\n'
+        # print('')
         return
-
-    # def score_difference(self) -> int:
-    #     """
-    #     raw score difference team pitching with a lead will be a positive number, duplicate func
-    #     :return:
-    #     """
-    #     return self.total_score[self.team_pitching()] - self.total_score[self.team_hitting()]
 
     def pitching_sit(self, pitching: Series, pitch_switch: bool) -> bool:
         """
@@ -243,8 +237,10 @@ class Game:
                 pitch_switch = True  # we switched pitcher this inning
                 self.is_save_sit[self.team_pitching()] = self.save_sit()
                 if self.chatty and pitch_switch:
-                    print(f'\tManager has made the call to the bull pen.  Pitching change....')
-                    print(f'\t{pitching.Player} has entered the game for {self.team_names[self.team_pitching()]}')
+                    self.game_recap += f'Manager has made the call to the bull pen.  Pitching change....\n'
+                    self.game_recap += f'\t{pitching.Player} has entered the game for {self.team_names[self.team_pitching()]}\n'
+                    # print(f'\tManager has made the call to the bull pen.  Pitching change....')
+                    # print(f'\t{pitching.Player} has entered the game for {self.team_names[self.team_pitching()]}')
         return pitch_switch
 
     def stolen_base_sit(self) -> None:
@@ -263,13 +259,16 @@ class Game:
                     self.bases.push_a_runner(1, 2)  # move runner from 1st to second
                     self.teams[self.team_hitting()].box_score.steal_result(runner_key, True)  # stole the base
                     if self.chatty:
-                        print(f'\t{runner_stats.Player} stole 2nd base!')
-                        print(f'\t{self.bases.describe_runners()}')
+                        self.game_recap += f'\t{runner_stats.Player} stole 2nd base!\n'
+                        self.game_recap += f'\t{self.bases.describe_runners()}\n'
+                        # print(f'\t{runner_stats.Player} stole 2nd base!')
+                        # print(f'\t{self.bases.describe_runners()}')
                 else:
                     self.teams[self.team_hitting()].box_score.steal_result(runner_key, False)  # caught stealing
                     if self.chatty:
                         self.outs += 1  # this could result in the third out
-                        print(f'\t{runner_stats.Player} was caught stealing for out number {self.outs}')
+                        self.game_recap += f'\t{runner_stats.Player} was caught stealing for out number {self.outs}\n'
+                        # print(f'\t{runner_stats.Player} was caught stealing for out number {self.outs}')
         return
 
     def is_extra_innings(self) -> bool:
@@ -288,7 +287,8 @@ class Game:
             self.bases.add_runner_to_base(base_num=2, batter_num=self.prior_batter_out_num[self.team_hitting()],
                                           player_name=self.prior_batter_out_name[self.team_hitting()])
             if self.chatty:
-                print(f'Extra innings: {self.prior_batter_out_name[self.team_hitting()]} will start at 2nd base.')
+                self.game_recap += f'Extra innings: {self.prior_batter_out_name[self.team_hitting()]} will start at 2nd base.\n'
+                # print(f'Extra innings: {self.prior_batter_out_name[self.team_hitting()]} will start at 2nd base.')
         return
 
     def sim_ab(self) -> Tuple[Series, Series]:
@@ -317,10 +317,14 @@ class Game:
                                                                  self.bases.player_scored)
         if self.chatty:
             out_text = 'Out' if self.outs <= 1 else 'Outs'
-            print(f'Pitcher: {pitching.Player} against '
-                  f'{self.team_names[self.team_hitting()]} batter #'
-                  f'{self.batting_num[self.team_hitting()]}. {batting.Player} \n'
-                  f'\t {self.outcomes.score_book_cd}, {self.outs} {out_text}')
+            self.game_recap += (f'Pitcher: {pitching.Player} against ' 
+                  f'{self.team_names[self.team_hitting()]} batter #' 
+                  f'{self.batting_num[self.team_hitting()]}. {batting.Player} \n' 
+                  f'\t {self.outcomes.score_book_cd}, {self.outs} {out_text}\n')
+            # print(f'Pitcher: {pitching.Player} against '
+            #       f'{self.team_names[self.team_hitting()]} batter #'
+            #       f'{self.batting_num[self.team_hitting()]}. {batting.Player} \n'
+            #       f'\t {self.outcomes.score_book_cd}, {self.outs} {out_text}')
 
         self.prior_batter_out_name[self.team_hitting()] = batting.Player
         self.prior_batter_out_num[self.team_hitting()] = cur_batter_index
@@ -334,7 +338,8 @@ class Game:
         pitch_switch = False  # did we switch pitchers this inning, don't sub if closer came in
         top_or_bottom = 'top' if self.top_bottom == 0 else 'bottom'
         if self.chatty:
-            print(f'\nStarting the {top_or_bottom} of inning {self.inning[self.team_hitting()]}.')
+            self.game_recap += f'\nStarting the {top_or_bottom} of inning {self.inning[self.team_hitting()]}.\n'
+            # print(f'\nStarting the {top_or_bottom} of inning {self.inning[self.team_hitting()]}.')
         self.extra_innings()  # set runner on second if it is extra innings
         while self.outs < 3:
             # check for pitching change due to fatigue or game sit
@@ -352,11 +357,15 @@ class Game:
                 for player_id in self.bases.player_scored.keys():
                     players = players + ', ' + self.bases.player_scored[player_id] if players != '' \
                         else self.bases.player_scored[player_id]
-                print(f'\tScored {self.bases.runs_scored} run(s)!  ({players})\n'
+                self.game_recap += (f'\tScored {self.bases.runs_scored} run(s)!  ({players})\n'
                       f'\tThe score is {self.team_names[0]} {self.total_score[0]} to'
-                      f' {self.team_names[1]} {self.total_score[1]}')
+                      f' {self.team_names[1]} {self.total_score[1]}\n')
+                # print(f'\tScored {self.bases.runs_scored} run(s)!  ({players})\n'
+                #       f'\tThe score is {self.team_names[0]} {self.total_score[0]} to'
+                #       f' {self.team_names[1]} {self.total_score[1]}')
             if self.bases.count_runners() >= 1 and self.outs < 3 and self.chatty:  # leave out batter check for runner
-                print(f'\t{self.bases.describe_runners()}')
+                self.game_recap += f'\t{self.bases.describe_runners()}\n'
+                # print(f'\t{self.bases.describe_runners()}')
             self.batting_num[self.team_hitting()] = self.batting_num[self.team_hitting()] + 1 \
                 if (self.batting_num[self.team_hitting()] + 1) <= 9 else 1  # wrap around lineup
             # check for walk off
@@ -367,10 +376,13 @@ class Game:
         self.update_inning_score(number_of_runs=0)  # push a zero on the board if no runs score this half inning
         self.bases.clear_bases()
         if self.chatty:
-            print('')  # add a blank line for verbose output
-            print(f'Completed {top_or_bottom} half of inning {self.inning[self.team_hitting()]}. '
+            self.game_recap += (f'\nCompleted {top_or_bottom} half of inning {self.inning[self.team_hitting()]}\n'
                   f'The score is {self.team_names[0]} {self.total_score[0]} to {self.team_names[1]} '
-                  f'{self.total_score[1]}')
+                  f'{self.total_score[1]}\n')
+            # print('')  # add a blank line for verbose output
+            # print(f'Completed {top_or_bottom} half of inning {self.inning[self.team_hitting()]}. '
+            #       f'The score is {self.team_names[0]} {self.total_score[0]} to {self.team_names[1]} '
+            #       f'{self.total_score[1]}')
             self.print_inning_score()
         self.inning[self.team_hitting()] += 1
         self.top_bottom = 0 if self.top_bottom == 1 else 1  # switch teams hitting and pitching
@@ -418,28 +430,33 @@ class Game:
         self.teams[AWAY].box_score.totals()
         self.teams[HOME].box_score.totals()
         if self.print_box_score_b:  # print or not to print...
-            self.teams[AWAY].box_score.print_boxes()
-            self.teams[HOME].box_score.print_boxes()
-        print('Final:')
+            self.game_recap += self.teams[AWAY].box_score.print_boxes()
+            self.game_recap += self.teams[HOME].box_score.print_boxes()
+        self.game_recap += 'Final:\n'
+        # print('Final:')
         self.print_inning_score()
         return
 
-    def sim_game(self, team_to_follow: str = '') -> Tuple[List[int], List[int], List[List[int]]]:
+    def sim_game(self, team_to_follow: str = '') -> Tuple[List[int], List[int], List[List[int]], str]:
         """
         simulate an entire game
         :param team_to_follow: three character abbrev of a team that the user is following, prints more detail
-        :return: tuple contains a list of total score for each team, inning by inning score and win loss records
+        :return: tuple contains a list of total score for each team, inning by inning score and win loss records,
+            and the output string
         """
+        self.game_recap += f'{self.team_names[0]} vs. {self.team_names[1]}\n'
+        # print(f'{self.team_names[0]} vs. {self.team_names[1]}')
         if team_to_follow in self.team_names:
-            print(f'Following team: {team_to_follow}')
+            self.game_recap += f'Following team: {team_to_follow}\n'
+            # print(f'Following team: {team_to_follow}')
             self.chatty = True
             self.print_box_score_b = True
-            if self.interactive:
-                pass  # ??? need to handle interactive
+            # if self.interactive:
+            #     pass  # ??? need to handle interactive
         while self.is_game_end() is False:
             self.sim_half_inning()
         self.end_game()
-        return self.total_score, self.inning, self.win_loss
+        return self.total_score, self.inning, self.win_loss, self.game_recap
 
     def sim_game_threaded(self, q: queue) -> None:
         """
@@ -447,9 +464,10 @@ class Game:
         :param q: queue for data exchange
         :return: None
         """
-        g_score, g_innings, g_win_loss = self.sim_game(team_to_follow=q.get())
-        q.put((g_score, g_innings, g_win_loss, self.teams[AWAY].box_score, self.teams[HOME].box_score))  # results on q
+        g_score, g_innings, g_win_loss, final_game_recap = self.sim_game(team_to_follow=q.get())
+        q.put((g_score, g_innings, g_win_loss, self.teams[AWAY].box_score, self.teams[HOME].box_score, final_game_recap))  # results on q
         return
+
 
 # test a number of games
 if __name__ == '__main__':
@@ -482,23 +500,24 @@ if __name__ == '__main__':
                     # , starting_pitchers=[MIL_starter, BOS_starter]
                     # , starting_lineups=[MIL_lineup, None]
                     )
-        score, inning, win_loss = game.sim_game(team_to_follow=None)
+        score, inning, win_loss, game_recap_str = game.sim_game(team_to_follow=home_team)
+        print(game_recap_str)
         season_win_loss[0] = list(np.add(np.array(season_win_loss[0]), np.array(win_loss[0])))
         season_win_loss[1] = list(np.add(np.array(season_win_loss[1]), np.array(win_loss[1])))
         score_total[0] = score_total[0] + score[0]
         score_total[1] = score_total[1] + score[1]
         # if team0_season_df is None:
-        team0_season_df = game.teams[AWAY].box_score.team_box_batting
+        # team0_season_df = game.teams[AWAY].box_score.team_box_batting
         # else:
         #     col_list = ['G', 'AB', 'R', 'H', '2B', '3B', 'HR', 'RBI', 'SB', 'CS', 'BB', 'SO', 'SH', 'SF', 'HBP']
         #     team0_season_df = team0_season_df[col_list].add(game.teams[AWAY].box_score.box_batting[col_list])
         #     team0_season_df['Player'] = game.teams[AWAY].box_score.box_batting['Player']
         #     team0_season_df['Team'] = game.teams[AWAY].box_score.box_batting['Team']
         #     team0_season_df['Pos'] = game.teams[AWAY].box_score.box_batting['Pos']
-        print('')
-        print(f'{away_team} season : {season_win_loss[0][0]} W and {season_win_loss[0][1]} L')
-        print(f'{home_team} season : {season_win_loss[1][0]} W and {season_win_loss[1][1]} L')
-    print(f'away team scored {score_total[0]} for an average of {score_total[0]/sims}')
-    print(f'home team scored {score_total[1]} for an average of {score_total[1] / sims}')
+    #     print('')
+    #     print(f'{away_team} season : {season_win_loss[0][0]} W and {season_win_loss[0][1]} L')
+    #     print(f'{home_team} season : {season_win_loss[1][0]} W and {season_win_loss[1][1]} L')
+    # print(f'away team scored {score_total[0]} for an average of {score_total[0]/sims}')
+    # print(f'home team scored {score_total[1]} for an average of {score_total[1] / sims}')
     print(startdt)
     print(datetime.datetime.now())

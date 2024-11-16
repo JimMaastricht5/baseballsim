@@ -52,9 +52,11 @@ class Team:
         self.new_season_pos_players_df = baseball_data.get_batting_data(team_name=team_name, prior_season=False)
         if self.debug:
             print(f'bbteam.py init prior season data')
-            print(self.prior_season_pos_players_df.to_string())
+            # print(self.prior_season_pos_players_df.to_string())
+            print(self.prior_season_pitchers_df.to_string())
             print(f'bbteam.py init baseball data df')
-            print(self.baseball_data.batting_data.to_string())
+            # print(self.baseball_data.batting_data.to_string())
+            print(self.baseball_data.pitching_data.to_string())
         if self.prior_season_pitchers_df.shape[0] == 0:
             print(f'bbteam.py init: team {team_name} does not exist.')
             print(f'Try one of these teams {self.baseball_data.get_all_team_names()}')

@@ -233,8 +233,8 @@ class BaseballStatsPreProcess:
 
     def create_leagues(self):
         # replace AL and NL with random league names, set leagues column to match
-        league_list = ['ACB', 'NBL', 'SOL', 'NNL']  # Armchair Baseball and Nerd Baseball, Some Other League, No Name
-        league_names = random.sample(league_list, 2)
+        league_names = ['ACB', 'NBL']  # Armchair Baseball and Nerd Baseball, Some Other League SOL, No Name NNL
+        # league_names = random.sample(league_list, 2)
         self.pitching_data.loc[self.pitching_data['League'] == 'AL', 'League'] = league_names[0]
         self.pitching_data.loc[self.pitching_data['League'] == 'NL', 'League'] = league_names[1]
         self.pitching_data['Leagues'] = self.pitching_data['League'].apply(lambda x: [x])
@@ -335,8 +335,8 @@ class BaseballStatsPreProcess:
 
 
 if __name__ == '__main__':
-    baseball_data = BaseballStatsPreProcess(load_seasons=[2024], new_season=2024,
-                                            generate_random_data=False,
+    baseball_data = BaseballStatsPreProcess(load_seasons=[2024], new_season=2025,
+                                            generate_random_data=True,
                                             load_batter_file='player-stats-Batters.csv',
                                             load_pitcher_file='player-stats-Pitching.csv')
     print(*baseball_data.pitching_data.columns)

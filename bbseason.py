@@ -124,16 +124,16 @@ class BaseballSeason:
         schedule_str = ''
         game_day_off = ''
         day_schedule = self.schedule[day]
-        schedule_str += (f'Games for day {day + 1}:\n')
+        schedule_str += f'Games for day {day + 1}:\n'
         # print(f'Games for day {day + 1}:')
         for game in day_schedule:
             if 'OFF DAY' not in game:
-                schedule_str += (f'{game[0]} vs. {game[1]}\n')
+                schedule_str += f'{game[0]} vs. {game[1]}\n'
                 # print(f'{game[0]} vs. {game[1]}')
             else:
                 game_day_off = game[0] if game[0] != 'OFF DAY' else game[1]  # find the team with the off game
         if game_day_off != '':
-            schedule_str += (f'{game_day_off} has the day off\n\n')
+            schedule_str += f'{game_day_off} has the day off\n\n'
             # print(f'{game_day_off} has the day off')
         # print('')
         # print(schedule_str)
@@ -216,8 +216,9 @@ class BaseballSeason:
                                    rotation_len=self.rotation_len, print_lineup=self.print_lineup_b,
                                    chatty=self.season_chatty, print_box_score_b=self.print_box_score_b,
                                    interactive=self.interactive, debug=self.debug)
-                score, inning, win_loss_list = game.sim_game(team_to_follow=self.team_to_follow)
+                score, inning, win_loss_list, game_recap = game.sim_game(team_to_follow=self.team_to_follow)
                 self.update_win_loss(away_team_name=match_up[0], home_team_name=match_up[1], win_loss=win_loss_list)
+                print(game_recap)
                 print(f'Final: {match_up[0]} {score[0]} {match_up[1]} {score[1]}')
                 self.baseball_data.game_results_to_season(box_score_class=game.teams[AWAY].box_score)
                 self.baseball_data.game_results_to_season(box_score_class=game.teams[HOME].box_score)

@@ -42,12 +42,12 @@ class OutCome:
         self.score_book_cd = ''
         self.bases_to_advance = 0
         self.runs_scored = 0
-        self.bases_dict = {'BB': 1, 'HBP': 1, 'H': 1, '2B': 2, '3B': 3, 'HR': 4, 'K': 0, 'SO': 0, 'GB': 1, 'DP': 1,
+        self.bases_dict = {'BB': 1, 'HBP': 1, 'H': 1, '2B': 2, '3B': 3, 'HR': 4, 'SO': 0, 'SO': 0, 'GB': 1, 'DP': 1,
                            'GB FC': 1, 'FO': 0, 'LD': 0, 'SF': 0}  # some outs allow runners to move such as dp or gb
-        self.on_base_dict = {'BB': True, 'HBP': True, 'H': True, '2B': True, '3B': True, 'HR': True, 'K': False,
+        self.on_base_dict = {'BB': True, 'HBP': True, 'H': True, '2B': True, '3B': True, 'HR': True, 'SO': False,
                              'SO': False, 'GB': False, 'DP': False, 'GB FC': False, 'FO': False, 'LD': False,
                              'SF': False}
-        self.outs_dict = {'BB': 0, 'HBP': 0, 'H': 0, '2B': 0, '3B': 0, 'HR': 0, 'K': 1, 'SO': 1, 'GB': 1, 'DP': 2,
+        self.outs_dict = {'BB': 0, 'HBP': 0, 'H': 0, '2B': 0, '3B': 0, 'HR': 0, 'SO': 1, 'GB': 1, 'DP': 2,
                           'GB FC': 1, 'FO': 1, 'LD': 1, 'SF': 1}
         return
 
@@ -83,14 +83,14 @@ class OutCome:
         self.runs_scored = runs_scored
         return
 
-    def convert_k(self) -> None:
-        """
-        converts SO to K for scorebook
-        :return: None
-        """
-        if self.score_book_cd == 'SO':
-            self.score_book_cd = 'K'
-        return
+    # def convert_k(self) -> None:
+    #     """
+    #     converts SO to K for scorebook
+    #     :return: None
+    #     """
+    #     if self.score_book_cd == 'SO':
+    #         self.score_book_cd = 'SO'
+    #     return
 
 
 class SimAB:
@@ -203,8 +203,8 @@ class SimAB:
         :return: true if K
         """
         return self.rng() < self.odds_ratio((self.batting['SO'] / self.batting.Total_Outs),
-                                            (self.pitching['K'] / self.pitching.Total_Outs),
-                                            self.league_K_rate_per_AB, stat_type='K')
+                                            (self.pitching['SO'] / self.pitching.Total_Outs),
+                                            self.league_K_rate_per_AB, stat_type='SO')
 
     def gb_fo_lo(self, outs: int = 0, runner_on_first: bool = False, runner_on_third: bool = False) -> str:
         """
@@ -262,7 +262,7 @@ class SimAB:
                 outcomes.set_score_book_cd('H')
         else:  # handle outs
             if self.k():
-                outcomes.set_score_book_cd('K')
+                outcomes.set_score_book_cd('SO')
             else:
                 outcomes.set_score_book_cd(self.gb_fo_lo(outs, runner_on_first, runner_on_third))
         return

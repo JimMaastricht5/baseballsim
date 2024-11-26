@@ -42,8 +42,8 @@ class BaseballStatsPreProcess:
 
         self.numeric_bcols = ['G', 'AB', 'R', 'H', '2B', '3B', 'HR', 'RBI', 'SB', 'CS', 'BB', 'SO', 'SH', 'SF',
                               'HBP', 'Condition']  # these cols will get added to running season total
-        self.numeric_pcols = ['G', 'GS', 'CG', 'SHO', 'IP', 'AB', 'H', '2B', '3B', 'HR', 'ER', 'K', 'BB', 'W', 'L',
-                              'SV', 'BS', 'HLD', 'Total_Outs', 'Condition']  # cols will add to running season total
+        self.numeric_pcols = ['G', 'GS', 'CG', 'SHO', 'IP', 'AB', 'H', '2B', '3B', 'HR', 'ER', 'SO', 'BB', 'W', 'L',
+                              'SV', 'Total_Outs', 'Condition']  # cols will add to running season total
         self.nl = ['CHC', 'CIN', 'MIL', 'PIT', 'STL', 'ATL', 'MIA', 'NYM', 'PHI', 'WAS', 'WSH', 'COL', 'LAD', 'ARI',
                    'SD', 'SF']  # keep old and new abrrev for WAS/WSH
         self.al = ['BOS', 'TEX', 'NYY', 'KC', 'BAL', 'CLE', 'TOR', 'LAA', 'OAK', 'CWS', 'SEA', 'MIN', 'DET', 'TB',
@@ -124,7 +124,7 @@ class BaseballStatsPreProcess:
         # caution war and salary cols will get aggregated across multiple seasons
         pitching_data = None
         p_salary = None
-        stats_pcols_sum = ['G', 'GS', 'CG', 'SHO', 'IP', 'H', 'ER', 'K', 'BB', 'HR', 'W', 'L', 'SV', 'BS', 'HLD']
+        stats_pcols_sum = ['G', 'GS', 'CG', 'SHO', 'IP', 'H', 'ER', 'SO', 'BB', 'HR', 'W', 'L', 'SV']
         for season in load_seasons:
             df = pd.read_csv(str(season) + f" {pitcher_file}")
             df['Team'] = df['Team'].apply(self.update_team_names)
@@ -138,7 +138,6 @@ class BaseballStatsPreProcess:
             pitching_data = pd.merge(pitching_data, p_salary, on='Hashcode', how='left')  # war and salary cols
             pitching_data = salary.set_league_min_salary(pitching_data)  # set league min for players not in salary set
 
-        # if ('League' in pitching_data.columns) is False:  # if no league set one up
         pitching_data['League'] = pitching_data['Team'].apply(
                 lambda x: 'NL' if x in self.nl else ('AL' if x in self.al else '') )
         pitching_data = self.group_col_to_list(df=pitching_data, key_col='Hashcode', col='Team', new_col='Teams')
@@ -165,6 +164,8 @@ class BaseballStatsPreProcess:
         pitching_data['Condition'] = 100
         pitching_data['Status'] = 'Active'  # DL or active
         pitching_data['Injured Days'] = 0  # days to spend in IL
+        pitching_data['BS'] = 0
+        pitching_data['HLD'] = 0
         return pitching_data
 
     def get_batting_seasons(self, batter_file: str, load_seasons: List[int]) -> DataFrame:
@@ -178,7 +179,7 @@ class BaseballStatsPreProcess:
             b_salary_season = salary.build_war_salary(season, batter_file, self.create_hash)
             if b_salary_season is not None:
                 b_salary = pd.concat([b_salary, b_salary_season], axis=0)
-
+        # print(batting_data.head(10).to_string())
         batting_data['Hashcode'] = batting_data['Player'].apply(self.create_hash)
         if b_salary is not None:
             batting_data = pd.merge(batting_data, b_salary, on='Hashcode', how='left')  # war and salary cols
@@ -315,7 +316,7 @@ class BaseballStatsPreProcess:
                 self.new_season_pitching_data[self.numeric_pcols].astype('int')
             self.new_season_pitching_data[self.numeric_pcols] = 0
             self.new_season_pitching_data[['ERA', 'WHIP', 'OBP', 'AVG_faced', 'Total_OB', 'Total_Outs', 'AB',
-                                           'Injured Days']] = 0
+                                           'HLD', 'BS', 'Injured Days']] = 0
             self.new_season_pitching_data['Condition'] = 100
             self.new_season_pitching_data.drop(['Total_OB', 'Total_Outs'], axis=1)
             self.new_season_pitching_data['Season'] = str(self.new_season)
@@ -340,14 +341,15 @@ class BaseballStatsPreProcess:
 
 if __name__ == '__main__':
     baseball_data = BaseballStatsPreProcess(load_seasons=[2024], new_season=2025,
-                                            generate_random_data=True,
-                                            load_batter_file='player-stats-Batters.csv',
-                                            load_pitcher_file='player-stats-Pitching.csv')
+                                            generate_random_data=False,
+                                            load_batter_file='player-stats-Batters-v2.csv',
+                                            load_pitcher_file='player-stats-Pitching-v2.csv')
     print(*baseball_data.pitching_data.columns)
     print(*baseball_data.batting_data.columns)
     print(baseball_data.batting_data.Team.unique())
-    print(baseball_data.batting_data[baseball_data.batting_data['Team'] == 'MIL'].to_string())
+    # print(baseball_data.batting_data[baseball_data.batting_data['Team'] == 'MIL'].to_string())
+    print(baseball_data.pitching_data[baseball_data.pitching_data['Team'] == 'MIL'].to_string())
     # print(baseball_data.batting_data.Mascot.unique())
-    print(baseball_data.pitching_data.sort_values('Hashcode').to_string())
-    print(baseball_data.batting_data.sort_values('Hashcode').to_string())
+    # print(baseball_data.pitching_data.sort_values('Hashcode').to_string())
+    # print(baseball_data.batting_data.sort_values('Hashcode').to_string())
     # print(baseball_data.new_season_pitching_data.sort_values('Hashcode').to_string())

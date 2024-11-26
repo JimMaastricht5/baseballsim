@@ -37,7 +37,7 @@ class TeamBoxScore:
         self.box_printed = ''
         self.box_pitching = pitching.copy()
         self.box_pitching[['G', 'GS']] = 1
-        self.box_pitching[['CG', 'SHO', 'AB', 'H', '2B', '3B', 'ER', 'K', 'BB', 'HR', 'W', 'L', 'SV', 'BS',
+        self.box_pitching[['CG', 'SHO', 'AB', 'H', '2B', '3B', 'ER', 'SO', 'BB', 'HR', 'W', 'L', 'SV', 'BS',
                            'HLD']] = 0
         self.box_pitching[['IP', 'ERA', 'WHIP', 'OBP', 'SLG', 'OPS', 'Total_Outs']] = 0.0
         pcols_to_convert = ['IP', 'ERA', 'WHIP', 'OBP', 'SLG', 'OPS', 'Total_Outs', 'Condition',
@@ -72,13 +72,12 @@ class TeamBoxScore:
         return pitcher_stats.H + pitcher_stats.BB + pitcher_stats.IP * 3  # total batters faced
 
     def pitching_result(self, pitcher_index: int64, outcomes: OutCome, condition: Union[float64, int]) -> None:
-        outcomes.convert_k()
         row = self.box_pitching.loc[pitcher_index]
         row['AB'] += (outcomes.score_book_cd != 'BB')  # add 1 if true
         if not outcomes.on_base_b:  # Handle outs
             row['Total_Outs'] += outcomes.outs_on_play
             row['IP'] = float(row['Total_Outs'] / 3)
-        if outcomes.score_book_cd in ['H', '2B', '3B', 'HR', 'K', 'BB', 'HBP']:  # Handle plate appearance
+        if outcomes.score_book_cd in ['H', '2B', '3B', 'HR', 'SO', 'BB', 'HBP']:  # Handle plate appearance
             row[outcomes.score_book_cd] += 1
         row['H'] += (outcomes.score_book_cd not in ['BB', 'H'] and outcomes.on_base_b)  # add 1 if true else 0
         row['ER'] += outcomes.runs_scored
@@ -124,11 +123,10 @@ class TeamBoxScore:
         return
 
     def batting_result(self, batter_index: int, outcomes: OutCome, players_scored_list: Dict[int32, str]) -> None:
-        outcomes.convert_k()
         batter_stats = self.box_batting.loc[batter_index].copy()  # Store the row in a variable
         if outcomes.score_book_cd != 'BB':  # handle walks
             batter_stats['AB'] += 1
-        outcome_cd = outcomes.score_book_cd if outcomes.score_book_cd != 'K' else 'SO'  # translate K to SO for batter
+        outcome_cd = outcomes.score_book_cd # if outcomes.score_book_cd != 'SO' else 'SO'  # translate K SO for batter
         if outcome_cd in ['H', '2B', '3B', 'HR', 'BB', 'SO', 'SF', 'HBP']:  # record  plate appearance
             batter_stats[outcome_cd] += 1
         if outcomes.score_book_cd != 'BB' and outcomes.score_book_cd != 'H' and outcomes.on_base_b is True:
@@ -160,7 +158,7 @@ class TeamBoxScore:
         batting_cols = ['Player', 'Team', 'Pos', 'Age', 'G', 'AB', 'R', 'H', '2B', '3B', 'HR', 'RBI',
                         'SB', 'CS', 'BB', 'SO', 'SH', 'SF', 'HBP']
         pitching_cols = ['Player', 'Team', 'Age', 'G', 'GS', 'CG', 'SHO', 'IP', 'H', '2B', '3B',
-                         'ER', 'K', 'BB', 'HR', 'W', 'L', 'SV', 'BS', 'HLD']
+                         'ER', 'SO', 'BB', 'HR', 'W', 'L', 'SV', 'BS', 'HLD']
         df = self.box_batting[batting_cols]
         df = pd.concat([df, self.box_batting_totals.assign(Player='Totals', Team='', Pos='', Age='')[batting_cols]])
         self.box_printed += df.to_string(index=False, justify='right') + '\n\n'

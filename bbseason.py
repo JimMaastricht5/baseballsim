@@ -93,6 +93,9 @@ class BaseballSeason:
         self.team_city_dict = self.baseball_data.get_all_team_city_names()
         return
 
+    def get_team_names(self) -> list:
+        return self.teams
+
     def create_schedule(self) -> None:
         """
         set the schedule for the seasons using the teams, series length, min games in season, and limit of games
@@ -135,7 +138,7 @@ class BaseballSeason:
                 game_day_off = game[0] if game[0] != 'OFF DAY' else game[1]  # find the team with the off game
         if game_day_off != '':
             schedule_str += f'{game_day_off} has the day off\n\n'
-            # print(f'{game_day_off} has the day off')
+            # print(f{game_day_off} has the day off)
         # print('')
         # print(schedule_str)
         return schedule_str
@@ -295,7 +298,7 @@ class BaseballSeason:
 
 
 class MultiBaseballSeason:
-    def __init__(self, load_seasons: List[int], new_season: int, team_list: Optional[list] = None,
+    def __init__(self, load_seasons: List[int], new_season: int, team_lists: Optional[list] = None,
                  season_length: int = 6, series_length: int = 3,
                  rotation_len: int = 5, majors_minors: list = None, season_interactive: bool = False,
                  season_print_lineup_b: bool = False, season_print_box_score_b: bool = False,
@@ -306,7 +309,7 @@ class MultiBaseballSeason:
         """
                 :param load_seasons: list of seasons to load for stats, can blend multiple seasons
                 :param new_season: int value representing the year of the new season can be the same as one of the loads
-                :param team_list: list of teams to use in the simulations, optional param
+                :param team_lists: list of list for [[majors], [minors]] to use in the simulations, optional param
                 :param season_length: number of games to be played for the season
                 :param series_length: series is usually 3, the default is one for testing
                 :param rotation_len: number of starters to rotate, default is 5
@@ -324,12 +327,12 @@ class MultiBaseballSeason:
         self.season_day_num = 0  # set to first day of the season
         self.load_seasons = load_seasons  # pull base data across for what seasons
         self.new_season = new_season
-        self.team_list = team_list
+        self.team_lists = team_lists if team_lists is not None else [None, None]  # create list for input to season
         self.season_length = season_length
         self.series_length = series_length
         self.rotation_len = rotation_len
         if majors_minors is not None:
-            self.majors = [majors_minors[0]]  # convert to a list for input to  single season class
+            self.majors = [majors_minors[0]]  # convert to a list, expected input for single season class
             self.minors = [majors_minors[1]]
         else:
             self.majors = None
@@ -344,6 +347,7 @@ class MultiBaseballSeason:
         self.debug = debug
         # if no major and minor league settings is passed bbseason_a will run all teams in all leagues
         self.bbseason_a = BaseballSeason(load_seasons=self.load_seasons, new_season=self.new_season,
+                                         team_list= self.team_lists[0],  # majors team list
                                          season_length=self.season_length, series_length=self.season_length,
                                          rotation_len=self.rotation_len,
                                          include_leagues=self.majors,
@@ -357,6 +361,7 @@ class MultiBaseballSeason:
 
         if self.minors is not None:
             self.bbseason_b = BaseballSeason(load_seasons=self.load_seasons, new_season=self.new_season,
+                                             team_list = self.team_lists[1],  # minors team list
                                              season_length=self.season_length, series_length=self.season_length,
                                              rotation_len=self.rotation_len,
                                              include_leagues=self.minors,
@@ -368,8 +373,11 @@ class MultiBaseballSeason:
                                              load_batter_file=self.load_batter_file,
                                              load_pitcher_file=self.load_pitcher_file,
                                              debug=self.debug)
+            self.affliations = dict(zip(self.bbseason_a.get_team_names(), self.bbseason_b.get_team_names()))
+            print(self.affliations)
         else:
             self.bbseason_b = None
+            self.affliations = None
         return
 
     def sim_start(self) -> None:

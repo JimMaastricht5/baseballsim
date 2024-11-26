@@ -44,8 +44,10 @@ class BaseballStatsPreProcess:
                               'HBP', 'Condition']  # these cols will get added to running season total
         self.numeric_pcols = ['G', 'GS', 'CG', 'SHO', 'IP', 'AB', 'H', '2B', '3B', 'HR', 'ER', 'K', 'BB', 'W', 'L',
                               'SV', 'BS', 'HLD', 'Total_Outs', 'Condition']  # cols will add to running season total
-        self.nl = ['CHC', 'CIN', 'MIL', 'PIT', 'STL', 'ATL', 'MIA', 'NYM', 'PHI', 'WAS', 'WSH', 'AZ', 'COL', 'LA',
+        self.nl = ['CHC', 'CIN', 'MIL', 'PIT', 'STL', 'ATL', 'MIA', 'NYM', 'PHI', 'WAS', 'WSH', 'COL', 'LAD', 'ARI',
                    'SD', 'SF']  # keep old and new abrrev for WAS/WSH
+        self.al = ['BOS', 'TEX', 'NYY', 'KC', 'BAL', 'CLE', 'TOR', 'LAA', 'OAK', 'CWS', 'SEA', 'MIN', 'DET', 'TB',
+                   'HOU']
         self.name_changes = {'WAS': 'WSH'}
         self.load_seasons = [load_seasons] if not isinstance(load_seasons, list) else load_seasons  # convert to list
         self.new_season = new_season
@@ -136,8 +138,9 @@ class BaseballStatsPreProcess:
             pitching_data = pd.merge(pitching_data, p_salary, on='Hashcode', how='left')  # war and salary cols
             pitching_data = salary.set_league_min_salary(pitching_data)  # set league min for players not in salary set
 
-        if ('League' in pitching_data.columns) is False:  # if no league set one up
-            pitching_data['League'] = pitching_data['Team'].apply(lambda x: 'NL' if x in self.nl else 'AL')
+        # if ('League' in pitching_data.columns) is False:  # if no league set one up
+        pitching_data['League'] = pitching_data['Team'].apply(
+                lambda x: 'NL' if x in self.nl else ('AL' if x in self.al else '') )
         pitching_data = self.group_col_to_list(df=pitching_data, key_col='Hashcode', col='Team', new_col='Teams')
         pitching_data = self.group_col_to_list(df=pitching_data, key_col='Hashcode', col='League', new_col='Leagues')
         pitching_data = self.de_dup_df(df=pitching_data, key_name='Hashcode', dup_column_names='Hashcode',
@@ -181,8 +184,9 @@ class BaseballStatsPreProcess:
             batting_data = pd.merge(batting_data, b_salary, on='Hashcode', how='left')  # war and salary cols
             batting_data = salary.set_league_min_salary(batting_data)  # set league min for players not in salary set
 
-        if ('League' in batting_data.columns) is False:  # if no league set one up
-            batting_data['League'] = batting_data['Team'].apply(lambda x: 'NL' if x in self.nl else 'AL')
+        # if ('League' in batting_data.columns) is False:  # if no league set one up
+        batting_data['League'] = batting_data['Team'].apply(
+                lambda x: 'NL' if x in self.nl else ('AL' if x in self.al else '') )
         batting_data = self.group_col_to_list(df=batting_data, key_col='Hashcode', col='Team', new_col='Teams')
         batting_data = self.group_col_to_list(df=batting_data, key_col='Hashcode', col='League', new_col='Leagues')
         batting_data = self.de_dup_df(df=batting_data, key_name='Hashcode', dup_column_names='Hashcode',
@@ -212,10 +216,9 @@ class BaseballStatsPreProcess:
         batting_data['Condition'] = 100
         batting_data['Status'] = 'Active'  # DL or active
         batting_data['Injured Days'] = 0
-        if ('League' in batting_data.columns) is False:
-            batting_data['League'] = \
-                batting_data['Team'].apply(lambda league: 'NL' if league in self.nl else 'AL')
-
+        # if ('League' in batting_data.columns) is False:  # ?? why is this here twice
+        #     batting_data['League'] = \
+        #         batting_data['Team'].apply(lambda league: 'NL' if league in self.nl else 'AL')
         return batting_data
 
     def get_seasons(self, batter_file: str, pitcher_file: str) -> None:
@@ -235,6 +238,7 @@ class BaseballStatsPreProcess:
         # replace AL and NL with random league names, set leagues column to match
         league_names = ['ACB', 'NBL']  # Armchair Baseball and Nerd Baseball, Some Other League SOL, No Name NNL
         # league_names = random.sample(league_list, 2)
+        print(self.pitching_data[['League', 'Team']].drop_duplicates())
         self.pitching_data.loc[self.pitching_data['League'] == 'AL', 'League'] = league_names[0]
         self.pitching_data.loc[self.pitching_data['League'] == 'NL', 'League'] = league_names[1]
         self.pitching_data['Leagues'] = self.pitching_data['League'].apply(lambda x: [x])

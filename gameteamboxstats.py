@@ -87,7 +87,7 @@ class TeamBoxScore:
 
     def add_pitcher_to_box(self, new_pitcher: Series) -> None:
         new_pitcher = new_pitcher if isinstance(new_pitcher, pd.DataFrame) else new_pitcher.to_frame().T
-        new_pitcher = new_pitcher.assign(G=1, GS=0, CG=0, SHO=0, IP=0, AB=0, H=0, ER=0, K=0, BB=0, HR=0,
+        new_pitcher = new_pitcher.assign(G=1, GS=0, CG=0, SHO=0, IP=0, AB=0, H=0, ER=0, SO=0, BB=0, HR=0,
                                          W=0, L=0, SV=0, BS=0, HLD=0, ERA=0,
                                          WHIP=0, OBP=0, SLG=0, OPS=0, Total_Outs=0, Condition=100.0)  # ?? ISSUE!!!
         self.box_pitching = pd.concat([self.box_pitching, new_pitcher], ignore_index=False)

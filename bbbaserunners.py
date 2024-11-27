@@ -120,7 +120,7 @@ class Bases:
     def tag_up(self, outs):
         if outs >= 3:
             return
-        self.runs_scored += 1  # give batter and RBI
+        self.runs_scored += 1  # give batter an RBI
         self.move_a_runner(3, 4)  # move runner from 3 to 4
         self.move_a_runner(2, 3)  # move runner from 2 to 3rd if there is a runner on second
         self.remove_runner(0)  # batter is out

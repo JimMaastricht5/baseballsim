@@ -243,10 +243,31 @@ class Game:
                     # print(f'\t{pitching.Player} has entered the game for {self.team_names[self.team_pitching()]}')
         return pitch_switch
 
+    def balk_wild_pitch(self) -> None:
+        """
+        if this a situation where a balk or a wild pitch matters?  did it occur? what was the result?
+        :return: None
+        """
+        # if self.bases.count_runners() > 0:
+        #     die_roll = self.rng()
+        #     balk_wild_pitch_rate = ((self.teams[self.team_pitching()].cur_pitcher_stats()['BK'] +
+        #                             self.teams[self.team_pitching()].cur_pitcher_stats()['WP']) /
+        #                             (self.teams[self.team_pitching()].cur_pitcher_stats()['AB'] +
+        #                              self.teams[self.team_pitching()].cur_pitcher_stats()['BB']))
+        #     balk_rate = (self.teams[self.team_pitching()].cur_pitcher_stats()['BK'] /
+        #                             (self.teams[self.team_pitching()].cur_pitcher_stats()['AB'] +
+        #                              self.teams[self.team_pitching()].cur_pitcher_stats()['BB']))
+        #     if die_roll <= balk_wild_pitch_rate:
+        #         if die_roll <= balk_rate:
+        #             self.game_recap += f'******* balk '
+        #         else:
+        #             self.game_recap += f'**** wild pitch'
+        return
+
     def stolen_base_sit(self) -> None:
         """
-        is this a stolen base situation?  should we steal?
-        :return: true is opp for a steal
+        is this a stolen base situation?  should we steal? what was the result?
+        :return: None
         """
         if self.bases.is_eligible_for_stolen_base():
             runner_key = self.bases.get_runner_key(1)
@@ -338,10 +359,11 @@ class Game:
             # check for pitching change due to fatigue or game sit
             pitch_switch = self.pitching_sit(self.teams[self.team_pitching()].cur_pitcher_stats(),
                                              pitch_switch=pitch_switch)
-            # check for base stealing and then resolve ab
-            self.stolen_base_sit()
+            self.stolen_base_sit()  # check for base stealing and then resolve ab
             if self.outs >= 3:
                 break  # handle caught stealing
+
+            self.balk_wild_pitch()  # handle wild pitch and balks
             __pitching, __batting = self.sim_ab()  # resolve ab
             if self.bases.runs_scored > 0:  # did a run score?
                 self.update_inning_score(number_of_runs=self.bases.runs_scored)
@@ -462,7 +484,7 @@ if __name__ == '__main__':
     #               299454: '3B', 46074: '2B', 752787: 'RF'}
     NYM_starter = 626858
     MIL_starter = 288650
-    sims = 1
+    sims = 100
     season_win_loss = [[0, 0], [0, 0]]  # away record pos 0, home pos 1
     score_total = [0, 0]
     # team0_season_df = None

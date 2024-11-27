@@ -42,9 +42,9 @@ class OutCome:
         self.score_book_cd = ''
         self.bases_to_advance = 0
         self.runs_scored = 0
-        self.bases_dict = {'BB': 1, 'HBP': 1, 'H': 1, '2B': 2, '3B': 3, 'HR': 4, 'SO': 0, 'SO': 0, 'GB': 1, 'DP': 1,
+        self.bases_dict = {'BB': 1, 'HBP': 1, 'H': 1, '2B': 2, '3B': 3, 'HR': 4, 'SO': 0, 'GB': 1, 'DP': 1,
                            'GB FC': 1, 'FO': 0, 'LD': 0, 'SF': 0}  # some outs allow runners to move such as dp or gb
-        self.on_base_dict = {'BB': True, 'HBP': True, 'H': True, '2B': True, '3B': True, 'HR': True, 'SO': False,
+        self.on_base_dict = {'BB': True, 'HBP': True, 'H': True, '2B': True, '3B': True, 'HR': True,
                              'SO': False, 'GB': False, 'DP': False, 'GB FC': False, 'FO': False, 'LD': False,
                              'SF': False}
         self.outs_dict = {'BB': 0, 'HBP': 0, 'H': 0, '2B': 0, '3B': 0, 'HR': 0, 'SO': 1, 'GB': 1, 'DP': 2,
@@ -153,7 +153,10 @@ class SimAB:
         if the batter reached base with it a hit by pitch?
         :return: true if HBP
         """
-        return self.rng() < (self.HBP_rate + self.HBP_adjustment)
+        # return self.rng() < (self.HBP_rate + self.HBP_adjustment)
+        return self.rng() < self.odds_ratio((self.batting['HBP'] / self.batting.Total_Outs),
+                                            (self.pitching['HBP'] / self.pitching.Total_Outs),
+                                            float64((self.HBP_rate + self.HBP_adjustment)), stat_type='HBP')
 
     def hr(self) -> bool:
         """
@@ -209,7 +212,8 @@ class SimAB:
         self.dice_roll = self.rng()
         if self.dice_roll <= self.league_GB:  # ground out
             score_book_cd = 'GB'
-            if runner_on_first and outs <= 1 and self.rng() <= self.dp_chance:
+            if runner_on_first and outs <= 1 and self.rng() <= (self.batting['GIDP'] / self.batting['AB']):
+            # if runner_on_first and outs <= 1 and self.rng() <= self.dp_chance:
                 score_book_cd = 'DP'
             elif runner_on_first and outs <= 1 and self.rng() <= self.league_GB_FC:
                 score_book_cd = 'GB FC'

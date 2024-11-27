@@ -45,7 +45,7 @@ class BaseballStatsPreProcess:
         self.numeric_pcols = ['G', 'GS', 'CG', 'SHO', 'IP', 'AB', 'H', '2B', '3B', 'HR', 'ER', 'SO', 'BB', 'W', 'L',
                               'SV', 'Total_Outs', 'Condition']  # cols will add to running season total
         self.nl = ['CHC', 'CIN', 'MIL', 'PIT', 'STL', 'ATL', 'MIA', 'NYM', 'PHI', 'WAS', 'WSN', 'COL', 'LAD', 'ARI',
-                   'SDP', 'SFG']  # keep old and new abrrev for WAS/WSH
+                   'SDP', 'SFG']
         self.al = ['BOS', 'TEX', 'NYY', 'KCR', 'BAL', 'CLE', 'TOR', 'LAA', 'OAK', 'CWS', 'SEA', 'MIN', 'DET', 'TBR',
                    'HOU']
         self.digit_pos_map = digit_char_map = {'1': 'P', '2': 'C', '3': '1B', '4': '2B', '5': '3B', '6': 'SS',
@@ -130,7 +130,8 @@ class BaseballStatsPreProcess:
         # caution war and salary cols will get aggregated across multiple seasons
         pitching_data = None
         p_salary = None
-        stats_pcols_sum = ['G', 'GS', 'CG', 'SHO', 'IP', 'H', 'ER', 'SO', 'BB', 'HR', 'W', 'L', 'SV']
+        stats_pcols_sum = ['G', 'GS', 'CG', 'SHO', 'IP', 'H', 'R', 'ER', 'SO', 'BB', 'HR', 'W', 'L', 'SV', 'HBP', 'BK',
+                           'WP']
         for season in load_seasons:
             df = pd.read_csv(str(season) + f" {pitcher_file}")
             pitching_data = pd.concat([pitching_data, df], axis=0)
@@ -146,7 +147,9 @@ class BaseballStatsPreProcess:
         if p_salary is not None:
             pitching_data = pd.merge(pitching_data, p_salary, on='Hashcode', how='left')  # war and salary cols
             pitching_data = salary.set_league_min_salary(pitching_data)  # set league min for players not in salary set
-        pitching_data['Team'] = pitching_data['Team'].apply(lambda x: x if x in self.nl + self.al else '' )
+        pitching_data['Team'] = pitching_data['Team'].apply(lambda x: x if x in self.nl + self.al else '')
+        # players with multiple teams have a 2TM or 3TM line that is the total of all stats.  Drop rows since we total
+        pitching_data = pitching_data[pitching_data['Team'] != '']  # drop rows without a formal team name
         pitching_data['League'] = pitching_data['Team'].apply(
                 lambda x: 'NL' if x in self.nl else ('AL' if x in self.al else '') )
         pitching_data = self.group_col_to_list(df=pitching_data, key_col='Hashcode', col='Team', new_col='Teams')
@@ -175,11 +178,13 @@ class BaseballStatsPreProcess:
         pitching_data['Injured Days'] = 0  # days to spend in IL
         pitching_data['BS'] = 0
         pitching_data['HLD'] = 0
+        pitching_data['E'] = 0
         return pitching_data
 
     def get_batting_seasons(self, batter_file: str, load_seasons: List[int]) -> DataFrame:
         batting_data = None
-        stats_bcols_sum = ['G', 'AB', 'R', 'H', '2B', '3B', 'HR', 'RBI', 'SB', 'CS', 'BB', 'SO', 'SH', 'SF', 'HBP']
+        stats_bcols_sum = ['G', 'AB', 'R', 'H', '2B', '3B', 'HR', 'RBI', 'SB', 'CS', 'BB', 'SO', 'SH', 'SF', 'HBP',
+                           'GIDP']
         for season in load_seasons:
             df = pd.read_csv(str(season) + f" {batter_file}")
             batting_data = pd.concat([batting_data, df], axis=0)
@@ -194,6 +199,8 @@ class BaseballStatsPreProcess:
         batting_data['Team'] = batting_data['Team'].apply(lambda x: x if x in self.nl + self.al else '' )
         batting_data['League'] = batting_data['Team'].apply(
                 lambda x: 'NL' if x in self.nl else ('AL' if x in self.al else '') )
+        # players with multiple teams have a 2TM or 3TM line that is the total of all stats.  Drop rows since we total
+        batting_data = batting_data[batting_data['Team'] != '']  # drop rows without a formal team name
         batting_data = self.group_col_to_list(df=batting_data, key_col='Hashcode', col='Team', new_col='Teams')
         batting_data = self.group_col_to_list(df=batting_data, key_col='Hashcode', col='League', new_col='Leagues')
         batting_data = self.de_dup_df(df=batting_data, key_name='Hashcode', dup_column_names='Hashcode',
@@ -219,6 +226,7 @@ class BaseballStatsPreProcess:
         batting_data['Total_OB'] = batting_data['H'] + batting_data['BB'] + batting_data['HBP']
         batting_data['Total_Outs'] = batting_data['AB'] - batting_data['H'] + batting_data['HBP']
         batting_data = batting_data[batting_data['AB'] >= 10]  # drop players without enough AB
+        batting_data['E'] = 0
         batting_data['Game_Fatigue_Factor'] = 0
         batting_data['Condition'] = 100
         batting_data['Status'] = 'Active'  # DL or active

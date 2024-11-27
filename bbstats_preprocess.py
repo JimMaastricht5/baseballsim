@@ -44,11 +44,12 @@ class BaseballStatsPreProcess:
                               'HBP', 'Condition']  # these cols will get added to running season total
         self.numeric_pcols = ['G', 'GS', 'CG', 'SHO', 'IP', 'AB', 'H', '2B', '3B', 'HR', 'ER', 'SO', 'BB', 'W', 'L',
                               'SV', 'Total_Outs', 'Condition']  # cols will add to running season total
-        self.nl = ['CHC', 'CIN', 'MIL', 'PIT', 'STL', 'ATL', 'MIA', 'NYM', 'PHI', 'WAS', 'WSH', 'COL', 'LAD', 'ARI',
-                   'SD', 'SF']  # keep old and new abrrev for WAS/WSH
-        self.al = ['BOS', 'TEX', 'NYY', 'KC', 'BAL', 'CLE', 'TOR', 'LAA', 'OAK', 'CWS', 'SEA', 'MIN', 'DET', 'TB',
+        self.nl = ['CHC', 'CIN', 'MIL', 'PIT', 'STL', 'ATL', 'MIA', 'NYM', 'PHI', 'WAS', 'WSN', 'COL', 'LAD', 'ARI',
+                   'SDP', 'SFG']  # keep old and new abrrev for WAS/WSH
+        self.al = ['BOS', 'TEX', 'NYY', 'KCR', 'BAL', 'CLE', 'TOR', 'LAA', 'OAK', 'CWS', 'SEA', 'MIN', 'DET', 'TBR',
                    'HOU']
-        self.name_changes = {'WAS': 'WSH'}
+        self.digit_pos_map = digit_char_map = {'1': 'P', '2': 'C', '3': '1B', '4': '2B', '5': '3B', '6': 'SS',
+                                               '7': 'LF', '8': 'CF', '9': 'RF'}
         self.load_seasons = [load_seasons] if not isinstance(load_seasons, list) else load_seasons  # convert to list
         self.new_season = new_season
         self.pitching_data = None
@@ -77,7 +78,8 @@ class BaseballStatsPreProcess:
             self.new_season_batting_data.to_csv(f'{self.new_season} New-Season-{f_bname}', index=True, header=True)
         return
 
-    def group_col_to_list(self, df: DataFrame, key_col: str, col: str, new_col: str) -> DataFrame:
+    @staticmethod
+    def group_col_to_list(df: DataFrame, key_col: str, col: str, new_col: str) -> DataFrame:
         # Groups unique values in a column by a key column
         # Args: df (pd.DataFrame): The dataframe containing the columns.
         #    key_col (str): The name of the column containing the key.
@@ -90,12 +92,14 @@ class BaseballStatsPreProcess:
             val = row[col]
             if key not in groups:
                 groups[key] = set()
-            groups[key].add(val)
+            if val and val.strip():  # if the val is non-blank
+                groups[key].add(val)
         df[new_col] = df[key_col].map(groups)  # Create a new column to store grouped unique values
         df[new_col] = df[new_col].apply(list)  # Convert sets to lists for easier handling in DataFrame
         return df
 
-    def find_duplicate_rows(self, df: DataFrame, column_names: str) -> DataFrame:
+    @staticmethod
+    def find_duplicate_rows(df: DataFrame, column_names: str) -> DataFrame:
         #  This function finds duplicate rows in a DataFrame based on a specified column.
         # Args: df (pandas.DataFrame): The DataFrame to analyze.
         #   column_names (list): The name of the column containing strings for comparison.
@@ -104,21 +108,23 @@ class BaseballStatsPreProcess:
         duplicates = filtered_df.duplicated(keep=False)  # keep both rows
         return df[duplicates]
 
+    @staticmethod
+    def remove_non_numeric(text):
+        return ''.join(char for char in text if char.isdigit())
+
+    def translate_pos(self, digit_string):
+        return ''.join(self.digit_pos_map.get(digit, digit) + ',' for digit in digit_string).rstrip(',')
+
     def de_dup_df(self, df: DataFrame, key_name: str, dup_column_names: str,
                   stats_cols_to_sum: List[str], drop_dups: bool = False) -> DataFrame:
         dup_hashcodes = self.find_duplicate_rows(df=df, column_names=dup_column_names)
         for dfrow_key in dup_hashcodes[key_name].unique():
             df_rows = df.loc[df[key_name] == dfrow_key]
-            # if dfrow_key == 810032:
-            #     print(f'bbstats preprocess de_dup_df {dfrow_key} {df_rows.to_string()}')
             for dfcol_name in stats_cols_to_sum:
                 df.loc[df[key_name] == dfrow_key, dfcol_name] = df_rows[dfcol_name].sum()
         if drop_dups:
             df = df.drop_duplicates(subset='Hashcode', keep='last')
         return df
-
-    def update_team_names(self, team: str) -> str:
-        return self.name_changes.get(team, team)
 
     def get_pitching_seasons(self, pitcher_file: str, load_seasons: List[int]) -> DataFrame:
         # caution war and salary cols will get aggregated across multiple seasons
@@ -127,17 +133,20 @@ class BaseballStatsPreProcess:
         stats_pcols_sum = ['G', 'GS', 'CG', 'SHO', 'IP', 'H', 'ER', 'SO', 'BB', 'HR', 'W', 'L', 'SV']
         for season in load_seasons:
             df = pd.read_csv(str(season) + f" {pitcher_file}")
-            df['Team'] = df['Team'].apply(self.update_team_names)
             pitching_data = pd.concat([pitching_data, df], axis=0)
             p_salary_season = salary.build_war_salary(season, pitcher_file, self.create_hash)
             if p_salary_season is not None:
                 p_salary = pd.concat([p_salary, p_salary_season], axis=0)
 
+        # drop unwanted cols
+        pitching_data.drop(['Rk', 'Lg', 'W-L%', 'GF', 'IBB', 'ERA+', 'FIP', 'H9', 'BB9', 'SO9', 'SO/BB',
+                            'HR9', 'Awards', 'Player-additional', 'BF'],inplace=True, axis=1)
+        pitching_data['Player'] = pitching_data['Player'].str.rstrip('*')
         pitching_data['Hashcode'] = pitching_data['Player'].apply(self.create_hash)
         if p_salary is not None:
             pitching_data = pd.merge(pitching_data, p_salary, on='Hashcode', how='left')  # war and salary cols
             pitching_data = salary.set_league_min_salary(pitching_data)  # set league min for players not in salary set
-
+        pitching_data['Team'] = pitching_data['Team'].apply(lambda x: x if x in self.nl + self.al else '' )
         pitching_data['League'] = pitching_data['Team'].apply(
                 lambda x: 'NL' if x in self.nl else ('AL' if x in self.al else '') )
         pitching_data = self.group_col_to_list(df=pitching_data, key_col='Hashcode', col='Team', new_col='Teams')
@@ -170,22 +179,19 @@ class BaseballStatsPreProcess:
 
     def get_batting_seasons(self, batter_file: str, load_seasons: List[int]) -> DataFrame:
         batting_data = None
-        b_salary = None
         stats_bcols_sum = ['G', 'AB', 'R', 'H', '2B', '3B', 'HR', 'RBI', 'SB', 'CS', 'BB', 'SO', 'SH', 'SF', 'HBP']
         for season in load_seasons:
             df = pd.read_csv(str(season) + f" {batter_file}")
-            df['Team'] = df['Team'].apply(self.update_team_names)
             batting_data = pd.concat([batting_data, df], axis=0)
-            b_salary_season = salary.build_war_salary(season, batter_file, self.create_hash)
-            if b_salary_season is not None:
-                b_salary = pd.concat([b_salary, b_salary_season], axis=0)
-        # print(batting_data.head(10).to_string())
-        batting_data['Hashcode'] = batting_data['Player'].apply(self.create_hash)
-        if b_salary is not None:
-            batting_data = pd.merge(batting_data, b_salary, on='Hashcode', how='left')  # war and salary cols
-            batting_data = salary.set_league_min_salary(batting_data)  # set league min for players not in salary set
 
-        # if ('League' in batting_data.columns) is False:  # if no league set one up
+        # drop unwanted cols
+        batting_data.drop(['Rk', 'PA', 'Lg', 'OPS+', 'rOBA', 'Rbat+', 'TB', 'IBB', 'Awards',
+                           'Player-additional'],inplace=True, axis=1)
+        batting_data['Player'] = batting_data['Player'].str.rstrip('*')
+        batting_data['Hashcode'] = batting_data['Player'].apply(self.create_hash)
+        batting_data['Pos1'] = batting_data['Pos'].apply(self.remove_non_numeric).apply(self.translate_pos)
+        batting_data = self.group_col_to_list(df=batting_data, key_col='Hashcode', col='Pos1', new_col='Pos2')
+        batting_data['Team'] = batting_data['Team'].apply(lambda x: x if x in self.nl + self.al else '' )
         batting_data['League'] = batting_data['Team'].apply(
                 lambda x: 'NL' if x in self.nl else ('AL' if x in self.al else '') )
         batting_data = self.group_col_to_list(df=batting_data, key_col='Hashcode', col='Team', new_col='Teams')
@@ -272,7 +278,8 @@ class BaseballStatsPreProcess:
             self.batting_data.loc[self.batting_data['Team'] == new_team, 'Mascot'] = mascot
         return
 
-    def randomize_mascots(self, length):
+    @staticmethod
+    def randomize_mascots(length):
         with open('animals.txt', 'r') as f:
             animals = f.readlines()
         animals = [animal.strip() for animal in animals]
@@ -335,7 +342,8 @@ class BaseballStatsPreProcess:
             self.new_season_batting_data = self.new_season_batting_data.fillna(0)
         return
 
-    def trunc_col(self, df_n: ndarray, d: int = 3) -> ndarray:
+    @staticmethod
+    def trunc_col(df_n: ndarray, d: int = 3) -> ndarray:
         return (df_n * 10 ** d).astype(int) / 10 ** d
 
 
@@ -347,8 +355,8 @@ if __name__ == '__main__':
     print(*baseball_data.pitching_data.columns)
     print(*baseball_data.batting_data.columns)
     print(baseball_data.batting_data.Team.unique())
-    # print(baseball_data.batting_data[baseball_data.batting_data['Team'] == 'MIL'].to_string())
-    print(baseball_data.pitching_data[baseball_data.pitching_data['Team'] == 'MIL'].to_string())
+    print(baseball_data.batting_data[baseball_data.batting_data['Team'] == 'MIL'].to_string())
+    # print(baseball_data.pitching_data[baseball_data.pitching_data['Team'] == 'MIL'].to_string())
     # print(baseball_data.batting_data.Mascot.unique())
     # print(baseball_data.pitching_data.sort_values('Hashcode').to_string())
     # print(baseball_data.batting_data.sort_values('Hashcode').to_string())

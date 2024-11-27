@@ -57,7 +57,7 @@ def impute_war_salary(df, debug=False):
     if df is None:
         return None
 
-    df_fit = df[df['salary'] > 0]  # drop rows that are missing salary data
+    df_fit = df[df['salary'] > 0]  # drop rows that are not missing salary data
     x = df_fit['WAR'].to_numpy().reshape(-1, 1)  # create X for model, using only WAR
     y = df_fit['salary'].to_numpy().reshape(-1, 1)
     x_train, x_test, y_train, y_test = train_test_split(x, y, test_size=0.2, random_state=42)  # Split 20% for testing
@@ -81,9 +81,9 @@ def build_war_salary(season, war_file, hash_func, debug=False):
 
 
 if __name__ == '__main__':
-    season = 2023
-    war_pitcher_file = 'player-stats-Pitching.csv'
-    war_batting_file = 'Player-stats-Batters.csv'
+    season = 2024
+    war_pitcher_file = 'player-stats-Pitching-v2.csv'
+    war_batting_file = 'Player-stats-Batters-v2.csv'
     war_files = [war_pitcher_file, war_batting_file]
     for wf in war_files:
         # df_war = retrieve_war(season, wf, lambda text: int(hashlib.sha256(text.encode('utf-8')).hexdigest()[:5], 16))

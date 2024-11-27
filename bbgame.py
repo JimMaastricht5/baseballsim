@@ -261,14 +261,12 @@ class Game:
                     if self.chatty:
                         self.game_recap += f'\t{runner_stats.Player} stole 2nd base!\n'
                         self.game_recap += f'\t{self.bases.describe_runners()}\n'
-                        # print(f'\t{runner_stats.Player} stole 2nd base!')
-                        # print(f'\t{self.bases.describe_runners()}')
                 else:
                     self.teams[self.team_hitting()].box_score.steal_result(runner_key, False)  # caught stealing
+                    self.bases.remove_runner(1)  # runner was on first and never made it to second on the out
                     if self.chatty:
                         self.outs += 1  # this could result in the third out
                         self.game_recap += f'\t{runner_stats.Player} was caught stealing for out number {self.outs}\n'
-                        # print(f'\t{runner_stats.Player} was caught stealing for out number {self.outs}')
         return
 
     def is_extra_innings(self) -> bool:
@@ -287,8 +285,8 @@ class Game:
             self.bases.add_runner_to_base(base_num=2, batter_num=self.prior_batter_out_num[self.team_hitting()],
                                           player_name=self.prior_batter_out_name[self.team_hitting()])
             if self.chatty:
-                self.game_recap += f'Extra innings: {self.prior_batter_out_name[self.team_hitting()]} will start at 2nd base.\n'
-                # print(f'Extra innings: {self.prior_batter_out_name[self.team_hitting()]} will start at 2nd base.')
+                self.game_recap += (f'Extra innings: {self.prior_batter_out_name[self.team_hitting()]} '
+                                    f'will start at 2nd base.\n')
         return
 
     def sim_ab(self) -> Tuple[Series, Series]:
@@ -321,10 +319,6 @@ class Game:
                   f'{self.team_names[self.team_hitting()]} batter #' 
                   f'{self.batting_num[self.team_hitting()]}. {batting.Player} \n' 
                   f'\t {self.outcomes.score_book_cd}, {self.outs} {out_text}\n')
-            # print(f'Pitcher: {pitching.Player} against '
-            #       f'{self.team_names[self.team_hitting()]} batter #'
-            #       f'{self.batting_num[self.team_hitting()]}. {batting.Player} \n'
-            #       f'\t {self.outcomes.score_book_cd}, {self.outs} {out_text}')
 
         self.prior_batter_out_name[self.team_hitting()] = batting.Player
         self.prior_batter_out_num[self.team_hitting()] = cur_batter_index
@@ -339,7 +333,6 @@ class Game:
         top_or_bottom = 'top' if self.top_bottom == 0 else 'bottom'
         if self.chatty:
             self.game_recap += f'\nStarting the {top_or_bottom} of inning {self.inning[self.team_hitting()]}.\n'
-            # print(f'\nStarting the {top_or_bottom} of inning {self.inning[self.team_hitting()]}.')
         self.extra_innings()  # set runner on second if it is extra innings
         while self.outs < 3:
             # check for pitching change due to fatigue or game sit
@@ -360,12 +353,8 @@ class Game:
                 self.game_recap += (f'\tScored {self.bases.runs_scored} run(s)!  ({players})\n'
                       f'\tThe score is {self.team_names[0]} {self.total_score[0]} to'
                       f' {self.team_names[1]} {self.total_score[1]}\n')
-                # print(f'\tScored {self.bases.runs_scored} run(s)!  ({players})\n'
-                #       f'\tThe score is {self.team_names[0]} {self.total_score[0]} to'
-                #       f' {self.team_names[1]} {self.total_score[1]}')
             if self.bases.count_runners() >= 1 and self.outs < 3 and self.chatty:  # leave out batter check for runner
                 self.game_recap += f'\t{self.bases.describe_runners()}\n'
-                # print(f'\t{self.bases.describe_runners()}')
             self.batting_num[self.team_hitting()] = self.batting_num[self.team_hitting()] + 1 \
                 if (self.batting_num[self.team_hitting()] + 1) <= 9 else 1  # wrap around lineup
             # check for walk off
@@ -379,10 +368,6 @@ class Game:
             self.game_recap += (f'\nCompleted {top_or_bottom} half of inning {self.inning[self.team_hitting()]}\n'
                   f'The score is {self.team_names[0]} {self.total_score[0]} to {self.team_names[1]} '
                   f'{self.total_score[1]}\n')
-            # print('')  # add a blank line for verbose output
-            # print(f'Completed {top_or_bottom} half of inning {self.inning[self.team_hitting()]}. '
-            #       f'The score is {self.team_names[0]} {self.total_score[0]} to {self.team_names[1]} '
-            #       f'{self.total_score[1]}')
             self.print_inning_score()
         self.inning[self.team_hitting()] += 1
         self.top_bottom = 0 if self.top_bottom == 1 else 1  # switch teams hitting and pitching
@@ -433,7 +418,6 @@ class Game:
             self.game_recap += self.teams[AWAY].box_score.print_boxes()
             self.game_recap += self.teams[HOME].box_score.print_boxes()
         self.game_recap += 'Final:\n'
-        # print('Final:')
         self.print_inning_score()
         return
 
@@ -445,10 +429,8 @@ class Game:
             and the output string
         """
         self.game_recap += f'{self.team_names[0]} vs. {self.team_names[1]}\n'
-        # print(f'{self.team_names[0]} vs. {self.team_names[1]}')
         if team_to_follow in self.team_names:
             self.game_recap += f'Following team: {team_to_follow}\n'
-            # print(f'Following team: {team_to_follow}')
             self.chatty = True
             self.print_box_score_b = True
             # if self.interactive:

@@ -191,8 +191,8 @@ class Team:
         # loop over lineup from lead off to last, build lineup list and set player fielding pos in lineup df
         # note cur_lineup_index should be the same as lineup_index_list, but just to be certain we rebuild it.
         for row_num in range(0, len(self.prior_season_lineup_df)):
-            player_index = self.prior_season_lineup_df.index[row_num]  # grab the index of the player
-            self.prior_season_lineup_df[player_index, 'Pos'] = pos_index_dict[player_index]  # fielding pos in lineup
+            player_index = int64(self.prior_season_lineup_df.index[row_num])  # grab the index of the player
+            self.prior_season_lineup_df.loc[player_index, 'Pos'] = pos_index_dict[player_index]  # fielding pos in lineup
         return
 
     def dynamic_lineup(self) -> Dict[int64, str]:
@@ -200,7 +200,7 @@ class Team:
         if no batting order is provided create one
         :return: dictionary containing lineup with pos and hashcode for player
         """
-        position_list = ['C', '2B', '3B', 'SS', 'OF', 'OF', 'OF', '1B', 'DH']
+        position_list = ['C', '2B', '3B', 'SS', 'LF', 'CF', 'RF', '1B', 'DH']
         pos_index_list = []
         pos_index_dict = {}
         for position in position_list:  # search for best player at each position, returns a df series and appends list
@@ -462,7 +462,8 @@ class Team:
             not_exhausted = ~(self.prior_season_pos_players_df['Condition'] <= self.fatigue_unavailable)
             not_injured = (self.prior_season_pos_players_df['Injured Days'] == 0)
             df_criteria_pos = (~self.prior_season_pos_players_df.index.isin(lineup_index_list) &
-                               (self.prior_season_pos_players_df['Pos'] == position)) if (
+                               # (self.prior_season_pos_players_df['Pos'] == position)) if (
+                               (self.prior_season_pos_players_df['Pos'].apply(lambda df_positions: position in df_positions))) if (
                                position != 'DH' and position != '1B') else \
                 ~self.prior_season_pos_players_df.index.isin(lineup_index_list)
             df_criteria = df_criteria_pos & not_exhausted & not_injured

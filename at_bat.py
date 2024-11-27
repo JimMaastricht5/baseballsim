@@ -83,15 +83,6 @@ class OutCome:
         self.runs_scored = runs_scored
         return
 
-    # def convert_k(self) -> None:
-    #     """
-    #     converts SO to K for scorebook
-    #     :return: None
-    #     """
-    #     if self.score_book_cd == 'SO':
-    #         self.score_book_cd = 'SO'
-    #     return
-
 
 class SimAB:
     def __init__(self, baseball_data: bbstats.BaseballStats, debug: bool = False) -> None:

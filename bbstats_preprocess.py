@@ -141,7 +141,7 @@ class BaseballStatsPreProcess:
         # drop unwanted cols
         pitching_data.drop(['Rk', 'Lg', 'W-L%', 'GF', 'IBB', 'ERA+', 'FIP', 'H9', 'BB9', 'SO9', 'SO/BB',
                             'HR9', 'Awards', 'Player-additional', 'BF'],inplace=True, axis=1)
-        pitching_data['Player'] = pitching_data['Player'].str.rstrip('*')
+        pitching_data['Player'] = pitching_data['Player'].str.replace('*', '').str.replace('#', '')
         pitching_data['Hashcode'] = pitching_data['Player'].apply(self.create_hash)
         if p_salary is not None:
             pitching_data = pd.merge(pitching_data, p_salary, on='Hashcode', how='left')  # war and salary cols
@@ -153,7 +153,7 @@ class BaseballStatsPreProcess:
         pitching_data = self.group_col_to_list(df=pitching_data, key_col='Hashcode', col='League', new_col='Leagues')
         pitching_data = self.de_dup_df(df=pitching_data, key_name='Hashcode', dup_column_names='Hashcode',
                                        stats_cols_to_sum=stats_pcols_sum, drop_dups=True)
-        pitching_data.set_index(keys=['Hashcode'], drop=True, append=False, inplace=True)
+        pitching_data = pitching_data.set_index('Hashcode')
         # set up additional stats
         if self.generate_random_data:
             for stats_col in stats_pcols_sum:
@@ -187,10 +187,10 @@ class BaseballStatsPreProcess:
         # drop unwanted cols
         batting_data.drop(['Rk', 'PA', 'Lg', 'OPS+', 'rOBA', 'Rbat+', 'TB', 'IBB', 'Awards',
                            'Player-additional'],inplace=True, axis=1)
-        batting_data['Player'] = batting_data['Player'].str.rstrip('*')
+        batting_data['Player'] = batting_data['Player'].str.replace('#', '').str.replace('*', '')
         batting_data['Hashcode'] = batting_data['Player'].apply(self.create_hash)
-        batting_data['Pos1'] = batting_data['Pos'].apply(self.remove_non_numeric).apply(self.translate_pos)
-        batting_data = self.group_col_to_list(df=batting_data, key_col='Hashcode', col='Pos1', new_col='Pos2')
+        batting_data['Pos'] = batting_data['Pos'].apply(self.remove_non_numeric).apply(self.translate_pos)
+        batting_data = self.group_col_to_list(df=batting_data, key_col='Hashcode', col='Pos', new_col='Pos')
         batting_data['Team'] = batting_data['Team'].apply(lambda x: x if x in self.nl + self.al else '' )
         batting_data['League'] = batting_data['Team'].apply(
                 lambda x: 'NL' if x in self.nl else ('AL' if x in self.al else '') )
@@ -198,7 +198,7 @@ class BaseballStatsPreProcess:
         batting_data = self.group_col_to_list(df=batting_data, key_col='Hashcode', col='League', new_col='Leagues')
         batting_data = self.de_dup_df(df=batting_data, key_name='Hashcode', dup_column_names='Hashcode',
                                       stats_cols_to_sum=stats_bcols_sum, drop_dups=True)
-        batting_data.set_index(keys=['Hashcode'], drop=True, append=False, inplace=True)
+        batting_data = batting_data.set_index('Hashcode')
         # set up additional stats
         if self.generate_random_data:
             for stats_col in stats_bcols_sum:

@@ -168,15 +168,15 @@ class BaseballStats:
         try:
             if self.pitching_data is None or self.batting_data is None:  # need to read data... else skip as cached
                 self.pitching_data = self.add_missing_cols(
-                    pd.read_csv(f'{seasons_str} {pitcher_file}', index_col=0))
+                    pd.read_csv(f'{seasons_str} {pitcher_file}', index_col='Hashcode'))
                 self.batting_data = self.add_missing_cols(
-                    pd.read_csv(f'{seasons_str} {batter_file}', index_col=0))
+                    pd.read_csv(f'{seasons_str} {batter_file}', index_col='Hashcode'))
 
             if self.new_season_pitching_data is None or self.new_season_batting_data is None:
                 self.new_season_pitching_data = self.add_missing_cols(pd.read_csv(str(self.new_season) +
-                                                                                  f" {new_pitcher_file}", index_col=0))
+                                                                                  f" {new_pitcher_file}", index_col='Hashcode'))
                 self.new_season_batting_data = self.add_missing_cols(pd.read_csv(str(self.new_season) +
-                                                                                 f" {new_batter_file}", index_col=0))
+                                                                                 f" {new_batter_file}", index_col='Hashcode'))
         except FileNotFoundError as e:
             print(e)
             print(f'file was not found, correct spelling or try running bbstats_preprocess.py to setup the data')
@@ -501,8 +501,8 @@ def update_column_with_other_df(df1, col1, df2, col2):
 if __name__ == '__main__':
     my_teams = []
     baseball_data = BaseballStats(load_seasons=[2024], new_season=2025,  include_leagues=['ACB', 'NBL'],
-                                  load_batter_file='random-stats-pp-Batting.csv',
-                                  load_pitcher_file='random-stats-pp-Pitching.csv',
+                                  load_batter_file='stats-pp-Batting.csv',
+                                  load_pitcher_file='stats-pp-Pitching.csv',
                                   debug=True)
     # print(*baseball_data.pitching_data.columns)
     # print(*baseball_data.batting_data.columns)

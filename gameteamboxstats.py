@@ -150,8 +150,8 @@ class TeamBoxScore:
     def totals(self) -> None:
         self.game_batting_stats = self.box_batting.copy()  # make a copy w/o totals for season accumulations
         self.game_pitching_stats = self.box_pitching.copy()  # make a copy w/o totals for season accumulations
-        self.box_batting_totals = bbstats.team_batting_totals(self.box_batting, team_name=self.team_name)
-        self.box_pitching_totals = bbstats.team_pitching_totals(self.box_pitching, team_name=self.team_name)
+        self.box_batting_totals = bbstats.team_batting_totals(self.box_batting)
+        self.box_pitching_totals = bbstats.team_pitching_totals(self.box_pitching)
         return
 
     def print_boxes(self) -> str:

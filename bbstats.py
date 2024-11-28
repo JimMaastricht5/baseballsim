@@ -135,8 +135,17 @@ class BaseballStats:
             df_new = self.new_season_batting_data[self.new_season_batting_data['Team'] == team_name]
             df_cur = self.batting_data[self.batting_data.index.isin(df_new.index)]
             df = df_cur if prior_season else df_new
-        df = team_batting_stats(df)
+        if self.debug:
+            print('bbstats.py get batting data')
+            print(team_name)
+            print(self.new_season_batting_data.head(5).to_string())
+            print(self.new_season_batting_data['Team'].unique())
+            print(df.head(5).to_string())
+            print('bbstats.py done getting batting data')
+
+        df = team_batting_stats(df, filter_stats=False)
         df = self.add_missing_cols(df)
+
         return df
 
     def get_pitching_data(self, team_name: Optional[str] = None, prior_season: bool = True) -> DataFrame:
@@ -400,12 +409,14 @@ def condition_txt_f(condition: int) -> str:
         'Exhausted'
 
 
-def remove_non_print_cols(df: DataFrame) -> DataFrame:
+def remove_non_print_cols(df: DataFrame, debug: bool=False) -> DataFrame:
     """
     Remove df columns that are for internal use only
     :param df: df to clean
     :return: df cleaned up
     """
+    if debug:
+        print(df.head(5).to_string())
     non_print_cols = {'Season', 'Total_OB', 'AVG_faced', 'Game_Fatigue_Factor', 'Total_Outs', 'Condition'}  # Total_Outs
     cols_to_drop = list(non_print_cols.intersection(df.columns))
     if cols_to_drop:

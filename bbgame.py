@@ -71,7 +71,8 @@ class Game:
         if baseball_data is None:
             self.baseball_data = bbstats.BaseballStats(load_seasons=load_seasons, new_season=new_season,
                                                        load_batter_file=load_batter_file,
-                                                       load_pitcher_file=load_pitcher_file)
+                                                       load_pitcher_file=load_pitcher_file,
+                                                       debug=debug)
         else:
             self.baseball_data = baseball_data
         if away_team_name != '' and home_team_name != '':
@@ -482,16 +483,16 @@ if __name__ == '__main__':
 
     # MIL_lineup = {647549: 'LF', 239398: 'C', 224423: '1B', 138309: 'DH', 868055: 'CF', 520723: 'SS',
     #               299454: '3B', 46074: '2B', 752787: 'RF'}
-    NYM_starter = 626858
-    MIL_starter = 288650
-    sims = 100
+    # NYM_starter = 626858
+    # MIL_starter = 288650
+    sims = 1
     season_win_loss = [[0, 0], [0, 0]]  # away record pos 0, home pos 1
     score_total = [0, 0]
     # team0_season_df = None
     for sim_game_num in range(1, sims + 1):
         print(f'Game number {sim_game_num}: from bbgame.py sims {sims}')
         game = Game(home_team_name=home_team, away_team_name=away_team,
-                    chatty=False, print_lineup=False,
+                    chatty=False, print_lineup=True,
                     print_box_score_b=False,
                     load_seasons=[2024], new_season=2025,
                     # load_batter_file='random-stats-pp-Batting.csv',

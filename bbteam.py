@@ -31,7 +31,7 @@ from typing import Any, Dict, List, Optional, Tuple, Union
 
 class Team:
     def __init__(self, team_name: str, baseball_data: bbstats.BaseballStats, game_num: int = 1,
-                 rotation_len: int = 5, debug: bool = False) -> None:
+                 rotation_len: int = 5, interactive: bool=False, debug: bool = False) -> None:
         """
         class handles a single team within a game including all prev year and current year stats, rosters,
         available players, in game fatigue for pitchers, provides stats to in game requests.  sets, maintains, and
@@ -40,11 +40,13 @@ class Team:
         :param baseball_data: baseball data class
         :param game_num: number of game in season
         :param rotation_len: length of stating rotations, typically 5
+        :param interactive: should the program print to screen for interaction with GM and keyboard?
         :param debug: are we debugging?
         :return: None
         """
         pd.options.mode.chained_assignment = None  # suppresses chained assignment warning for lineup pos setting
         self.debug = debug
+        self.interactive = interactive
         self.team_name = team_name
         self.baseball_data = baseball_data
         self.prior_season_pitchers_df = baseball_data.get_pitching_data(team_name=team_name, prior_season=True)
@@ -52,11 +54,8 @@ class Team:
         self.new_season_pos_players_df = baseball_data.get_batting_data(team_name=team_name, prior_season=False)
         if self.debug:
             print(f'bbteam.py init prior season data')
-            # print(self.prior_season_pos_players_df.to_string())
-            print(self.prior_season_pitchers_df.to_string())
-            print(f'bbteam.py init baseball data df')
-            # print(self.baseball_data.batting_data.to_string())
-            print(self.baseball_data.pitching_data.to_string())
+            print(self.prior_season_pos_players_df.to_string())
+            print(self.new_season_pos_players_df.to_string())
         if self.prior_season_pitchers_df.shape[0] == 0:
             print(f'bbteam.py init: team {team_name} does not exist.')
             print(f'Try one of these teams {self.baseball_data.get_all_team_names()}')
@@ -75,7 +74,7 @@ class Team:
                              f' {len(self.prior_season_pitchers_df)}')
 
         self.p_lineup_cols_to_print = ['Player', 'League', 'Team', 'Age', 'G', 'GS', 'CG', 'SHO', 'IP', 'H', '2B', '3B',
-                                       'ER', 'K', 'BB', 'HR', 'W', 'L', 'SV', 'BS', 'HLD', 'ERA', 'WHIP']
+                                       'ER', 'SO', 'BB', 'HR', 'W', 'L', 'SV', 'BS', 'HLD', 'ERA', 'WHIP']
         self.b_lineup_cols_to_print = ['Player', 'League', 'Team', 'Pos', 'Age', 'G', 'AB', 'R', 'H', '2B', '3B', 'HR',
                                        'RBI', 'SB', 'CS', 'BB', 'SO', 'SH', 'SF', 'HBP', 'AVG', 'OBP', 'SLG', 'OPS']
         if ('Mascot' in self.prior_season_pos_players_df.columns) is True:
@@ -162,6 +161,8 @@ class Team:
         """
         if self.debug:
             print(f'bbteam.py set_prior_and_new....  {self.cur_lineup_index_list}')
+            print(self.prior_season_pos_players_df.head(5).to_string())
+            print(self.new_season_pos_players_df.head(5).to_string())
         self.prior_season_lineup_df = self.prior_season_pos_players_df.loc[self.cur_lineup_index_list]  # subset team df
         self.new_season_lineup_df = self.new_season_pos_players_df.loc[self.cur_lineup_index_list]
 
@@ -293,17 +294,19 @@ class Team:
         """
         if include_starters:
             self.lineup_card += f'Starting Rotation:\n {self.starting_pitchers_df.to_string(justify="right")} \n'
-            # print('Starting Rotation:')
-            # print(self.starting_pitchers_df.to_string(justify='right'))
-            # print('')
         self.lineup_card += f'Middle Relievers:\n {self.middle_relievers_df.to_string(justify="right")} \n'
-        # print('Middle Relievers:')
-        # print(self.middle_relievers_df.to_string(justify='right'))
-        # print('')
         self.lineup_card += f'Closers:\n{self.relievers_df.to_string(justify="right")} \n'
-        # print('Closers:')
-        # print(self.relievers_df.to_string(justify='right'))
-        # print('')
+        if self.interactive:
+            if include_starters:
+                print('Starting Rotation:')
+                print(self.starting_pitchers_df.to_string(justify='right'))
+                print('')
+            print('Middle Relievers:')
+            print(self.middle_relievers_df.to_string(justify='right'))
+            print('')
+            print('Closers:')
+            print(self.relievers_df.to_string(justify='right'))
+            print('')
         return
 
     def cur_pitcher_stats(self) -> Series:
@@ -508,8 +511,10 @@ class Team:
         :param show_pitching_starter: true prints the starting pitcher
         :return: None
         """
+        if self.debug:
+            print(self.prior_season_lineup_df.head(5).to_string())
+            print(self.new_season_lineup_df.head(5).to_string())
         self.lineup_card += f'Starting lineup for the {self.city_name} ({self.team_name}) {self.mascot}:\n'
-        # print(f'Starting lineup for the {self.city_name} ({self.team_name}) {self.mascot}:')
         if current_season_stats:
             dfb = bbstats.remove_non_print_cols(self.new_season_lineup_df)
             dfp = bbstats.remove_non_print_cols(self.new_season_pitching_df)
@@ -519,15 +524,20 @@ class Team:
 
         dfb = dfb[self.b_lineup_cols_to_print]
         self.lineup_card += dfb.to_string(index=True, justify='right') + '\n'
-        # print(dfb.to_string(index=True, justify='right'))
-        # print('')
+
         if show_pitching_starter:
             dfp = dfp[self.p_lineup_cols_to_print]
             self.lineup_card += f'Pitching for {self.team_name}:\n'
             self.lineup_card += (dfp.to_string(index=True, justify='right')) + '\n'
-            # print(f'Pitching for {self.team_name}:')
-            # print(dfp.to_string(index=True, justify='right'))
-            # print('')
+
+        if self.interactive:
+            print(f'Starting lineup for the {self.city_name} ({self.team_name}) {self.mascot}:')
+            print(dfb.to_string(index=True, justify='right'))
+            print('')
+            if show_pitching_starter:
+                print(f'Pitching for {self.team_name}:')
+                print(dfp.to_string(index=True, justify='right'))
+                print('')
         return
 
     def print_pos_not_in_lineup(self, current_season_stats: bool = True) -> None:

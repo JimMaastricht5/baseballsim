@@ -24,79 +24,53 @@
 import pandas as pd
 import hashlib
 import numpy as np
-from sklearn.linear_model import LinearRegression
-from sklearn.model_selection import train_test_split
+import re
+
+def compare_strings(str1, str2):
+  """Compares two strings and prints differences. useful for hashcode issues
+  Args:
+    str1: The first string.
+    str2: The second string.
+  """
+  for i in range(min(len(str1), len(str2))):
+    if str1[i] != str2[i]:
+      print(f"Difference at index {i}: {str1[i]} vs. {str2[i]}")
+  if len(str1) != len(str2):
+    print(f"Length mismatch: {len(str1)} vs. {len(str2)}")
+  return
 
 
-def retrieve_war(war_season, war_file_name, hashfunc, debug=False):
+def retrieve_salary(war_file_name, hashfunc, debug=False):
     # war files include full seasons up to and including 2023
     try:
-        df = pd.read_csv(f'{str(war_season)} war-{war_file_name}')
+        df = pd.read_csv(war_file_name)
     except FileNotFoundError:
         return None
-    df = df[df['year_ID'] == war_season]
-    df['Hashcode'] = df['name_common'].apply(hashfunc)
-    df.set_index(keys=['Hashcode'], drop=True, append=False, inplace=True)
-    df = df[['WAR', 'salary']]  # keep salary and rebuild using WAR
-    df = df.fillna(0)
+
+    df = df.drop(["Pos'n", 'Unnamed: 4', 'Unnamed: 5', 'Unnamed: 6'], axis=1)
+    df['Player'] = df['Player'].apply(lambda x: x.split(',')[1].lstrip().rstrip() + ' '
+                                                + x.split(',')[0].lstrip().rstrip())
+    df = df.rename(columns={'Player': 'Player_S', df.columns[2]: 'Salary'})  # col 2 is 2024 -> salary
+    df['Salary'] = df['Salary'].astype(str)
+    df['Salary'] = df['Salary'].apply(lambda x: x.replace('$', '').replace(',', '').replace('nan', '0'))
+    df['Salary'] = df['Salary'].astype(int)
+    df = df.dropna(axis=1)
+
+    df['Hashcode'] = df['Player_S'].apply(hashfunc)
+    df.drop(['Player_S'], axis=1, inplace=True)
+    df = df.set_index('Hashcode')
     return df
 
-
-def set_league_min_salary(df):
-    if df is not None:
-        league_min_salary_2013 = 720000
-        league_min_salary = np.min(df['salary'].where(df['salary'] > 0))
-        league_min_salary = league_min_salary if league_min_salary >= league_min_salary_2013 else league_min_salary_2013
-        df = df.fillna(0)
-        df['salary'] = df['salary'].apply(lambda x: league_min_salary if x < league_min_salary else x)
+def fill_nan_salary(df, column_name, value=740000):
+    # replace with 2024 league min
+    df[column_name] = np.where((df[column_name] == 0) | df[column_name].isnull(), value, df[column_name])
     return df
-
-
-def impute_war_salary(df, debug=False):
-    # na must be replaced with zero before this call
-    if df is None:
-        return None
-
-    df_fit = df[df['salary'] > 0]  # drop rows that are not missing salary data
-    x = df_fit['WAR'].to_numpy().reshape(-1, 1)  # create X for model, using only WAR
-    y = df_fit['salary'].to_numpy().reshape(-1, 1)
-    x_train, x_test, y_train, y_test = train_test_split(x, y, test_size=0.2, random_state=42)  # Split 20% for testing
-    model = LinearRegression()  # Create and fit the linear regression model
-
-    model.fit(x_train, y_train)  # simple fit
-    training_score = model.score(x_test, y_test)
-    if debug:
-        print(f'training score is {training_score}')
-
-    # impute missing salary values
-    predict_salary = lambda x, y: int(model.predict(np.array(x).reshape(1, -1)) if y <= 0 else y)
-    df['salary'] = df.apply(lambda row: predict_salary(row['WAR'], row['salary']), axis=1)
-    df = set_league_min_salary(df)
-    # print(df)
-    return df
-
-
-def build_war_salary(season, war_file, hash_func, debug=False):
-    return impute_war_salary(retrieve_war(season, war_file, hash_func, debug), debug)
 
 
 if __name__ == '__main__':
-    season = 2024
-    war_pitcher_file = 'player-stats-Pitching-v2.csv'
-    war_batting_file = 'Player-stats-Batters-v2.csv'
-    war_files = [war_pitcher_file, war_batting_file]
+    war_files = ['mlb-salaries-2000-24.csv']
     for wf in war_files:
-        # df_war = retrieve_war(season, wf, lambda text: int(hashlib.sha256(text.encode('utf-8')).hexdigest()[:5], 16))
-        # # print(df_war.head(5).to_string())
-        # # print(df_war.shape)
-        # # print(np.min(df_war['WAR']))
-        # # print(np.max(df_war['WAR']))
-        # df_salary = impute_war_salary(df_war)
-        df_salary = \
-            build_war_salary(season, wf, lambda text: int(hashlib.sha256(text.encode('utf-8')).hexdigest()[:5], 16),
-                             debug=True)
-        print(df_salary.head(5).to_string())
-        print(df_salary.shape)
-        print(np.min(df_salary['salary']))
-        print(np.max(df_salary['salary']))
-        print(df_salary[df_salary['salary'] < 720000])
+        df_sal = retrieve_salary(wf, lambda text: int(hashlib.sha256(text.encode('utf-8')).hexdigest()[:5], 16))
+        print(df_sal.to_string())
+        print(df_sal.shape)
+

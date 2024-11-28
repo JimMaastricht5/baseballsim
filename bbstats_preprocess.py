@@ -48,7 +48,7 @@ class BaseballStatsPreProcess:
                    'SDP', 'SFG']
         self.al = ['BOS', 'TEX', 'NYY', 'KCR', 'BAL', 'CLE', 'TOR', 'LAA', 'OAK', 'CWS', 'SEA', 'MIN', 'DET', 'TBR',
                    'HOU']
-        self.digit_pos_map = digit_char_map = {'1': 'P', '2': 'C', '3': '1B', '4': '2B', '5': '3B', '6': 'SS',
+        self.digit_pos_map = {'1': 'P', '2': 'C', '3': '1B', '4': '2B', '5': '3B', '6': 'SS',
                                                '7': 'LF', '8': 'CF', '9': 'RF'}
         self.load_seasons = [load_seasons] if not isinstance(load_seasons, list) else load_seasons  # convert to list
         self.new_season = new_season
@@ -58,6 +58,7 @@ class BaseballStatsPreProcess:
         self.new_season_batting_data = None
         self.generate_random_data = generate_random_data
 
+        self.df_salary = salary.retrieve_salary('mlb-salaries-2000-24.csv', self.create_hash)
         self.get_seasons(load_batter_file, load_pitcher_file)  # get existing data file
         self.generate_random_data = generate_random_data
         if self.generate_random_data:  # generate new data from existing
@@ -129,24 +130,21 @@ class BaseballStatsPreProcess:
     def get_pitching_seasons(self, pitcher_file: str, load_seasons: List[int]) -> DataFrame:
         # caution war and salary cols will get aggregated across multiple seasons
         pitching_data = None
-        p_salary = None
         stats_pcols_sum = ['G', 'GS', 'CG', 'SHO', 'IP', 'H', 'R', 'ER', 'SO', 'BB', 'HR', 'W', 'L', 'SV', 'HBP', 'BK',
                            'WP']
         for season in load_seasons:
             df = pd.read_csv(str(season) + f" {pitcher_file}")
             pitching_data = pd.concat([pitching_data, df], axis=0)
-            p_salary_season = salary.build_war_salary(season, pitcher_file, self.create_hash)
-            if p_salary_season is not None:
-                p_salary = pd.concat([p_salary, p_salary_season], axis=0)
 
         # drop unwanted cols
         pitching_data.drop(['Rk', 'Lg', 'W-L%', 'GF', 'IBB', 'ERA+', 'FIP', 'H9', 'BB9', 'SO9', 'SO/BB',
                             'HR9', 'Awards', 'Player-additional', 'BF'],inplace=True, axis=1)
         pitching_data['Player'] = pitching_data['Player'].str.replace('*', '').str.replace('#', '')
         pitching_data['Hashcode'] = pitching_data['Player'].apply(self.create_hash)
-        if p_salary is not None:
-            pitching_data = pd.merge(pitching_data, p_salary, on='Hashcode', how='left')  # war and salary cols
-            pitching_data = salary.set_league_min_salary(pitching_data)  # set league min for players not in salary set
+
+        pitching_data = pd.merge(pitching_data, self.df_salary, on='Hashcode', how='left')  # war and salary cols
+        pitching_data = salary.fill_nan_salary(pitching_data, 'Salary')  # set league min for missing data
+        pitching_data = salary.fill_nan_salary(pitching_data, 'MLS', 0)  # set min for missing data
         pitching_data['Team'] = pitching_data['Team'].apply(lambda x: x if x in self.nl + self.al else '')
         # players with multiple teams have a 2TM or 3TM line that is the total of all stats.  Drop rows since we total
         pitching_data = pitching_data[pitching_data['Team'] != '']  # drop rows without a formal team name
@@ -194,6 +192,10 @@ class BaseballStatsPreProcess:
                            'Player-additional'],inplace=True, axis=1)
         batting_data['Player'] = batting_data['Player'].str.replace('#', '').str.replace('*', '')
         batting_data['Hashcode'] = batting_data['Player'].apply(self.create_hash)
+
+        batting_data = pd.merge(batting_data, self.df_salary, on='Hashcode', how='left')  # war and salary cols
+        batting_data = salary.fill_nan_salary(batting_data, 'Salary')  # set league min for missing data
+        batting_data = salary.fill_nan_salary(batting_data, 'MLS', 0)  # set min for missing data
         batting_data['Pos'] = batting_data['Pos'].apply(self.remove_non_numeric).apply(self.translate_pos)
         batting_data = self.group_col_to_list(df=batting_data, key_col='Hashcode', col='Pos', new_col='Pos')
         batting_data['Team'] = batting_data['Team'].apply(lambda x: x if x in self.nl + self.al else '' )
@@ -337,7 +339,7 @@ class BaseballStatsPreProcess:
             self.new_season_pitching_data['Season'] = str(self.new_season)
             if self.new_season not in self.load_seasons:  # add a year to age if it is the next season
                 self.new_season_pitching_data['Age'] = self.new_season_pitching_data['Age'] + 1  # everyone a year older
-            self.new_season_pitching_data.fillna(0)
+            # self.new_season_pitching_data.fillna(0)
 
             self.new_season_batting_data = self.batting_data.copy()
             self.new_season_batting_data[self.numeric_bcols] = 0
@@ -347,7 +349,7 @@ class BaseballStatsPreProcess:
             self.new_season_batting_data['Season'] = str(self.new_season)
             if self.new_season not in self.load_seasons:  # add a year to age if it is the next season
                 self.new_season_batting_data['Age'] = self.new_season_batting_data['Age'] + 1  # everyone a year older
-            self.new_season_batting_data = self.new_season_batting_data.fillna(0)
+            # self.new_season_batting_data = self.new_season_batting_data.fillna(0)
         return
 
     @staticmethod

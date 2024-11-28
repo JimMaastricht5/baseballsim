@@ -186,8 +186,10 @@ class BaseballStats:
 
         # limit the league if include leagues is not none and at least one league is in the list
         if self.debug:
-            print(self.include_leagues)
-            print(any(self.pitching_data['League'].isin(self.include_leagues)))
+            print('bbstats.py in get_seasons')
+            print(self.pitching_data.head(5).to_string())
+            print(self.new_season_pitching_data.head(5).to_string())
+            print('')
         if self.include_leagues is not None and any(self.pitching_data['League'].isin(self.include_leagues)):
             self.pitching_data = self.pitching_data[self.pitching_data['League'].isin(self.include_leagues)]
             self.batting_data = self.batting_data[self.batting_data['League'].isin(self.include_leagues)]
@@ -198,7 +200,6 @@ class BaseballStats:
         self.batting_data['Condition'] = self.batting_data['Condition'].astype(float)
         self.new_season_pitching_data[pcols_to_convert] = self.new_season_pitching_data[pcols_to_convert].astype(float)
         self.new_season_batting_data['Condition'] = self.new_season_batting_data['Condition'].astype(float)
-
         return
 
     def game_results_to_season(self, box_score_class) -> None:
@@ -317,9 +318,14 @@ class BaseballStats:
         :param summary_only_b: print team totals or entire roster stats
         :return: None
         """
+        if self.debug:
+            print('in bbstats.py print current season')
+            print(f'teams: {teams}')
+            print(self.new_season_batting_data.head(5).to_string())
+            print(team_batting_stats(self.new_season_batting_data).head(5).to_string())
         teams = list(self.batting_data.Team.unique()) if teams is None else teams
-        self.print_season(team_batting_stats(self.new_season_batting_data),
-                          team_pitching_stats(self.new_season_pitching_data), teams=teams,
+        self.print_season(team_batting_stats(self.new_season_batting_data, filter_stats=False),
+                          team_pitching_stats(self.new_season_pitching_data, filter_stats=False), teams=teams,
                           summary_only_b=summary_only_b)
         return
 
@@ -352,7 +358,7 @@ class BaseballStats:
             df_p['Condition'] = df_p['Condition'].apply(condition_txt_f)  # apply condition_txt static func
             df_b['Condition'] = df_b['Condition'].apply(condition_txt_f)  # apply condition_txt static func
         df = df_p[df_p['Team'].isin(teams)]
-        df_totals = team_pitching_totals(df, team_name='')
+        df_totals = team_pitching_totals(df)
         if summary_only_b is False:
             print(df[self.pcols_to_print].to_string(justify='right'))  # print entire team
 
@@ -361,7 +367,7 @@ class BaseballStats:
         print('\n\n')
 
         df = df_b[df_b['Team'].isin(teams)]
-        df_totals = team_batting_totals(df, team_name='')
+        df_totals = team_batting_totals(df)
         if summary_only_b is False:
             print(df[self.bcols_to_print].to_string(justify='right'))  # print entire team
 
@@ -417,13 +423,15 @@ def trunc_col(df_n: Union[ndarray, Series], d: int = 3) -> Union[ndarray, Series
     return (df_n * 10 ** d) / 10 ** d
 
 
-def team_batting_stats(df: DataFrame) -> DataFrame:
+def team_batting_stats(df: DataFrame, filter_stats: bool=True) -> DataFrame:
     """
     calculate stats based on underlying values for things like OBP
     :param df: current df
+    :param filter_stats: boolean that filters out players with no stats
     :return: data with calc cols updated
     """
-    df = df[df['AB'] > 0]
+    if filter_stats:
+        df = df[df['AB'] > 0]
     df['AVG'] = trunc_col(np.nan_to_num(np.divide(df['H'], df['AB']), nan=0.0, posinf=0.0), 3)
     df['OBP'] = trunc_col(np.nan_to_num(np.divide(df['H'] + df['BB'] + df['HBP'], df['AB'] + df['BB'] + df['HBP']),
                           nan=0.0, posinf=0.0), 3)
@@ -433,14 +441,15 @@ def team_batting_stats(df: DataFrame) -> DataFrame:
     return df
 
 
-def team_pitching_stats(df: DataFrame) -> DataFrame:
+def team_pitching_stats(df: DataFrame, filter_stats: bool=True) -> DataFrame:
     """
     build up pitcher stats.  Note initial values for some cols are 0. hbp is 0, 2b are 0, 3b are 0
     :param df: data set to calc
+    :param filter_stats boolean that drops players with no stats
     :return: df with new cols / updated cols
     """
-
-    df = df[(df['IP'] > 0) & (df['AB'] > 0)]
+    if filter_stats:
+        df = df[(df['IP'] > 0) & (df['AB'] > 0)]
     df['AB'] = trunc_col(df['AB'], 0)
     df['IP'] = trunc_col(df['IP'], 2)
     df['AVG'] = trunc_col(df['H'] / df['AB'], 3)
@@ -454,36 +463,40 @@ def team_pitching_stats(df: DataFrame) -> DataFrame:
     # Calculate 'WHIP' and 'ERA' columns
     df['WHIP'] = trunc_col((df['BB'] + df['H']) / df['IP'], 3)
     df['ERA'] = trunc_col((df['ER'] / df['IP']) * 9, 2)
+    df = fill_nan_with_value(df,'ERA', 0)
+    df = fill_nan_with_value(df, 'WHIP', 0)
+    df = fill_nan_with_value(df, 'AVG', 0)
+    df = fill_nan_with_value(df, 'OBP', 0)
+    df = fill_nan_with_value(df, 'SLG', 0)
+    df = fill_nan_with_value(df, 'OPS', 0)
     return df
 
 
-def team_batting_totals(batting_df: DataFrame, team_name: str = '') -> DataFrame:
+def team_batting_totals(batting_df: DataFrame) -> DataFrame:
     """
     team totals for batting
     :param batting_df: ind batting data
-    :param team_name: name of team to calc
     :return: df with team totals
     """
     df = batting_df[['AB', 'R', 'H', '2B', '3B', 'HR', 'RBI', 'SB', 'CS', 'BB', 'SO',
                      'SH', 'SF', 'HBP']].sum().astype(int)
     df['G'] = np.max(batting_df['G'])
     df = df.to_frame().T
-    df = team_batting_stats(df)
+    df = team_batting_stats(df, filter_stats=False)
     return df
 
 
-def team_pitching_totals(pitching_df: DataFrame, team_name: str = '') -> DataFrame:
+def team_pitching_totals(pitching_df: DataFrame) -> DataFrame:
     """
       team totals for pitching
       :param pitching_df: ind pitcher data
-      :param team_name: name of team to calc
       :return: df with team totals
       """
     df = pitching_df[['GS', 'CG', 'SHO', 'IP', 'AB', 'H', '2B', '3B', 'ER', 'SO', 'BB', 'HR', 'W', 'L', 'SV', 'BS',
                       'HLD']].sum().astype(int)
     df = df.to_frame().T
     df = df.assign(G=np.max(pitching_df['G']))
-    df = team_pitching_stats(df)
+    df = team_pitching_stats(df, filter_stats=False)
     return df
 
 
@@ -498,6 +511,10 @@ def update_column_with_other_df(df1, col1, df2, col2):
     """
     df1.loc[df1.index, col1] = df1[col1].apply(lambda x: df2.loc[x, col2] if x in df2.index else 0)
     return df1
+
+def fill_nan_with_value(df, column_name, value=0):
+    df[column_name] = np.where((df[column_name] == 0) | df[column_name].isnull(), value, df[column_name])
+    return df
 
 
 if __name__ == '__main__':

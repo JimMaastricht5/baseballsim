@@ -273,7 +273,7 @@ class Team:
         self.set_mid_relief()
         return
 
-    def print_available_batters(self, current_season_stats: bool = False, include_starters: bool = False) -> None:
+    def print_available_batters(self, include_starters: bool = False, current_season_stats: bool = False) -> None:
         """
         prints the available position players on the bench
         :param current_season_stats: use the prior (current) or new seasons stats for printing

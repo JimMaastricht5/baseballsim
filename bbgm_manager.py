@@ -140,7 +140,6 @@ if __name__ == '__main__':
                    load_batter_file='stats-pp-Batting.csv',
                    load_pitcher_file='stats-pp-Pitching.csv',
                    debug=False)
-    bbgm.print_team()
     bbgm.game_setup()
     bbgm.team.print_starting_lineups()  # reprint line up and loop to unused pos players at top
     bbgm.team.print_pos_not_in_lineup()  # lineup already printed

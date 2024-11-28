@@ -150,6 +150,7 @@ class Team:
             self.print_starting_lineups(current_season_stats=current_season_stats)
         if show_bench:
             self.print_pos_not_in_lineup(current_season_stats=current_season_stats)
+            self.print_available_pitchers(include_starters=False, current_season_stats=current_season_stats)
         self.box_score = gameteamboxstats.TeamBoxScore(self.prior_season_lineup_df, self.prior_season_pitching_df,
                                                        self.team_name)
         return self.lineup_card
@@ -193,7 +194,7 @@ class Team:
         # note cur_lineup_index should be the same as lineup_index_list, but just to be certain we rebuild it.
         for row_num in range(0, len(self.prior_season_lineup_df)):
             player_index = int64(self.prior_season_lineup_df.index[row_num])  # grab the index of the player
-            self.prior_season_lineup_df.loc[player_index, 'Pos'] = pos_index_dict[player_index]  # fielding pos in lineup
+            self.prior_season_lineup_df.loc[player_index, 'Pos'] = pos_index_dict[player_index]  # field pos in lineup
         return
 
     def dynamic_lineup(self) -> Dict[int64, str]:
@@ -211,8 +212,8 @@ class Team:
 
         # select player best at each stat to slot into lead off, cleanup, etc.
         # exclude players prev selected for SLG and ordering remaining players by OPS
-        sb_index_list = self.best_at_stat(pos_index_list, 'SB', count=1)  # takes list of index nums and scans master df
-        slg_index_list = self.best_at_stat(pos_index_list, 'SLG', count=2, exclude=sb_index_list)  # exclude sb
+        sb_index_list = self.best_at_stat(pos_index_list, 'SB', count=1)  # list of index#,scans master df
+        slg_index_list = self.best_at_stat(pos_index_list, 'SLG', count=2, exclude=sb_index_list)  # excl sb
         self.cur_lineup_index_list = self.best_at_stat(pos_index_list, 'OPS', count=6,
                                                        exclude=sb_index_list + slg_index_list)  # setup initial list
 
@@ -286,10 +287,11 @@ class Team:
         self.print_pos_not_in_lineup(current_season_stats=current_season_stats)
         return
 
-    def print_available_pitchers(self, include_starters: bool = False) -> None:
+    def print_available_pitchers(self, include_starters: bool = False, current_season_stats: bool=False) -> None:
         """
         prints the available pitchers in the bullpen
         :param include_starters: include the starters not just the bench players
+        :param current_season_stats: use current season stats, not the new season
         :return: None
         """
         if include_starters:
@@ -547,13 +549,16 @@ class Team:
         :return: None
         """
         self.lineup_card += 'bench players:\n'
-        # print('bench players:')
         if current_season_stats:
             self.lineup_card += (self.new_season_bench_pos_df.to_string(index=True, justify='right'))
-            # print(self.new_season_bench_pos_df.to_string(index=True, justify='right'))
+            if self.interactive:
+                print('bench players:')
+                print(self.new_season_bench_pos_df.to_string(index=True, justify='right'))
         else:
             self.lineup_card += (self.prior_season_bench_pos_df.to_string(index=True, justify='right'))
-            # print(self.prior_season_bench_pos_df.to_string(index=True, justify='right'))
+            if self.interactive:
+                print('bench players:')
+                print(self.prior_season_bench_pos_df.to_string(index=True, justify='right'))
         self.lineup_card += '\n'
         return
 

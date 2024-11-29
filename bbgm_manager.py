@@ -123,7 +123,9 @@ class Manager:
         print(self.baseball_data.get_all_team_names())
         new_team = str(input("Enter the name of the team the player is moving to: "))
         self.baseball_data.move_a_player_between_teams(player_index, new_team)
-        print(self.baseball_data.get_pitching_data(self.team_name).to_string())
+        # self.team.load_team_data()
+        # print(self.baseball_data.get_pitching_data(self.team_name).to_string())
+        # print(self.team.prior_season_pitchers_df.to_string())
         return
 
     def load_lineup(self):

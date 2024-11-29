@@ -49,42 +49,19 @@ class Team:
         self.interactive = interactive
         self.team_name = team_name
         self.baseball_data = baseball_data
-        self.prior_season_pitchers_df = baseball_data.get_pitching_data(team_name=team_name, prior_season=True)
-        self.prior_season_pos_players_df = baseball_data.get_batting_data(team_name=team_name, prior_season=True)
-        self.new_season_pos_players_df = baseball_data.get_batting_data(team_name=team_name, prior_season=False)
-        if self.debug:
-            print(f'bbteam.py init prior season data')
-            print(self.prior_season_pos_players_df.to_string())
-            print(self.new_season_pos_players_df.to_string())
-        if self.prior_season_pitchers_df.shape[0] == 0:
-            print(f'bbteam.py init: team {team_name} does not exist.')
-            print(f'Try one of these teams {self.baseball_data.get_all_team_names()}')
-            exit(1)
+        self.prior_season_pitchers_df = None
+        self.new_season_pitching_df = None
+        self.prior_season_pos_players_df = None
+        self.new_season_pos_players_df = None
+        self.mascot = ''
+        self.city_name = ''
 
-        self.prior_season_pitchers_df['Condition'] = self.baseball_data.new_season_pitching_data['Condition']
-        self.prior_season_pitchers_df['AVG_faced'] = self.prior_season_pitchers_df['AVG_faced'] * \
-            self.prior_season_pitchers_df['Condition']
-        self.prior_season_pos_players_df['Condition'] = self.baseball_data.new_season_batting_data['Condition']
-        # test for empty or insufficient number of players generally need 5 starting pitchers and 9 players
-        if (len(self.prior_season_pitchers_df) == 0 or len(self.prior_season_pitchers_df) < 5 or
-                len(self.prior_season_pos_players_df) == 0 or len(self.prior_season_pos_players_df) < 9):
-            print(f'Teams available are {self.baseball_data.pitching_data["Team"].unique()}')
-
-            raise ValueError(f'Pitching did not contain enough pitchers for {team_name} with length'
-                             f' {len(self.prior_season_pitchers_df)}')
-
+        self.load_team_data()
         self.p_lineup_cols_to_print = ['Player', 'League', 'Team', 'Age', 'G', 'GS', 'CG', 'SHO', 'IP', 'H', '2B', '3B',
                                        'ER', 'SO', 'BB', 'HR', 'W', 'L', 'SV', 'BS', 'HLD', 'ERA', 'WHIP']
         self.b_lineup_cols_to_print = ['Player', 'League', 'Team', 'Pos', 'Age', 'G', 'AB', 'R', 'H', '2B', '3B', 'HR',
                                        'RBI', 'SB', 'CS', 'BB', 'SO', 'SH', 'SF', 'HBP', 'AVG', 'OBP', 'SLG', 'OPS']
-        if ('Mascot' in self.prior_season_pos_players_df.columns) is True:
-            self.mascot = self.prior_season_pos_players_df.loc[self.prior_season_pos_players_df["Team"] == team_name,
-                                                               "Mascot"].unique()[0]
-            self.city_name = self.prior_season_pos_players_df.loc[self.prior_season_pos_players_df["Team"] == team_name,
-                                                                  "City"].unique()[0]
-        else:
-            self.mascot = ''
-            self.city_name = ''
+
         self.prior_season_lineup_df = None  # uses prior season stats
         self.new_season_lineup_df = None  # new / current season stats for printing starting lineup
         self.prior_season_bench_pos_df = None
@@ -108,6 +85,38 @@ class Team:
         self.fatigue_pitching_change_limit = self.baseball_data.fatigue_pitching_change_limit
         self.fatigue_unavailable = self.baseball_data.fatigue_unavailable
         self.lineup_card = ''
+        return
+
+    def load_team_data(self):
+        self.prior_season_pitchers_df = self.baseball_data.get_pitching_data(self.team_name, True)
+        self.prior_season_pos_players_df = self.baseball_data.get_batting_data(self.team_name, True)
+        self.new_season_pos_players_df = self.baseball_data.get_batting_data(self.team_name, False)
+        if self.debug:
+            print(f'bbteam.py load_team_data ')
+            print(self.prior_season_pos_players_df.to_string())
+            print(self.new_season_pos_players_df.to_string())
+        if self.prior_season_pitchers_df.shape[0] == 0:
+            print(f'bbteam.py load_team_data: team {self.team_name} does not exist.')
+            print(f'Try one of these teams {self.baseball_data.get_all_team_names()}')
+            exit(1)
+
+        self.prior_season_pitchers_df['Condition'] = self.baseball_data.new_season_pitching_data['Condition']
+        self.prior_season_pitchers_df['AVG_faced'] = self.prior_season_pitchers_df['AVG_faced'] * \
+                                                     self.prior_season_pitchers_df['Condition']
+        self.prior_season_pos_players_df['Condition'] = self.baseball_data.new_season_batting_data['Condition']
+        # test for empty or insufficient number of players generally need 5 starting pitchers and 9 players
+        if (len(self.prior_season_pitchers_df) == 0 or len(self.prior_season_pitchers_df) < 5 or
+                len(self.prior_season_pos_players_df) == 0 or len(self.prior_season_pos_players_df) < 9):
+            print(f'Teams available are {self.baseball_data.pitching_data["Team"].unique()}')
+
+            raise ValueError(f'Pitching did not contain enough pitchers for {self.team_name} with length'
+                             f' {len(self.prior_season_pitchers_df)}')
+
+        if ('Mascot' in self.prior_season_pos_players_df.columns) is True:
+            self.mascot = self.prior_season_pos_players_df.loc[self.prior_season_pos_players_df["Team"] ==
+                                                               self.team_name, "Mascot"].unique()[0]
+            self.city_name = self.prior_season_pos_players_df.loc[self.prior_season_pos_players_df["Team"] ==
+                                                                  self.team_name, "City"].unique()[0]
         return
 
     def batter_index_in_lineup(self, lineup_pos: int = 1) -> int:

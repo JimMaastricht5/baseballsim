@@ -21,6 +21,7 @@
 # SOFTWARE.
 #
 # JimMaastricht5@gmail.com
+import ast
 import pandas as pd
 import numpy as np
 from numpy import ndarray
@@ -142,7 +143,6 @@ class BaseballStats:
             print(self.new_season_batting_data['Team'].unique())
             print(df.head(5).to_string())
             print('bbstats.py done getting batting data')
-
         df = team_batting_stats(df, filter_stats=False)
         df = self.add_missing_cols(df)
 
@@ -323,9 +323,13 @@ class BaseballStats:
     def move_a_player_between_teams(self, player_index, new_team):
         is_batter, is_pitcher = self.is_batter_or_pitcher(player_index)
         if is_batter:
+            self.batting_data['Teams'] = self.batting_data['Teams'].apply(ast.literal_eval)
+            self.batting_data['Leagues'] = self.batting_data['Leagues'].apply(ast.literal_eval)
             self.batting_data.loc[player_index, 'Team'] = new_team
             self.batting_data.loc[player_index, 'Teams'].append(new_team)  # should inplace modify row
         if is_pitcher:
+            self.pitching_data['Teams'] = self.pitching_data['Teams'].apply(ast.literal_eval)
+            self.pitching_data['Leagues'] = self.pitching_data['Leagues'].apply(ast.literal_eval)
             self.pitching_data.loc[player_index, 'Team'] = new_team
             self.pitching_data.loc[player_index, 'Teams'].append(new_team)  # should inplace modify row
         return
@@ -333,14 +337,15 @@ class BaseballStats:
     def is_batter_or_pitcher(self, player_index):
         is_batter, is_pitcher = False, False
         try:
-            batter_row = self.batting_data.loc(player_index)
+            batter_row = self.batting_data.loc[player_index]
             is_batter = True
-        except ValueError:
+        except KeyError:
             pass
         try:
-            pitcher_row = self.pitching_data.loc(player_index)
+            print(self.pitching_data.head(5).to_string())
+            pitcher_row = self.pitching_data.loc[player_index]
             is_pitcher = True
-        except ValueError:
+        except KeyError:
             print(f'pitcher not found {player_index}')
             pass
         print(is_batter, is_pitcher)

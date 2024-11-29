@@ -320,6 +320,32 @@ class BaseballStats:
             print(f'bbstats.py in update_season_stats, release semaphore')
         return
 
+    def move_a_player_between_teams(self, player_index, new_team):
+        is_batter, is_pitcher = self.is_batter_or_pitcher(player_index)
+        if is_batter:
+            self.batting_data.loc[player_index, 'Team'] = new_team
+            self.batting_data.loc[player_index, 'Teams'].append(new_team)  # should inplace modify row
+        if is_pitcher:
+            self.pitching_data.loc[player_index, 'Team'] = new_team
+            self.pitching_data.loc[player_index, 'Teams'].append(new_team)  # should inplace modify row
+        return
+
+    def is_batter_or_pitcher(self, player_index):
+        is_batter, is_pitcher = False, False
+        try:
+            batter_row = self.batting_data.loc(player_index)
+            is_batter = True
+        except ValueError:
+            pass
+        try:
+            pitcher_row = self.pitching_data.loc(player_index)
+            is_pitcher = True
+        except ValueError:
+            print(f'pitcher not found {player_index}')
+            pass
+        print(is_batter, is_pitcher)
+        return is_batter, is_pitcher
+
     def print_current_season(self, teams: Optional[List[str]] = None, summary_only_b: bool = False) -> None:
         """
         prints the current season being played

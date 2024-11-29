@@ -29,21 +29,27 @@ import bbteam
 class Manager:
     def __init__(self, team_name, load_batter_file, load_pitcher_file,
                  load_seasons=2024, new_season=2025, baseball_data=None, debug=False):
+        self.debug = debug
         self.team_name = team_name
         self.baseball_data = baseball_data
         if self.baseball_data is None:
             self.baseball_data = bbstats.BaseballStats(load_seasons=load_seasons, new_season=new_season,
                                                        load_batter_file=load_batter_file,
-                                                       load_pitcher_file=load_pitcher_file, debug=debug)
-        self.team = bbteam.Team(team_name=self.team_name, baseball_data=self.baseball_data,
-                                interactive=True, debug=debug)
-        self.team.set_initial_lineup(show_lineup=True, show_bench=True)
+                                                       load_pitcher_file=load_pitcher_file, debug=self.debug)
+        self.team = None
+        self.setup_team()
         # self.print_team()
         # self.team.set_initial_lineup(show_lineup=True, show_bench=True)  # accept all defaults batting and pitching
         # self.team.set_initial_batting_order()
         # self.team.set_starting_rotation()
         # self.team.set_closers()
         # self.team.set_mid_relief()
+        return
+
+    def setup_team(self):
+        self.team = bbteam.Team(team_name=self.team_name, baseball_data=self.baseball_data,
+                                interactive=True, debug=self.debug)
+        self.team.set_initial_lineup(show_lineup=True, show_bench=True)
         return
 
     def game_setup(self):
@@ -57,7 +63,8 @@ class Manager:
             print("1. Change a Player in the Preferred Lineup")
             print("2. Change the Preferred Starting Rotation")
             print("3. Load a Saved Team")
-            print("4. Reset")
+            print("4. Reset Lineup to Default")
+            print("5. Move a Player to a new team")
             choice = input("\nEnter your choice: ")
             if choice == "1":
                 print("Changing lineup....2")
@@ -68,7 +75,8 @@ class Manager:
                 self.load_lineup()
             elif choice == "4":
                 self.team.set_initial_lineup(show_lineup=True, show_bench=True)  # defaults batting and pitching
-
+            elif choice == '5':
+                self.move_a_player()  # move players between teams
             elif choice == "0":
                 print("Starting game.")
                 break  # Exit the loop
@@ -109,6 +117,16 @@ class Manager:
             # print(self.team.print_starting_lineups())  # reprint already printed
         return
 
+    def move_a_player(self):
+        self.print_team()
+        player_index = int(input("Enter the index of the player to move: "))
+        print(self.baseball_data.get_all_team_names())
+        new_team = str(input("Enter the name of the team the player is moving to: "))
+        self.baseball_data.move_a_player_between_teams(player_index, new_team)
+        del self.team  # remove team object, kind of lazy
+        self.setup_team()  # reset team object
+        return
+
     def load_lineup(self):
         lineup_dict = {}
         try:
@@ -121,14 +139,11 @@ class Manager:
             # lineup_dict = self.team.line_up_dict()
             with open(self.team_name + '_team.json', 'w') as f:
                 json.dump(lineup_dict, f)
-        print(lineup_dict)
+        # print(lineup_dict)
         self.team.set_initial_batting_order(lineup_dict)
-        # self.team.set_prior_and_new_pos_player_batting_bench_dfs()  # ?? would prefer not to do this
         return
 
     def print_team(self):
-        # self.baseball_data.print_prior_season([self.team_name])
-        # self.baseball_data.print_current_season([self.team_name])
         self.team.print_available_batters(include_starters=True, current_season_stats=True)
         self.team.print_available_pitchers(include_starters=True)
         return

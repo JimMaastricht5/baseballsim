@@ -123,8 +123,7 @@ class Manager:
         print(self.baseball_data.get_all_team_names())
         new_team = str(input("Enter the name of the team the player is moving to: "))
         self.baseball_data.move_a_player_between_teams(player_index, new_team)
-        del self.team  # remove team object, kind of lazy
-        self.setup_team()  # reset team object
+        print(self.baseball_data.get_pitching_data(self.team_name).to_string())
         return
 
     def load_lineup(self):
@@ -139,7 +138,6 @@ class Manager:
             # lineup_dict = self.team.line_up_dict()
             with open(self.team_name + '_team.json', 'w') as f:
                 json.dump(lineup_dict, f)
-        # print(lineup_dict)
         self.team.set_initial_batting_order(lineup_dict)
         return
 

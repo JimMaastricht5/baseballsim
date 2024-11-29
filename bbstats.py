@@ -335,20 +335,8 @@ class BaseballStats:
         return
 
     def is_batter_or_pitcher(self, player_index):
-        is_batter, is_pitcher = False, False
-        try:
-            batter_row = self.batting_data.loc[player_index]
-            is_batter = True
-        except KeyError:
-            pass
-        try:
-            print(self.pitching_data.head(5).to_string())
-            pitcher_row = self.pitching_data.loc[player_index]
-            is_pitcher = True
-        except KeyError:
-            print(f'pitcher not found {player_index}')
-            pass
-        print(is_batter, is_pitcher)
+        is_batter = True if player_index in self.batting_data.index else False
+        is_pitcher = True if player_index in self.pitching_data.index else False
         return is_batter, is_pitcher
 
     def print_current_season(self, teams: Optional[List[str]] = None, summary_only_b: bool = False) -> None:

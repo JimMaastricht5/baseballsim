@@ -195,6 +195,7 @@ class Team:
         for row_num in range(0, len(self.prior_season_lineup_df)):
             player_index = int64(self.prior_season_lineup_df.index[row_num])  # grab the index of the player
             self.prior_season_lineup_df.loc[player_index, 'Pos'] = pos_index_dict[player_index]  # field pos in lineup
+            self.new_season_lineup_df.loc[player_index, 'Pos'] = pos_index_dict[player_index]
         return
 
     def dynamic_lineup(self) -> Dict[int64, str]:
@@ -514,6 +515,7 @@ class Team:
         :return: None
         """
         if self.debug:
+            print('bbteam.py in print_starting_lineups')
             print(self.prior_season_lineup_df.head(5).to_string())
             print(self.new_season_lineup_df.head(5).to_string())
         self.lineup_card += f'Starting lineup for the {self.city_name} ({self.team_name}) {self.mascot}:\n'

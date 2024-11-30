@@ -87,6 +87,29 @@ class Team:
         self.lineup_card = ''
         return
 
+    def reset_team_data(self):
+        self.prior_season_pitchers_df = None
+        self.new_season_pitching_df = None
+        self.prior_season_pos_players_df = None
+        self.new_season_pos_players_df = None
+
+        self.prior_season_lineup_df = None  # uses prior season stats
+        self.new_season_lineup_df = None  # new / current season stats for printing starting lineup
+        self.prior_season_bench_pos_df = None
+        self.new_season_bench_pos_df = None
+        self.prior_season_pitching_df = None  # uses prior season stats
+        self.new_season_pitching_df = None  # new / current season stats for printing starting lineup
+        self.starting_pitchers_df = None
+        self.starting_pitchers = []
+        self.cur_pitcher_index = None
+        self.cur_lineup_index_list = []
+        self.relievers_df = None  # df of 2 best closers
+        self.middle_relievers_df = None  # remaining pitchers sorted by IP descending
+        self.unavailable_pitchers_df = None
+
+        self.load_team_data()
+        return
+
     def load_team_data(self):
         self.prior_season_pitchers_df = self.baseball_data.get_pitching_data(self.team_name, True)
         self.prior_season_pos_players_df = self.baseball_data.get_batting_data(self.team_name, True)

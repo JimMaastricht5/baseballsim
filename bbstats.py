@@ -218,7 +218,6 @@ class BaseballStats:
         :return: None
         """
         with self.semaphore:
-            # print(f'bbstats.py game_results_to_season, got the semaphore')
             batting_box_score = box_score_class.get_batter_game_stats()
             pitching_box_score = box_score_class.get_pitcher_game_stats()
 
@@ -230,16 +229,12 @@ class BaseballStats:
                 self.new_season_batting_data.loc[index, 'Condition'] = batting_box_score.loc[index, 'Condition']
                 self.new_season_batting_data.loc[index, 'Injured Days'] = batting_box_score.loc[index, 'Injured Days']
 
-            # print(pitching_box_score[self.numeric_pcols].to_string())
-            # print(pitching_box_score[self.numeric_pcols].dtypes)
-            # print(self.new_season_pitching_data[self.numeric_pcols].dtypes)
             for index, row in pitching_box_score.iterrows():
                 self.new_season_pitching_data.loc[index, self.numeric_pcols] = (
                         pitching_box_score.loc[index, self.numeric_pcols] +
                         self.new_season_pitching_data.loc[index, self.numeric_pcols])
                 self.new_season_pitching_data.loc[index, 'Condition'] = pitching_box_score.loc[index, 'Condition']
                 self.new_season_pitching_data.loc[index, 'Injured Days'] = pitching_box_score.loc[index, 'Injured Days']
-            # print(f'bbstats.py game_results_to_season, critical section completed')
         return
 
     def is_injured(self) -> None:
@@ -283,7 +278,6 @@ class BaseballStats:
         :return: None
         """
         with self.semaphore:
-            # print(f'bbstats.py in new_game_day, got semaphore')
             self.is_injured()
             self.new_season_pitching_data['Condition'] = self.new_season_pitching_data.\
                 apply(lambda row: self.rnd_condition_chg(row['Age']) + row['Condition'], axis=1)
@@ -300,7 +294,6 @@ class BaseballStats:
             self.batting_data.loc[:, 'Condition'] = self.new_season_batting_data.loc[:, 'Condition']
             self.batting_data = update_column_with_other_df(self.batting_data, 'Injured Days',
                                                             self.new_season_batting_data, 'Injured Days')
-            # print(f'bbstats.py in new_game_day, released semaphore')
         return
 
     def update_season_stats(self) -> None:
@@ -310,29 +303,31 @@ class BaseballStats:
         :return: None
         """
         with self.semaphore:
-            print(f'bbstats.py in update_season_stats, got semaphore')
             self.new_season_pitching_data = \
                 team_pitching_stats(self.new_season_pitching_data[self.new_season_pitching_data['IP'] > 0].fillna(0))
             self.new_season_batting_data = \
                 team_batting_stats(self.new_season_batting_data[self.new_season_batting_data['AB'] > 0].fillna(0))
             if self.debug:
                 print(f'bbstats update season stats {self.new_season_pitching_data.to_string(justify="right")}')
-            print(f'bbstats.py in update_season_stats, release semaphore')
         return
 
     def move_a_player_between_teams(self, player_index, new_team):
         is_batter, is_pitcher = self.is_batter_or_pitcher(player_index)
         if is_batter:
-            self.batting_data['Teams'] = self.batting_data['Teams'].apply(ast.literal_eval)
-            self.batting_data['Leagues'] = self.batting_data['Leagues'].apply(ast.literal_eval)
-            self.batting_data.loc[player_index, 'Team'] = new_team
-            self.batting_data.loc[player_index, 'Teams'].append(new_team)  # should inplace modify row
+            self.move_player_in_df(self.batting_data, player_index, new_team)
+            self.move_player_in_df(self.new_season_batting_data, player_index, new_team)
         if is_pitcher:
-            self.pitching_data['Teams'] = self.pitching_data['Teams'].apply(ast.literal_eval)
-            self.pitching_data['Leagues'] = self.pitching_data['Leagues'].apply(ast.literal_eval)
-            self.pitching_data.loc[player_index, 'Team'] = new_team
-            self.pitching_data.loc[player_index, 'Teams'].append(new_team)  # should inplace modify row
+            self.move_player_in_df(self.pitching_data, player_index, new_team)
+            self.move_player_in_df(self.new_season_pitching_data, player_index, new_team)
         return
+
+    @staticmethod
+    def move_player_in_df(df, player_index, new_team):
+        df['Teams'] = df['Teams'].apply(ast.literal_eval)
+        df['Leagues'] = df['Leagues'].apply(ast.literal_eval)
+        df.loc[player_index, 'Team'] = new_team
+        df.loc[player_index, 'Teams'].append(new_team)  # should inplace modify row
+        return df
 
     def is_batter_or_pitcher(self, player_index):
         is_batter = True if player_index in self.batting_data.index else False

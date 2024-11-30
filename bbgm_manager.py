@@ -49,7 +49,7 @@ class Manager:
     def setup_team(self):
         self.team = bbteam.Team(team_name=self.team_name, baseball_data=self.baseball_data,
                                 interactive=True, debug=self.debug)
-        self.team.set_initial_lineup(show_lineup=True, show_bench=True)
+        self.team.set_initial_lineup(show_lineup=False, show_bench=False)
         return
 
     def game_setup(self):
@@ -60,22 +60,25 @@ class Manager:
         while True:
             print("\nOptions:")
             print("0. Accept the Team and Start the Game")
-            print("1. Change a Player in the Preferred Lineup")
-            print("2. Change the Preferred Starting Rotation")
-            print("3. Load a Saved Team")
-            print("4. Reset Lineup to Default")
-            print("5. Move a Player to a new team")
+            print("1. Print the Team")
+            print("2. Change a Player in the Preferred Lineup")
+            print("3. Change the Preferred Starting Rotation")
+            print("4. Load a Saved Team")
+            print("5. Reset Lineup to Default")
+            print("6. Move a Player to a new team")
             choice = input("\nEnter your choice: ")
             if choice == "1":
+                self.print_team()
+            elif choice == "2":
                 print("Changing lineup....2")
                 self.lineup_changes()
-            elif choice == "2":
-                self.pitching_rotation_changes()
             elif choice == "3":
-                self.load_lineup()
+                self.pitching_rotation_changes()
             elif choice == "4":
+                self.load_lineup()
+            elif choice == "5":
                 self.team.set_initial_lineup(show_lineup=True, show_bench=True)  # defaults batting and pitching
-            elif choice == '5':
+            elif choice == '6':
                 self.move_a_player()  # move players between teams
             elif choice == "0":
                 print("Starting game.")
@@ -118,14 +121,12 @@ class Manager:
         return
 
     def move_a_player(self):
-        self.print_team()
         player_index = int(input("Enter the index of the player to move: "))
         print(self.baseball_data.get_all_team_names())
         new_team = str(input("Enter the name of the team the player is moving to: "))
         self.baseball_data.move_a_player_between_teams(player_index, new_team)
-        # self.team.load_team_data()
-        # print(self.baseball_data.get_pitching_data(self.team_name).to_string())
-        # print(self.team.prior_season_pitchers_df.to_string())
+        self.team.reset_team_data()
+        self.team.set_initial_lineup()
         return
 
     def load_lineup(self):
@@ -156,5 +157,5 @@ if __name__ == '__main__':
                    load_pitcher_file='stats-pp-Pitching.csv',
                    debug=False)
     bbgm.game_setup()
-    bbgm.team.print_starting_lineups()  # reprint line up and loop to unused pos players at top
-    bbgm.team.print_pos_not_in_lineup()  # lineup already printed
+    # bbgm.team.print_starting_lineups()  # reprint line up and loop to unused pos players at top
+    # bbgm.team.print_pos_not_in_lineup()  # lineup already printed

@@ -603,7 +603,7 @@ class Team:
         :param target_batting_order_pos: batting order number to sub, 1 would be the first pos in the lineup
         :return: None
         """
-        print(f'bbteam.py swap player with bench {target_batting_order_pos}, {self.cur_lineup_index_list}')
+        # print(f'bbteam.py swap player with bench {target_batting_order_pos}, {self.cur_lineup_index_list}')
         cur_player_index = self.cur_lineup_index_list[target_batting_order_pos - 1]
         if pos_player_bench_hashcode in self.prior_season_pos_players_df.index:
             self.insert_player_in_lineup(player_hashcode=pos_player_bench_hashcode,

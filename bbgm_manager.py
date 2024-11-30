@@ -60,7 +60,9 @@ class Manager:
         while True:
             print("\nOptions:")
             print("0. Accept the Team and Start the Game")
-            print("1. Print the Team")
+            print("1. Print the Entire Team")
+            print("\t 1.1 Print the Pos Players")
+            print("\t 1.2 Print the Pitchers")
             print("2. Change a Player in the Preferred Lineup")
             print("3. Change the Preferred Starting Rotation")
             print("4. Load a Saved Team")
@@ -69,6 +71,10 @@ class Manager:
             choice = input("\nEnter your choice: ")
             if choice == "1":
                 self.print_team()
+            elif choice == "1.1":
+                self.team.print_available_batters(include_starters=True, current_season_stats=True)
+            elif choice == "1.2":
+                self.team.print_available_pitchers(include_starters=True, current_season_stats=True)
             elif choice == "2":
                 print("Changing lineup....2")
                 self.lineup_changes()
@@ -104,16 +110,24 @@ class Manager:
     def lineup_changes(self):
         # with print lineup and print bench set to true in bbgame it is not necessary to reprint them here
         while True:
-            self.team.print_starting_lineups()
-            self.team.print_pos_not_in_lineup()
-            batting_order_number = int(input("\nEnter the batting order number to change (1-9),"
+            try:
+                batting_order_number = float(input("\nEnter the batting order number to change (1-9),"
                                              " 0 accepts the lineup: "))
-            if batting_order_number == 0 or not isinstance(batting_order_number, (int, float, complex)):  # completed
+                print(batting_order_number, round(batting_order_number), abs(batting_order_number - round(batting_order_number)))
+                print(abs(batting_order_number - round(batting_order_number) < 1e-9))
+                if batting_order_number == 0:  # completed
+                    break
+                elif (not 1 <= batting_order_number <= 9) or not (abs(batting_order_number - round(batting_order_number) == 0)):
+                    print('Enter a batting order position betweeen 1 and 9')
+                    print(self.team.print_available_batters(include_starters=True, current_season_stats=True))
+                else:
+                    player_index = int(input("Enter the index of the new player: "))
+                    batting_order_number = int(batting_order_number)
+            except ValueError:
                 break
 
-            player_index = int(input("Enter the index of the new player: "))
-            if isinstance(player_index, (int, float, complex)) and 1 <= batting_order_number <= 9:
-                self.team.change_lineup(target_pos=batting_order_number, pos_player_bench_index=player_index)
+            if 1 <= batting_order_number <= 9 and abs(batting_order_number - round(batting_order_number) == 0):
+                self.team.change_lineup(target_batting_order_pos=batting_order_number, pos_player_bench_hashcode=player_index)
                 print("\nLineup updated!")
             else:
                 print("Invalid input. Please enter valid batting order and player index numbers.")

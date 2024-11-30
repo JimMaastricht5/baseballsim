@@ -60,31 +60,32 @@ class Manager:
         while True:
             print("\nOptions:")
             print("0. Accept the Team and Start the Game")
-            print("1. Print the Entire Team")
-            print("\t 1.1 Print the Pos Players")
-            print("\t 1.2 Print the Pitchers")
-            print("2. Change a Player in the Preferred Lineup")
-            print("3. Change the Preferred Starting Rotation")
-            print("4. Load a Saved Team")
-            print("5. Reset Lineup to Default")
-            print("6. Move a Player to a new team")
-            choice = input("\nEnter your choice: ")
-            if choice == "1":
+            print("P. Print the Entire Team")
+            print("\t P1 Print the Pos Players")
+            print("\t P2 Print the Pitchers")
+            print("M. Move a Player to a new team.  Note: This resets lineups and rotations")
+            print("L. Change a Player in the Preferred Lineup")
+            print("R. Change the Preferred Starting Rotation")
+            print("Load. Load a Saved Team")
+            print("Reset. Reset Lineup to Default")
+
+            choice = input("\nEnter your choice: ").lower()
+            if choice == "p":
                 self.print_team()
-            elif choice == "1.1":
+            elif choice == "p1":
                 self.team.print_available_batters(include_starters=True, current_season_stats=True)
-            elif choice == "1.2":
+            elif choice == "p2":
                 self.team.print_available_pitchers(include_starters=True, current_season_stats=True)
-            elif choice == "2":
+            elif choice == "l":
                 print("Changing lineup....2")
                 self.lineup_changes()
-            elif choice == "3":
+            elif choice == "r":
                 self.pitching_rotation_changes()
-            elif choice == "4":
+            elif choice == "load":
                 self.load_lineup()
-            elif choice == "5":
+            elif choice == "reset":
                 self.team.set_initial_lineup(show_lineup=True, show_bench=True)  # defaults batting and pitching
-            elif choice == '6':
+            elif choice == 'm':
                 self.move_a_player()  # move players between teams
             elif choice == "0":
                 print("Starting game.")
@@ -95,34 +96,45 @@ class Manager:
 
     def pitching_rotation_changes(self):
         while True:
-            self.team.print_available_pitchers(include_starters=True)
-            starting_rotation_order_num = int(input("\nEnter the spot in the starting rotation to change (1-5),"
-                                                    " 0 accepts the lineup: "))
-            if starting_rotation_order_num == 0:
+            try:
+                # self.team.print_available_pitchers(include_starters=True)
+                starting_rotation_order_num = float(input("\nEnter the spot in the starting rotation to change (1-5),"
+                                                        " 0 accepts the lineup: "))
+                if starting_rotation_order_num == 0:
+                    break
+                elif (not 1 <= starting_rotation_order_num <= 5) or not (
+                    abs(starting_rotation_order_num - round(starting_rotation_order_num) == 0)):
+                    print('Enter the spot in the starting rotation to change (1-5)')
+                    print(self.team.print_available_pitchers(include_starters=True, current_season_stats=True))
+                else:
+                    starting_rotation_order_num = int(starting_rotation_order_num)
+                    start_rotation_pitcher_num = int(
+                        input(f'Please enter the number of the pitcher you would like to be '
+                              f'in the starting rotation: '))
+            except ValueError:
                 break
-            start_rotation_pitcher_num = int(input(f'Please enter the number of the pitcher you would like to be '
-                                                   f'in the starting rotation: '))
-            self.team.change_starting_rotation(starting_pitcher_num=start_rotation_pitcher_num,
-                                               rotation_order_num=starting_rotation_order_num)
 
+            if (1 <= starting_rotation_order_num <= 5) and (abs(starting_rotation_order_num - round(starting_rotation_order_num) == 0)):
+                self.team.change_starting_rotation(starting_pitcher_num=start_rotation_pitcher_num,
+                                                   rotation_order_num=starting_rotation_order_num)
         return
 
     def lineup_changes(self):
         # with print lineup and print bench set to true in bbgame it is not necessary to reprint them here
         while True:
             try:
-                batting_order_number = float(input("\nEnter the batting order number to change (1-9),"
-                                             " 0 accepts the lineup: "))
-                print(batting_order_number, round(batting_order_number), abs(batting_order_number - round(batting_order_number)))
-                print(abs(batting_order_number - round(batting_order_number) < 1e-9))
-                if batting_order_number == 0:  # completed
-                    break
-                elif (not 1 <= batting_order_number <= 9) or not (abs(batting_order_number - round(batting_order_number) == 0)):
-                    print('Enter a batting order position betweeen 1 and 9')
+                batting_order_number = input("\nEnter the batting order number to change (1-9),  0 accepts the lineup: ")
+                if batting_order_number.lower == 'p1':
                     print(self.team.print_available_batters(include_starters=True, current_season_stats=True))
                 else:
-                    player_index = int(input("Enter the index of the new player: "))
                     batting_order_number = int(batting_order_number)
+                    if batting_order_number == 0:  # completed
+                        break
+                    elif (not 1 <= batting_order_number <= 9) or not (abs(batting_order_number - round(batting_order_number) == 0)):
+                        print('Enter a batting order position betweeen 1 and 9')
+                    else:
+                        player_index = int(input("Enter the index of the new player: "))
+                        batting_order_number = int(batting_order_number)
             except ValueError:
                 break
 
@@ -131,7 +143,6 @@ class Manager:
                 print("\nLineup updated!")
             else:
                 print("Invalid input. Please enter valid batting order and player index numbers.")
-            # print(self.team.print_starting_lineups())  # reprint already printed
         return
 
     def move_a_player(self):

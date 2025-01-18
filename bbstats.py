@@ -29,6 +29,7 @@ from pandas.core.frame import DataFrame
 from pandas.core.series import Series
 from typing import List, Optional, Union
 import threading
+import re
 
 
 class BaseballStats:
@@ -322,9 +323,22 @@ class BaseballStats:
         return
 
     @staticmethod
-    def move_player_in_df(df, player_index, new_team):
-        df['Teams'] = df['Teams'].apply(ast.literal_eval)
-        df['Leagues'] = df['Leagues'].apply(ast.literal_eval)
+    def safe_literal_eval(s):
+        """Safely evaluates a string to a Python literal, handling unquoted strings in lists."""
+        if isinstance(s, list):
+            return s
+        try:
+            # Replace unquoted strings within lists with quoted strings
+            s = re.sub(r"\[([^\]]+)\]",
+                       lambda match: "[" + ",".join(f'"{item.strip()}"' for item in match.group(1).split(",")) + "]", s)
+            return ast.literal_eval(s)
+        except (ValueError, SyntaxError):
+            return None  # Or handle the error as needed
+
+    def move_player_in_df(self, df, player_index, new_team):
+        # ast.literal_eval doesn't work well unless the list is formatted like ["'BOS'"], use static method
+        df['Teams'] = df['Teams'].apply(self.safe_literal_eval)
+        df['Leagues'] = df['Leagues'].apply(self.safe_literal_eval)
         df.loc[player_index, 'Team'] = new_team
         df.loc[player_index, 'Teams'].append(new_team)  # should inplace modify row
         return df
@@ -417,10 +431,14 @@ def condition_txt_f(condition: int) -> str:
     :param condition: condition level, 100 is perfect, 0 is dead tired
     :return:
     """
-    return 'Peak' if condition > 75 else \
-        'Healthy' if condition > 51 else \
-        'Tired' if condition > 33 else \
-        'Exhausted'
+    if isinstance(condition, str):
+        condition_text = condition  # already converted to a string
+    else:
+        condition_text = 'Peak' if condition > 75 else \
+            'Healthy' if condition > 51 else \
+            'Tired' if condition > 33 else \
+            'Exhausted'
+    return condition_text
 
 
 def remove_non_print_cols(df: DataFrame, debug: bool=False) -> DataFrame:

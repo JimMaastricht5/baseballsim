@@ -64,6 +64,7 @@ class Manager:
             print("\t P1 Print the Pos Players")
             print("\t P2 Print the Pitchers")
             print("M. Move a Player to a new team.  Note: This resets lineups and rotations")
+            print("T. Trade Players between two teams.  Note: This resets lineups and rotations")
             print("L. Change a Player in the Preferred Lineup")
             print("R. Change the Preferred Starting Rotation")
             print("Load. Load a Saved Team")
@@ -87,6 +88,8 @@ class Manager:
                 self.team.set_initial_lineup(show_lineup=True, show_bench=True)  # defaults batting and pitching
             elif choice == 'm':
                 self.move_a_player()  # move players between teams
+            elif choice == 't':
+                self.trade_players()  # move players between teams
             elif choice == "0":
                 print("Starting game.")
                 break  # Exit the loop
@@ -149,10 +152,45 @@ class Manager:
         player_index = int(input("Enter the index of the player to move: "))
         print(self.baseball_data.get_all_team_names())
         new_team = str(input("Enter the name of the team the player is moving to: "))
-        self.baseball_data.move_a_player_between_teams(player_index, new_team)
+        self.move_multiple_players(new_team=new_team, players=[player_index])
         self.team.reset_team_data()
         self.team.set_initial_lineup()
         return
+
+    def trade_players(self):
+        team_a = str(input("Enter the name of the first team involved in the trade: "))
+        print(self.baseball_data.get_all_team_names())
+        self.baseball_data.print_current_season(teams=[team_a])
+        team_a_players = self.multiplayer_selection(team=team_a)
+
+        team_b = str(input("Enter the name of the second team involved in the trade: "))
+        print(self.baseball_data.get_all_team_names())
+        self.baseball_data.print_current_season(teams=[team_b])
+        team_b_players = self.multiplayer_selection(team=team_b)
+
+        self.move_multiple_players(new_team=team_b, players=team_a_players)
+        self.move_multiple_players(new_team=team_a, players=team_b_players)
+        self.team.reset_team_data()
+        self.team.set_initial_lineup()
+        return
+
+    def move_multiple_players(self, new_team: str, players: list):
+        for player in players:
+            print(new_team, player)
+            self.baseball_data.move_a_player_between_teams(player_index=player, new_team=new_team)
+        return
+
+    @staticmethod
+    def multiplayer_selection(team: str = ''):
+        players = []
+        player_num = ''
+        while player_num != "x":
+            player_num = str(input("Enter the player number (enter x when done): "))
+            try:
+                players.append(int(player_num))
+            except ValueError:
+                break
+        return players
 
     def load_lineup(self):
         lineup_dict = {}

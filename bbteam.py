@@ -123,10 +123,14 @@ class Team:
             print(f'Try one of these teams {self.baseball_data.get_all_team_names()}')
             exit(1)
 
-        self.prior_season_pitchers_df['Condition'] = self.baseball_data.new_season_pitching_data['Condition']
-        self.prior_season_pitchers_df['AVG_faced'] = self.prior_season_pitchers_df['AVG_faced'] * \
-                                                     self.prior_season_pitchers_df['Condition']
-        self.prior_season_pos_players_df['Condition'] = self.baseball_data.new_season_batting_data['Condition']
+        # check data type of new season pitching data, after first pass it is converted to a string
+        if (self.baseball_data.new_season_pitching_data['Condition'].dtype == float or
+                self.baseball_data.new_season_pitching_data['Condition'].dtype == int):  # action has already been performed
+            self.prior_season_pitchers_df['Condition'] = self.baseball_data.new_season_pitching_data['Condition']
+            self.prior_season_pitchers_df['AVG_faced'] = self.prior_season_pitchers_df['AVG_faced'] * \
+                                                         self.prior_season_pitchers_df['Condition']
+            self.prior_season_pos_players_df['Condition'] = self.baseball_data.new_season_batting_data['Condition']
+
         # test for empty or insufficient number of players generally need 5 starting pitchers and 9 players
         if (len(self.prior_season_pitchers_df) == 0 or len(self.prior_season_pitchers_df) < 5 or
                 len(self.prior_season_pos_players_df) == 0 or len(self.prior_season_pos_players_df) < 9):

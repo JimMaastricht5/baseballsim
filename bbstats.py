@@ -473,6 +473,7 @@ def team_batting_stats(df: DataFrame, filter_stats: bool=True) -> DataFrame:
     :param filter_stats: boolean that filters out players with no stats
     :return: data with calc cols updated
     """
+    df = df.copy()
     if filter_stats:
         df = df[df['AB'] > 0]
     df['AVG'] = trunc_col(np.nan_to_num(np.divide(df['H'], df['AB']), nan=0.0, posinf=0.0), 3)

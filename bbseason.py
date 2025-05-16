@@ -426,7 +426,7 @@ if __name__ == '__main__':
 
     # full season
     # num_games = 162 - 42  # 42 games already played
-    num_games = 162
+    num_games = 10
     interactive = False
 
     # multiple seasons for majors and minors of random league

@@ -30,6 +30,7 @@ from pandas.core.series import Series
 from typing import List, Optional, Union
 import threading
 import re
+import bbinjuries
 
 
 class BaseballStats:
@@ -59,11 +60,11 @@ class BaseballStats:
                                        'W', 'L', 'SV', 'BS', 'HLD', 'ERA', 'WHIP', 'AVG', 'OBP', 'SLG', 'OPS']
         self.pcols_to_print = ['Player', 'League', 'Team', 'Age', 'G', 'GS', 'CG', 'SHO', 'IP', 'H', '2B', '3B', 'ER',
                                'SO', 'BB', 'HR', 'W', 'L', 'SV', 'BS', 'HLD', 'ERA', 'WHIP', 'AVG', 'OBP', 'SLG', 'OPS',
-                               'Status', 'Injured Days', 'Condition']
+                               'Status', 'Estimated Days Remaining', 'Injury Description', 'Condition']
         self.bcols_to_print = ['Player', 'League', 'Team', 'Pos', 'Age', 'G', 'AB', 'R', 'H', '2B', '3B', 'HR', 'RBI',
                                'SB', 'CS', 'BB', 'SO', 'SH', 'SF', 'HBP', 'AVG', 'OBP', 'SLG',
-                               'OPS', 'Status', 'Injured Days', 'Condition']
-        self.injury_cols_to_print = ['Player', 'Team', 'Age', 'Status', 'Days Remaining']  # Days Remaining to see time
+                               'OPS', 'Status', 'Estimated Days Remaining', 'Injury Description', 'Condition']
+        self.injury_cols_to_print = ['Player', 'Team', 'Age', 'Status', 'Estimated Days Remaining', 'Injury Description']  # Days Remaining to see time
         self.include_leagues = include_leagues
         self.debug = debug
         self.load_seasons = [load_seasons] if not isinstance(load_seasons, list) else load_seasons
@@ -114,6 +115,9 @@ class BaseballStats:
                                                           scale=self.pitching_injury_avg_len / 2, size=1)[0])
         self.rnd_b_inj = lambda age: abs(np.random.normal(loc=self.batting_injury_avg_len,
                                                           scale=self.batting_injury_avg_len / 2, size=1)[0])
+        
+        # Initialize the injury system
+        self.injury_system = bbinjuries.InjuryType()
         return
 
     @staticmethod
@@ -210,6 +214,15 @@ class BaseballStats:
         self.batting_data['Condition'] = self.batting_data['Condition'].astype(float)
         self.new_season_pitching_data[pcols_to_convert] = self.new_season_pitching_data[pcols_to_convert].astype(float)
         self.new_season_batting_data['Condition'] = self.new_season_batting_data['Condition'].astype(float)
+        
+        # Add 'Injury Description' column if it doesn't exist
+        if 'Injury Description' not in self.pitching_data.columns:
+            self.pitching_data['Injury Description'] = ""
+            self.new_season_pitching_data['Injury Description'] = ""
+            
+        if 'Injury Description' not in self.batting_data.columns:
+            self.batting_data['Injury Description'] = ""
+            self.new_season_batting_data['Injury Description'] = ""
         return
 
     def game_results_to_season(self, box_score_class) -> None:
@@ -241,35 +254,83 @@ class BaseballStats:
     def is_injured(self) -> None:
         """
         determine if a pitcher or hitter is injured and severity.  older players get injured more often
-        add that data to the active seasons df
+        add that data to the active seasons df and assign appropriate injury descriptions
         ??? should condition be a factor
         :return: None
         """
-        self.new_season_pitching_data['Injured Days'] = self.new_season_pitching_data.\
-            apply(lambda row: 0 if self.rnd() > self.pitcher_injury_odds_for_season(row['Age']) and
-                  row['Injured Days'] == 0 else
-                  row['Injured Days'] - 1 if row['Injured Days'] > 0 else
-                  int(self.rnd_p_inj(row['Age'])), axis=1)
-        self.new_season_batting_data['Injured Days'] = self.new_season_batting_data.\
-            apply(lambda row: 0 if self.rnd() > self.batter_injury_odds_for_season(row['Age']) and
-                  row['Injured Days'] == 0 else
-                  row['Injured Days'] - 1 if row['Injured Days'] > 0 else
-                  int(self.rnd_b_inj(row['Age'])), axis=1)
+        # Process pitcher injuries
+        for idx, row in self.new_season_pitching_data.iterrows():
+            # Check if player is currently healthy
+            if row['Injured Days'] == 0:
+                # Determine if a new injury occurs
+                if self.rnd() <= self.pitcher_injury_odds_for_season(row['Age']):
+                    # Calculate injury length using the normal distribution
+                    injury_days = int(self.rnd_p_inj(row['Age']))
+                    # Get appropriate injury description based on days
+                    injury_desc = self.injury_system.get_pitcher_injury(injury_days)
+                    # Get a more accurate injury length based on description
+                    refined_injury_days = self.injury_system.get_injury_days_from_description(injury_desc, is_pitcher=True)
+                    
+                    # Update the dataframe with new injury info
+                    self.new_season_pitching_data.at[idx, 'Injured Days'] = refined_injury_days
+                    self.new_season_pitching_data.at[idx, 'Injury Description'] = injury_desc
+                # No change for healthy players who stay healthy
+            else:
+                # Reduce injury days for currently injured players
+                self.new_season_pitching_data.at[idx, 'Injured Days'] = row['Injured Days'] - 1
+                # Clear injury description if the player has recovered
+                if row['Injured Days'] <= 1:  # Will be 0 after the decrement
+                    self.new_season_pitching_data.at[idx, 'Injury Description'] = ""
+        
+        # Process batter injuries - same logic as pitchers
+        for idx, row in self.new_season_batting_data.iterrows():
+            if row['Injured Days'] == 0:
+                if self.rnd() <= self.batter_injury_odds_for_season(row['Age']):
+                    injury_days = int(self.rnd_b_inj(row['Age']))
+                    injury_desc = self.injury_system.get_batter_injury(injury_days)
+                    refined_injury_days = self.injury_system.get_injury_days_from_description(injury_desc, is_pitcher=False)
+                    
+                    self.new_season_batting_data.at[idx, 'Injured Days'] = refined_injury_days
+                    self.new_season_batting_data.at[idx, 'Injury Description'] = injury_desc
+            else:
+                self.new_season_batting_data.at[idx, 'Injured Days'] = row['Injured Days'] - 1
+                if row['Injured Days'] <= 1:
+                    self.new_season_batting_data.at[idx, 'Injury Description'] = ""
 
-        self.new_season_pitching_data['Status'] = \
-            self.new_season_pitching_data['Injured Days'].apply(injured_list_f)  # apply injured list static func
-        self.new_season_batting_data['Status'] = \
-            self.new_season_batting_data['Injured Days'].apply(injured_list_f)  # apply injured list static func
+        # Update status based on injured days, player type, and injury description
+        self.new_season_pitching_data['Status'] = self.new_season_pitching_data.apply(
+            lambda row: injured_list_f(
+                row['Injured Days'], 
+                is_pitcher=True, 
+                is_concussion=self.injury_system.is_concussion(row['Injury Description'])
+            ), axis=1
+        )
+        
+        self.new_season_batting_data['Status'] = self.new_season_batting_data.apply(
+            lambda row: injured_list_f(
+                row['Injured Days'], 
+                is_pitcher=False, 
+                is_concussion=self.injury_system.is_concussion(row['Injury Description'])
+            ), axis=1
+        )
 
+        # Print the disabled lists
         print(f'Season Disabled Lists:')
         if self.new_season_pitching_data[self.new_season_pitching_data["Injured Days"] > 0].shape[0] > 0:
             df = self.new_season_pitching_data[self.new_season_pitching_data["Injured Days"] > 0]
-            df = df.rename(columns={'Injured Days': 'Days Remaining'})
-            print(f'{df[self.injury_cols_to_print].to_string(justify="right")}\n')
+            df = df.rename(columns={'Injured Days': 'Estimated Days Remaining'})
+            # Remove the index name to avoid the separate "Hashcode" line
+            df = df.rename_axis(None)
+            print(f'{df[self.injury_cols_to_print].to_string(justify="right", index_names=False)}\n')
         if self.new_season_batting_data[self.new_season_batting_data["Injured Days"] > 0].shape[0] > 0:
             df = self.new_season_batting_data[self.new_season_batting_data["Injured Days"] > 0]
-            df = df.rename(columns={'Injured Days': 'Days Remaining'})
-            print(f'{df[self.injury_cols_to_print].to_string(justify="right")}\n')
+            df = df.rename(columns={'Injured Days': 'Estimated Days Remaining'})
+            # Format positions to remove brackets and quotes, but keep commas
+            if 'Pos' in df.columns:
+                df['Pos'] = df['Pos'].apply(format_positions)
+            # Remove the index name to avoid the separate "Hashcode" line
+            df = df.rename_axis(None)
+            print(f'{df[self.injury_cols_to_print].to_string(justify="right", index_names=False)}\n')
         return
 
     def new_game_day(self) -> None:
@@ -289,12 +350,16 @@ class BaseballStats:
 
             # copy over results in new season to prior season for game management
             self.pitching_data.loc[:, 'Condition'] = self.new_season_pitching_data.loc[:, 'Condition']
-            # self.pitching_data.loc[:, 'Injured Days'] = self.new_season_pitching_data.loc[:, 'Injured Days']
             self.pitching_data = update_column_with_other_df(self.pitching_data, 'Injured Days',
                                                              self.new_season_pitching_data, 'Injured Days')
+            # Copy injury descriptions
+            self.pitching_data.loc[:, 'Injury Description'] = self.new_season_pitching_data.loc[:, 'Injury Description']
+            
             self.batting_data.loc[:, 'Condition'] = self.new_season_batting_data.loc[:, 'Condition']
             self.batting_data = update_column_with_other_df(self.batting_data, 'Injured Days',
                                                             self.new_season_batting_data, 'Injured Days')
+            # Copy injury descriptions
+            self.batting_data.loc[:, 'Injury Description'] = self.new_season_batting_data.loc[:, 'Injury Description']
         return
 
     def update_season_stats(self) -> None:
@@ -394,19 +459,40 @@ class BaseballStats:
         if condition_text:
             df_p['Condition'] = df_p['Condition'].apply(condition_txt_f)  # apply condition_txt static func
             df_b['Condition'] = df_b['Condition'].apply(condition_txt_f)  # apply condition_txt static func
-        df = df_p[df_p['Team'].isin(teams)]
-        df_totals = team_pitching_totals(df)
+        
+        # Prepare pitching data
+        df_p_display = df_p[df_p['Team'].isin(teams)].copy()
+        # Rename 'Injured Days' to 'Estimated Days Remaining' for pitchers
+        if 'Injured Days' in df_p_display.columns:
+            df_p_display = df_p_display.rename(columns={'Injured Days': 'Estimated Days Remaining'})
+        
+        # Rename index to remove the separate "Hashcode" line
+        df_p_display = df_p_display.rename_axis(None)
+        
+        df_totals = team_pitching_totals(df_p_display)
         if summary_only_b is False:
-            print(df[self.pcols_to_print].to_string(justify='right'))  # print entire team
+            print(df_p_display[self.pcols_to_print].to_string(justify='right', index_names=False))  # print entire team
 
         print('\nTeam Pitching Totals:')
         print(df_totals[self.numeric_pcols_to_print].to_string(justify='right', index=False))
         print('\n\n')
 
-        df = df_b[df_b['Team'].isin(teams)]
-        df_totals = team_batting_totals(df)
+        # Prepare batting data
+        df_b_display = df_b[df_b['Team'].isin(teams)].copy()
+        # Rename 'Injured Days' to 'Estimated Days Remaining' for batters
+        if 'Injured Days' in df_b_display.columns:
+            df_b_display = df_b_display.rename(columns={'Injured Days': 'Estimated Days Remaining'})
+        
+        # Format positions to remove brackets and quotes, but keep commas
+        if 'Pos' in df_b_display.columns:
+            df_b_display['Pos'] = df_b_display['Pos'].apply(format_positions)
+        
+        # Rename index to remove the separate "Hashcode" line
+        df_b_display = df_b_display.rename_axis(None)
+        
+        df_totals = team_batting_totals(df_b_display)
         if summary_only_b is False:
-            print(df[self.bcols_to_print].to_string(justify='right'))  # print entire team
+            print(df_b_display[self.bcols_to_print].to_string(justify='right', index_names=False))  # print entire team
 
         print('\nTeam Batting Totals:')
         print(df_totals[self.numeric_bcols_to_print].to_string(justify='right', index=False))
@@ -414,15 +500,29 @@ class BaseballStats:
         return
 
 
-def injured_list_f(idays: int) -> str:
+def injured_list_f(idays: int, is_pitcher: bool = False, is_concussion: bool = False) -> str:
     """
-    generate text for dl list if player is injured
-    :param idays: number of day that player is injured
-    :return: string with name of the DL list player should be placed on
+    Generate text for IL (Injured List) based on MLB rules:
+    - 7-Day IL: For concussions only
+    - 10-Day IL: For position players
+    - 15-Day IL: For pitchers and two-way players
+    - 60-Day IL: For long-term injuries (removes player from 40-man roster)
+    
+    :param idays: number of days the player is injured
+    :param is_pitcher: whether the player is a pitcher
+    :param is_concussion: whether the injury is a concussion
+    :return: string with name of the IL the player should be placed on
     """
-    # mlb is 10 for pos min, 15 for pitcher min, and 60 day
-    return 'Active' if idays == 0 else \
-        '10 Day DL' if idays <= 10 else '15 Day DL' if idays <= 15 else '60 Day DL'
+    if idays == 0:
+        return 'Active'
+    elif is_concussion:
+        return '7-Day IL'
+    elif idays >= 60:
+        return '60-Day IL'
+    elif is_pitcher:
+        return '15-Day IL'
+    else:
+        return '10-Day IL'
 
 
 def condition_txt_f(condition: int) -> str:
@@ -559,6 +659,27 @@ def update_column_with_other_df(df1, col1, df2, col2):
 def fill_nan_with_value(df, column_name, value=0):
     df[column_name] = np.where((df[column_name] == 0) | df[column_name].isnull(), value, df[column_name])
     return df
+
+
+def format_positions(pos):
+    """
+    Format positions by removing brackets and quotes, but keeping commas.
+    Handles both list and string representations.
+    
+    :param pos: Position(s) as list or string
+    :return: Formatted string of positions
+    """
+    if isinstance(pos, list):
+        return ", ".join(pos)
+    elif isinstance(pos, str):
+        # Check if it looks like a string representation of a list
+        if pos.startswith('[') and pos.endswith(']'):
+            # Remove brackets and split by comma, then clean up quotes and spaces
+            items = pos[1:-1].split(',')
+            cleaned_items = [item.strip().strip("'\"") for item in items]
+            return ", ".join(cleaned_items)
+    # Return the original if no formatting is needed
+    return pos
 
 
 if __name__ == '__main__':

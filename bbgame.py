@@ -337,10 +337,9 @@ class Game:
                                                                  self.bases.player_scored)
         if self.chatty:
             out_text = 'Out' if self.outs <= 1 else 'Outs'
-            self.game_recap += (f'Pitcher: {pitching.Player} against ' 
-                  f'{self.team_names[self.team_hitting()]} batter #' 
-                  f'{self.batting_num[self.team_hitting()]}. {batting.Player} \n' 
-                  f'\t {self.outcomes.score_book_cd}, {self.outs} {out_text}\n')
+            self.game_recap += (f'Pitcher: {pitching.Player} against {self.team_names[self.team_hitting()]} '
+                  f'batter #{self.batting_num[self.team_hitting()]} {batting.Player} - '
+                  f'{self.outcomes.score_book_cd}, {self.outs} {out_text}\n')
 
         self.prior_batter_out_name[self.team_hitting()] = batting.Player
         self.prior_batter_out_num[self.team_hitting()] = cur_batter_index

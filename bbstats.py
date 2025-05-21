@@ -31,20 +31,19 @@ from typing import List, Optional, Union
 import threading
 import re
 import bbinjuries
+from bblogger import logger
 
 
 class BaseballStats:
     def __init__(self, load_seasons: List[int], new_season: int, include_leagues: list = None,
                  load_batter_file: str = 'stats-pp-Batting.csv',
-                 load_pitcher_file: str = 'stats-pp-Pitching.csv',
-                 debug: bool = False) -> None:
+                 load_pitcher_file: str = 'stats-pp-Pitching.csv') -> None:
         """
         :param load_seasons: list of seasons to load, each season is an integer year
         :param new_season: integer value of year for new season
         :param include_leagues: list of leagues to include in season
         :param load_batter_file: file name of the batting stats, year will be added as a prefix
         :param load_pitcher_file: file name of the pitching stats, year will be added as a prefix
-        :param debug: boolean to control extra printing
         """
         self.semaphore = threading.Semaphore(1)  # one thread can update games stats at a time
         self.rnd = lambda: np.random.default_rng().uniform(low=0.0, high=1.001)  # random generator between 0 and 1
@@ -66,7 +65,7 @@ class BaseballStats:
                                'OPS', 'Status', 'Estimated Days Remaining', 'Injury Description', 'Condition']
         self.injury_cols_to_print = ['Player', 'Team', 'Age', 'Status', 'Estimated Days Remaining', 'Injury Description']  # Days Remaining to see time
         self.include_leagues = include_leagues
-        self.debug = debug
+        logger.debug("Initializing BaseballStats with seasons: {}", load_seasons)
         self.load_seasons = [load_seasons] if not isinstance(load_seasons, list) else load_seasons
         self.new_season = new_season
         self.pitching_data = None
@@ -141,13 +140,10 @@ class BaseballStats:
             df_new = self.new_season_batting_data[self.new_season_batting_data['Team'] == team_name]
             df_cur = self.batting_data[self.batting_data.index.isin(df_new.index)]
             df = df_cur if prior_season else df_new
-        if self.debug:
-            print('bbstats.py get batting data')
-            print(team_name)
-            print(self.new_season_batting_data.head(5).to_string())
-            print(self.new_season_batting_data['Team'].unique())
-            print(df.head(5).to_string())
-            print('bbstats.py done getting batting data')
+        logger.debug('Getting batting data for team: {}', team_name)
+        logger.debug('New season batting data sample:\n{}', self.new_season_batting_data.head(5).to_string())
+        logger.debug('Available teams: {}', self.new_season_batting_data['Team'].unique())
+        logger.debug('Retrieved batting data sample:\n{}', df.head(5).to_string())
         df = team_batting_stats(df, filter_stats=False)
         df = self.add_missing_cols(df)
 
@@ -199,11 +195,9 @@ class BaseballStats:
             exit(1)  # stop the program
 
         # limit the league if include leagues is not none and at least one league is in the list
-        if self.debug:
-            print('bbstats.py in get_seasons')
-            print(self.pitching_data.head(5).to_string())
-            print(self.new_season_pitching_data.head(5).to_string())
-            print('')
+        logger.debug('In get_seasons')
+        logger.debug('Prior season pitching data:\n{}', self.pitching_data.head(5).to_string())
+        logger.debug('New season pitching data:\n{}', self.new_season_pitching_data.head(5).to_string())
         if self.include_leagues is not None and any(self.pitching_data['League'].isin(self.include_leagues)):
             self.pitching_data = self.pitching_data[self.pitching_data['League'].isin(self.include_leagues)]
             self.batting_data = self.batting_data[self.batting_data['League'].isin(self.include_leagues)]
@@ -373,8 +367,7 @@ class BaseballStats:
                 team_pitching_stats(self.new_season_pitching_data[self.new_season_pitching_data['IP'] > 0].fillna(0))
             self.new_season_batting_data = \
                 team_batting_stats(self.new_season_batting_data[self.new_season_batting_data['AB'] > 0].fillna(0))
-            if self.debug:
-                print(f'bbstats update season stats {self.new_season_pitching_data.to_string(justify="right")}')
+            logger.debug('Updated season pitching stats:\n{}', self.new_season_pitching_data.to_string(justify="right"))
         return
 
     def move_a_player_between_teams(self, player_index, new_team):
@@ -420,11 +413,10 @@ class BaseballStats:
         :param summary_only_b: print team totals or entire roster stats
         :return: None
         """
-        if self.debug:
-            print('in bbstats.py print current season')
-            print(f'teams: {teams}')
-            print(self.new_season_batting_data.head(5).to_string())
-            print(team_batting_stats(self.new_season_batting_data).head(5).to_string())
+        logger.debug('In print_current_season')
+        logger.debug('Teams: {}', teams)
+        logger.debug('Current season batting data:\n{}', self.new_season_batting_data.head(5).to_string())
+        logger.debug('Current season batting stats:\n{}', team_batting_stats(self.new_season_batting_data).head(5).to_string())
         teams = list(self.batting_data.Team.unique()) if teams is None else teams
         self.print_season(team_batting_stats(self.new_season_batting_data, filter_stats=False),
                           team_pitching_stats(self.new_season_pitching_data, filter_stats=False), teams=teams,
@@ -541,14 +533,13 @@ def condition_txt_f(condition: int) -> str:
     return condition_text
 
 
-def remove_non_print_cols(df: DataFrame, debug: bool=False) -> DataFrame:
+def remove_non_print_cols(df: DataFrame) -> DataFrame:
     """
     Remove df columns that are for internal use only
     :param df: df to clean
     :return: df cleaned up
     """
-    if debug:
-        print(df.head(5).to_string())
+    logger.debug('Removing non-print columns from dataframe:\n{}', df.head(5).to_string())
     non_print_cols = {'Season', 'Total_OB', 'AVG_faced', 'Game_Fatigue_Factor', 'Total_Outs', 'Condition'}  # Total_Outs
     cols_to_drop = list(non_print_cols.intersection(df.columns))
     if cols_to_drop:
@@ -683,11 +674,14 @@ def format_positions(pos):
 
 
 if __name__ == '__main__':
+    # Configure logger level - change to "DEBUG" for more detailed logs
+    from bblogger import configure_logger
+    configure_logger("INFO")
+    
     my_teams = []
     baseball_data = BaseballStats(load_seasons=[2024], new_season=2025,  include_leagues=['ACB', 'NBL'],
                                   load_batter_file='stats-pp-Batting.csv',
-                                  load_pitcher_file='stats-pp-Pitching.csv',
-                                  debug=True)
+                                  load_pitcher_file='stats-pp-Pitching.csv')
     # print(*baseball_data.pitching_data.columns)
     # print(*baseball_data.batting_data.columns)
     print(baseball_data.get_all_team_names())

@@ -27,16 +27,17 @@ import bbstats
 from numpy import bool_, float64
 from pandas.core.series import Series
 from typing import Union
+from bblogger import logger
 
 
 class OutCome:
-    def __init__(self, debug: bool = False) -> None:
+    def __init__(self) -> None:
         """
         class handles tracking battering outcomes and translating that into base running results
         dict in object maintains translation to runner movement and outs
         :return: None
         """
-        self.debug = debug
+        logger.debug("Initializing OutCome class")
         self.outs_on_play = 0
         self.on_base_b = False  # if this a BB or some form of a hit does not cover GB FC
         self.score_book_cd = ''
@@ -85,13 +86,13 @@ class OutCome:
 
 
 class SimAB:
-    def __init__(self, baseball_data: bbstats.BaseballStats, debug: bool = False) -> None:
+    def __init__(self, baseball_data: bbstats.BaseballStats) -> None:
         """
         class handles calculating the outcome of an ab based on pitcher, batter, and league probabilities
         :param baseball_data: class containing the league data and methods
         :return: None
         """
-        self.debug = debug
+        logger.debug("Initializing SimAB class")
         self.rng = lambda: np.random.default_rng().uniform(low=0.0, high=1.001)  # random generator between 0 and 1
         self.dice_roll = None
         self.pitching = None
@@ -281,8 +282,8 @@ class SimAB:
         :param stat_type:
         :return: a float of type numpy float64
         """
-        if self.debug:
-            print(f'at_bat.odds ratio, hitter stat:{hitter_stat}, pitcher stat{pitcher_stat}')
+        logger.debug('Computing odds ratio - hitter stat: {}, pitcher stat: {}', 
+                  hitter_stat, pitcher_stat)
 
         odds = 0
         with warnings.catch_warnings():
@@ -291,14 +292,289 @@ class SimAB:
                 odds = ((hitter_stat / (1 - hitter_stat)) * (pitcher_stat / (1 - pitcher_stat))) / \
                              (league_stat / (1 - league_stat))
             except ZeroDivisionError:
-                print(f'***Exception in odds ratio calculation for hitter:{hitter_stat}, pitcher:{pitcher_stat}, '
-                      f'league: {league_stat} {stat_type}')
-                print(self.batting)
-                print(self.pitching)
+                logger.error('Exception in odds ratio calculation - hitter: {}, pitcher: {}, league: {}, stat_type: {}',
+                           hitter_stat, pitcher_stat, league_stat, stat_type)
+                logger.error('Batter data: {}', self.batting)
+                logger.error('Pitcher data: {}', self.pitching)
             except Warning as warning:
-                print(f'***Warning in odds ratio calculation for hitter:{hitter_stat}, pitcher:{pitcher_stat}, '
-                      f'league: {league_stat} {stat_type}')
-                print("Warning caught:", warning)
-                print(self.batting)
-                print(self.pitching)
+                logger.warning('Warning in odds ratio calculation - hitter: {}, pitcher: {}, league: {}, stat_type: {}',
+                             hitter_stat, pitcher_stat, league_stat, stat_type)
+                logger.warning('Warning caught: {}', warning)
+                logger.warning('Batter data: {}', self.batting)
+                logger.warning('Pitcher data: {}', self.pitching)
         return float64(odds / (1 + odds))
+
+
+if __name__ == '__main__':
+    # Configure logger level for testing
+    from bblogger import configure_logger
+    configure_logger("DEBUG")
+    
+    # Print header
+    print("\n===== Testing at_bat.py Classes and Methods =====\n")
+    
+    # Create test data for a fictional batter and pitcher
+    class MockSeries(dict):
+        """Mock pandas Series for testing"""
+        def __init__(self, *args, **kwargs):
+            super().__init__(*args, **kwargs)
+            self.__dict__ = self  # Allow attribute access (series.Value)
+    
+    # Create custom functions for testing instead of relying on bbstats
+    def custom_team_batting_totals(batting_df):
+        """Simplified version of bbstats.team_batting_totals for testing"""
+        import pandas as pd
+        # Create a single-row DataFrame with summarized stats
+        return pd.DataFrame([{
+            'G': 162,
+            'AB': batting_df['AB'].sum(),
+            'R': 800,  # Fixed value for testing
+            'H': batting_df['H'].sum(),
+            '2B': 300,  # Fixed values for testing
+            '3B': 30,
+            'HR': 200,
+            'RBI': 750,
+            'SB': 100,
+            'CS': 30,
+            'BB': batting_df['BB'].sum(),
+            'SO': batting_df['SO'].sum(),
+            'SH': 50,
+            'SF': 70,
+            'HBP': batting_df['HBP'].sum(),
+            'AVG': batting_df['H'].sum() / batting_df['AB'].sum(),
+            'OBP': (batting_df['H'].sum() + batting_df['BB'].sum() + batting_df['HBP'].sum()) / 
+                  (batting_df['AB'].sum() + batting_df['BB'].sum() + batting_df['HBP'].sum()),
+            'SLG': 0.420,  # Fixed for testing
+            'OPS': 0.750   # Fixed for testing
+        }])
+
+    def custom_team_pitching_totals(pitching_df):
+        """Simplified version of bbstats.team_pitching_totals for testing"""
+        import pandas as pd
+        # Create a single-row DataFrame with summarized stats
+        return pd.DataFrame([{
+            'G': 162,
+            'GS': 162,
+            'CG': 5,
+            'SHO': 2,
+            'IP': 1458.0,
+            'AB': pitching_df['AB'].sum(),
+            'H': pitching_df['H'].sum(),
+            '2B': 300,  # Fixed values for testing
+            '3B': 30,
+            'ER': 700,
+            'SO': pitching_df['SO'].sum(),
+            'BB': pitching_df['BB'].sum(),
+            'HR': 200,
+            'W': 81,
+            'L': 81,
+            'SV': 40,
+            'BS': 15,
+            'HLD': 100,
+            'ERA': 4.30,  # Fixed for testing
+            'WHIP': 1.30,  # Fixed for testing
+            'AVG': pitching_df['H'].sum() / pitching_df['AB'].sum(),
+            'OBP': (pitching_df['H'].sum() + pitching_df['BB'].sum()) / 
+                  (pitching_df['AB'].sum() + pitching_df['BB'].sum()),
+            'SLG': 0.420,  # Fixed for testing
+            'OPS': 0.750   # Fixed for testing
+        }])
+            
+    # Create mock BaseballStats object
+    class MockBaseballStats:
+        def __init__(self):
+            # Create minimal batting/pitching data needed for tests
+            import pandas as pd
+            import numpy as np
+            
+            # Create mock batting data with all required columns
+            batting_data = pd.DataFrame({
+                'Team': ['TEST'] * 10,
+                'H': np.random.randint(100, 200, 10),
+                'BB': np.random.randint(20, 80, 10),
+                'HBP': np.random.randint(1, 15, 10),
+                'AB': np.random.randint(300, 600, 10),
+                'SO': np.random.randint(50, 150, 10),
+                # Add other required columns with mock data
+                'R': np.random.randint(50, 100, 10),
+                '2B': np.random.randint(20, 40, 10),
+                '3B': np.random.randint(1, 10, 10),
+                'HR': np.random.randint(10, 40, 10),
+                'RBI': np.random.randint(50, 100, 10),
+                'SB': np.random.randint(5, 30, 10),
+                'CS': np.random.randint(1, 10, 10),
+                'SH': np.random.randint(1, 10, 10),
+                'SF': np.random.randint(1, 10, 10)
+            })
+            
+            # Create mock pitching data with all required columns
+            pitching_data = pd.DataFrame({
+                'Team': ['TEST'] * 10,
+                'H': np.random.randint(100, 200, 10),
+                'BB': np.random.randint(20, 80, 10),
+                'AB': np.random.randint(300, 600, 10),
+                'SO': np.random.randint(50, 150, 10),
+                'HBP': np.random.randint(1, 15, 10),
+                # Add other required columns with mock data
+                'HR': np.random.randint(10, 40, 10),
+                '2B': np.random.randint(20, 40, 10),
+                '3B': np.random.randint(1, 10, 10)
+            })
+            
+            self.batting_data = batting_data
+            self.pitching_data = pitching_data
+    
+    # Create test batter and pitcher data
+    test_batter = MockSeries({
+        'Player': 'Test Batter',
+        'AVG': 0.280,
+        'OBP': 0.350,
+        'SLG': 0.480,
+        'H': 150,
+        'BB': 60,
+        'HBP': 8,
+        'AB': 500,
+        'SO': 120,
+        '2B': 30,
+        '3B': 5,
+        'HR': 25,
+        'GIDP': 12,
+        'Total_OB': 218,  # H + BB + HBP
+        'Total_Outs': 350  # AB - H + SF + SH approx
+    })
+    
+    test_pitcher = MockSeries({
+        'Player': 'Test Pitcher',
+        'ERA': 3.50,
+        'WHIP': 1.20,
+        'AVG': 0.245,
+        'OBP': 0.310,
+        'SLG': 0.380,
+        'H': 180,
+        'BB': 70,
+        'HBP': 10,
+        'AB': 700,
+        'SO': 200,
+        '2B': 40,
+        '3B': 5,
+        'HR': 20,
+        'Total_OB': 260,  # H + BB
+        'Total_Outs': 520,  # AB - H approx
+        'Game_Fatigue_Factor': 0.0  # No fatigue for test
+    })
+    
+    # Create test instances
+    print("Creating test instances...")
+    mock_stats = MockBaseballStats()
+    outcome = OutCome()
+    
+    # Create a modified SimAB class for testing that uses our custom functions
+    class TestSimAB(SimAB):
+        def __init__(self, baseball_data):
+            """Modified init that uses our custom totals functions"""
+            logger.debug("Initializing TestSimAB class")
+            self.rng = lambda: np.random.default_rng().uniform(low=0.0, high=1.001)
+            self.dice_roll = None
+            self.pitching = None
+            self.batting = None
+            self.baseball_data = baseball_data
+            
+            # Use custom functions instead of bbstats functions
+            self.league_batting_totals_df = custom_team_batting_totals(self.baseball_data.batting_data)
+            self.league_pitching_totals_df = custom_team_pitching_totals(self.baseball_data.pitching_data)
+            
+            # set league totals for odds ratio
+            self.league_batting_obp = self.league_batting_totals_df.at[0, 'OBP']
+            self.league_pitching_obp = self.league_pitching_totals_df.at[0, 'OBP']
+            batting_data_sum = self.baseball_data.batting_data[['H', 'BB', 'HBP']].sum()
+            self.league_batting_Total_OB = batting_data_sum['H'] + batting_data_sum['BB'] + batting_data_sum['HBP']
+            self.league_pitching_Total_OB = self.baseball_data.pitching_data[['H', 'BB']].sum().sum()
+            self.league_batting_Total_BB = self.league_batting_totals_df.at[0, 'BB']
+            self.league_batting_Total_HBP = self.league_batting_totals_df.at[0, 'HBP']
+            self.league_batting_Total_HR = self.league_batting_totals_df.at[0, 'HR']
+            self.league_batting_Total_3B = self.league_batting_totals_df.at[0, '3B']
+            self.league_batting_Total_2B = self.league_batting_totals_df.at[0, '2B']
+            self.league_Total_outs = self.baseball_data.batting_data['AB'].sum() - batting_data_sum['H']
+            self.league_K_rate_per_AB = self.baseball_data.batting_data['SO'].sum() / self.league_Total_outs
+            self.league_GB = .429  # ground ball rate for season
+            self.league_GB_FC = .10  # GB FC occur 10 out of 100 times ball in play
+            self.league_FB = .372  # fly ball rate for season
+            self.league_LD = .199  # line drive rate for the season
+            self.OBP_adjustment = 0  # final adjustment to line up with prior seasons, 2022 -0.025
+            self.BB_adjustment = -0.30  # final adjustment to shift more bb to H
+            self.HBP_rate = .0143  # 1.4% of AB in 2022
+            self.HBP_adjustment = 0.0143 * 4.0  # adjustment to shift more to or from hbp league avg is 1.4%, results 1/4 of
+            self.HR_adjustment = 1.1  # adjust for higher HR rate with new 2023 pitching rules
+            self.DBL_adjustment = 1.1  # adjust for higher 2B rate with new 2023 pitching rules
+            self.dp_chance = .20  # 20% chance dp with runner on per mlb
+            self.tag_up_chance = .20  # 20% chance of tagging up and scoring, per mlb
+    
+    sim_ab = TestSimAB(mock_stats)
+    
+    # Test OutCome class methods
+    print("\n----- Testing OutCome class -----")
+    outcome.reset()
+    print(f"After reset - on_base: {outcome.on_base_b}, score_book_cd: '{outcome.score_book_cd}', bases_to_advance: {outcome.bases_to_advance}")
+    
+    # Test setting different outcomes
+    test_codes = ['BB', 'HR', '2B', 'SO', 'DP', 'SF']
+    for code in test_codes:
+        outcome.set_score_book_cd(code)
+        print(f"Outcome '{code}': on_base={outcome.on_base_b}, bases_to_advance={outcome.bases_to_advance}, outs={outcome.outs_on_play}")
+    
+    # Test runs scored
+    outcome.set_runs_score(2)
+    print(f"Runs scored: {outcome.runs_scored}")
+    
+    # Test SimAB class with the test data
+    print("\n----- Testing SimAB class -----")
+    sim_ab.pitching = test_pitcher
+    sim_ab.batting = test_batter
+    
+    # Test odds_ratio method
+    hr_odds = sim_ab.odds_ratio(
+        hitter_stat=test_batter.HR / test_batter.Total_OB,
+        pitcher_stat=test_pitcher.HR / test_pitcher.Total_OB,
+        league_stat=sim_ab.league_batting_Total_HR / sim_ab.league_batting_Total_OB,
+        stat_type='HR'
+    )
+    print(f"HR odds ratio: {hr_odds:.3f}")
+    
+    # Run several outcome simulations
+    print("\n----- Testing ab_outcome method -----")
+    results = {'BB': 0, 'H': 0, '2B': 0, '3B': 0, 'HR': 0, 'HBP': 0, 'SO': 0, 'GB': 0, 'DP': 0, 'GB FC': 0, 'FO': 0, 'LD': 0, 'SF': 0}
+    
+    # Simulate 100 at-bats and count outcomes
+    num_sims = 100
+    for _ in range(num_sims):
+        outcome.reset()
+        sim_ab.ab_outcome(test_pitcher, test_batter, outcome, outs=1, runner_on_first=True, runner_on_third=True)
+        results[outcome.score_book_cd] += 1
+    
+    # Print simulation results
+    print(f"Results from {num_sims} simulated at-bats:")
+    for result, count in sorted(results.items(), key=lambda x: x[1], reverse=True):
+        if count > 0:
+            percentage = (count / num_sims) * 100
+            print(f"  {result}: {count} ({percentage:.1f}%)")
+    
+    # Test individual probability methods
+    print("\n----- Testing individual probability methods -----")
+    outcomes = {
+        'On Base': sim_ab.onbase,
+        'Walk': sim_ab.bb,
+        'HBP': sim_ab.hbp,
+        'Home Run': sim_ab.hr,
+        'Triple': sim_ab.triple,
+        'Double': sim_ab.double,
+        'Strikeout': sim_ab.k
+    }
+    
+    # Sample each probability 1000 times
+    sample_size = 1000
+    for name, method in outcomes.items():
+        true_count = sum(method() for _ in range(sample_size))
+        percentage = (true_count / sample_size) * 100
+        print(f"{name}: {true_count}/{sample_size} ({percentage:.1f}%)")
+    
+    print("\n===== Test Complete =====")

@@ -31,6 +31,7 @@ import datetime
 from pandas.core.series import Series
 from typing import List, Tuple
 import queue
+from bblogger import logger
 
 AWAY = 0
 HOME = 1
@@ -71,8 +72,7 @@ class Game:
         if baseball_data is None:
             self.baseball_data = bbstats.BaseballStats(load_seasons=load_seasons, new_season=new_season,
                                                        load_batter_file=load_batter_file,
-                                                       load_pitcher_file=load_pitcher_file,
-                                                       debug=debug)
+                                                       load_pitcher_file=load_pitcher_file)
         else:
             self.baseball_data = baseball_data
         if away_team_name != '' and home_team_name != '':
@@ -83,7 +83,7 @@ class Game:
         self.rotation_len = rotation_len  # number of starting pitchers to rotate over
         self.chatty = chatty
         self.print_box_score_b = print_box_score_b
-        self.debug = debug
+        logger.debug(f"Initializing Game: {away_team_name} vs {home_team_name}, game #{game_num}")
         if starting_pitchers is None:
             starting_pitchers = [None, None]
         self.starting_pitchers = starting_pitchers  # can use if you want to sim the same two starters repeatedly
@@ -93,15 +93,13 @@ class Game:
 
         self.teams = []  # keep track of away in pos 0 and home team in pos 1
         self.teams.insert(AWAY, bbteam.Team(team_name=self.team_names[AWAY], baseball_data=self.baseball_data,
-                                              game_num=self.game_num, rotation_len=self.rotation_len,
-                                              debug=self.debug))  # init away team class
+                                              game_num=self.game_num, rotation_len=self.rotation_len))  # init away team class
         alineup_card = self.teams[AWAY].set_initial_lineup(show_lineup=print_lineup, show_bench=show_bench,
                                                           current_season_stats=(True if game_num > 1 else False),
                                                           force_starting_pitcher=starting_pitchers[AWAY],
                                                           force_lineup_dict=starting_lineups[AWAY])
         self.teams.insert(HOME, bbteam.Team(team_name=self.team_names[HOME], baseball_data=self.baseball_data,
-                                              game_num=self.game_num, rotation_len=self.rotation_len,
-                                              debug=self.debug))  # init away team class
+                                              game_num=self.game_num, rotation_len=self.rotation_len))  # init away team class
         hlineup_card = self.teams[HOME].set_initial_lineup(show_lineup=print_lineup, show_bench=show_bench,
                                                            current_season_stats=(True if game_num > 1 else False),
                                                            force_starting_pitcher=starting_pitchers[HOME],
@@ -475,6 +473,10 @@ class Game:
 
 # test a number of games
 if __name__ == '__main__':
+    # Configure logger level - change to "DEBUG" for more detailed logs
+    from bblogger import configure_logger
+    configure_logger("INFO")
+    
     startdt = datetime.datetime.now()
 
     away_team = 'NYM'
@@ -499,8 +501,7 @@ if __name__ == '__main__':
                     load_batter_file='stats-pp-Batting.csv',
                     load_pitcher_file='stats-pp-Pitching.csv',
                     interactive=False,
-                    show_bench=False,
-                    debug=False
+                    show_bench=False
                     # , starting_pitchers=[MIL_starter, BOS_starter]
                     # , starting_lineups=[MIL_lineup, None]
                     )

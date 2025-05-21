@@ -30,6 +30,7 @@ import bbstats
 import numpy as np
 from typing import List, Optional
 import threading
+from bblogger import logger
 
 AWAY = 0
 HOME = 1
@@ -42,8 +43,7 @@ class BaseballSeason:
                  season_print_lineup_b: bool = False, season_print_box_score_b: bool = False,
                  season_chatty: bool = False, season_team_to_follow: str = None,
                  load_batter_file: str = 'stats-pp-Batting.csv',
-                 load_pitcher_file: str = 'stats-pp-Pitching.csv',
-                 debug: bool = False) -> None:
+                 load_pitcher_file: str = 'stats-pp-Pitching.csv') -> None:
         """
         :param load_seasons: list of seasons to load for stats, can blend multiple seasons
         :param new_season: int value representing the year of the new season can be the same as one of the loads
@@ -59,7 +59,6 @@ class BaseballSeason:
         :param season_team_to_follow: if none skip otherwise follow this team in gory detail
         :param load_batter_file: name of the file with batter data, year will be added to the front of the text
         :param load_pitcher_file: name of the file for the pitcher data, year will be added to the front of the text
-        :param debug: like the name says.... True prints more stuff
         :return: None
         """
         self.season_day_num = 0  # set to first day of the season
@@ -77,7 +76,7 @@ class BaseballSeason:
         self.print_box_score_b = season_print_box_score_b
         self.season_chatty = season_chatty
         self.team_to_follow = season_team_to_follow
-        self.debug = debug
+        logger.debug("Initializing BaseballSeason with seasons: {}, new season: {}", load_seasons, new_season)
         self.baseball_data = bbstats.BaseballStats(load_seasons=self.load_seasons, new_season=new_season,
                                                    include_leagues=include_leagues, load_batter_file=load_batter_file,
                                                    load_pitcher_file=load_pitcher_file)
@@ -219,7 +218,7 @@ class BaseballSeason:
                                    baseball_data=self.baseball_data, game_num=season_day_num,
                                    rotation_len=self.rotation_len, print_lineup=self.print_lineup_b,
                                    chatty=self.season_chatty, print_box_score_b=self.print_box_score_b,
-                                   interactive=self.interactive, debug=self.debug)
+                                   interactive=self.interactive)
                 score, inning, win_loss_list, game_recap = game.sim_game(team_to_follow=self.team_to_follow)
                 self.update_win_loss(away_team_name=match_up[0], home_team_name=match_up[1], win_loss=win_loss_list)
                 print(game_recap)
@@ -250,7 +249,7 @@ class BaseballSeason:
                                    baseball_data=self.baseball_data, game_num=season_day_num,
                                    rotation_len=self.rotation_len, print_lineup=self.print_lineup_b,
                                    chatty=self.season_chatty, print_box_score_b=self.print_box_score_b,
-                                   interactive=self.interactive, debug=self.debug)
+                                   interactive=self.interactive)
                 q = queue.Queue()
                 q.put(self.team_to_follow)
                 thread = threading.Thread(target=game.sim_game_threaded, args=(q,))
@@ -304,8 +303,7 @@ class MultiBaseballSeason:
                  season_print_lineup_b: bool = False, season_print_box_score_b: bool = False,
                  season_chatty: bool = False, season_team_to_follow: str = None,
                  load_batter_file: str = 'stats-pp-Batting.csv',
-                 load_pitcher_file: str = 'stats-pp-Pitching.csv',
-                 debug: bool = False) -> None:
+                 load_pitcher_file: str = 'stats-pp-Pitching.csv') -> None:
         """
                 :param load_seasons: list of seasons to load for stats, can blend multiple seasons
                 :param new_season: int value representing the year of the new season can be the same as one of the loads
@@ -321,7 +319,6 @@ class MultiBaseballSeason:
                 :param season_team_to_follow: if none skip otherwise follow this team in gory detail
                 :param load_batter_file: name of the file with batter data, year will be added to the front of the text
                 :param load_pitcher_file: name of the file for the pitcher data, year will be added to the front of name
-                :param debug: like the name says.... True prints more stuff
                 :return: None
                 """
         self.season_day_num = 0  # set to first day of the season
@@ -344,7 +341,7 @@ class MultiBaseballSeason:
         self.team_to_follow = season_team_to_follow
         self.load_batter_file = load_batter_file
         self.load_pitcher_file = load_pitcher_file
-        self.debug = debug
+        logger.debug("Initializing MultiBaseballSeason with seasons: {}, new season: {}", load_seasons, new_season)
         # if no major and minor league settings is passed bbseason_a will run all teams in all leagues
         self.bbseason_a = BaseballSeason(load_seasons=self.load_seasons, new_season=self.new_season,
                                          team_list= self.team_lists[0],  # majors team list
@@ -356,8 +353,7 @@ class MultiBaseballSeason:
                                          season_print_box_score_b=self.print_box_score_b,
                                          season_team_to_follow=self.team_to_follow,
                                          load_batter_file=self.load_batter_file,
-                                         load_pitcher_file=self.load_pitcher_file,
-                                         debug=self.debug)
+                                         load_pitcher_file=self.load_pitcher_file)
 
         if self.minors is not None:
             self.bbseason_b = BaseballSeason(load_seasons=self.load_seasons, new_season=self.new_season,
@@ -371,8 +367,7 @@ class MultiBaseballSeason:
                                              season_print_box_score_b=self.print_box_score_b,
                                              season_team_to_follow=self.team_to_follow,
                                              load_batter_file=self.load_batter_file,
-                                             load_pitcher_file=self.load_pitcher_file,
-                                             debug=self.debug)
+                                             load_pitcher_file=self.load_pitcher_file)
             self.affliations = dict(zip(self.bbseason_a.get_team_names(), self.bbseason_b.get_team_names()))
             print(self.affliations)
         else:
@@ -422,6 +417,10 @@ class MultiBaseballSeason:
 
 # test a number of games
 if __name__ == '__main__':
+    # Configure logger level - change to "DEBUG" for more detailed logs
+    from bblogger import configure_logger
+    configure_logger("INFO")
+    
     startdt = datetime.datetime.now()
 
     # full season
@@ -438,8 +437,7 @@ if __name__ == '__main__':
     #                                  season_chatty=False, season_print_lineup_b=False,
     #                                  season_print_box_score_b=False, season_team_to_follow=my_teams_to_follow,
     #                                  load_batter_file='random-stats-pp-Batting.csv',  # 'random-stats-pp-Batting.csv',
-    #                                  load_pitcher_file='random-stats-pp-Pitching.csv',  #'random-stats-pp-Pitching.csv',
-    #                                  debug=False)
+    #                                  load_pitcher_file='random-stats-pp-Pitching.csv')
     #
     # bbseasonMS.sim_start()
     # bbseasonMS.sim_all_days_for_seasons()
@@ -453,8 +451,7 @@ if __name__ == '__main__':
                                 season_chatty=False, season_print_lineup_b=False,
                                 season_print_box_score_b=False, season_team_to_follow=my_teams_to_follow,
                                 load_batter_file='stats-pp-Batting.csv',  # 'random-stats-pp-Batting.csv',
-                                load_pitcher_file='stats-pp-Pitching.csv',  # 'random-stats-pp-Pitching.csv'
-                                debug=False)
+                                load_pitcher_file='stats-pp-Pitching.csv')
 
     bbseasonSS.sim_full_season()
 

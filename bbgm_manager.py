@@ -24,18 +24,19 @@
 import json
 import bbstats
 import bbteam
+from bblogger import logger
 
 
 class Manager:
     def __init__(self, team_name, load_batter_file, load_pitcher_file,
-                 load_seasons=2024, new_season=2025, baseball_data=None, debug=False):
-        self.debug = debug
+                 load_seasons=2024, new_season=2025, baseball_data=None):
+        logger.debug("Initializing Manager for team: {}", team_name)
         self.team_name = team_name
         self.baseball_data = baseball_data
         if self.baseball_data is None:
             self.baseball_data = bbstats.BaseballStats(load_seasons=load_seasons, new_season=new_season,
                                                        load_batter_file=load_batter_file,
-                                                       load_pitcher_file=load_pitcher_file, debug=self.debug)
+                                                       load_pitcher_file=load_pitcher_file)
         self.team = None
         self.setup_team()
         # self.print_team()
@@ -47,8 +48,9 @@ class Manager:
         return
 
     def setup_team(self):
+        logger.debug("Setting up team: {}", self.team_name)
         self.team = bbteam.Team(team_name=self.team_name, baseball_data=self.baseball_data,
-                                interactive=True, debug=self.debug)
+                                interactive=True)
         self.team.set_initial_lineup(show_lineup=False, show_bench=False)
         return
 
@@ -215,10 +217,12 @@ class Manager:
 
 # test code Main
 if __name__ == '__main__':
+    # Configure logger level - change to "DEBUG" for more detailed logs
+    from bblogger import configure_logger
+    configure_logger("INFO")
     bbgm = Manager(team_name='MIL', load_seasons=2024, new_season=2025,
                    load_batter_file='stats-pp-Batting.csv',
-                   load_pitcher_file='stats-pp-Pitching.csv',
-                   debug=False)
+                   load_pitcher_file='stats-pp-Pitching.csv')
     bbgm.game_setup()
     # bbgm.team.print_starting_lineups()  # reprint line up and loop to unused pos players at top
     # bbgm.team.print_pos_not_in_lineup()  # lineup already printed

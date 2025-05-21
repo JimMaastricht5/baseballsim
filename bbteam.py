@@ -27,11 +27,12 @@ import bbstats
 from numpy import bool_, float64, int32, int64
 from pandas.core.series import Series
 from typing import Any, Dict, List, Optional, Tuple, Union
+from bblogger import logger
 
 
 class Team:
     def __init__(self, team_name: str, baseball_data: bbstats.BaseballStats, game_num: int = 1,
-                 rotation_len: int = 5, interactive: bool=False, debug: bool = False) -> None:
+                 rotation_len: int = 5, interactive: bool=False) -> None:
         """
         class handles a single team within a game including all prev year and current year stats, rosters,
         available players, in game fatigue for pitchers, provides stats to in game requests.  sets, maintains, and
@@ -41,11 +42,10 @@ class Team:
         :param game_num: number of game in season
         :param rotation_len: length of stating rotations, typically 5
         :param interactive: should the program print to screen for interaction with GM and keyboard?
-        :param debug: are we debugging?
         :return: None
         """
         pd.options.mode.chained_assignment = None  # suppresses chained assignment warning for lineup pos setting
-        self.debug = debug
+        logger.debug("Initializing Team: {}", team_name)
         self.interactive = interactive
         self.team_name = team_name
         self.baseball_data = baseball_data
@@ -114,10 +114,9 @@ class Team:
         self.prior_season_pitchers_df = self.baseball_data.get_pitching_data(self.team_name, True)
         self.prior_season_pos_players_df = self.baseball_data.get_batting_data(self.team_name, True)
         self.new_season_pos_players_df = self.baseball_data.get_batting_data(self.team_name, False)
-        if self.debug:
-            print(f'bbteam.py load_team_data ')
-            print(self.prior_season_pos_players_df.to_string())
-            print(self.new_season_pos_players_df.to_string())
+        logger.debug('Loading team data for team: {}', self.team_name)
+        logger.debug('Prior season position players sample:\n{}', self.prior_season_pos_players_df.head(5).to_string())
+        logger.debug('New season position players sample:\n{}', self.new_season_pos_players_df.head(5).to_string())
         if self.prior_season_pitchers_df.shape[0] == 0:
             print(f'bbteam.py load_team_data: team {self.team_name} does not exist.')
             print(f'Try one of these teams {self.baseball_data.get_all_team_names()}')
@@ -152,8 +151,8 @@ class Team:
         :param lineup_pos: order in lineup numbers are from 1 to 9
         :return: hashcode of the current batter in the lineup
         """
-        if self.debug:
-            print(f'batter_index_in_lineup {lineup_pos}, {self.cur_lineup_index_list}')
+        logger.debug('Getting batter index in lineup. Position: {}, Current lineup: {}', 
+                  lineup_pos, self.cur_lineup_index_list)
         cur_batter_hash_code = self.cur_lineup_index_list[lineup_pos - 1]
         return cur_batter_hash_code
 
@@ -196,10 +195,10 @@ class Team:
         set the dfs used for prior season team data as well as new season team data.
         :return: None
         """
-        if self.debug:
-            print(f'bbteam.py set_prior_and_new....  {self.cur_lineup_index_list}')
-            print(self.prior_season_pos_players_df.head(5).to_string())
-            print(self.new_season_pos_players_df.head(5).to_string())
+        logger.debug('Setting prior and new position player batting bench DFs')
+        logger.debug('Current lineup index list: {}', self.cur_lineup_index_list)
+        logger.debug('Prior season position players sample:\n{}', self.prior_season_pos_players_df.head(5).to_string())
+        logger.debug('New season position players sample:\n{}', self.new_season_pos_players_df.head(5).to_string())
         self.prior_season_lineup_df = self.prior_season_pos_players_df.loc[self.cur_lineup_index_list]  # subset team df
         self.new_season_lineup_df = self.new_season_pos_players_df.loc[self.cur_lineup_index_list]
 
@@ -412,8 +411,7 @@ class Team:
         cur_game_faced = self.box_score.batters_faced(cur_pitching_index)
         avg_faced = self.prior_season_pitching_df.AVG_faced  # avg adjusted for starting condition
         cur_ratio = cur_game_faced / avg_faced * 100
-        if self.debug:
-            print(f'gameteam update fatigue {100 - (cur_ratio * 100)}')
+        logger.debug('Updating pitcher fatigue. New condition: {}', 100 - (cur_ratio * 100))
         if cur_ratio >= self.fatigue_start_perc:
             in_game_fatigue = (cur_ratio - self.fatigue_start_perc) * self.fatigue_rate
         self.set_pitching_condition(cur_ratio)
@@ -496,9 +494,8 @@ class Team:
         :return: hashcode with player number select at the request position
         """
         df_players, df_criteria = None, None
-        if debug:
-            print(f'bbteam.py search_for_pos with pos {position}')
-            print(f'prior season df {self.prior_season_pos_players_df}')
+        logger.debug('Searching for position: {}', position)
+        logger.debug('Prior season position players:\n{}', self.prior_season_pos_players_df.head(10).to_string())
         try:
             df_player_num = None
             not_exhausted = ~(self.prior_season_pos_players_df['Condition'] <= self.fatigue_unavailable)
@@ -516,8 +513,8 @@ class Team:
                 else:  # try if the DH criteria fails try grabbing tired players
                     df_players = self.prior_season_pos_players_df[df_criteria_pos].sort_values('Condition',
                                                                                                ascending=False)
-            if debug:
-                print(f'top player at pos {df_players.head(1).index[0] if df_player_num is None else df_player_num}')
+            logger.debug('Top player at position {}: {}', 
+                       position, df_players.head(1).index[0] if df_player_num is None else df_player_num)
         except IndexError:
             print(f'***Error in bbteam.py search_for_pos with pos {position}')
             print(f'with criteria {df_criteria}')
@@ -550,10 +547,9 @@ class Team:
         :param show_pitching_starter: true prints the starting pitcher
         :return: None
         """
-        if self.debug:
-            print('bbteam.py in print_starting_lineups')
-            print(self.prior_season_lineup_df.head(5).to_string())
-            print(self.new_season_lineup_df.head(5).to_string())
+        logger.debug('Printing starting lineups')
+        logger.debug('Prior season lineup:\n{}', self.prior_season_lineup_df.head(5).to_string())
+        logger.debug('New season lineup:\n{}', self.new_season_lineup_df.head(5).to_string())
         self.lineup_card += f'Starting lineup for the {self.city_name} ({self.team_name}) {self.mascot}:\n'
         if current_season_stats:
             dfb = bbstats.remove_non_print_cols(self.new_season_lineup_df)

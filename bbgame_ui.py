@@ -50,12 +50,12 @@ ORANGE = (255, 140, 0)
 YELLOW = (255, 215, 0)
 
 # Fonts
-FONT_SMALLEST = pygame.font.SysFont("Arial", 8)
-FONT_SMALLER = pygame.font.SysFont("Arial", 10)
-FONT_SMALL = pygame.font.SysFont("Arial", 12)
-FONT_MEDIUM = pygame.font.SysFont("Arial", 14)
-FONT_LARGE = pygame.font.SysFont("Arial", 18)
-FONT_TITLE = pygame.font.SysFont("Arial", 20, bold=True)
+FONT_SMALLEST = pygame.font.SysFont("Arial", 12)  # Increased from 8
+FONT_SMALLER = pygame.font.SysFont("Arial", 14)   # Increased from 10
+FONT_SMALL = pygame.font.SysFont("Arial", 16)     # Increased from 12
+FONT_MEDIUM = pygame.font.SysFont("Arial", 18)    # Increased from 14
+FONT_LARGE = pygame.font.SysFont("Arial", 22)     # Increased from 18
+FONT_TITLE = pygame.font.SysFont("Arial", 24, bold=True)  # Increased from 20
 
 class BaseballUI:
     def __init__(self):
@@ -130,34 +130,17 @@ class BaseballUI:
         self.game.bases.baserunners_names[batter_index] = batter_stats.Player
         
     def add_outcome_text(self, text, color=BLACK):
-        """Add text to the outcome window, keeping the last N lines
-        Colors can be used to highlight different types of events:
-        - BLACK: default text
-        - RED: outs and errors
-        - GREEN: hits and runs scored
-        - BLUE: innings and game state
-        - ORANGE: special events (stolen bases, etc.)
-        """
+        """Add text to the outcome window, keeping the last N lines"""
         lines = text.split('\n')
         for line in lines:
             if line.strip():  # Skip empty lines
-                # Auto-coloring based on content
-                auto_color = color
-                if color == BLACK:  # Only apply auto-coloring if a specific color wasn't provided
-                    if "Scored" in line or "hit" in line.lower() or "single" in line.lower() or "double" in line.lower() or "triple" in line.lower() or "home run" in line.lower():
-                        auto_color = GREEN
-                    elif "out" in line.lower() or "struck out" in line.lower() or "error" in line.lower():
-                        auto_color = RED
-                    elif "inning" in line.lower() or "Game Over" in line or "Final Score" in line:
-                        auto_color = BLUE
-                    elif "steal" in line.lower() or "wild pitch" in line.lower() or "balk" in line.lower():
-                        auto_color = ORANGE
-                
-                self.current_outcome_text.append((line, auto_color))
+                # Always use BLACK color for all text
+                self.current_outcome_text.append((line, BLACK))
         
         # Keep only the last max_outcome_lines
         if len(self.current_outcome_text) > self.max_outcome_lines:
             self.current_outcome_text = self.current_outcome_text[-self.max_outcome_lines:]
+            
     
     def draw_scoreboard(self):
         """Draw the game scoreboard with detailed information"""
@@ -261,19 +244,13 @@ class BaseballUI:
         self.screen.blit(home_hits_label, (rhe_start_x + 40, home_y))
         self.screen.blit(home_errors, (rhe_start_x + 70, home_y))
         
-        # Current inning indicator at bottom
-        inning_text = f"{'Top' if self.game.top_bottom == 0 else 'Bottom'} of Inning {self.game.inning[self.game.team_hitting()]}"
-        inning_surface = FONT_MEDIUM.render(inning_text, True, BLACK)
-        
         # Outs with red circles
         outs_text = "Outs: "
         outs_label = FONT_MEDIUM.render(outs_text, True, BLACK)
         
-        # Position everything along the bottom of the scoreboard
-        inning_x = self.scoreboard_rect.x + 20
+        # Position at the center bottom of scoreboard (original position)
         outs_x = self.scoreboard_rect.centerx
         
-        self.screen.blit(inning_surface, (inning_x, self.scoreboard_rect.bottom - 25))
         self.screen.blit(outs_label, (outs_x, self.scoreboard_rect.bottom - 25))
         
         # Draw out circles (filled if out occurred)
@@ -379,6 +356,26 @@ class BaseballUI:
         filled_width = int(meter_width * (fatigue_percent / 100))
         pygame.draw.rect(self.screen, fatigue_color, (meter_x, meter_y, filled_width, meter_height), border_radius=3)
         
+        # Define base coordinates for the diamond.png image first
+        base_size = 12  # Size of the diamond from center to point (slightly smaller)
+        home_plate_size = 12  # Same size as other bases
+        
+        # First base is at the right corner of the diamond image
+        first_base_x = field_center_x + 210  # Adjusted from base_distance (120)
+        first_base_y = field_center_y - 17   # Adjusted to match image
+        
+        # Second base is at the top corner of the diamond image
+        second_base_x = field_center_x
+        second_base_y = field_center_y - 95  # Adjusted from base_distance
+        
+        # Third base is at the left corner of the diamond image
+        third_base_x = field_center_x - 210  # Adjusted from base_distance
+        third_base_y = field_center_y - 17   # Adjusted to match image
+        
+        # Home plate is at the bottom corner of the diamond image
+        home_plate_x = field_center_x
+        home_plate_y = field_center_y + 85  # Adjusted for diamond.png
+        
         # If we have the diamond image, draw it instead of the polygon field
         if self.diamond_img:
             # Draw the diamond background image
@@ -419,36 +416,32 @@ class BaseballUI:
                             (field_center_x + self.base_distance, field_center_y), 
                             (field_center_x, field_center_y + self.base_distance), 3)
             
-            # Draw bases
-            # Home plate
-            pygame.draw.rect(self.screen, WHITE, 
-                            (field_center_x - 10, field_center_y + self.base_distance - 10, 20, 20))
-            
-            # First base
-            pygame.draw.rect(self.screen, WHITE, 
-                            (field_center_x + self.base_distance - 10, field_center_y - 10, 20, 20))
-            
-            # Second base
-            pygame.draw.rect(self.screen, WHITE, 
-                            (field_center_x - 10, field_center_y - self.base_distance - 10, 20, 20))
-            
-            # Third base
-            pygame.draw.rect(self.screen, WHITE, 
-                            (field_center_x - self.base_distance - 10, field_center_y - 10, 20, 20))
-            
             # Draw pitcher's mound
             pygame.draw.circle(self.screen, BROWN, (field_center_x, field_center_y), 10)
         
-        # Draw fielders with more spread-out infield positions
+        # Draw fielders positioned on the dirt infield
         fielder_positions = {
-            'P': (field_center_x, field_center_y),
-            'C': (field_center_x, field_center_y + self.base_distance + 30),
-            '1B': (field_center_x + self.base_distance - 20, field_center_y - 20),
-            '2B': (field_center_x + 60, field_center_y - 70),
-            '3B': (field_center_x - self.base_distance + 20, field_center_y - 20),
-            'SS': (field_center_x - 60, field_center_y - 70),
+            # Pitcher on the mound
+            'P': (field_center_x, field_center_y - 20),
+            
+            # Catcher behind home plate
+            'C': (field_center_x, home_plate_y + 20),
+            
+            # First baseman near first base
+            '1B': (first_base_x - 20, first_base_y - 55),
+            
+            # Second baseman on the dirt between first and second
+            '2B': (field_center_x + 100, field_center_y - 110),
+            
+            # Third baseman near third base
+            '3B': (third_base_x + 20, third_base_y - 55),
+            
+            # Shortstop on the dirt between second and third
+            'SS': (field_center_x - 100, field_center_y - 110),
+            
+            # Outfielders in the outfield
             'LF': (field_center_x - self.base_distance - 40, field_center_y - self.base_distance - 40),
-            'CF': (field_center_x, field_center_y - self.base_distance - 80),
+            'CF': (field_center_x, field_center_y - self.base_distance - 40),
             'RF': (field_center_x + self.base_distance + 40, field_center_y - self.base_distance - 40)
         }
         
@@ -483,12 +476,13 @@ class BaseballUI:
         
         # Draw each fielder and their name
         for pos, coords in fielder_positions.items():
-            # Draw the fielder as a circle
-            pygame.draw.circle(self.screen, BLUE, coords, 8)
+            # Draw the fielder as a larger circle
+            pygame.draw.circle(self.screen, BLUE, coords, 12)  # Increased from 8
             
-            # Show position
-            pos_text = FONT_SMALLEST.render(pos, True, BLACK)
-            self.screen.blit(pos_text, (coords[0] - pos_text.get_width() // 2, coords[1] + 10))
+            # Show position with larger font and in white for better visibility
+            pos_text = FONT_SMALL.render(pos, True, WHITE)
+            # Center position text in the fielder circle
+            self.screen.blit(pos_text, (coords[0] - pos_text.get_width() // 2, coords[1] - pos_text.get_height() // 2))
             
             # Show player name and in-game stats if we have them
             if pos in position_to_player:
@@ -502,75 +496,112 @@ class BaseballUI:
                 if len(formatted_player_name) > 10:
                     formatted_player_name = formatted_player_name[:8] + ".."
                 
-                name_text = FONT_SMALLEST.render(formatted_player_name, True, BLACK)
-                self.screen.blit(name_text, (coords[0] - name_text.get_width() // 2, coords[1] + 25))
+                # Use larger font for player names
+                name_text = FONT_SMALL.render(formatted_player_name, True, BLACK)
+                
+                # Special positioning for CF - position to the right instead of below
+                if pos == 'CF':
+                    # Position name to the right of the CF
+                    self.screen.blit(name_text, (coords[0] + 20, coords[1] - 5))
+                else:
+                    # Position name below other fielders with more space
+                    self.screen.blit(name_text, (coords[0] - name_text.get_width() // 2, coords[1] + 15))
                 
                 # No in-game stats displayed next to fielders as requested
         
-        # Draw runners if present
-        if self.game.bases.is_runner_on_base_num(1):  # Runner on first
-            # Draw runner as yellow square
-            pygame.draw.rect(self.screen, YELLOW, 
-                          (field_center_x + self.base_distance - 8, field_center_y - 8, 16, 16))
-            runner_name = self.game.bases.baserunners_names[self.game.bases.baserunners[1]]
-            
-            # Format runner name (first initial + last name)
-            runner_parts = runner_name.split()
-            formatted_runner_name = f"{runner_parts[0][0]}. {' '.join(runner_parts[1:])}" if len(runner_parts) > 0 else runner_name
-            
-            name_text = FONT_SMALLEST.render(formatted_runner_name[:10], True, BLACK)
-            # Position name to right of base
-            self.screen.blit(name_text, (field_center_x + self.base_distance + 15, 
-                                      field_center_y - 6))
-            
-        if self.game.bases.is_runner_on_base_num(2):  # Runner on second
-            pygame.draw.rect(self.screen, YELLOW, 
-                          (field_center_x - 8, field_center_y - self.base_distance - 8, 16, 16))
-            runner_name = self.game.bases.baserunners_names[self.game.bases.baserunners[2]]
-            
-            # Format runner name (first initial + last name)
-            runner_parts = runner_name.split()
-            formatted_runner_name = f"{runner_parts[0][0]}. {' '.join(runner_parts[1:])}" if len(runner_parts) > 0 else runner_name
-            
-            name_text = FONT_SMALLEST.render(formatted_runner_name[:10], True, BLACK)
-            # Position name to right of base
-            self.screen.blit(name_text, (field_center_x + 15, 
-                                      field_center_y - self.base_distance - 6))
-            
-        if self.game.bases.is_runner_on_base_num(3):  # Runner on third
-            pygame.draw.rect(self.screen, YELLOW, 
-                          (field_center_x - self.base_distance - 8, field_center_y - 8, 16, 16))
-            runner_name = self.game.bases.baserunners_names[self.game.bases.baserunners[3]]
-            
-            # Format runner name (first initial + last name)
-            runner_parts = runner_name.split()
-            formatted_runner_name = f"{runner_parts[0][0]}. {' '.join(runner_parts[1:])}" if len(runner_parts) > 0 else runner_name
-            
-            name_text = FONT_SMALLEST.render(formatted_runner_name[:10], True, BLACK)
-            # Position name to right of base
-            self.screen.blit(name_text, (field_center_x - self.base_distance + 15, 
-                                      field_center_y - 6))
+        # Instead of drawing separate yellow squares, we'll draw the bases with different colors
+        # based on whether runners are present. Let's handle this in the base drawing code below.
         
-        # Draw current batter - always show the current batter in the lineup
-        # Get current batter from lineup, not from bases (which might have last out)
+        # Draw runners on bases using blue circles with player initials
+        # First get batter info for display
         batter_num = self.game.batting_num[self.game.team_hitting()]
         batter_index = self.game.teams[self.game.team_hitting()].batter_index_in_lineup(batter_num)
         batter_stats = self.game.teams[self.game.team_hitting()].batter_stats_in_lineup(batter_index)
         
-        # Draw the batter at home plate
-        pygame.draw.rect(self.screen, PURPLE, 
-                      (field_center_x - 8, field_center_y + self.base_distance - 8, 16, 16))
-        
-        # Format batter name (first initial + last name)
+        # Show the current batter with a circle and name to the right of home plate
         batter_name = batter_stats.Player
         batter_parts = batter_name.split()
-        formatted_batter_name = f"{batter_parts[0][0]}. {' '.join(batter_parts[1:])}" if len(batter_parts) > 0 else batter_name
+        batter_initial = batter_parts[0][0] if len(batter_parts) > 0 else "B"
         
-        # Display the batter name
-        name_text = FONT_SMALLEST.render(formatted_batter_name[:10], True, BLACK)
-        # Position name to right of base
-        self.screen.blit(name_text, (field_center_x + 15, 
-                                  field_center_y + self.base_distance - 6))
+        # Draw a blue-yellow (split) circle for batter to the right of home plate
+        batter_circle_x = home_plate_x + 50
+        batter_circle_y = home_plate_y - 5
+        
+        # Draw half blue, half yellow circle - using same size as fielders (12)
+        pygame.draw.circle(self.screen, BLUE, (batter_circle_x, batter_circle_y), 12)
+        
+        # Draw yellow semi-circle (right half)
+        pygame.draw.arc(self.screen, YELLOW, 
+                      (batter_circle_x - 12, batter_circle_y - 12, 24, 24),
+                      -1.57,  # Start angle in radians (-90 degrees)
+                      1.57,   # End angle in radians (90 degrees)
+                      12)     # Width of the arc (fills the entire circle)
+        
+        # Draw batter initial in white
+        batter_text = FONT_SMALL.render(batter_initial, True, BLACK)
+        self.screen.blit(batter_text, (batter_circle_x - batter_text.get_width()//2, 
+                                     batter_circle_y - batter_text.get_height()//2))
+        
+        # Display the full batter name to the right of the circle
+        formatted_batter_name = f"{batter_parts[0][0]}. {' '.join(batter_parts[1:])}" if len(batter_parts) > 0 else batter_name
+        name_text = FONT_SMALL.render(formatted_batter_name[:10], True, BLACK)
+        self.screen.blit(name_text, (batter_circle_x + 20, batter_circle_y - 10))
+        
+        # Draw runners on the bases if present
+        if self.game.bases.is_runner_on_base_num(1):  # Runner on first
+            runner_name = self.game.bases.baserunners_names[self.game.bases.baserunners[1]]
+            runner_parts = runner_name.split()
+            runner_initial = runner_parts[0][0] if len(runner_parts) > 0 else "R"
+            
+            # Draw yellow circle at first base (12 matches fielder size)
+            pygame.draw.circle(self.screen, YELLOW, (first_base_x, first_base_y), 12)
+            
+            # Draw runner initial in black
+            runner_text = FONT_SMALL.render(runner_initial, True, BLACK)
+            self.screen.blit(runner_text, (first_base_x - runner_text.get_width()//2, 
+                                       first_base_y - runner_text.get_height()//2))
+            
+            # Display runner name below the circle
+            formatted_name = f"{runner_parts[0][0]}. {' '.join(runner_parts[1:])}" if len(runner_parts) > 0 else runner_name
+            name_text = FONT_SMALL.render(formatted_name[:10], True, BLACK)
+            self.screen.blit(name_text, (first_base_x - name_text.get_width()//2, first_base_y + 20))
+            
+        if self.game.bases.is_runner_on_base_num(2):  # Runner on second
+            runner_name = self.game.bases.baserunners_names[self.game.bases.baserunners[2]]
+            runner_parts = runner_name.split()
+            runner_initial = runner_parts[0][0] if len(runner_parts) > 0 else "R"
+            
+            # Draw yellow circle at second base (12 matches fielder size)
+            pygame.draw.circle(self.screen, YELLOW, (second_base_x, second_base_y), 12)
+            
+            # Draw runner initial in black
+            runner_text = FONT_SMALL.render(runner_initial, True, BLACK)
+            self.screen.blit(runner_text, (second_base_x - runner_text.get_width()//2, 
+                                       second_base_y - runner_text.get_height()//2))
+            
+            # Display runner name below
+            formatted_name = f"{runner_parts[0][0]}. {' '.join(runner_parts[1:])}" if len(runner_parts) > 0 else runner_name
+            name_text = FONT_SMALL.render(formatted_name[:10], True, BLACK)
+            self.screen.blit(name_text, (second_base_x - name_text.get_width()//2, 
+                                      second_base_y + 20))
+            
+        if self.game.bases.is_runner_on_base_num(3):  # Runner on third
+            runner_name = self.game.bases.baserunners_names[self.game.bases.baserunners[3]]
+            runner_parts = runner_name.split()
+            runner_initial = runner_parts[0][0] if len(runner_parts) > 0 else "R"
+            
+            # Draw yellow circle at third base (12 matches fielder size)
+            pygame.draw.circle(self.screen, YELLOW, (third_base_x, third_base_y), 12)
+            
+            # Draw runner initial in black
+            runner_text = FONT_SMALL.render(runner_initial, True, BLACK)
+            self.screen.blit(runner_text, (third_base_x - runner_text.get_width()//2, 
+                                       third_base_y - runner_text.get_height()//2))
+            
+            # Display runner name below the circle
+            formatted_name = f"{runner_parts[0][0]}. {' '.join(runner_parts[1:])}" if len(runner_parts) > 0 else runner_name
+            name_text = FONT_SMALL.render(formatted_name[:10], True, BLACK)
+            self.screen.blit(name_text, (third_base_x - name_text.get_width()//2, third_base_y + 20))
     
     def draw_lineup(self):
         """Draw the batting lineup display"""
@@ -648,25 +679,32 @@ class BaseballUI:
         """Draw the text window showing at-bat outcomes"""
         pygame.draw.rect(self.screen, GRAY, self.outcome_rect, border_radius=5)
         
-        # Title
-        title_text = "Game Play-by-Play"
+        # Title with inning information included
+        inning_text = f"{'Top' if self.game.top_bottom == 0 else 'Bottom'} of Inning {self.game.inning[self.game.team_hitting()]}"
+        title_text = f"Game Play-by-Play ({inning_text})"
         title_surface = FONT_LARGE.render(title_text, True, BLACK)
         self.screen.blit(title_surface, (self.outcome_rect.centerx - title_surface.get_width() // 2, 
                                          self.outcome_rect.y + 10))
         
-        # Display outcome text with smaller font and line spacing
+        # Display outcome text with smaller font in a single column
         text_y = self.outcome_rect.y + 40
+        
         for line_tuple in self.current_outcome_text:
             if isinstance(line_tuple, tuple) and len(line_tuple) == 2:
-                line, color = line_tuple
+                line, _ = line_tuple  # Ignore any stored color
             else:
                 # Handle legacy format (string only)
                 line = line_tuple
-                color = BLACK
-                
-            line_surface = FONT_SMALLER.render(line, True, color)
-            self.screen.blit(line_surface, (self.outcome_rect.x + 20, text_y))
-            text_y += 16  # Reduced from 20
+            
+            # Left side position
+            x_pos = self.outcome_rect.x + 20
+            
+            # Use slightly larger font for better readability - always BLACK
+            line_surface = FONT_SMALL.render(line, True, BLACK)
+            self.screen.blit(line_surface, (x_pos, text_y))
+            
+            # Increment y position after each line
+            text_y += 16
             
             # Make sure we don't exceed the outcome rect area
             if text_y > self.outcome_rect.bottom - 20:
@@ -678,7 +716,7 @@ class BaseballUI:
     def sim_next_at_bat(self):
         """Simulate the next at-bat in the game"""
         if self.game.is_game_end():
-            self.add_outcome_text("The game has ended.")
+            self.add_outcome_text("The game has ended.", BLACK)
             return
             
         # Store current state to detect changes
@@ -688,22 +726,9 @@ class BaseballUI:
                              self.game.bases.is_runner_on_base_num(2),
                              self.game.bases.is_runner_on_base_num(3)]
         
-        # Reset ball-strike count for each at-bat
+        # Reset ball-strike count for each at-bat (still track internally but don't show pitches)
         self.balls = 0
         self.strikes = 0
-        
-        # Simulate random pitches for visual effect (between 1-5 pitches)
-        num_pitches = random.randint(1, 5)
-        for i in range(num_pitches):
-            # Randomly simulate a ball or strike
-            if random.random() > 0.5 and self.strikes < 2:
-                self.strikes += 1
-                pitch_desc = random.choice(["Strike on the corner", "Swinging strike", "Called strike", "Foul ball"])
-                self.add_outcome_text(f"Pitch {i+1}: {pitch_desc}. Count: {self.balls}-{self.strikes}", BLUE)
-            elif self.balls < 3:
-                self.balls += 1
-                pitch_desc = random.choice(["Ball outside", "Ball high", "Ball in the dirt", "Ball inside"])
-                self.add_outcome_text(f"Pitch {i+1}: {pitch_desc}. Count: {self.balls}-{self.strikes}", BLUE)
         
         # Simulate one at-bat
         pitch_switch = False
@@ -712,7 +737,7 @@ class BaseballUI:
         self.game.stolen_base_sit()
         
         if self.game.outs >= 3:
-            self.add_outcome_text("The half inning is over.")
+            self.add_outcome_text("The half inning is over.", BLACK)
             return
             
         self.game.balk_wild_pitch()
@@ -724,8 +749,8 @@ class BaseballUI:
             players = ''
             for player_id in self.game.bases.player_scored.keys():
                 players = players + ', ' + self.game.bases.player_scored[player_id] if players != '' else self.game.bases.player_scored[player_id]
-            self.add_outcome_text(f"Scored {self.game.bases.runs_scored} run(s)! ({players})")
-            self.add_outcome_text(f"The score is {self.game.team_names[0]} {self.game.total_score[0]} to {self.game.team_names[1]} {self.game.total_score[1]}")
+            self.add_outcome_text(f"Scored {self.game.bases.runs_scored} run(s)! ({players})", BLACK)
+            self.add_outcome_text(f"The score is {self.game.team_names[0]} {self.game.total_score[0]} to {self.game.team_names[1]} {self.game.total_score[1]}", BLACK)
         
         # Get outcome text from the most recent at-bat
         batting_team = self.game.team_names[self.game.team_hitting()]
@@ -733,11 +758,11 @@ class BaseballUI:
         pitcher_name = __pitching.Player
         outcome = self.game.outcomes.score_book_cd
         
-        self.add_outcome_text(f"Pitcher: {pitcher_name} against {batting_team} batter: {batter_name}")
-        self.add_outcome_text(f"Outcome: {outcome}, Outs: {self.game.outs}")
+        # Just create a simple combined text in black
+        self.add_outcome_text(f"Pitcher: {pitcher_name} vs {batter_name} ({batting_team}) - Outcome: {outcome}, Outs: {self.game.outs}", BLACK)
         
         if self.game.bases.count_runners() >= 1 and self.game.outs < 3:
-            self.add_outcome_text(self.game.bases.describe_runners())
+            self.add_outcome_text(self.game.bases.describe_runners(), BLACK)
         
         # Update batting order
         self.game.batting_num[self.game.team_hitting()] = self.game.batting_num[self.game.team_hitting()] + 1 if (self.game.batting_num[self.game.team_hitting()] + 1) <= 9 else 1
@@ -748,8 +773,8 @@ class BaseballUI:
             self.game.update_inning_score(number_of_runs=0)
             self.game.bases.clear_bases()
             top_or_bottom = 'top' if self.game.top_bottom == 0 else 'bottom'
-            self.add_outcome_text(f"Completed {top_or_bottom} half of inning {self.game.inning[self.game.team_hitting()]}")
-            self.add_outcome_text(f"The score is {self.game.team_names[0]} {self.game.total_score[0]} to {self.game.team_names[1]} {self.game.total_score[1]}")
+            self.add_outcome_text(f"Completed {top_or_bottom} half of inning {self.game.inning[self.game.team_hitting()]}", BLACK)
+            self.add_outcome_text(f"The score is {self.game.team_names[0]} {self.game.total_score[0]} to {self.game.team_names[1]} {self.game.total_score[1]}", BLACK)
             
             self.game.inning[self.game.team_hitting()] += 1
             self.game.top_bottom = 0 if self.game.top_bottom == 1 else 1
@@ -757,16 +782,16 @@ class BaseballUI:
             
             if self.game.is_game_end():
                 self.game.end_game()
-                self.add_outcome_text("Game Over!")
-                self.add_outcome_text(f"Final Score: {self.game.team_names[0]} {self.game.total_score[0]} to {self.game.team_names[1]} {self.game.total_score[1]}")
+                self.add_outcome_text("Game Over!", BLACK)
+                self.add_outcome_text(f"Final Score: {self.game.team_names[0]} {self.game.total_score[0]} to {self.game.team_names[1]} {self.game.total_score[1]}", BLACK)
             else:
                 top_or_bottom = 'top' if self.game.top_bottom == 0 else 'bottom'
-                self.add_outcome_text(f"Starting the {top_or_bottom} of inning {self.game.inning[self.game.team_hitting()]}")
+                self.add_outcome_text(f"Starting the {top_or_bottom} of inning {self.game.inning[self.game.team_hitting()]}", BLACK)
     
     def sim_half_inning(self):
         """Simulate a full half-inning"""
         if self.game.is_game_end():
-            self.add_outcome_text("The game has ended.")
+            self.add_outcome_text("The game has ended.", BLACK)
             return
             
         initial_outs = self.game.outs

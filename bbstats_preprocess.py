@@ -21,7 +21,8 @@
 # SOFTWARE.
 #
 # JimMaastricht5@gmail.com
-# data clean up and standarization for stats.  handles random generation if requested
+# data clean up and standardization for stats.  handles random generation if requested
+# data imported from https://www.rotowire.com/baseball/stats.php
 import pandas as pd
 import random
 import city_names as city
@@ -358,10 +359,10 @@ class BaseballStatsPreProcess:
 
 
 if __name__ == '__main__':
-    baseball_data = BaseballStatsPreProcess(load_seasons=[2024], new_season=2025,
+    baseball_data = BaseballStatsPreProcess(load_seasons=[2025], new_season=2026,
                                             generate_random_data=True,
-                                            load_batter_file='player-stats-Batters-v2.csv',
-                                            load_pitcher_file='player-stats-Pitching-v2.csv')
+                                            load_batter_file='player-stats-Batters.csv',
+                                            load_pitcher_file='player-stats-Pitching.csv')
     print(*baseball_data.pitching_data.columns)
     print(*baseball_data.batting_data.columns)
     print(baseball_data.batting_data.Team.unique())

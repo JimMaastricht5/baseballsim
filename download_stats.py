@@ -104,6 +104,7 @@ class StatsDownloader:
             bool: True if successful, False otherwise
         """
         driver = None
+        error_occurred = False
         try:
             logger.info(f"Downloading batting statistics for {season}...")
             
@@ -118,6 +119,9 @@ class StatsDownloader:
             # Look for batting stats table or tab
             logger.info("Waiting for batting stats to load...")
             wait.until(EC.presence_of_element_located((By.TAG_NAME, "table")))
+            
+            # Wait for page to fully load
+            time.sleep(2)
             
             # Look for "Export Table Data" text and CSV button
             logger.info("Looking for Export Table Data section...")
@@ -172,16 +176,23 @@ class StatsDownloader:
                     return True
                 else:
                     logger.error("No CSV file was downloaded")
+                    logger.info("Chrome window left open for debugging - close manually when done")
+                    error_occurred = True
                     return False
             else:
                 logger.error("Could not find CSV export button")
+                logger.info("Chrome window left open for debugging - close manually when done")
+                error_occurred = True
                 return False
                 
         except Exception as e:
             logger.error(f"Error downloading batting stats for {season}: {e}")
+            logger.info("Chrome window left open for debugging - close manually when done")
+            error_occurred = True
             return False
         finally:
-            if driver:
+            # Only quit driver if no error occurred
+            if driver and not error_occurred:
                 driver.quit()
 
     def download_pitching_stats(self, season: int) -> bool:
@@ -195,6 +206,7 @@ class StatsDownloader:
             bool: True if successful, False otherwise
         """
         driver = None
+        error_occurred = False
         try:
             logger.info(f"Downloading pitching statistics for {season}...")
             
@@ -235,7 +247,10 @@ class StatsDownloader:
             
             # Wait for table to load
             wait.until(EC.presence_of_element_located((By.TAG_NAME, "table")))
-            
+
+            # Wait for page to fully load
+            time.sleep(2)
+
             # Look for "Export Table Data" text and CSV button
             logger.info("Looking for Export Table Data section...")
             
@@ -289,16 +304,23 @@ class StatsDownloader:
                     return True
                 else:
                     logger.error("No CSV file was downloaded")
+                    logger.info("Chrome window left open for debugging - close manually when done")
+                    error_occurred = True
                     return False
             else:
                 logger.error("Could not find CSV export button")
+                logger.info("Chrome window left open for debugging - close manually when done")
+                error_occurred = True
                 return False
                 
         except Exception as e:
             logger.error(f"Error downloading pitching stats for {season}: {e}")
+            logger.info("Chrome window left open for debugging - close manually when done")
+            error_occurred = True
             return False
         finally:
-            if driver:
+            # Only quit driver if no error occurred
+            if driver and not error_occurred:
                 driver.quit()
 
     def verify_files_exist(self) -> bool:
@@ -421,9 +443,9 @@ def main():
     """
     # You can modify these parameters as needed
     downloader = StatsDownloader(
-        season=[2024, 2025],
+        season=[2023],
         generate_random=False,  # Set to False for real data
-        new_season=2025,
+        new_season=2026,
         headless=False  # Set to True to run browser in background
     )
     
@@ -436,6 +458,9 @@ def main():
         # downloader.clean_up_files()
     else:
         print("❌ Stats download and processing failed!")
+        print("Chrome window should be left open for debugging.")
+        print("Press Enter to exit...")
+        input()
         sys.exit(1)
 
 

@@ -138,6 +138,7 @@ class BaseballStatsPreProcess:
             pitching_data = pd.concat([pitching_data, df], axis=0)
 
         # drop unwanted cols
+        print(pitching_data.columns)
         pitching_data.drop(['Rk', 'Lg', 'W-L%', 'GF', 'IBB', 'ERA+', 'FIP', 'H9', 'BB9', 'SO9', 'SO/BB',
                             'HR9', 'Awards', 'Player-additional', 'BF'],inplace=True, axis=1)
         pitching_data['Player'] = pitching_data['Player'].str.replace('*', '').str.replace('#', '')

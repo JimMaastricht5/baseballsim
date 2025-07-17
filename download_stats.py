@@ -41,6 +41,7 @@ from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.chrome.service import Service
+from selenium.webdriver.common.action_chains import ActionChains
 from webdriver_manager.chrome import ChromeDriverManager
 from bbstats_preprocess import BaseballStatsPreProcess
 from bblogger import logger
@@ -120,17 +121,57 @@ class StatsDownloader:
             logger.info("Waiting for batting stats to load...")
             wait.until(EC.presence_of_element_located((By.TAG_NAME, "table")))
             
+            # Select the correct year
+            logger.info(f"Looking for year {season} selection...")
+            try:
+                # Look for year selection elements after "Season" text
+                year_selectors = [
+                    f"//a[contains(text(), '{season}')]",
+                    f"//button[contains(text(), '{season}')]",
+                    f"//span[contains(text(), '{season}')]",
+                    f"//div[contains(text(), '{season}')]",
+                    f"//li[contains(text(), '{season}')]"
+                ]
+                
+                year_element = None
+                for selector in year_selectors:
+                    try:
+                        year_element = driver.find_element(By.XPATH, selector)
+                        logger.info(f"Found year {season} using selector: {selector}")
+                        break
+                    except:
+                        continue
+                
+                if year_element:
+                    logger.info(f"Clicking on year {season}")
+                    year_element.click()
+                    logger.info(f"Year {season} clicked successfully")
+                    
+                    # Add immediate check after click
+                    logger.info("Checking page state after year click...")
+                    time.sleep(1)
+                    logger.info("1 second passed after year click")
+                    time.sleep(1)
+                    logger.info("2 seconds passed after year click")
+                    
+                else:
+                    logger.warning(f"Could not find year {season} selection")
+            except Exception as e:
+                logger.warning(f"Error selecting year {season}: {e}")
+            
+            # Wait for page to fully load after year selection
+            logger.info("Waiting for page to reload after year selection...")
+            time.sleep(3)
+            logger.info("3 second wait completed")
+            
             # Wait for page to fully load
             time.sleep(2)
             
             # Look for "Export Table Data" text and CSV button
             logger.info("Looking for Export Table Data section...")
             
-            # Try different possible selectors for the export functionality
-            export_selectors = [
-                "//text()[contains(., 'Export Table Data')]",
-                "//span[contains(text(), 'Export Table Data')]",
-                "//div[contains(text(), 'Export Table Data')]",
+            # Try different possible selectors for the CSV button
+            csv_selectors = [
                 "//a[contains(text(), 'CSV')]",
                 "//button[contains(text(), 'CSV')]",
                 "//input[@value='CSV']",
@@ -138,20 +179,10 @@ class StatsDownloader:
             ]
             
             csv_button = None
-            for selector in export_selectors:
+            for selector in csv_selectors:
                 try:
-                    if selector.startswith("//text()"):
-                        # Find the text first, then look for CSV button nearby
-                        elements = driver.find_elements(By.XPATH, selector)
-                        if elements:
-                            # Look for CSV button near this text
-                            csv_buttons = driver.find_elements(By.XPATH, "//a[contains(text(), 'CSV')] | //button[contains(text(), 'CSV')]")
-                            if csv_buttons:
-                                csv_button = csv_buttons[0]
-                                break
-                    else:
-                        csv_button = driver.find_element(By.XPATH, selector)
-                        break
+                    csv_button = driver.find_element(By.XPATH, selector)
+                    break
                 except:
                     continue
             
@@ -248,47 +279,155 @@ class StatsDownloader:
             # Wait for table to load
             wait.until(EC.presence_of_element_located((By.TAG_NAME, "table")))
 
-            # Wait for page to fully load
-            time.sleep(2)
+            # Select the correct year
+            logger.info(f"Looking for year {season} selection...")
+            try:
+                # Look for year selection elements after "Season" text
+                year_selectors = [
+                    f"//a[contains(text(), '{season}')]",
+                    f"//button[contains(text(), '{season}')]",
+                    f"//span[contains(text(), '{season}')]",
+                    f"//div[contains(text(), '{season}')]",
+                    f"//li[contains(text(), '{season}')]"
+                ]
+                
+                year_element = None
+                for selector in year_selectors:
+                    try:
+                        year_element = driver.find_element(By.XPATH, selector)
+                        logger.info(f"Found year {season} using selector: {selector}")
+                        break
+                    except:
+                        continue
+                
+                if year_element:
+                    logger.info(f"Clicking on year {season}")
+                    year_element.click()
+                    logger.info(f"Year {season} clicked successfully")
+                    
+                    # Add immediate check after click
+                    logger.info("Checking page state after year click...")
+                    time.sleep(1)
+                    logger.info("1 second passed after year click")
+                    time.sleep(1)
+                    logger.info("2 seconds passed after year click")
+                    
+                else:
+                    logger.warning(f"Could not find year {season} selection")
+            except Exception as e:
+                logger.warning(f"Error selecting year {season}: {e}")
 
-            # Look for "Export Table Data" text and CSV button
-            logger.info("Looking for Export Table Data section...")
+            # Wait for page to fully load after year selection
+            logger.info("Waiting for page to reload after year selection...")
+            time.sleep(3)
+            logger.info("3 second wait completed")
+
+            # Skip waiting for table since it's already present and just continue
+            logger.info("Skipping table wait since table is already present")
             
-            # Try different possible selectors for the export functionality
-            export_selectors = [
-                "//text()[contains(., 'Export Table Data')]",
-                "//span[contains(text(), 'Export Table Data')]",
-                "//div[contains(text(), 'Export Table Data')]",
-                "//a[contains(text(), 'CSV')]",
-                "//button[contains(text(), 'CSV')]",
-                "//input[@value='CSV']",
-                "//a[contains(@href, 'csv')]"
+            # Look for pitching tab/button and click it
+            logger.info("Looking for pitching stats tab...")
+            
+            # Try to find pitching tab/button
+            pitching_selectors = [
+                "//a[contains(text(), 'Pitching')]",
+                "//button[contains(text(), 'Pitching')]",
+                "//span[contains(text(), 'Pitching')]",
+                "//div[contains(text(), 'Pitching')]",
+                "//li[contains(text(), 'Pitching')]"
             ]
             
-            csv_button = None
-            for selector in export_selectors:
+            pitching_tab = None
+            for selector in pitching_selectors:
                 try:
-                    if selector.startswith("//text()"):
-                        # Find the text first, then look for CSV button nearby
-                        elements = driver.find_elements(By.XPATH, selector)
-                        if elements:
-                            # Look for CSV button near this text
-                            csv_buttons = driver.find_elements(By.XPATH, "//a[contains(text(), 'CSV')] | //button[contains(text(), 'CSV')]")
-                            if csv_buttons:
-                                csv_button = csv_buttons[0]
-                                break
-                    else:
-                        csv_button = driver.find_element(By.XPATH, selector)
-                        break
+                    pitching_tab = driver.find_element(By.XPATH, selector)
+                    break
                 except:
                     continue
             
+            if pitching_tab:
+                logger.info("Found pitching tab, clicking...")
+                pitching_tab.click()
+                logger.info("Pitching tab clicked, waiting for pitching stats to load...")
+                time.sleep(5)  # Wait longer for pitching tab to load
+                logger.info("Pitching tab load wait completed")
+            else:
+                logger.warning("No pitching tab found, assuming pitching stats are already visible")
+
+            # Brief wait to ensure page is stable
+            time.sleep(2)
+            logger.info("Brief stability wait completed")
+
+            # Look for CSV button specifically on pitching page
+            logger.info("Looking for CSV button on pitching page...")
+            
+            # Try different possible selectors for the CSV button specifically
+            csv_selectors = [
+                "//a[contains(text(), 'CSV')]",
+                "//button[contains(text(), 'CSV')]",
+                "//input[@value='CSV']",
+                "//a[contains(@href, 'csv')]",
+                "//span[contains(text(), 'CSV')]",
+                "//div[contains(text(), 'CSV')]",
+                "//a[text()='CSV']",
+                "//button[text()='CSV']"
+            ]
+            
+            csv_button = None
+            for selector in csv_selectors:
+                try:
+                    csv_button = driver.find_element(By.XPATH, selector)
+                    logger.info(f"Found CSV button using selector: {selector}")
+                    break
+                except Exception as e:
+                    logger.debug(f"Selector {selector} failed: {e}")
+                    continue
+            
+            # If we still can't find the CSV button, try waiting a bit more
+            if not csv_button:
+                logger.info("CSV button not found, waiting longer and trying again...")
+                time.sleep(2)
+                for selector in csv_selectors:
+                    try:
+                        csv_button = driver.find_element(By.XPATH, selector)
+                        logger.info(f"Found CSV button on retry using selector: {selector}")
+                        break
+                    except:
+                        continue
+            
             if csv_button:
-                logger.info("Found CSV export button, clicking...")
-                csv_button.click()
+                logger.info(f"Found CSV export button: {csv_button.tag_name}, text: '{csv_button.text}', href: '{csv_button.get_attribute('href')}'")
+                
+                # Scroll to the element first
+                driver.execute_script("arguments[0].scrollIntoView(true);", csv_button)
+                time.sleep(1)
+                
+                # Try multiple click methods for better reliability
+                try:
+                    # Method 1: Regular click
+                    csv_button.click()
+                    logger.info("Regular click successful")
+                except Exception as e:
+                    logger.warning(f"Regular click failed: {e}")
+                    try:
+                        # Method 2: JavaScript click
+                        driver.execute_script("arguments[0].click();", csv_button)
+                        logger.info("JavaScript click successful")
+                    except Exception as e2:
+                        logger.warning(f"JavaScript click failed: {e2}")
+                        try:
+                            # Method 3: Action chains click
+                            ActionChains(driver).move_to_element(csv_button).click().perform()
+                            logger.info("Action chains click successful")
+                        except Exception as e3:
+                            logger.error(f"All click methods failed: {e3}")
+                            logger.info("Chrome window left open for debugging - close manually when done")
+                            error_occurred = True
+                            return False
                 
                 # Wait for download to complete
-                time.sleep(5)
+                logger.info("Waiting for download to complete...")
+                time.sleep(3)
                 
                 # Check if file was downloaded and rename it
                 pitcher_file = f'{season} player-stats-Pitching.csv'

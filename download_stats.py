@@ -48,15 +48,12 @@ from bblogger import logger
 
 
 class StatsDownloader:
-    def __init__(self, season: Optional[List[int]] = None, generate_random: bool = False, 
-                 new_season: Optional[int] = None, headless: bool = True):
+    def __init__(self, season: Optional[List[int]] = None, headless: bool = True):
         """
         Initialize the stats downloader
         
         Args:
             season: Season year(s) to download (defaults to current year)
-            generate_random: Whether to generate random data during preprocessing
-            new_season: Optional new season to create from existing data
             headless: Whether to run browser in headless mode
         """
         if season is None:
@@ -65,14 +62,11 @@ class StatsDownloader:
             self.seasons = season
         else:
             self.seasons = [season]
-            
-        self.generate_random = generate_random
-        self.new_season = new_season
         self.headless = headless
         
-        # RotoWire URLs
-        self.batting_url = 'https://www.rotowire.com/baseball/stats.php'
-        self.pitching_url = 'https://www.rotowire.com/baseball/stats.php'  # Same page, different tabs
+        # Baseball Reference URLs
+        self.batting_url = 'https://www.baseball-reference.com/leagues/majors/{season}-standard-batting.shtml'
+        self.pitching_url = 'https://www.baseball-reference.com/leagues/majors/{season}-standard-pitching.shtml'
         
         # Setup Chrome options
         self.chrome_options = Options()
@@ -110,111 +104,112 @@ class StatsDownloader:
             logger.info(f"Downloading batting statistics for {season}...")
             
             # Initialize Chrome driver with auto-managed ChromeDriver
+            logger.info("Installing and starting Chrome WebDriver...")
             service = Service(ChromeDriverManager().install())
             driver = webdriver.Chrome(service=service, options=self.chrome_options)
-            driver.get(self.batting_url)
+            logger.info("Chrome WebDriver started successfully")
             
-            # Wait for page to load
-            wait = WebDriverWait(driver, 20)
+            # Format URL with season year
+            batting_url = self.batting_url.format(season=season)
+            logger.info(f"Navigating to: {batting_url}")
             
-            # Look for batting stats table or tab
-            logger.info("Waiting for batting stats to load...")
-            wait.until(EC.presence_of_element_located((By.TAG_NAME, "table")))
+            # Set page load timeout
+            driver.set_page_load_timeout(3)  # 10 second timeout for page load
             
-            # Select the correct year
-            logger.info(f"Looking for year {season} selection...")
             try:
-                # Look for year selection elements after "Season" text
-                year_selectors = [
-                    f"//a[contains(text(), '{season}')]",
-                    f"//button[contains(text(), '{season}')]",
-                    f"//span[contains(text(), '{season}')]",
-                    f"//div[contains(text(), '{season}')]",
-                    f"//li[contains(text(), '{season}')]"
-                ]
-                
-                year_element = None
-                for selector in year_selectors:
-                    try:
-                        year_element = driver.find_element(By.XPATH, selector)
-                        logger.info(f"Found year {season} using selector: {selector}")
-                        break
-                    except:
-                        continue
-                
-                if year_element:
-                    logger.info(f"Clicking on year {season}")
-                    year_element.click()
-                    logger.info(f"Year {season} clicked successfully")
-                    
-                    # Add immediate check after click
-                    logger.info("Checking page state after year click...")
-                    time.sleep(1)
-                    logger.info("1 second passed after year click")
-                    time.sleep(1)
-                    logger.info("2 seconds passed after year click")
-                    
-                else:
-                    logger.warning(f"Could not find year {season} selection")
+                driver.get(batting_url)
+                logger.info(f"Successfully navigated to Baseball Reference batting page for {season}")
             except Exception as e:
-                logger.warning(f"Error selecting year {season}: {e}")
-            
-            # Wait for page to fully load after year selection
-            logger.info("Waiting for page to reload after year selection...")
-            time.sleep(3)
-            logger.info("3 second wait completed")
+                logger.warning(f"Page load timed out or failed: {e}")
+                logger.info("Attempting to continue anyway since page may have partially loaded...")
+                # Continue execution - page might be loaded enough to work with
             
             # Wait for page to fully load
-            time.sleep(2)
+            logger.info("Waiting 3 seconds for page to load...")
+            time.sleep(3)
+            logger.info("Page load wait completed")
             
-            # Look for "Export Table Data" text and CSV button
-            logger.info("Looking for Export Table Data section...")
+            # Manual Share & Export click
+            logger.info("⚠️  MANUAL ACTION REQUIRED ⚠️")
+            logger.info("Please manually click 'Share & Export' -> 'Get Table as CSV' in the browser window")
+            input("Press Enter after you have clicked through to get the CSV data displayed...")
+            logger.info("Continuing to capture CSV data from screen...")
+                    
+            # Wait for CSV data to display on screen
+            time.sleep(3)
             
-            # Try different possible selectors for the CSV button
-            csv_selectors = [
-                "//a[contains(text(), 'CSV')]",
-                "//button[contains(text(), 'CSV')]",
-                "//input[@value='CSV']",
-                "//a[contains(@href, 'csv')]"
-            ]
+            # The CSV data should now be displayed on the page - capture it
+            logger.info("Attempting to capture CSV data from the page...")
             
-            csv_button = None
-            for selector in csv_selectors:
-                try:
-                    csv_button = driver.find_element(By.XPATH, selector)
-                    break
-                except:
-                    continue
-            
-            if csv_button:
-                logger.info("Found CSV export button, clicking...")
-                csv_button.click()
+            try:
+                # Look for CSV content starting with "Rk,Player," and ending before "MLB Average"
+                logger.info("Looking for CSV data starting with 'Rk,Player,'...")
                 
-                # Wait for download to complete
-                time.sleep(5)
+                # Get the entire page text
+                page_text = driver.find_element(By.TAG_NAME, "body").text
                 
-                # Check if file was downloaded and rename it
-                batter_file = f'{season} player-stats-Batters.csv'
-                downloaded_files = [f for f in os.listdir('.') if f.endswith('.csv') and 'batting' in f.lower()]
-                if not downloaded_files:
-                    downloaded_files = [f for f in os.listdir('.') if f.endswith('.csv') and os.path.getmtime(f) > time.time() - 60]
+                # Find the start of CSV data
+                start_marker = "Rk,Player,"
+                start_index = page_text.find(start_marker)
                 
-                if downloaded_files:
-                    # Rename the most recent CSV file
-                    latest_file = max(downloaded_files, key=os.path.getmtime)
-                    os.rename(latest_file, batter_file)
+                if start_index != -1:
+                    logger.info("Found CSV data starting point")
+                    
+                    # Extract from start marker to end
+                    csv_section = page_text[start_index:]
+                    
+                    # Split into lines and filter out MLB Average line
+                    lines = csv_section.split('\n')
+                    csv_lines = []
+                    
+                    for line in lines:
+                        # Stop if we hit the MLB Average line
+                        if ",MLB Average" in line or line.strip().endswith("MLB Average"):
+                            logger.info("Found MLB Average line, stopping data collection")
+                            break
+                        # Only include lines that look like CSV data
+                        if line.strip() and (',' in line):
+                            csv_lines.append(line.strip())
+                    
+                    if csv_lines:
+                        csv_content = '\n'.join(csv_lines)
+                        logger.info(f"Captured {len(csv_lines)} lines of CSV data")
+                    else:
+                        csv_content = None
+                        logger.warning("No valid CSV lines found after filtering")
+                else:
+                    csv_content = None
+                    logger.warning("Could not find CSV data starting with 'Rk,Player,'")
+                
+                if csv_content:
+                    # Save the CSV content to file
+                    batter_file = f'{season} player-stats-Batters.csv'
+                    
+                    # Remove existing file if it exists
+                    if os.path.exists(batter_file):
+                        os.remove(batter_file)
+                        logger.info(f"Removed existing file {batter_file}")
+                    
+                    # Write CSV content to file
+                    with open(batter_file, 'w', encoding='utf-8') as f:
+                        f.write(csv_content)
+                    
                     logger.info(f"Batting stats saved to {batter_file}")
                     return True
                 else:
-                    logger.error("No CSV file was downloaded")
-                    logger.info("Chrome window left open for debugging - close manually when done")
-                    error_occurred = True
-                    return False
-            else:
-                logger.error("Could not find CSV export button")
-                logger.info("Chrome window left open for debugging - close manually when done")
-                error_occurred = True
-                return False
+                    logger.warning("Could not find CSV content on the page")
+                    # Fallback: ask user to manually save
+                    logger.info("⚠️  MANUAL ACTION REQUIRED ⚠️")
+                    logger.info("Please manually copy the CSV data and save it yourself, then press Enter...")
+                    input("Press Enter when you have manually saved the CSV data...")
+                    return True
+                    
+            except Exception as e:
+                logger.error(f"Error capturing CSV content: {e}")
+                logger.info("⚠️  MANUAL ACTION REQUIRED ⚠️")  
+                logger.info("Please manually copy the CSV data and save it yourself, then press Enter...")
+                input("Press Enter when you have manually saved the CSV data...")
+                return True
                 
         except Exception as e:
             logger.error(f"Error downloading batting stats for {season}: {e}")
@@ -242,215 +237,119 @@ class StatsDownloader:
             logger.info(f"Downloading pitching statistics for {season}...")
             
             # Initialize Chrome driver with auto-managed ChromeDriver
+            logger.info("Installing and starting Chrome WebDriver...")
             service = Service(ChromeDriverManager().install())
             driver = webdriver.Chrome(service=service, options=self.chrome_options)
-            driver.get(self.pitching_url)
+            logger.info("Chrome WebDriver started successfully")
             
-            # Wait for page to load
-            wait = WebDriverWait(driver, 20)
+            # Format URL with season year
+            pitching_url = self.pitching_url.format(season=season)
+            logger.info(f"Navigating to: {pitching_url}")
             
-            # Look for pitching stats tab or button
-            logger.info("Looking for pitching stats tab...")
+            # Set page load timeout
+            driver.set_page_load_timeout(3)  # 3 second timeout for page load
             
-            # Try to find pitching tab/button
-            pitching_selectors = [
-                "//a[contains(text(), 'Pitching')]",
-                "//button[contains(text(), 'Pitching')]",
-                "//span[contains(text(), 'Pitching')]",
-                "//div[contains(text(), 'Pitching')]",
-                "//li[contains(text(), 'Pitching')]"
-            ]
-            
-            pitching_tab = None
-            for selector in pitching_selectors:
-                try:
-                    pitching_tab = driver.find_element(By.XPATH, selector)
-                    break
-                except:
-                    continue
-            
-            if pitching_tab:
-                logger.info("Found pitching tab, clicking...")
-                pitching_tab.click()
-                time.sleep(3)  # Wait for tab to load
-            else:
-                logger.warning("No pitching tab found, assuming pitching stats are already visible")
-            
-            # Wait for table to load
-            wait.until(EC.presence_of_element_located((By.TAG_NAME, "table")))
-
-            # Select the correct year
-            logger.info(f"Looking for year {season} selection...")
             try:
-                # Look for year selection elements after "Season" text
-                year_selectors = [
-                    f"//a[contains(text(), '{season}')]",
-                    f"//button[contains(text(), '{season}')]",
-                    f"//span[contains(text(), '{season}')]",
-                    f"//div[contains(text(), '{season}')]",
-                    f"//li[contains(text(), '{season}')]"
-                ]
-                
-                year_element = None
-                for selector in year_selectors:
-                    try:
-                        year_element = driver.find_element(By.XPATH, selector)
-                        logger.info(f"Found year {season} using selector: {selector}")
-                        break
-                    except:
-                        continue
-                
-                if year_element:
-                    logger.info(f"Clicking on year {season}")
-                    year_element.click()
-                    logger.info(f"Year {season} clicked successfully")
-                    
-                    # Add immediate check after click
-                    logger.info("Checking page state after year click...")
-                    time.sleep(1)
-                    logger.info("1 second passed after year click")
-                    time.sleep(1)
-                    logger.info("2 seconds passed after year click")
-                    
-                else:
-                    logger.warning(f"Could not find year {season} selection")
+                driver.get(pitching_url)
+                logger.info(f"Successfully navigated to Baseball Reference pitching page for {season}")
             except Exception as e:
-                logger.warning(f"Error selecting year {season}: {e}")
-
-            # Wait for page to fully load after year selection
-            logger.info("Waiting for page to reload after year selection...")
+                logger.warning(f"Page load timed out or failed: {e}")
+                logger.info("Attempting to continue anyway since page may have partially loaded...")
+                # Continue execution - page might be loaded enough to work with
+            
+            # Wait for page to fully load
+            logger.info("Waiting 3 seconds for page to load...")
             time.sleep(3)
-            logger.info("3 second wait completed")
+            logger.info("Page load wait completed")
 
-            # Skip waiting for table since it's already present and just continue
-            logger.info("Skipping table wait since table is already present")
+            # Manual Share & Export click
+            logger.info("⚠️  MANUAL ACTION REQUIRED ⚠️")
+            logger.info("Please manually click 'Share & Export' -> 'Get Table as CSV' in the browser window")
+            input("Press Enter after you have clicked through to get the CSV data displayed...")
+            logger.info("Continuing to capture CSV data from screen...")
+                    
+            # Wait for CSV data to display on screen
+            time.sleep(3)
             
-            # Look for pitching tab/button and click it
-            logger.info("Looking for pitching stats tab...")
+            # The CSV data should now be displayed on the page - capture it
+            logger.info("Attempting to capture CSV data from the page...")
             
-            # Try to find pitching tab/button
-            pitching_selectors = [
-                "//a[contains(text(), 'Pitching')]",
-                "//button[contains(text(), 'Pitching')]",
-                "//span[contains(text(), 'Pitching')]",
-                "//div[contains(text(), 'Pitching')]",
-                "//li[contains(text(), 'Pitching')]"
-            ]
-            
-            pitching_tab = None
-            for selector in pitching_selectors:
-                try:
-                    pitching_tab = driver.find_element(By.XPATH, selector)
-                    break
-                except:
-                    continue
-            
-            if pitching_tab:
-                logger.info("Found pitching tab, clicking...")
-                pitching_tab.click()
-                logger.info("Pitching tab clicked, waiting for pitching stats to load...")
-                time.sleep(5)  # Wait longer for pitching tab to load
-                logger.info("Pitching tab load wait completed")
-            else:
-                logger.warning("No pitching tab found, assuming pitching stats are already visible")
-
-            # Brief wait to ensure page is stable
-            time.sleep(2)
-            logger.info("Brief stability wait completed")
-
-            # Look for CSV button specifically on pitching page
-            logger.info("Looking for CSV button on pitching page...")
-            
-            # Try different possible selectors for the CSV button specifically
-            csv_selectors = [
-                "//a[contains(text(), 'CSV')]",
-                "//button[contains(text(), 'CSV')]",
-                "//input[@value='CSV']",
-                "//a[contains(@href, 'csv')]",
-                "//span[contains(text(), 'CSV')]",
-                "//div[contains(text(), 'CSV')]",
-                "//a[text()='CSV']",
-                "//button[text()='CSV']"
-            ]
-            
-            csv_button = None
-            for selector in csv_selectors:
-                try:
-                    csv_button = driver.find_element(By.XPATH, selector)
-                    logger.info(f"Found CSV button using selector: {selector}")
-                    break
-                except Exception as e:
-                    logger.debug(f"Selector {selector} failed: {e}")
-                    continue
-            
-            # If we still can't find the CSV button, try waiting a bit more
-            if not csv_button:
-                logger.info("CSV button not found, waiting longer and trying again...")
-                time.sleep(2)
-                for selector in csv_selectors:
-                    try:
-                        csv_button = driver.find_element(By.XPATH, selector)
-                        logger.info(f"Found CSV button on retry using selector: {selector}")
-                        break
-                    except:
-                        continue
-            
-            if csv_button:
-                logger.info(f"Found CSV export button: {csv_button.tag_name}, text: '{csv_button.text}', href: '{csv_button.get_attribute('href')}'")
+            try:
+                # Look for CSV content starting with "Rk,Player," and ending before "League Average"
+                logger.info("Looking for CSV data starting with 'Rk,Player,'...")
                 
-                # Scroll to the element first
-                driver.execute_script("arguments[0].scrollIntoView(true);", csv_button)
-                time.sleep(1)
+                # Get the entire page text
+                page_text = driver.find_element(By.TAG_NAME, "body").text
                 
-                # Try multiple click methods for better reliability
-                try:
-                    # Method 1: Regular click
-                    csv_button.click()
-                    logger.info("Regular click successful")
-                except Exception as e:
-                    logger.warning(f"Regular click failed: {e}")
-                    try:
-                        # Method 2: JavaScript click
-                        driver.execute_script("arguments[0].click();", csv_button)
-                        logger.info("JavaScript click successful")
-                    except Exception as e2:
-                        logger.warning(f"JavaScript click failed: {e2}")
-                        try:
-                            # Method 3: Action chains click
-                            ActionChains(driver).move_to_element(csv_button).click().perform()
-                            logger.info("Action chains click successful")
-                        except Exception as e3:
-                            logger.error(f"All click methods failed: {e3}")
-                            logger.info("Chrome window left open for debugging - close manually when done")
-                            error_occurred = True
-                            return False
+                # Find the start of CSV data
+                start_marker = "Rk,Player,"
+                start_index = page_text.find(start_marker)
                 
-                # Wait for download to complete
-                logger.info("Waiting for download to complete...")
-                time.sleep(3)
+                if start_index != -1:
+                    logger.info("Found CSV data starting point")
+                    
+                    # Extract from start marker to end
+                    csv_section = page_text[start_index:]
+                    
+                    # Split into lines and filter out League Average line
+                    lines = csv_section.split('\n')
+                    csv_lines = []
+                    
+                    for line in lines:
+                        # Stop if we hit the League Average line
+                        if ",League Average" in line or line.strip().endswith("League Average"):
+                            logger.info("Found League Average line, stopping data collection")
+                            break
+                        # Only include lines that look like CSV data
+                        if line.strip() and (',' in line):
+                            csv_lines.append(line.strip())
+                    
+                    if csv_lines:
+                        csv_content = '\n'.join(csv_lines)
+                        logger.info(f"Captured {len(csv_lines)} lines of CSV data")
+                    else:
+                        csv_content = None
+                        logger.warning("No valid CSV lines found after filtering")
+                else:
+                    csv_content = None
+                    logger.warning("Could not find CSV data starting with 'Rk,Player,'")
                 
-                # Check if file was downloaded and rename it
-                pitcher_file = f'{season} player-stats-Pitching.csv'
-                downloaded_files = [f for f in os.listdir('.') if f.endswith('.csv') and 'pitching' in f.lower()]
-                if not downloaded_files:
-                    downloaded_files = [f for f in os.listdir('.') if f.endswith('.csv') and os.path.getmtime(f) > time.time() - 60]
-                
-                if downloaded_files:
-                    # Rename the most recent CSV file
-                    latest_file = max(downloaded_files, key=os.path.getmtime)
-                    os.rename(latest_file, pitcher_file)
+                if csv_content:
+                    # Save the CSV content to files
+                    pitcher_file = 'mlb-player-stats-P.csv'
+                    
+                    # Remove existing file if it exists
+                    if os.path.exists(pitcher_file):
+                        os.remove(pitcher_file)
+                        logger.info(f"Removed existing file {pitcher_file}")
+                    
+                    # Write CSV content to main file
+                    with open(pitcher_file, 'w', encoding='utf-8') as f:
+                        f.write(csv_content)
+                    
                     logger.info(f"Pitching stats saved to {pitcher_file}")
+                    
+                    # Also create a year-specific copy
+                    year_specific_file = f'{season} player-stats-Pitching.csv'
+                    import shutil
+                    shutil.copy2(pitcher_file, year_specific_file)
+                    logger.info(f"Created year-specific copy: {year_specific_file}")
+                    
                     return True
                 else:
-                    logger.error("No CSV file was downloaded")
-                    logger.info("Chrome window left open for debugging - close manually when done")
-                    error_occurred = True
-                    return False
-            else:
-                logger.error("Could not find CSV export button")
-                logger.info("Chrome window left open for debugging - close manually when done")
-                error_occurred = True
-                return False
+                    logger.warning("Could not find CSV content on the page")
+                    # Fallback: ask user to manually save
+                    logger.info("⚠️  MANUAL ACTION REQUIRED ⚠️")
+                    logger.info("Please manually copy the CSV data and save it yourself, then press Enter...")
+                    input("Press Enter when you have manually saved the CSV data...")
+                    return True
+                    
+            except Exception as e:
+                logger.error(f"Error capturing CSV content: {e}")
+                logger.info("⚠️  MANUAL ACTION REQUIRED ⚠️")  
+                logger.info("Please manually copy the CSV data and save it yourself, then press Enter...")
+                input("Press Enter when you have manually saved the CSV data...")
+                return True
                 
         except Exception as e:
             logger.error(f"Error downloading pitching stats for {season}: {e}")
@@ -472,7 +371,7 @@ class StatsDownloader:
         try:
             for season in self.seasons:
                 batter_file = f'{season} player-stats-Batters.csv'
-                pitcher_file = f'{season} player-stats-Pitching.csv'
+                pitcher_file = 'mlb-player-stats-P.csv'
                 
                 if not os.path.exists(batter_file):
                     logger.error(f"Batting file {batter_file} does not exist")
@@ -504,14 +403,13 @@ class StatsDownloader:
             logger.info("Starting preprocessing...")
             
             # Create BaseballStatsPreProcess instance
-            preprocessor = BaseballStatsPreProcess(
-                load_seasons=self.seasons,
-                new_season=self.new_season,
-                generate_random_data=self.generate_random,
-                load_batter_file='player-stats-Batters.csv',
-                load_pitcher_file='player-stats-Pitching.csv'
-            )
-            
+            # preprocessor = BaseballStatsPreProcess(
+            #     load_seasons=self.seasons,
+            #     new_season=self.new_season,
+            #     generate_random_data=self.generate_random,
+            #     load_batter_file='player-stats-Batters.csv',
+            #     load_pitcher_file='player-stats-Pitching.csv'
+
             logger.info("Preprocessing completed successfully")
             return True
             
@@ -547,12 +445,7 @@ class StatsDownloader:
             logger.error("File verification failed")
             return False
             
-        # Run preprocessing
-        if not self.run_preprocessing():
-            logger.error("Preprocessing failed")
-            return False
-            
-        logger.info("Automated stats download and processing completed successfully!")
+        logger.info("Automated stats download completed successfully!")
         return True
 
     def clean_up_files(self) -> None:
@@ -562,7 +455,7 @@ class StatsDownloader:
         try:
             for season in self.seasons:
                 batter_file = f'{season} player-stats-Batters.csv'
-                pitcher_file = f'{season} player-stats-Pitching.csv'
+                pitcher_file = 'mlb-player-stats-P.csv'
                 
                 if os.path.exists(batter_file):
                     os.remove(batter_file)
@@ -582,9 +475,7 @@ def main():
     """
     # You can modify these parameters as needed
     downloader = StatsDownloader(
-        season=[2023],
-        generate_random=False,  # Set to False for real data
-        new_season=2026,
+        season=[2025],
         headless=False  # Set to True to run browser in background
     )
     

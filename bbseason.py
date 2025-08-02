@@ -424,8 +424,7 @@ if __name__ == '__main__':
     startdt = datetime.datetime.now()
 
     # full season
-    # num_games = 162 - 42  # 42 games already played
-    num_games = 10
+    num_games = 162 - 108  # 42 games already played
     interactive = False
 
     # multiple seasons for majors and minors of random league
@@ -445,7 +444,7 @@ if __name__ == '__main__':
 
     # handle a single full season of MLB
     my_teams_to_follow = 'MIL'  # or follow no team
-    bbseasonSS = BaseballSeason(load_seasons=[2024], new_season=2025,
+    bbseasonSS = BaseballSeason(load_seasons=[2025], new_season=2025,
                                 season_length=num_games, series_length=3, rotation_len=5,
                                 season_interactive=interactive,
                                 season_chatty=False, season_print_lineup_b=False,

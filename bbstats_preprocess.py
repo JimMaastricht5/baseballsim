@@ -47,10 +47,12 @@ class BaseballStatsPreProcess:
                               'SV', 'Total_Outs', 'Condition']  # cols will add to running season total
         self.nl = ['CHC', 'CIN', 'MIL', 'PIT', 'STL', 'ATL', 'MIA', 'NYM', 'PHI', 'WAS', 'WSN', 'COL', 'LAD', 'ARI',
                    'SDP', 'SFG']
-        self.al = ['BOS', 'TEX', 'NYY', 'KCR', 'BAL', 'CLE', 'TOR', 'LAA', 'OAK', 'CWS', 'SEA', 'MIN', 'DET', 'TBR',
+        self.al = ['ATH', 'BOS', 'TEX', 'NYY', 'KCR', 'BAL', 'CLE', 'TOR', 'LAA', 'CWS', 'SEA', 'MIN', 'DET', 'TBR',
                    'HOU']
         self.digit_pos_map = {'1': 'P', '2': 'C', '3': '1B', '4': '2B', '5': '3B', '6': 'SS',
                                                '7': 'LF', '8': 'CF', '9': 'RF'}
+        # Team remapping dictionary - maps old team names to new team names
+        self.team_remapping = {'OAK': 'ATH'}
         self.load_seasons = [load_seasons] if not isinstance(load_seasons, list) else load_seasons  # convert to list
         self.new_season = new_season
         self.pitching_data = None
@@ -61,6 +63,7 @@ class BaseballStatsPreProcess:
 
         self.df_salary = salary.retrieve_salary('mlb-salaries-2000-24.csv', self.create_hash)
         self.get_seasons(load_batter_file, load_pitcher_file)  # get existing data file
+        self.apply_team_remapping()  # apply team name remapping before other processing
         self.generate_random_data = generate_random_data
         if self.generate_random_data:  # generate new data from existing
             self.randomize_data()  # generate random data
@@ -131,14 +134,14 @@ class BaseballStatsPreProcess:
     def get_pitching_seasons(self, pitcher_file: str, load_seasons: List[int]) -> DataFrame:
         # caution war and salary cols will get aggregated across multiple seasons
         pitching_data = None
-        stats_pcols_sum = ['G', 'GS', 'CG', 'SHO', 'IP', 'H', 'R', 'ER', 'SO', 'BB', 'HR', 'W', 'L', 'SV', 'HBP', 'BK',
+        stats_pcols_sum = ['G', 'GS', 'CG', 'SHO', 'IP', 'H', 'ER', 'SO', 'BB', 'HR', 'W', 'L', 'SV', 'HBP', 'BK',
                            'WP']
         for season in load_seasons:
             df = pd.read_csv(str(season) + f" {pitcher_file}")
             pitching_data = pd.concat([pitching_data, df], axis=0)
 
         # drop unwanted cols
-        print(pitching_data.columns)
+        # print(pitching_data.columns)
         pitching_data.drop(['Rk', 'Lg', 'W-L%', 'GF', 'IBB', 'ERA+', 'FIP', 'H9', 'BB9', 'SO9', 'SO/BB',
                             'HR9', 'Awards', 'Player-additional', 'BF'],inplace=True, axis=1)
         pitching_data['Player'] = pitching_data['Player'].str.replace('*', '').str.replace('#', '')
@@ -245,6 +248,35 @@ class BaseballStatsPreProcess:
         self.batting_data = self.get_batting_seasons(batter_file, self.load_seasons)
         return
 
+    def apply_team_remapping(self) -> None:
+        """
+        Apply team name remapping based on self.team_remapping dictionary.
+        This remaps old team names to new team names in both pitching and batting data.
+        """
+        if not self.team_remapping:
+            return  # No remapping needed if dictionary is empty
+        
+        remapped_teams = []
+        
+        # Apply remapping to pitching data
+        for old_team, new_team in self.team_remapping.items():
+            if old_team in self.pitching_data['Team'].values:
+                self.pitching_data['Team'] = self.pitching_data['Team'].replace(old_team, new_team)
+                remapped_teams.append(f"Pitching: {old_team} → {new_team}")
+        
+        # Apply remapping to batting data  
+        for old_team, new_team in self.team_remapping.items():
+            if old_team in self.batting_data['Team'].values:
+                self.batting_data['Team'] = self.batting_data['Team'].replace(old_team, new_team)
+                if f"Pitching: {old_team} → {new_team}" not in remapped_teams:
+                    remapped_teams.append(f"Batting: {old_team} → {new_team}")
+        
+        # Log the remappings that were applied
+        if remapped_teams:
+            print(f"Applied team remappings: {', '.join(remapped_teams)}")
+        
+        return
+
     def randomize_data(self):
         self.create_leagues()
         self.randomize_city_names()
@@ -257,7 +289,7 @@ class BaseballStatsPreProcess:
         # replace AL and NL with random league names, set leagues column to match
         league_names = ['ACB', 'NBL']  # Armchair Baseball and Nerd Baseball, Some Other League SOL, No Name NNL
         # league_names = random.sample(league_list, 2)
-        print(self.pitching_data[['League', 'Team']].drop_duplicates())
+        # print(self.pitching_data[['League', 'Team']].drop_duplicates())
         self.pitching_data.loc[self.pitching_data['League'] == 'AL', 'League'] = league_names[0]
         self.pitching_data.loc[self.pitching_data['League'] == 'NL', 'League'] = league_names[1]
         self.pitching_data['Leagues'] = self.pitching_data['League'].apply(lambda x: [x])
@@ -360,14 +392,14 @@ class BaseballStatsPreProcess:
 
 
 if __name__ == '__main__':
-    baseball_data = BaseballStatsPreProcess(load_seasons=[2025], new_season=2026,
-                                            generate_random_data=True,
+    baseball_data = BaseballStatsPreProcess(load_seasons=[2025], new_season=None,
+                                            generate_random_data=False,
                                             load_batter_file='player-stats-Batters.csv',
                                             load_pitcher_file='player-stats-Pitching.csv')
-    print(*baseball_data.pitching_data.columns)
-    print(*baseball_data.batting_data.columns)
-    print(baseball_data.batting_data.Team.unique())
-    print(baseball_data.batting_data[baseball_data.batting_data['Team'] == 'MIL'].to_string())
+    # print(*baseball_data.pitching_data.columns)
+    # print(*baseball_data.batting_data.columns)
+    # print(baseball_data.batting_data.Team.unique())
+    # print(baseball_data.batting_data[baseball_data.batting_data['Team'] == 'MIL'].to_string())
     # print(baseball_data.pitching_data[baseball_data.pitching_data['Team'] == 'MIL'].to_string())
     # print(baseball_data.batting_data.Mascot.unique())
     # print(baseball_data.pitching_data.sort_values('Hashcode').to_string())

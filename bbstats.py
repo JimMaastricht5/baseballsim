@@ -679,7 +679,7 @@ if __name__ == '__main__':
     configure_logger("INFO")
     
     my_teams = []
-    baseball_data = BaseballStats(load_seasons=[2024], new_season=2025,  include_leagues=['ACB', 'NBL'],
+    baseball_data = BaseballStats(load_seasons=[2023, 2024, 2025], new_season=2025,  include_leagues=['AL', 'NL'],
                                   load_batter_file='stats-pp-Batting.csv',
                                   load_pitcher_file='stats-pp-Pitching.csv')
     # print(*baseball_data.pitching_data.columns)

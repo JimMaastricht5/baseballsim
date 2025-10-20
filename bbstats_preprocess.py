@@ -196,6 +196,7 @@ class BaseballStatsPreProcess:
         pitching_data['BS'] = 0
         pitching_data['HLD'] = 0
         pitching_data['E'] = 0
+        pitching_data['Adjustment_Term'] = 0.0  # adjust performance based on age change
         return pitching_data
 
     def get_batting_seasons(self, batter_file: str, load_seasons: List[int]) -> DataFrame:
@@ -252,6 +253,7 @@ class BaseballStatsPreProcess:
         batting_data['Condition'] = 100
         batting_data['Status'] = 'Active'  # DL or active
         batting_data['Injured Days'] = 0
+        batting_data['Adjustment_Term'] = 0.0  # adjust performance based on age change
         return batting_data
 
     def get_seasons(self, batter_file: str, pitcher_file: str) -> None:
@@ -365,6 +367,20 @@ class BaseballStatsPreProcess:
         self.pitching_data = self.pitching_data.set_index('Hashcode')
         return
 
+    def calc_age_adjustment(self, df: pd.DataFrame) -> pd.DataFrame:
+        """
+        Calculates and applies a parabolic age-based adjustment to a specified performance column in a DataFrame.
+        Args: df: The DataFrame to modify (e.g., batting or pitching data).
+        Returns: The modified DataFrame with the adjustment applied and a new 'Adjustment_Term' column created.
+        """
+        # Calculate the Age Adjustment using the stored self. coefficients
+        df['Adjustment_Term'] = np.where(
+            df['Age'] <= self.peak_perf_age,
+            self.coeff_improvement * (df['Age'] - self.peak_perf_age) ** 2,
+            self.coeff_decline * (df['Age'] - self.peak_perf_age) ** 2
+        )
+        return df
+
     def create_new_season_from_existing(self, load_batter_file: str, load_pitcher_file: str) -> None:
         if self.pitching_data is None or self.batting_data is None:
             raise Exception('load at least one season of pitching and batting')
@@ -384,12 +400,7 @@ class BaseballStatsPreProcess:
             self.new_season_pitching_data['Season'] = str(self.new_season)
             if self.new_season not in self.load_seasons:  # add a year to age if it is the next year
                 self.new_season_pitching_data['Age'] = self.new_season_pitching_data['Age'] + 1  # everyone a year older
-                self.new_season_pitching_data['OBP_Adjustment_Term'] = (
-                    np.where(self.new_season_pitching_data['Age'] <= self.peak_perf_age,
-                             self.coeff_improvement * (self.new_season_pitching_data['Age'] - self.peak_perf_age) ** 2,
-                             self.coeff_decline * (self.new_season_pitching_data['Age'] - self.peak_perf_age) ** 2))
-                self.new_season_pitching_data['OBP'] = (self.new_season_pitching_data['OBP'] +
-                                                        self.new_season_pitching_data['OBP_Adjustment_Term'])
+                self.new_season_pitching_data = self.calc_age_adjustment(df=self.new_season_pitching_data)
 
             self.new_season_batting_data = self.batting_data.copy()
             self.new_season_batting_data[self.numeric_bcols] = 0
@@ -399,6 +410,7 @@ class BaseballStatsPreProcess:
             self.new_season_batting_data['Season'] = str(self.new_season)
             if self.new_season not in self.load_seasons:  # add a year to age if it is the next year
                 self.new_season_batting_data['Age'] = self.new_season_batting_data['Age'] + 1  # everyone a year older
+                self.new_season_batting_data = self.calc_age_adjustment(df=self.new_season_batting_data)
 
         return
 

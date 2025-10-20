@@ -53,6 +53,20 @@ class BaseballStatsPreProcess:
                                                '7': 'LF', '8': 'CF', '9': 'RF'}
         # Team remapping dictionary - maps old team names to new team names
         self.team_remapping = {'OAK': 'ATH'}
+
+        # constants for age adjusted performance
+        # key assumptions about year over year performance changes
+        # 1. A young player (21-25) will show significant improvement from year to year
+        #    assuming the peak is at age 29 at an avg OBP of .325, OBP = -0.0008 * (Age - 29)^2 + 0.325
+        # 2. a player in their late 20s (27-29) is typically at their stable peak
+        # 3. a player entering their 30s (30+) will begin to show a slight year-over-year decline.
+        #    assuming the peak is at age 29 at an avg OBP of 0.325, OBP = -0.00059 * (Age - 29)^2 + 0.325
+        # 4. The decline often becomes more rapid after Age 34
+        self.coeff_improvement = 0.0008
+        self.coeff_decline = -0.0059
+        self.peak_perf_age = 29
+
+        # load seasons
         self.load_seasons = [load_seasons] if not isinstance(load_seasons, list) else load_seasons  # convert to list
         self.new_season = new_season
         self.pitching_data = None
@@ -238,9 +252,6 @@ class BaseballStatsPreProcess:
         batting_data['Condition'] = 100
         batting_data['Status'] = 'Active'  # DL or active
         batting_data['Injured Days'] = 0
-        # if ('League' in batting_data.columns) is False:  # ?? why is this here twice
-        #     batting_data['League'] = \
-        #         batting_data['Team'].apply(lambda league: 'NL' if league in self.nl else 'AL')
         return batting_data
 
     def get_seasons(self, batter_file: str, pitcher_file: str) -> None:
@@ -371,9 +382,14 @@ class BaseballStatsPreProcess:
             self.new_season_pitching_data['Condition'] = 100
             self.new_season_pitching_data.drop(['Total_OB', 'Total_Outs'], axis=1)
             self.new_season_pitching_data['Season'] = str(self.new_season)
-            if self.new_season not in self.load_seasons:  # add a year to age if it is the next season
+            if self.new_season not in self.load_seasons:  # add a year to age if it is the next year
                 self.new_season_pitching_data['Age'] = self.new_season_pitching_data['Age'] + 1  # everyone a year older
-            # self.new_season_pitching_data.fillna(0)
+                self.new_season_pitching_data['OBP_Adjustment_Term'] = (
+                    np.where(self.new_season_pitching_data['Age'] <= self.peak_perf_age,
+                             self.coeff_improvement * (self.new_season_pitching_data['Age'] - self.peak_perf_age) ** 2,
+                             self.coeff_decline * (self.new_season_pitching_data['Age'] - self.peak_perf_age) ** 2))
+                self.new_season_pitching_data['OBP'] = (self.new_season_pitching_data['OBP'] +
+                                                        self.new_season_pitching_data['OBP_Adjustment_Term'])
 
             self.new_season_batting_data = self.batting_data.copy()
             self.new_season_batting_data[self.numeric_bcols] = 0
@@ -381,9 +397,9 @@ class BaseballStatsPreProcess:
             self.new_season_batting_data['Condition'] = 100
             self.new_season_batting_data.drop(['Total_OB', 'Total_Outs'], axis=1)
             self.new_season_batting_data['Season'] = str(self.new_season)
-            if self.new_season not in self.load_seasons:  # add a year to age if it is the next season
+            if self.new_season not in self.load_seasons:  # add a year to age if it is the next year
                 self.new_season_batting_data['Age'] = self.new_season_batting_data['Age'] + 1  # everyone a year older
-            # self.new_season_batting_data = self.new_season_batting_data.fillna(0)
+
         return
 
     @staticmethod
@@ -392,7 +408,7 @@ class BaseballStatsPreProcess:
 
 
 if __name__ == '__main__':
-    baseball_data = BaseballStatsPreProcess(load_seasons=[2025], new_season=None,
+    baseball_data = BaseballStatsPreProcess(load_seasons=[2025], new_season=2026,
                                             generate_random_data=False,
                                             load_batter_file='player-stats-Batters.csv',
                                             load_pitcher_file='player-stats-Pitching.csv')

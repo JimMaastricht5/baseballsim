@@ -424,7 +424,7 @@ if __name__ == '__main__':
     startdt = datetime.datetime.now()
 
     # full season
-    num_games = 162 - 108  # 42 games already played
+    num_games = 162 - 155  # 42 games already played
     interactive = False
 
     # multiple seasons for majors and minors of random league

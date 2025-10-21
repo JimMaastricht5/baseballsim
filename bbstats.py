@@ -103,10 +103,10 @@ class BaseballStats:
         # self.batting_injury_odds_for_season = 1 - (1 - self.batting_injury_rate) ** (1/162)
         self.injury_odds_adjustment_for_age = .000328  # 3.28% inc injury per season above 20 w/ .90 survival
         self.batting_injury_avg_len = 15  # made this up
-        self.pitcher_injury_odds_for_season = lambda age: 1 - (1 - (self.pitching_injury_rate + ((age - 20)
-                                                                    * self.injury_odds_adjustment_for_age))) ** (1/162)
-        self.batter_injury_odds_for_season = lambda age: 1 - (1 - (self.batting_injury_rate + ((age - 20)
-                                                                   * self.injury_odds_adjustment_for_age))) ** (1 / 162)
+        # self.pitcher_injury_odds_for_season = lambda age: 1 - (1 - (self.pitching_injury_rate + ((age - 20)
+        #                                                             * self.injury_odds_adjustment_for_age))) ** (1/162)
+        # self.batter_injury_odds_for_season = lambda age: 1 - (1 - (self.batting_injury_rate + ((age - 20)
+        #                                                            * self.injury_odds_adjustment_for_age))) ** (1 / 162)
         self.rnd_condition_chg = lambda age: abs(np.random.normal(loc=(self.condition_change_per_day - (age - 20) / 100
                                                                        * self.condition_change_per_day),
                                                                   scale=self.condition_change_per_day / 3, size=1)[0])
@@ -203,11 +203,13 @@ class BaseballStats:
             self.batting_data = self.batting_data[self.batting_data['League'].isin(self.include_leagues)]
 
         # cast cols to float, may not be needed, best to be certain
-        pcols_to_convert = ['Condition', 'IP', 'ERA', 'WHIP', 'OBP', 'AVG_faced', 'Game_Fatigue_Factor']
+        pcols_to_convert = ['Condition', 'IP', 'ERA', 'WHIP', 'OBP', 'AVG_faced', 'Game_Fatigue_Factor',
+                            'Injury_Adjustment']
+        bcols_to_convert = ['Condition', 'Injury_Adjustment']
         self.pitching_data[pcols_to_convert] = self.pitching_data[pcols_to_convert].astype(float)
-        self.batting_data['Condition'] = self.batting_data['Condition'].astype(float)
+        self.batting_data[bcols_to_convert] = self.batting_data[bcols_to_convert].astype(float)
         self.new_season_pitching_data[pcols_to_convert] = self.new_season_pitching_data[pcols_to_convert].astype(float)
-        self.new_season_batting_data['Condition'] = self.new_season_batting_data['Condition'].astype(float)
+        self.new_season_batting_data[bcols_to_convert] = self.new_season_batting_data[bcols_to_convert].astype(float)
         
         # Add 'Injury Description' column if it doesn't exist
         if 'Injury Description' not in self.pitching_data.columns:
@@ -245,11 +247,30 @@ class BaseballStats:
                 self.new_season_pitching_data.loc[index, 'Injured Days'] = pitching_box_score.loc[index, 'Injured Days']
         return
 
+    def calculate_per_game_injury_odds(self, age: int, injury_rate: float, injury_adjustment: float) -> float:
+        """ Calculates the per-game probability of injury based on a season-long rate adjusted for age and 162-games
+        Formula (P_game = 1 - (1 - P_season) ** (1 / 162))
+        Args:
+            age: The player's current age.
+            injury_rate: the injury rate for the position either pitcher or batter
+            injury_adjustment: the injury adjustment is an increase in the odds of injury based on past injury
+        Returns: The probability of injury for a single game.
+        """
+        # 1. Calculate the season-long injury rate, adjusted for age
+        age_adjustment_term = (age - 20) * self.injury_odds_adjustment_for_age
+        season_long_injury_rate = injury_rate + age_adjustment_term + injury_adjustment
+        # 2. Convert the season-long probability to a per-game probability
+        # 1 - (Probability of NOT getting hurt in the season) ^ (1/162)
+        probability_of_not_getting_hurt_season = 1 - season_long_injury_rate
+        per_game_odds = 1 - (probability_of_not_getting_hurt_season) ** (1 / 162)
+        return per_game_odds
+
     def is_injured(self) -> None:
         """
         determine if a pitcher or hitter is injured and severity.  older players get injured more often
         add that data to the active seasons df and assign appropriate injury descriptions
-        ??? should condition be a factor
+        It is assumed that once a player has a substantial injury that player is 10-20% more likely
+        to be injured again.  Also there is a cumulative downward effect on performance
         :return: None
         """
         # Process pitcher injuries
@@ -257,9 +278,13 @@ class BaseballStats:
             # Check if player is currently healthy
             if row['Injured Days'] == 0:
                 # Determine if a new injury occurs
-                if self.rnd() <= self.pitcher_injury_odds_for_season(row['Age']):
-                    # Calculate injury length using the normal distribution
+                # if self.rnd() <= self.pitcher_injury_odds_for_season(row['Age']):
+                if self.rnd() <= self.calculate_per_game_injury_odds(row['Age'], self.pitching_injury_rate,
+                                                                     row['Injury_Adjustment']):
+                    # Calculate injury length using the normal distribution, decrease performance if inj significant
                     injury_days = int(self.rnd_p_inj(row['Age']))
+                    injury_adjustment = np.random.uniform(low=0.1, high=0.2) + row['Injury_Adjustment'] \
+                        if injury_days >= 30 else row['Injury_Adjustment']
                     # Get appropriate injury description based on days
                     injury_desc = self.injury_system.get_pitcher_injury(injury_days)
                     # Get a more accurate injury length based on description
@@ -268,6 +293,7 @@ class BaseballStats:
                     # Update the dataframe with new injury info
                     self.new_season_pitching_data.at[idx, 'Injured Days'] = refined_injury_days
                     self.new_season_pitching_data.at[idx, 'Injury Description'] = injury_desc
+                    self.new_season_pitching_data.at[idx, 'Injury_Adjustment'] = injury_adjustment
                 # No change for healthy players who stay healthy
             else:
                 # Reduce injury days for currently injured players
@@ -279,13 +305,18 @@ class BaseballStats:
         # Process batter injuries - same logic as pitchers
         for idx, row in self.new_season_batting_data.iterrows():
             if row['Injured Days'] == 0:
-                if self.rnd() <= self.batter_injury_odds_for_season(row['Age']):
+                # if self.rnd() <= self.batter_injury_odds_for_season(row['Age']):
+                if self.rnd() <= self.calculate_per_game_injury_odds(row['Age'], self.batting_injury_rate,
+                                                                     row['Injury_Adjustment']):
                     injury_days = int(self.rnd_b_inj(row['Age']))
+                    injury_adjustment = np.random.uniform(low=0.1, high=0.2) + row['Injury_Adjustment'] \
+                        if injury_days >= 30 else row['Injury_Adjustment']
                     injury_desc = self.injury_system.get_batter_injury(injury_days)
                     refined_injury_days = self.injury_system.get_injury_days_from_description(injury_desc, is_pitcher=False)
                     
                     self.new_season_batting_data.at[idx, 'Injured Days'] = refined_injury_days
                     self.new_season_batting_data.at[idx, 'Injury Description'] = injury_desc
+                    self.new_season_batting_data.at[idx, 'Injury_Adjustment'] = injury_adjustment
             else:
                 self.new_season_batting_data.at[idx, 'Injured Days'] = row['Injured Days'] - 1
                 if row['Injured Days'] <= 1:
@@ -679,7 +710,7 @@ if __name__ == '__main__':
     configure_logger("INFO")
     
     my_teams = []
-    baseball_data = BaseballStats(load_seasons=[2023, 2024, 2025], new_season=2025,  include_leagues=['AL', 'NL'],
+    baseball_data = BaseballStats(load_seasons=[2025], new_season=2026,  include_leagues=['AL', 'NL'],
                                   load_batter_file='stats-pp-Batting.csv',
                                   load_pitcher_file='stats-pp-Pitching.csv')
     # print(*baseball_data.pitching_data.columns)

@@ -42,9 +42,9 @@ class BaseballStatsPreProcess:
         self.jigger_data = lambda x: x + int(np.abs(np.random.normal(loc=x * .10, scale=2, size=1)))
 
         self.numeric_bcols = ['G', 'AB', 'R', 'H', '2B', '3B', 'HR', 'RBI', 'SB', 'CS', 'BB', 'SO', 'SH', 'SF',
-                              'HBP', 'Condition']  # these cols will get added to running season total
-        self.numeric_pcols = ['G', 'GS', 'CG', 'SHO', 'IP', 'AB', 'H', '2B', '3B', 'HR', 'ER', 'SO', 'BB', 'W', 'L',
-                              'SV', 'Total_Outs', 'Condition']  # cols will add to running season total
+                              'BA', 'GIDP', 'HBP', 'Condition']  # these cols will get added to running season total
+        self.numeric_pcols = ['G', 'GS', 'CG', 'SHO', 'IP', 'AB', 'H', '2B', '3B', 'HR', 'ER', 'R', 'SO', 'BB', 'W',
+                              'L', 'SV', 'WP', 'Total_Outs', 'Condition']  # cols will add to running season total
         self.nl = ['CHC', 'CIN', 'MIL', 'PIT', 'STL', 'ATL', 'MIA', 'NYM', 'PHI', 'WAS', 'WSN', 'COL', 'LAD', 'ARI',
                    'SDP', 'SFG']
         self.al = ['ATH', 'BOS', 'TEX', 'NYY', 'KCR', 'BAL', 'CLE', 'TOR', 'LAA', 'CWS', 'SEA', 'MIN', 'DET', 'TBR',
@@ -196,7 +196,9 @@ class BaseballStatsPreProcess:
         pitching_data['BS'] = 0
         pitching_data['HLD'] = 0
         pitching_data['E'] = 0
-        pitching_data['Adjustment_Term'] = 0.0  # adjust performance based on age change
+        pitching_data['Age_Adjustment'] = 0.0  # adjust performance based on age change
+        if 'Injury_Adjustment' not in pitching_data.columns:
+            pitching_data['Injury_Adjustment'] = 0
         return pitching_data
 
     def get_batting_seasons(self, batter_file: str, load_seasons: List[int]) -> DataFrame:
@@ -253,7 +255,9 @@ class BaseballStatsPreProcess:
         batting_data['Condition'] = 100
         batting_data['Status'] = 'Active'  # DL or active
         batting_data['Injured Days'] = 0
-        batting_data['Adjustment_Term'] = 0.0  # adjust performance based on age change
+        batting_data['Age_Adjustment'] = 0.0  # adjust performance based on age change
+        if 'Injury_Adjustment' not in batting_data.columns:
+            batting_data['Injury_Adjustment'] = 0
         return batting_data
 
     def get_seasons(self, batter_file: str, pitcher_file: str) -> None:
@@ -371,10 +375,10 @@ class BaseballStatsPreProcess:
         """
         Calculates and applies a parabolic age-based adjustment to a specified performance column in a DataFrame.
         Args: df: The DataFrame to modify (e.g., batting or pitching data).
-        Returns: The modified DataFrame with the adjustment applied and a new 'Adjustment_Term' column created.
+        Returns: The modified DataFrame with the adjustment applied and a new 'Age_Adjustment' column created.
         """
         # Calculate the Age Adjustment using the stored self. coefficients
-        df['Adjustment_Term'] = np.where(
+        df['Age_Adjustment'] = np.where(
             df['Age'] <= self.peak_perf_age,
             self.coeff_improvement * (df['Age'] - self.peak_perf_age) ** 2,
             self.coeff_decline * (df['Age'] - self.peak_perf_age) ** 2

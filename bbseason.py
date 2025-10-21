@@ -444,7 +444,7 @@ if __name__ == '__main__':
 
     # handle a single full season of MLB
     my_teams_to_follow = 'MIL'  # or follow no team
-    bbseasonSS = BaseballSeason(load_seasons=[2025], new_season=2025,
+    bbseasonSS = BaseballSeason(load_seasons=[2025], new_season=2026,
                                 season_length=num_games, series_length=3, rotation_len=5,
                                 season_interactive=interactive,
                                 season_chatty=False, season_print_lineup_b=False,

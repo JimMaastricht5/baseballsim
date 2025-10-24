@@ -131,11 +131,15 @@ class SimAB:
 
     def onbase(self) -> bool:
         """
-        did the batter reach base?
+        did the batter reach base? adjusted for age and injury
+        adjustments are neg values if worse and positive for improvements
+        requires negation on pitchers,
         :return: true if batter reached base
         """
-        return self.rng() < self.odds_ratio(self.batting.OBP + self.pitching.Game_Fatigue_Factor + self.OBP_adjustment,
-                                            self.pitching.OBP + self.pitching.Game_Fatigue_Factor + self.OBP_adjustment,
+        return self.rng() < self.odds_ratio(self.batting.OBP + self.pitching.Game_Fatigue_Factor + self.OBP_adjustment +
+                                            self.batting.Age_Adjustment + self.batting.Injury_Perf_Adj,
+                                            self.pitching.OBP + self.pitching.Game_Fatigue_Factor + self.OBP_adjustment +
+                                            -1 * self.pitching.Age_Adjustment + -1 * self.pitching.Injury_Perf_Adj,
                                             self.league_batting_obp + self.OBP_adjustment, stat_type='obp')
 
     def bb(self) -> bool:

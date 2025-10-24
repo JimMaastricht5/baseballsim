@@ -70,7 +70,7 @@ class BaseballSeason:
         self.load_seasons = load_seasons  # pull base data across for what seasons
         self.new_season = new_season
         self.schedule = []
-        self.leagues_str = ' '.join(include_leagues) if include_leagues is not None else None
+        self.leagues_str = ' '.join(include_leagues) if include_leagues is not None else 'MLB'
         self.interactive = season_interactive
         self.print_lineup_b = season_print_lineup_b
         self.print_box_score_b = season_print_box_score_b

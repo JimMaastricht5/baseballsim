@@ -62,8 +62,8 @@ class BaseballStatsPreProcess:
         # 3. a player entering their 30s (30+) will begin to show a slight year-over-year decline.
         #    assuming the peak is at age 29 at an avg OBP of 0.325, OBP = -0.00059 * (Age - 29)^2 + 0.325
         # 4. The decline often becomes more rapid after Age 34
-        self.coeff_improvement = 0.0008
-        self.coeff_decline = -0.0059
+        self.coeff_age_improvement = 0.0008
+        self.coeff_age_decline = -0.0059
         self.peak_perf_age = 29
 
         # load seasons
@@ -197,8 +197,9 @@ class BaseballStatsPreProcess:
         pitching_data['HLD'] = 0
         pitching_data['E'] = 0
         pitching_data['Age_Adjustment'] = 0.0  # adjust performance based on age change
-        if 'Injury_Adjustment' not in pitching_data.columns:
-            pitching_data['Injury_Adjustment'] = 0
+        if 'Injury_Rate_Adj' not in pitching_data.columns:
+            pitching_data['Injury_Rate_Adj'] = 0
+            pitching_data['Injury_Perf_Adj'] = 0
         return pitching_data
 
     def get_batting_seasons(self, batter_file: str, load_seasons: List[int]) -> DataFrame:
@@ -256,8 +257,9 @@ class BaseballStatsPreProcess:
         batting_data['Status'] = 'Active'  # DL or active
         batting_data['Injured Days'] = 0
         batting_data['Age_Adjustment'] = 0.0  # adjust performance based on age change
-        if 'Injury_Adjustment' not in batting_data.columns:
-            batting_data['Injury_Adjustment'] = 0
+        if 'Injury_Rate_Adj' not in batting_data.columns:
+            batting_data['Injury_Rate_Adj'] = 0
+            batting_data['Injury_Perf_Adj'] = 0
         return batting_data
 
     def get_seasons(self, batter_file: str, pitcher_file: str) -> None:
@@ -380,8 +382,8 @@ class BaseballStatsPreProcess:
         # Calculate the Age Adjustment using the stored self. coefficients
         df['Age_Adjustment'] = np.where(
             df['Age'] <= self.peak_perf_age,
-            self.coeff_improvement * (df['Age'] - self.peak_perf_age) ** 2,
-            self.coeff_decline * (df['Age'] - self.peak_perf_age) ** 2
+            self.coeff_age_improvement * (df['Age'] - self.peak_perf_age) ** 2,
+            self.coeff_age_decline * (df['Age'] - self.peak_perf_age) ** 2
         )
         return df
 

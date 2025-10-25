@@ -287,8 +287,8 @@ class BaseballStats:
                     # Calculate injury length using the normal distribution, decrease performance if inj significant
                     injury_days = int(self.rnd_p_inj(row['Age']))
                     injury_rate_adjustment = np.random.uniform(low=0.1, high=0.2) + row['Injury_Rate_Adj'] \
-                        if injury_days >= 30 else row['Injury_Rate_Adj']
-                    injury_perf_adj = self.injury_perf_f(injury_days, row['Injury_Perf_Adj'])
+                        if injury_days >= 30 else row['Injury_Rate_Adj']  # more injuries
+                    injury_perf_adj = self.injury_perf_f(injury_days, row['Injury_Perf_Adj'])  # lower perf
                     # Get appropriate injury description based on days
                     injury_desc = self.injury_system.get_pitcher_injury(injury_days)
                     # Get a more accurate injury length based on description

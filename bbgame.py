@@ -479,14 +479,14 @@ if __name__ == '__main__':
     
     startdt = datetime.datetime.now()
 
-    away_team = 'NYM'
-    home_team = 'MIL'
+    away_team = 'LAD'
+    home_team = 'TOR'
 
     # MIL_lineup = {647549: 'LF', 239398: 'C', 224423: '1B', 138309: 'DH', 868055: 'CF', 520723: 'SS',
     #               299454: '3B', 46074: '2B', 752787: 'RF'}
     # NYM_starter = 626858
     # MIL_starter = 288650
-    sims = 1
+    sims = 70
     season_win_loss = [[0, 0], [0, 0]]  # away record pos 0, home pos 1
     score_total = [0, 0]
     # team0_season_df = None
@@ -520,9 +520,9 @@ if __name__ == '__main__':
         #     team0_season_df['Team'] = game.teams[AWAY].box_score.box_batting['Team']
         #     team0_season_df['Pos'] = game.teams[AWAY].box_score.box_batting['Pos']
     #     print('')
-    #     print(f'{away_team} season : {season_win_loss[0][0]} W and {season_win_loss[0][1]} L')
-    #     print(f'{home_team} season : {season_win_loss[1][0]} W and {season_win_loss[1][1]} L')
-    # print(f'away team scored {score_total[0]} for an average of {score_total[0]/sims}')
-    # print(f'home team scored {score_total[1]} for an average of {score_total[1] / sims}')
+        print(f'{away_team} season : {season_win_loss[0][0]} W and {season_win_loss[0][1]} L')
+        print(f'{home_team} season : {season_win_loss[1][0]} W and {season_win_loss[1][1]} L')
+    print(f'away team scored {score_total[0]} for an average of {score_total[0]/sims}')
+    print(f'home team scored {score_total[1]} for an average of {score_total[1] / sims}')
     print(startdt)
     print(datetime.datetime.now())

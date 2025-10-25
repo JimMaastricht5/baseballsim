@@ -43,7 +43,8 @@ class BaseballSeason:
                  season_print_lineup_b: bool = False, season_print_box_score_b: bool = False,
                  season_chatty: bool = False, season_team_to_follow: str = None,
                  load_batter_file: str = 'stats-pp-Batting.csv',
-                 load_pitcher_file: str = 'stats-pp-Pitching.csv') -> None:
+                 load_pitcher_file: str = 'stats-pp-Pitching.csv',
+                 schedule: list = None) -> None:
         """
         :param load_seasons: list of seasons to load for stats, can blend multiple seasons
         :param new_season: int value representing the year of the new season can be the same as one of the loads
@@ -69,7 +70,6 @@ class BaseballSeason:
         self.team_season_pitching_df = None
         self.load_seasons = load_seasons  # pull base data across for what seasons
         self.new_season = new_season
-        self.schedule = []
         self.leagues_str = ' '.join(include_leagues) if include_leagues is not None else 'MLB'
         self.interactive = season_interactive
         self.print_lineup_b = season_print_lineup_b
@@ -85,7 +85,9 @@ class BaseballSeason:
         if len(self.teams) % 2 == 1:  # odd number of teams
             self.teams.append('OFF DAY')
 
-        self.create_schedule()  # set schedule
+        self.schedule = [] if schedule is None else schedule
+        if len(schedule) == 0:
+            self.create_schedule()  # set schedule if not passed
         self.team_win_loss = {}
         for team in self.teams:
             self.team_win_loss.update({team: [0, 0]})  # set team win loss to 0, 0
@@ -423,36 +425,41 @@ if __name__ == '__main__':
     
     startdt = datetime.datetime.now()
 
-    # full season
-    num_games = 162 - 155  # 42 games already played
-    interactive = False
+    # full season 162 games
+    num_games = 7
+    interactive = True
+    fantasy = False
 
     # multiple seasons for majors and minors of random league
-    # my_teams_to_follow = 'AUG'
-    # bbseasonMS = MultiBaseballSeason(load_seasons=[2024], new_season=2025,
-    #                                  season_length=num_games, series_length=3, rotation_len=5,
-    #                                  majors_minors=['ACB', 'NBL'],
-    #                                  season_interactive=interactive,
-    #                                  season_chatty=False, season_print_lineup_b=False,
-    #                                  season_print_box_score_b=False, season_team_to_follow=my_teams_to_follow,
-    #                                  load_batter_file='random-stats-pp-Batting.csv',  # 'random-stats-pp-Batting.csv',
-    #                                  load_pitcher_file='random-stats-pp-Pitching.csv')
-    #
-    # bbseasonMS.sim_start()
-    # bbseasonMS.sim_all_days_for_seasons()
-    # bbseasonMS.sim_end()
+    if fantasy:
+        my_teams_to_follow = 'AUG'
+        bbseasonMS = MultiBaseballSeason(load_seasons=[2025], new_season=2026,
+                                         season_length=num_games, series_length=3, rotation_len=5,
+                                         majors_minors=['ACB', 'NBL'],
+                                         season_interactive=interactive,
+                                         season_chatty=False, season_print_lineup_b=False,
+                                         season_print_box_score_b=False, season_team_to_follow=my_teams_to_follow,
+                                         load_batter_file='random-stats-pp-Batting.csv',
+                                         load_pitcher_file='random-stats-pp-Pitching.csv')
+        bbseasonMS.sim_start()
+        bbseasonMS.sim_all_days_for_seasons()
+        bbseasonMS.sim_end()
 
     # handle a single full season of MLB
-    my_teams_to_follow = 'MIL'  # or follow no team
-    bbseasonSS = BaseballSeason(load_seasons=[2025], new_season=2026,
-                                season_length=num_games, series_length=3, rotation_len=5,
-                                season_interactive=interactive,
-                                season_chatty=False, season_print_lineup_b=False,
-                                season_print_box_score_b=False, season_team_to_follow=my_teams_to_follow,
-                                load_batter_file='stats-pp-Batting.csv',  # 'random-stats-pp-Batting.csv',
-                                load_pitcher_file='stats-pp-Pitching.csv')
-
-    bbseasonSS.sim_full_season()
+    if not fantasy:
+        my_teams_to_follow = None  # or follow no team
+        series_schedule = [[['LAD', 'TOR']], [['LAD', 'TOR']],
+                           [['TOR', 'LAD']], [['TOR', 'LAD']],
+                           [['TOR', 'LAD']], [['LAD', 'TOR']],[['LAD', 'TOR']]]
+        bbseasonSS = BaseballSeason(load_seasons=[2025], new_season=2026,
+                                    season_length=num_games, series_length=7, rotation_len=5,
+                                    season_interactive=interactive,
+                                    season_chatty=False, season_print_lineup_b=False,
+                                    season_print_box_score_b=False, season_team_to_follow=my_teams_to_follow,
+                                    load_batter_file='stats-pp-Batting.csv',  # 'random-stats-pp-Batting.csv',
+                                    load_pitcher_file='stats-pp-Pitching.csv',
+                                    schedule=series_schedule)
+        bbseasonSS.sim_full_season()
 
     # how long did that take?
     print(startdt)

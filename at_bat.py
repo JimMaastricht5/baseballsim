@@ -444,7 +444,10 @@ if __name__ == '__main__':
         'HR': 25,
         'GIDP': 12,
         'Total_OB': 218,  # H + BB + HBP
-        'Total_Outs': 350  # AB - H + SF + SH approx
+        'Total_Outs': 350,  # AB - H + SF + SH approx
+        'Age_Adjustment': 0.0,  # Age-related performance adjustment
+        'Injury_Rate_Adj': 0.0,  # Injury rate adjustment
+        'Injury_Perf_Adj': 1.0  # Injury performance adjustment (multiplier)
     })
     
     test_pitcher = MockSeries({
@@ -464,7 +467,10 @@ if __name__ == '__main__':
         'HR': 20,
         'Total_OB': 260,  # H + BB
         'Total_Outs': 520,  # AB - H approx
-        'Game_Fatigue_Factor': 0.0  # No fatigue for test
+        'Game_Fatigue_Factor': 0.0,  # No fatigue for test
+        'Age_Adjustment': 0.0,  # Age-related performance adjustment
+        'Injury_Rate_Adj': 0.0,  # Injury rate adjustment
+        'Injury_Perf_Adj': 1.0  # Injury performance adjustment (multiplier)
     })
     
     # Create test instances

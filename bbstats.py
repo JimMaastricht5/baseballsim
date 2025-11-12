@@ -36,8 +36,8 @@ from bblogger import logger
 
 class BaseballStats:
     def __init__(self, load_seasons: List[int], new_season: int, include_leagues: list = None,
-                 load_batter_file: str = 'stats-pp-Batting.csv',
-                 load_pitcher_file: str = 'stats-pp-Pitching.csv') -> None:
+                 load_batter_file: str = 'aggr-stats-pp-Batting.csv',
+                 load_pitcher_file: str = 'aggr-stats-pp-Pitching.csv') -> None:
         """
         :param load_seasons: list of seasons to load, each season is an integer year
         :param new_season: integer value of year for new season
@@ -177,8 +177,9 @@ class BaseballStats:
         :param pitcher_file: pitcher file name
         :return: None
         """
-        new_pitcher_file = 'New-Season-' + pitcher_file
-        new_batter_file = 'New-Season-' + batter_file
+        # New season files don't have 'aggr-' prefix, so remove it if present
+        new_pitcher_file = 'New-Season-' + pitcher_file.replace('aggr-', '')
+        new_batter_file = 'New-Season-' + batter_file.replace('aggr-', '')
         seasons_str = " ".join(str(season) for season in self.load_seasons)
         try:
             if self.pitching_data is None or self.batting_data is None:  # need to read data... else skip as cached
@@ -194,7 +195,10 @@ class BaseballStats:
                                                                                  f" {new_batter_file}", index_col='Hashcode'))
         except FileNotFoundError as e:
             print(e)
-            print(f'file was not found, correct spelling or try running bbstats_preprocess.py to setup the data')
+            print(f'bbstats.py, get_seasons(), file was not found.')
+            print(f'Looking for files with pattern: "{seasons_str} {pitcher_file}" and "{seasons_str} {batter_file}"')
+            print(f'Or new season files: "{self.new_season} {new_pitcher_file}" and "{self.new_season} {new_batter_file}"')
+            print(f'Correct spelling or try running bbstats_preprocess.py to setup the data')
             exit(1)  # stop the program
 
         # limit the league if include leagues is not none and at least one league is in the list
@@ -718,9 +722,9 @@ if __name__ == '__main__':
     configure_logger("INFO")
     
     my_teams = []
-    baseball_data = BaseballStats(load_seasons=[2025], new_season=2026,  include_leagues=['AL', 'NL'],
-                                  load_batter_file='stats-pp-Batting.csv',
-                                  load_pitcher_file='stats-pp-Pitching.csv')
+    baseball_data = BaseballStats(load_seasons=[2023, 2024, 2025], new_season=2026,  include_leagues=['AL', 'NL'],
+                                  load_batter_file='aggr-stats-pp-Batting.csv',
+                                  load_pitcher_file='aggr-stats-pp-Pitching.csv')
     # print(*baseball_data.pitching_data.columns)
     # print(*baseball_data.batting_data.columns)
     print(baseball_data.get_all_team_names())

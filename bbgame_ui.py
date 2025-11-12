@@ -110,8 +110,8 @@ class BaseballUI:
             print_box_score_b=True,
             load_seasons=[2024], 
             new_season=2025,
-            load_batter_file='stats-pp-Batting.csv',
-            load_pitcher_file='stats-pp-Pitching.csv',
+            load_batter_file='aggr-stats-pp-Batting.csv',
+            load_pitcher_file='aggr-stats-pp-Pitching.csv',
             interactive=True,
             show_bench=False,
             debug=False

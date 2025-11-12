@@ -71,6 +71,8 @@ class BaseballStatsPreProcess:
         self.new_season = new_season
         self.pitching_data = None
         self.batting_data = None
+        self.pitching_data_historical = None
+        self.batting_data_historical = None
         self.new_season_pitching_data = None
         self.new_season_batting_data = None
         self.generate_random_data = generate_random_data
@@ -87,14 +89,34 @@ class BaseballStatsPreProcess:
         return
 
     def save_data(self) -> None:
-        f_pname = 'random-stats-pp-Pitching.csv' if self.generate_random_data else 'stats-pp-Pitching.csv'
-        f_bname = 'random-stats-pp-Batting.csv' if self.generate_random_data else 'stats-pp-Batting.csv'
+        # Aggregated files now include 'aggr' in name
+        f_pname_aggr = 'random-aggr-stats-pp-Pitching.csv' if self.generate_random_data else 'aggr-stats-pp-Pitching.csv'
+        f_bname_aggr = 'random-aggr-stats-pp-Batting.csv' if self.generate_random_data else 'aggr-stats-pp-Batting.csv'
+        # New season files do NOT include 'aggr' since they are not aggregated
+        f_pname_new = 'random-stats-pp-Pitching.csv' if self.generate_random_data else 'stats-pp-Pitching.csv'
+        f_bname_new = 'random-stats-pp-Batting.csv' if self.generate_random_data else 'stats-pp-Batting.csv'
         seasons_str = " ".join(str(season) for season in self.load_seasons)
-        self.pitching_data.to_csv(f'{seasons_str} {f_pname}', index=True, header=True)
-        self.batting_data.to_csv(f'{seasons_str} {f_bname}', index=True, header=True)
+
+        # Save aggregated data (with 'aggr' in filename - for bbstats.py)
+        self.pitching_data.to_csv(f'{seasons_str} {f_pname_aggr}', index=True, header=True)
+        self.batting_data.to_csv(f'{seasons_str} {f_bname_aggr}', index=True, header=True)
+        print(f'Saved aggregated files: {seasons_str} {f_pname_aggr} and {f_bname_aggr}')
+
+        # Save historical year-by-year data (new)
+        if self.pitching_data_historical is not None:
+            f_hist_pname = 'random-historical-Pitching.csv' if self.generate_random_data else 'historical-Pitching.csv'
+            self.pitching_data_historical.to_csv(f'{seasons_str} {f_hist_pname}', index=True, header=True)
+            print(f'Saved historical pitching data: {seasons_str} {f_hist_pname}')
+
+        if self.batting_data_historical is not None:
+            f_hist_bname = 'random-historical-Batting.csv' if self.generate_random_data else 'historical-Batting.csv'
+            self.batting_data_historical.to_csv(f'{seasons_str} {f_hist_bname}', index=True, header=True)
+            print(f'Saved historical batting data: {seasons_str} {f_hist_bname}')
+
+        # Save new season data (no 'aggr' prefix - this is single season data, not aggregated)
         if self.new_season is not None:
-            self.new_season_pitching_data.to_csv(f'{self.new_season} New-Season-{f_pname}', index=True, header=True)
-            self.new_season_batting_data.to_csv(f'{self.new_season} New-Season-{f_bname}', index=True, header=True)
+            self.new_season_pitching_data.to_csv(f'{self.new_season} New-Season-{f_pname_new}', index=True, header=True)
+            self.new_season_batting_data.to_csv(f'{self.new_season} New-Season-{f_bname_new}', index=True, header=True)
         return
 
     @staticmethod
@@ -111,8 +133,20 @@ class BaseballStatsPreProcess:
             val = row[col]
             if key not in groups:
                 groups[key] = set()
-            if val and val.strip():  # if the val is non-blank
+
+            # Handle both string and list values
+            if isinstance(val, list):
+                # If val is already a list, add each non-empty item
+                for item in val:
+                    if item and str(item).strip():
+                        groups[key].add(item)
+            elif val and isinstance(val, str) and val.strip():
+                # If val is a non-empty string
                 groups[key].add(val)
+            elif val and not isinstance(val, str):
+                # Handle other types (int, float, etc.)
+                groups[key].add(val)
+
         df[new_col] = df[key_col].map(groups)  # Create a new column to store grouped unique values
         df[new_col] = df[new_col].apply(list)  # Convert sets to lists for easier handling in DataFrame
         return df
@@ -145,13 +179,15 @@ class BaseballStatsPreProcess:
             df = df.drop_duplicates(subset='Hashcode', keep='last')
         return df
 
-    def get_pitching_seasons(self, pitcher_file: str, load_seasons: List[int]) -> DataFrame:
+    def get_pitching_seasons(self, pitcher_file: str, load_seasons: List[int]) -> tuple:
+        # Returns tuple of (aggregated_df, historical_df)
         # caution war and salary cols will get aggregated across multiple seasons
         pitching_data = None
         stats_pcols_sum = ['G', 'GS', 'CG', 'SHO', 'IP', 'H', 'ER', 'SO', 'BB', 'HR', 'W', 'L', 'SV', 'HBP', 'BK',
                            'WP']
         for season in load_seasons:
             df = pd.read_csv(str(season) + f" {pitcher_file}")
+            df['Season'] = season  # Add season before concatenating
             pitching_data = pd.concat([pitching_data, df], axis=0)
 
         # drop unwanted cols
@@ -169,21 +205,43 @@ class BaseballStatsPreProcess:
         pitching_data = pitching_data[pitching_data['Team'] != '']  # drop rows without a formal team name
         pitching_data['League'] = pitching_data['Team'].apply(
                 lambda x: 'NL' if x in self.nl else ('AL' if x in self.al else '') )
+        # Create Player_Season_Key BEFORE de-duplication
+        pitching_data['Player_Season_Key'] = (
+            pitching_data['Hashcode'].astype(str) + '_' +
+            pitching_data['Season'].astype(str)
+        )
+
+        # *** Create HISTORICAL data (year-by-year) - one row per player per season ***
+        historical_data = pitching_data.copy()
+        historical_data = self.group_col_to_list(df=historical_data, key_col='Player_Season_Key', col='Team', new_col='Teams')
+        historical_data = self.group_col_to_list(df=historical_data, key_col='Player_Season_Key', col='League', new_col='Leagues')
+        # For historical, only de-dup within same season (mid-season trades)
+        historical_data = self.de_dup_df(df=historical_data, key_name='Player_Season_Key',
+                                        dup_column_names='Player_Season_Key',
+                                        stats_cols_to_sum=stats_pcols_sum, drop_dups=True)
+        historical_data = historical_data.set_index('Player_Season_Key')
+
+        # *** Create AGGREGATED data (career totals) - one row per player ***
         pitching_data = self.group_col_to_list(df=pitching_data, key_col='Hashcode', col='Team', new_col='Teams')
         pitching_data = self.group_col_to_list(df=pitching_data, key_col='Hashcode', col='League', new_col='Leagues')
+        # Create Years_Included column - list of seasons this player appeared in
+        pitching_data = self.group_col_to_list(df=pitching_data, key_col='Hashcode', col='Season', new_col='Years_Included')
         pitching_data = self.de_dup_df(df=pitching_data, key_name='Hashcode', dup_column_names='Hashcode',
                                        stats_cols_to_sum=stats_pcols_sum, drop_dups=True)
         pitching_data = pitching_data.set_index('Hashcode')
-        # set up additional stats
+
+        # Apply random data jigger if needed (to both datasets)
         if self.generate_random_data:
             for stats_col in stats_pcols_sum:
                 pitching_data[stats_col] = pitching_data[stats_col].apply(self.jigger_data)
+                historical_data[stats_col] = historical_data[stats_col].apply(self.jigger_data)
 
+        # Calculate derived stats for AGGREGATED data
         pitching_data['AB'] = pitching_data['IP'] * 3 + pitching_data['H']
         pitching_data['2B'] = 0
         pitching_data['3B'] = 0
         pitching_data['HBP'] = 0
-        pitching_data['Season'] = str(load_seasons)
+        pitching_data['Season'] = str(load_seasons)  # List of all seasons
         pitching_data['OBP'] = pitching_data['WHIP'] / (3 + pitching_data['WHIP'])  # bat reached / number faced
         pitching_data['Total_OB'] = pitching_data['H'] + pitching_data['BB']  # + pitching_data['HBP']
         pitching_data['Total_Outs'] = pitching_data['IP'] * 3  # 3 outs per inning
@@ -200,14 +258,40 @@ class BaseballStatsPreProcess:
         if 'Injury_Rate_Adj' not in pitching_data.columns:
             pitching_data['Injury_Rate_Adj'] = 0
             pitching_data['Injury_Perf_Adj'] = 0
-        return pitching_data
 
-    def get_batting_seasons(self, batter_file: str, load_seasons: List[int]) -> DataFrame:
+        # Calculate derived stats for HISTORICAL data
+        historical_data['AB'] = historical_data['IP'] * 3 + historical_data['H']
+        historical_data['2B'] = 0
+        historical_data['3B'] = 0
+        historical_data['HBP'] = 0
+        # Season is already set per row from the loop
+        historical_data['OBP'] = historical_data['WHIP'] / (3 + historical_data['WHIP'])
+        historical_data['Total_OB'] = historical_data['H'] + historical_data['BB']
+        historical_data['Total_Outs'] = historical_data['IP'] * 3
+        historical_data = historical_data[historical_data['IP'] >= 5]
+        historical_data['AVG_faced'] = (historical_data['Total_OB'] + historical_data['Total_Outs']) / historical_data.G
+        historical_data['Game_Fatigue_Factor'] = 0
+        historical_data['Condition'] = 100
+        historical_data['Status'] = 'Active'
+        historical_data['Injured Days'] = 0
+        historical_data['BS'] = 0
+        historical_data['HLD'] = 0
+        historical_data['E'] = 0
+        historical_data['Age_Adjustment'] = 0.0
+        if 'Injury_Rate_Adj' not in historical_data.columns:
+            historical_data['Injury_Rate_Adj'] = 0
+            historical_data['Injury_Perf_Adj'] = 0
+
+        return pitching_data, historical_data
+
+    def get_batting_seasons(self, batter_file: str, load_seasons: List[int]) -> tuple:
+        # Returns tuple of (aggregated_df, historical_df)
         batting_data = None
         stats_bcols_sum = ['G', 'AB', 'R', 'H', '2B', '3B', 'HR', 'RBI', 'SB', 'CS', 'BB', 'SO', 'SH', 'SF', 'HBP',
                            'GIDP']
         for season in load_seasons:
             df = pd.read_csv(str(season) + f" {batter_file}")
+            df['Season'] = season  # Add season before concatenating
             batting_data = pd.concat([batting_data, df], axis=0)
 
         # drop unwanted cols
@@ -226,17 +310,41 @@ class BaseballStatsPreProcess:
                 lambda x: 'NL' if x in self.nl else ('AL' if x in self.al else '') )
         # players with multiple teams have a 2TM or 3TM line that is the total of all stats.  Drop rows since we total
         batting_data = batting_data[batting_data['Team'] != '']  # drop rows without a formal team name
+        # Create Player_Season_Key BEFORE de-duplication
+        batting_data['Player_Season_Key'] = (
+            batting_data['Hashcode'].astype(str) + '_' +
+            batting_data['Season'].astype(str)
+        )
+
+        # *** Create HISTORICAL data (year-by-year) - one row per player per season ***
+        historical_data = batting_data.copy()
+        historical_data = self.group_col_to_list(df=historical_data, key_col='Player_Season_Key', col='Pos', new_col='Pos')
+        historical_data = self.group_col_to_list(df=historical_data, key_col='Player_Season_Key', col='Team', new_col='Teams')
+        historical_data = self.group_col_to_list(df=historical_data, key_col='Player_Season_Key', col='League', new_col='Leagues')
+        # For historical, only de-dup within same season (mid-season trades)
+        historical_data = self.de_dup_df(df=historical_data, key_name='Player_Season_Key',
+                                        dup_column_names='Player_Season_Key',
+                                        stats_cols_to_sum=stats_bcols_sum, drop_dups=True)
+        historical_data = historical_data.set_index('Player_Season_Key')
+
+        # *** Create AGGREGATED data (career totals) - one row per player ***
+        batting_data = self.group_col_to_list(df=batting_data, key_col='Hashcode', col='Pos', new_col='Pos')
         batting_data = self.group_col_to_list(df=batting_data, key_col='Hashcode', col='Team', new_col='Teams')
         batting_data = self.group_col_to_list(df=batting_data, key_col='Hashcode', col='League', new_col='Leagues')
+        # Create Years_Included column - list of seasons this player appeared in
+        batting_data = self.group_col_to_list(df=batting_data, key_col='Hashcode', col='Season', new_col='Years_Included')
         batting_data = self.de_dup_df(df=batting_data, key_name='Hashcode', dup_column_names='Hashcode',
                                       stats_cols_to_sum=stats_bcols_sum, drop_dups=True)
         batting_data = batting_data.set_index('Hashcode')
-        # set up additional stats
+
+        # Apply random data jigger if needed (to both datasets)
         if self.generate_random_data:
             for stats_col in stats_bcols_sum:
                 batting_data[stats_col] = batting_data[stats_col].apply(self.jigger_data)
+                historical_data[stats_col] = historical_data[stats_col].apply(self.jigger_data)
 
-        batting_data['Season'] = str(load_seasons)
+        # Calculate derived stats for AGGREGATED data
+        batting_data['Season'] = str(load_seasons)  # List of all seasons
         batting_data['OBP'] = self.trunc_col(np.nan_to_num(np.divide(batting_data['H'] + batting_data['BB'] +
                                                                      batting_data['HBP'], batting_data['AB'] +
                                                                      batting_data['BB'] + batting_data['HBP']),
@@ -260,11 +368,38 @@ class BaseballStatsPreProcess:
         if 'Injury_Rate_Adj' not in batting_data.columns:
             batting_data['Injury_Rate_Adj'] = 0
             batting_data['Injury_Perf_Adj'] = 0
-        return batting_data
+
+        # Calculate derived stats for HISTORICAL data
+        # Season is already set per row from the loop
+        historical_data['OBP'] = self.trunc_col(np.nan_to_num(np.divide(historical_data['H'] + historical_data['BB'] +
+                                                                        historical_data['HBP'], historical_data['AB'] +
+                                                                        historical_data['BB'] + historical_data['HBP']),
+                                                              nan=0.0, posinf=0.0), 3)
+        historical_data['SLG'] = self.trunc_col(np.nan_to_num(np.divide((historical_data['H'] - historical_data['2B'] -
+                                                                         historical_data['3B'] - historical_data['HR']) +
+                                                                        historical_data['2B'] * 2 +
+                                                                        historical_data['3B'] * 3 + historical_data['HR'] * 4,
+                                                                        historical_data['AB']), nan=0.0, posinf=0.0), 3)
+        historical_data['OPS'] = self.trunc_col(np.nan_to_num(historical_data['OBP'] + historical_data['SLG'],
+                                                              nan=0.0, posinf=0.0), 3)
+        historical_data['Total_OB'] = historical_data['H'] + historical_data['BB'] + historical_data['HBP']
+        historical_data['Total_Outs'] = historical_data['AB'] - historical_data['H'] + historical_data['HBP']
+        historical_data = historical_data[historical_data['AB'] >= 10]
+        historical_data['E'] = 0
+        historical_data['Game_Fatigue_Factor'] = 0
+        historical_data['Condition'] = 100
+        historical_data['Status'] = 'Active'
+        historical_data['Injured Days'] = 0
+        historical_data['Age_Adjustment'] = 0.0
+        if 'Injury_Rate_Adj' not in historical_data.columns:
+            historical_data['Injury_Rate_Adj'] = 0
+            historical_data['Injury_Perf_Adj'] = 0
+
+        return batting_data, historical_data
 
     def get_seasons(self, batter_file: str, pitcher_file: str) -> None:
-        self.pitching_data = self.get_pitching_seasons(pitcher_file, self.load_seasons)
-        self.batting_data = self.get_batting_seasons(batter_file, self.load_seasons)
+        self.pitching_data, self.pitching_data_historical = self.get_pitching_seasons(pitcher_file, self.load_seasons)
+        self.batting_data, self.batting_data_historical = self.get_batting_seasons(batter_file, self.load_seasons)
         return
 
     def apply_team_remapping(self) -> None:
@@ -274,26 +409,37 @@ class BaseballStatsPreProcess:
         """
         if not self.team_remapping:
             return  # No remapping needed if dictionary is empty
-        
+
         remapped_teams = []
-        
-        # Apply remapping to pitching data
+
+        # Apply remapping to pitching data (aggregated)
         for old_team, new_team in self.team_remapping.items():
             if old_team in self.pitching_data['Team'].values:
                 self.pitching_data['Team'] = self.pitching_data['Team'].replace(old_team, new_team)
                 remapped_teams.append(f"Pitching: {old_team} → {new_team}")
-        
-        # Apply remapping to batting data  
+
+        # Apply remapping to batting data (aggregated)
         for old_team, new_team in self.team_remapping.items():
             if old_team in self.batting_data['Team'].values:
                 self.batting_data['Team'] = self.batting_data['Team'].replace(old_team, new_team)
                 if f"Pitching: {old_team} → {new_team}" not in remapped_teams:
                     remapped_teams.append(f"Batting: {old_team} → {new_team}")
-        
+
+        # Apply remapping to historical data as well
+        if self.pitching_data_historical is not None:
+            for old_team, new_team in self.team_remapping.items():
+                if old_team in self.pitching_data_historical['Team'].values:
+                    self.pitching_data_historical['Team'] = self.pitching_data_historical['Team'].replace(old_team, new_team)
+
+        if self.batting_data_historical is not None:
+            for old_team, new_team in self.team_remapping.items():
+                if old_team in self.batting_data_historical['Team'].values:
+                    self.batting_data_historical['Team'] = self.batting_data_historical['Team'].replace(old_team, new_team)
+
         # Log the remappings that were applied
         if remapped_teams:
             print(f"Applied team remappings: {', '.join(remapped_teams)}")
-        
+
         return
 
     def randomize_data(self):
@@ -309,12 +455,26 @@ class BaseballStatsPreProcess:
         league_names = ['ACB', 'NBL']  # Armchair Baseball and Nerd Baseball, Some Other League SOL, No Name NNL
         # league_names = random.sample(league_list, 2)
         # print(self.pitching_data[['League', 'Team']].drop_duplicates())
+
+        # Update aggregated data
         self.pitching_data.loc[self.pitching_data['League'] == 'AL', 'League'] = league_names[0]
         self.pitching_data.loc[self.pitching_data['League'] == 'NL', 'League'] = league_names[1]
         self.pitching_data['Leagues'] = self.pitching_data['League'].apply(lambda x: [x])
         self.batting_data.loc[self.batting_data['League'] == 'AL', 'League'] = league_names[0]
         self.batting_data.loc[self.batting_data['League'] == 'NL', 'League'] = league_names[1]
         self.batting_data['Leagues'] = self.batting_data['League'].apply(lambda x: [x])
+
+        # Update historical data
+        if self.pitching_data_historical is not None:
+            self.pitching_data_historical.loc[self.pitching_data_historical['League'] == 'AL', 'League'] = league_names[0]
+            self.pitching_data_historical.loc[self.pitching_data_historical['League'] == 'NL', 'League'] = league_names[1]
+            self.pitching_data_historical['Leagues'] = self.pitching_data_historical['League'].apply(lambda x: [x])
+
+        if self.batting_data_historical is not None:
+            self.batting_data_historical.loc[self.batting_data_historical['League'] == 'AL', 'League'] = league_names[0]
+            self.batting_data_historical.loc[self.batting_data_historical['League'] == 'NL', 'League'] = league_names[1]
+            self.batting_data_historical['Leagues'] = self.batting_data_historical['League'].apply(lambda x: [x])
+
         return
 
     def randomize_city_names(self):
@@ -331,6 +491,8 @@ class BaseballStatsPreProcess:
             new_team = new_teams[ii]
             mascot = city_dict[new_team][1]
             city_name = city_dict[new_team][0]
+
+            # Update aggregated data
             self.pitching_data.replace([team], [new_team], inplace=True)
             self.pitching_data.loc[self.pitching_data['Team'] == new_team, 'City'] = city_name
             self.pitching_data['Teams'] = self.pitching_data['Team'].apply(lambda x: [x])
@@ -339,6 +501,20 @@ class BaseballStatsPreProcess:
             self.batting_data.loc[self.batting_data['Team'] == new_team, 'City'] = city_name
             self.batting_data['Teams'] = self.batting_data['Team'].apply(lambda x: [x])
             self.batting_data.loc[self.batting_data['Team'] == new_team, 'Mascot'] = mascot
+
+            # Update historical data
+            if self.pitching_data_historical is not None:
+                self.pitching_data_historical.replace([team], [new_team], inplace=True)
+                self.pitching_data_historical.loc[self.pitching_data_historical['Team'] == new_team, 'City'] = city_name
+                self.pitching_data_historical['Teams'] = self.pitching_data_historical['Team'].apply(lambda x: [x])
+                self.pitching_data_historical.loc[self.pitching_data_historical['Team'] == new_team, 'Mascot'] = mascot
+
+            if self.batting_data_historical is not None:
+                self.batting_data_historical.replace([team], [new_team], inplace=True)
+                self.batting_data_historical.loc[self.batting_data_historical['Team'] == new_team, 'City'] = city_name
+                self.batting_data_historical['Teams'] = self.batting_data_historical['Team'].apply(lambda x: [x])
+                self.batting_data_historical.loc[self.batting_data_historical['Team'] == new_team, 'Mascot'] = mascot
+
         return
 
     @staticmethod
@@ -361,7 +537,7 @@ class BaseballStatsPreProcess:
         random_names = list(set(random_names))  # drop non-unique names
         random_names = random.sample(random_names, self.batting_data.shape[0] + self.pitching_data.shape[0])
 
-        # load new names and reset hashcode index
+        # load new names and reset hashcode index for AGGREGATED data
         self.batting_data['Player'] = random_names[: len(self.batting_data)]  # grab first x rows of list
         self.batting_data = self.batting_data.reset_index()
         self.batting_data['Hashcode'] = self.batting_data['Player'].apply(self.create_hash)
@@ -371,6 +547,38 @@ class BaseballStatsPreProcess:
         self.pitching_data = self.pitching_data.reset_index()
         self.pitching_data['Hashcode'] = self.pitching_data['Player'].apply(self.create_hash)
         self.pitching_data = self.pitching_data.set_index('Hashcode')
+
+        # Update HISTORICAL data with same player names (need to map old hashcode to new)
+        # Create mapping from old hashcode to new player name
+        if self.batting_data_historical is not None:
+            # Extract hashcode from Player_Season_Key (format: hashcode_season)
+            self.batting_data_historical = self.batting_data_historical.reset_index()
+            self.batting_data_historical['Old_Hashcode'] = self.batting_data_historical['Player_Season_Key'].str.split('_').str[0].astype(int)
+            # Map old hashcode to new player name from aggregated data
+            old_to_new_player = dict(zip(self.batting_data.reset_index()['Hashcode'], self.batting_data.reset_index()['Player']))
+            self.batting_data_historical['Player'] = self.batting_data_historical['Old_Hashcode'].map(old_to_new_player)
+            # Recalculate hashcode and Player_Season_Key
+            self.batting_data_historical['Hashcode'] = self.batting_data_historical['Player'].apply(self.create_hash)
+            self.batting_data_historical['Player_Season_Key'] = (
+                self.batting_data_historical['Hashcode'].astype(str) + '_' +
+                self.batting_data_historical['Season'].astype(str)
+            )
+            self.batting_data_historical = self.batting_data_historical.drop('Old_Hashcode', axis=1)
+            self.batting_data_historical = self.batting_data_historical.set_index('Player_Season_Key')
+
+        if self.pitching_data_historical is not None:
+            self.pitching_data_historical = self.pitching_data_historical.reset_index()
+            self.pitching_data_historical['Old_Hashcode'] = self.pitching_data_historical['Player_Season_Key'].str.split('_').str[0].astype(int)
+            old_to_new_player = dict(zip(self.pitching_data.reset_index()['Hashcode'], self.pitching_data.reset_index()['Player']))
+            self.pitching_data_historical['Player'] = self.pitching_data_historical['Old_Hashcode'].map(old_to_new_player)
+            self.pitching_data_historical['Hashcode'] = self.pitching_data_historical['Player'].apply(self.create_hash)
+            self.pitching_data_historical['Player_Season_Key'] = (
+                self.pitching_data_historical['Hashcode'].astype(str) + '_' +
+                self.pitching_data_historical['Season'].astype(str)
+            )
+            self.pitching_data_historical = self.pitching_data_historical.drop('Old_Hashcode', axis=1)
+            self.pitching_data_historical = self.pitching_data_historical.set_index('Player_Season_Key')
+
         return
 
     def calc_age_adjustment(self, df: pd.DataFrame) -> pd.DataFrame:
@@ -426,7 +634,7 @@ class BaseballStatsPreProcess:
 
 
 if __name__ == '__main__':
-    baseball_data = BaseballStatsPreProcess(load_seasons=[2025], new_season=2026,
+    baseball_data = BaseballStatsPreProcess(load_seasons=[2023, 2024, 2025], new_season=2026,
                                             generate_random_data=False,
                                             load_batter_file='player-stats-Batters.csv',
                                             load_pitcher_file='player-stats-Pitching.csv')

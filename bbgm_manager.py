@@ -221,8 +221,8 @@ if __name__ == '__main__':
     from bblogger import configure_logger
     configure_logger("INFO")
     bbgm = Manager(team_name='MIL', load_seasons=2024, new_season=2025,
-                   load_batter_file='stats-pp-Batting.csv',
-                   load_pitcher_file='stats-pp-Pitching.csv')
+                   load_batter_file='aggr-stats-pp-Batting.csv',
+                   load_pitcher_file='aggr-stats-pp-Pitching.csv')
     bbgm.game_setup()
     # bbgm.team.print_starting_lineups()  # reprint line up and loop to unused pos players at top
     # bbgm.team.print_pos_not_in_lineup()  # lineup already printed

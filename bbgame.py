@@ -41,7 +41,7 @@ class Game:
     def __init__(self, away_team_name: str = '', home_team_name: str = '', baseball_data=None,
                  game_num: int = 1, rotation_len: int = 5,
                  print_lineup: bool = False, chatty: bool = False, print_box_score_b: bool = False,
-                 load_seasons: List[int] = 2023, new_season: int = 2024,
+                 load_seasons: List[int] = 2025, new_season: int = 2026,
                  starting_pitchers: None = None, starting_lineups: None = None,
                  load_batter_file: str = 'player-stats-Batters.csv',
                  load_pitcher_file: str = 'player-stats-Pitching.csv',
@@ -486,7 +486,7 @@ if __name__ == '__main__':
     #               299454: '3B', 46074: '2B', 752787: 'RF'}
     # NYM_starter = 626858
     # MIL_starter = 288650
-    sims = 70
+    sims = 5
     season_win_loss = [[0, 0], [0, 0]]  # away record pos 0, home pos 1
     score_total = [0, 0]
     # team0_season_df = None
@@ -495,11 +495,11 @@ if __name__ == '__main__':
         game = Game(home_team_name=home_team, away_team_name=away_team,
                     chatty=False, print_lineup=True,
                     print_box_score_b=False,
-                    load_seasons=[2025], new_season=2026,
-                    # load_batter_file='random-stats-pp-Batting.csv',
-                    # load_pitcher_file='random-stats-pp-Pitching.csv',
-                    load_batter_file='stats-pp-Batting.csv',
-                    load_pitcher_file='stats-pp-Pitching.csv',
+                    load_seasons=[2023, 2024, 2025], new_season=2026,
+                    # load_batter_file='random-aggr-stats-pp-Batting.csv',
+                    # load_pitcher_file='random-aggr-stats-pp-Pitching.csv',
+                    load_batter_file='aggr-stats-pp-Batting.csv',
+                    load_pitcher_file='aggr-stats-pp-Pitching.csv',
                     interactive=False,
                     show_bench=False
                     # , starting_pitchers=[MIL_starter, BOS_starter]

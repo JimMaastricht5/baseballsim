@@ -57,6 +57,10 @@ The simulator uses CSV files for player statistics:
 
 To use specific data, modify the `load_batter_file` and `load_pitcher_file` parameters when creating game/season objects.
 
+**Note:** The preprocessor creates two types of files:
+- Aggregated files (`aggr-stats-pp-*.csv`) - Career totals used for game simulation
+- Historical files (`historical-*.csv`) - Year-by-year data for analysis
+
 ## Dependencies
 To install required dependencies:
 ```bash

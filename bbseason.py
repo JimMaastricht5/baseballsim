@@ -42,8 +42,8 @@ class BaseballSeason:
                  rotation_len: int = 5, include_leagues: list = None, season_interactive: bool = False,
                  season_print_lineup_b: bool = False, season_print_box_score_b: bool = False,
                  season_chatty: bool = False, season_team_to_follow: str = None,
-                 load_batter_file: str = 'stats-pp-Batting.csv',
-                 load_pitcher_file: str = 'stats-pp-Pitching.csv',
+                 load_batter_file: str = 'aggr-stats-pp-Batting.csv',
+                 load_pitcher_file: str = 'aggr-stats-pp-Pitching.csv',
                  schedule: list = None) -> None:
         """
         :param load_seasons: list of seasons to load for stats, can blend multiple seasons
@@ -433,14 +433,14 @@ if __name__ == '__main__':
     # multiple seasons for majors and minors of random league
     if fantasy:
         my_teams_to_follow = 'AUG'
-        bbseasonMS = MultiBaseballSeason(load_seasons=[2025], new_season=2026,
+        bbseasonMS = MultiBaseballSeason(load_seasons=[2023, 2024, 2025], new_season=2026,
                                          season_length=num_games, series_length=3, rotation_len=5,
                                          majors_minors=['ACB', 'NBL'],
                                          season_interactive=interactive,
                                          season_chatty=False, season_print_lineup_b=False,
                                          season_print_box_score_b=False, season_team_to_follow=my_teams_to_follow,
-                                         load_batter_file='random-stats-pp-Batting.csv',
-                                         load_pitcher_file='random-stats-pp-Pitching.csv')
+                                         load_batter_file='aggr-stats-pp-Batting.csv',
+                                         load_pitcher_file='aggr-stats-pp-Pitching.csv')
         bbseasonMS.sim_start()
         bbseasonMS.sim_all_days_for_seasons()
         bbseasonMS.sim_end()
@@ -451,13 +451,13 @@ if __name__ == '__main__':
         series_schedule = [[['LAD', 'TOR']], [['LAD', 'TOR']],
                            [['TOR', 'LAD']], [['TOR', 'LAD']],
                            [['TOR', 'LAD']], [['LAD', 'TOR']],[['LAD', 'TOR']]]
-        bbseasonSS = BaseballSeason(load_seasons=[2025], new_season=2026,
+        bbseasonSS = BaseballSeason(load_seasons=[2023, 2024, 2025], new_season=2026,
                                     season_length=num_games, series_length=7, rotation_len=5,
                                     season_interactive=interactive,
                                     season_chatty=False, season_print_lineup_b=False,
                                     season_print_box_score_b=False, season_team_to_follow=my_teams_to_follow,
-                                    load_batter_file='stats-pp-Batting.csv',  # 'random-stats-pp-Batting.csv',
-                                    load_pitcher_file='stats-pp-Pitching.csv',
+                                    load_batter_file='aggr-stats-pp-Batting.csv',  # 'random-aggr-stats-pp-Batting.csv',
+                                    load_pitcher_file='aggr-stats-pp-Pitching.csv',
                                     schedule=series_schedule)
         bbseasonSS.sim_full_season()
 

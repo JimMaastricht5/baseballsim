@@ -26,6 +26,7 @@ import pygame
 import sys
 from bbgame import Game
 import random
+from bblogger import logger
 
 # Initialize Pygame
 pygame.init()
@@ -92,7 +93,7 @@ class BaseballUI:
             # Scale the image to fit the field_rect
             self.diamond_img = pygame.transform.scale(self.diamond_img, (self.field_rect.width, self.field_rect.height))
         except pygame.error:
-            print("Warning: Could not load diamond.png")
+            logger.warning("Could not load diamond.png")
             self.diamond_img = None
         
         # Increase max outcome lines to fit in the play-by-play area

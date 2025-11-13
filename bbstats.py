@@ -194,11 +194,13 @@ class BaseballStats:
                 self.new_season_batting_data = self.add_missing_cols(pd.read_csv(str(self.new_season) +
                                                                                  f" {new_batter_file}", index_col='Hashcode'))
         except FileNotFoundError as e:
-            print(e)
-            print(f'bbstats.py, get_seasons(), file was not found.')
-            print(f'Looking for files with pattern: "{seasons_str} {pitcher_file}" and "{seasons_str} {batter_file}"')
-            print(f'Or new season files: "{self.new_season} {new_pitcher_file}" and "{self.new_season} {new_batter_file}"')
-            print(f'Correct spelling or try running bbstats_preprocess.py to setup the data')
+            logger.error("File not found in get_seasons(): {}", e)
+            logger.error("bbstats.py, get_seasons(), file was not found.")
+            logger.error('Looking for files with pattern: "{} {}" and "{} {}"',
+                         seasons_str, pitcher_file, seasons_str, batter_file)
+            logger.error('Or new season files: "{} {}" and "{} {}"',
+                         self.new_season, new_pitcher_file, self.new_season, new_batter_file)
+            logger.error('Correct spelling or try running bbstats_preprocess.py to setup the data')
             exit(1)  # stop the program
 
         # limit the league if include leagues is not none and at least one league is in the list

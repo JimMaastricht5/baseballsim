@@ -86,7 +86,7 @@ class BaseballSeason:
             self.teams.append('OFF DAY')
 
         self.schedule = [] if schedule is None else schedule
-        if len(schedule) == 0:
+        if schedule is None:
             self.create_schedule()  # set schedule if not passed
         self.team_win_loss = {}
         for team in self.teams:
@@ -448,17 +448,17 @@ if __name__ == '__main__':
     # handle a single full season of MLB
     if not fantasy:
         my_teams_to_follow = None  # or follow no team
-        series_schedule = [[['LAD', 'TOR']], [['LAD', 'TOR']],
-                           [['TOR', 'LAD']], [['TOR', 'LAD']],
-                           [['TOR', 'LAD']], [['LAD', 'TOR']],[['LAD', 'TOR']]]
+        # series_schedule = [[['LAD', 'TOR']], [['LAD', 'TOR']],
+        #                    [['TOR', 'LAD']], [['TOR', 'LAD']],
+        #                    [['TOR', 'LAD']], [['LAD', 'TOR']],[['LAD', 'TOR']]]
         bbseasonSS = BaseballSeason(load_seasons=[2023, 2024, 2025], new_season=2026,
                                     season_length=num_games, series_length=7, rotation_len=5,
                                     season_interactive=interactive,
                                     season_chatty=False, season_print_lineup_b=False,
                                     season_print_box_score_b=False, season_team_to_follow=my_teams_to_follow,
                                     load_batter_file='aggr-stats-pp-Batting.csv',  # 'random-aggr-stats-pp-Batting.csv',
-                                    load_pitcher_file='aggr-stats-pp-Pitching.csv',
-                                    schedule=series_schedule)
+                                    load_pitcher_file='aggr-stats-pp-Pitching.csv')
+                                    # schedule=series_schedule)
         bbseasonSS.sim_full_season()
 
     # how long did that take?

@@ -284,9 +284,9 @@ class Team:
             self.new_season_pitching_df = \
                 self.baseball_data.new_season_pitching_data.loc[self.cur_pitcher_index].to_frame().T
         except IndexError:
-            print('****bbteam.py set_initial_starting_rotation error')
-            print(self.starting_pitchers)
-            print(self.prior_season_pitchers_df)
+            logger.error('bbteam.py set_initial_starting_rotation error')
+            logger.error('Starting pitchers: {}', self.starting_pitchers)
+            logger.error('Prior season pitchers dataframe:\n{}', self.prior_season_pitchers_df)
         return
 
     def change_starting_rotation(self, starting_pitcher_num: int, rotation_order_num: int) -> None:
@@ -367,8 +367,8 @@ class Team:
             # condition = 0 if cur_percentage < 0 else 0
             self.prior_season_pitching_df.Condition = 0 if 100 - (cur_ratio * 100) < 0 else 100 - (cur_ratio * 100)
         except Exception as e:
-            print(f'error in set_pitching_condition bbteam.py {e}')
-            print(self.prior_season_pitching_df)
+            logger.error('Error in set_pitching_condition bbteam.py: {}', e)
+            logger.error('Prior season pitching dataframe:\n{}', self.prior_season_pitching_df)
             raise Exception('set pitching condition error')
         return
 
@@ -516,10 +516,10 @@ class Team:
             logger.debug('Top player at position {}: {}', 
                        position, df_players.head(1).index[0] if df_player_num is None else df_player_num)
         except IndexError:
-            print(f'***Error in bbteam.py search_for_pos with pos {position}')
-            print(f'with criteria {df_criteria}')
-            print(f'available players {df_players}')
-            print(f'prior season df {self.prior_season_pos_players_df}')
+            logger.error('Error in bbteam.py search_for_pos with pos {}', position)
+            logger.error('With criteria: {}', df_criteria)
+            logger.error('Available players:\n{}', df_players)
+            logger.error('Prior season dataframe:\n{}', self.prior_season_pos_players_df)
             exit(1)
         return df_players.head(1).index[0] if df_player_num is None else df_player_num  # pick top player at pos
 

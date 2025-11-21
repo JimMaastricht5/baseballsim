@@ -89,6 +89,7 @@ class BaseballStats:
         pd.set_option('display.max_columns', None)  # Show all columns
         pd.set_option('display.width', None)  # Adjust the display width
         pd.set_option('display.precision', 3)  # Set the number of decimal places
+        pd.set_option('future.no_silent_downcasting', True)  # Opt-in to future pandas behavior
 
         # ***************** game to game stats and settings for injury and rest
         # condition and injury odds
@@ -907,8 +908,11 @@ def update_column_with_other_df(df1, col1, df2, col2):
     :param col2: The name of the column in df2 to use for updates.
     :return: The updated DataFrame with the modified column.
     """
-    # OPTIMIZED: map() is optimized for lookups, fillna handles missing values
-    df1.loc[df1.index, col1] = df1[col1].map(df2[col2]).fillna(0)
+    # OPTIMIZED: map() is optimized for lookups
+    # Create mapped series, fill NaN, infer proper dtypes, then assign
+    mapped_values = df1[col1].map(df2[col2])
+    filled_values = mapped_values.fillna(0)
+    df1[col1] = filled_values.infer_objects(copy=False)
     return df1
 
 def fill_nan_with_value(df, column_name, value=0):

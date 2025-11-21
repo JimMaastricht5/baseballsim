@@ -20,6 +20,12 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
 #
+# notes on multi-threading
+# 1.uv python install 3.14t
+# 2. uv python list
+# 3. uv python pin 3.14t
+# 4. uv sync
+# 5. uv run -- python -X gil=0 bbseason.py
 # JimMaastricht5@gmail.com
 import datetime
 import queue

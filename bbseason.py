@@ -430,7 +430,7 @@ if __name__ == '__main__':
     startdt = datetime.datetime.now()
 
     # full season 162 games
-    num_games = 10
+    num_games = 162
     interactive = True
     fantasy = False
 

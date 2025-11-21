@@ -31,13 +31,15 @@ from bblogger import logger
 
 
 class OutCome:
-    def __init__(self) -> None:
+    def __init__(self, debug_b=False) -> None:
         """
         class handles tracking battering outcomes and translating that into base running results
         dict in object maintains translation to runner movement and outs
         :return: None
         """
-        logger.debug("Initializing OutCome class")
+        self.debug_b = debug_b
+        if self.debug_b:
+            logger.debug("Initializing OutCome class")
         self.outs_on_play = 0
         self.on_base_b = False  # if this a BB or some form of a hit does not cover GB FC
         self.score_book_cd = ''
@@ -86,13 +88,15 @@ class OutCome:
 
 
 class SimAB:
-    def __init__(self, baseball_data: bbstats.BaseballStats) -> None:
+    def __init__(self, baseball_data: bbstats.BaseballStats, debug_b=False) -> None:
         """
         class handles calculating the outcome of an ab based on pitcher, batter, and league probabilities
         :param baseball_data: class containing the league data and methods
         :return: None
         """
-        logger.debug("Initializing SimAB class")
+        self.debug_b = debug_b
+        if self.debug_b:
+            logger.debug("Initializing SimAB class")
         # PERFORMANCE: Create RNG instance once, reuse for ~29x speedup (called ~1000x per game)
         self._rng_instance = np.random.default_rng()
         self.rng = lambda: self._rng_instance.uniform(low=0.0, high=1.001)
@@ -290,8 +294,9 @@ class SimAB:
         :param stat_type:
         :return: a float of type numpy float64
         """
-        logger.debug('Computing odds ratio - hitter stat: {}, pitcher stat: {}', 
-                  hitter_stat, pitcher_stat)
+        if self.debug_b:
+            logger.debug('Computing odds ratio - hitter stat: {}, pitcher stat: {}',
+                         hitter_stat, pitcher_stat)
 
         odds = 0
         with warnings.catch_warnings():

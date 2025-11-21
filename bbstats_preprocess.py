@@ -258,6 +258,8 @@ class BaseballStatsPreProcess:
         if 'Injury_Rate_Adj' not in pitching_data.columns:
             pitching_data['Injury_Rate_Adj'] = 0
             pitching_data['Injury_Perf_Adj'] = 0
+        if 'Streak_Adjustment' not in pitching_data.columns:
+            pitching_data['Streak_Adjustment'] = 0.0  # Always 0 for aggregated data
 
         # Calculate derived stats for HISTORICAL data
         historical_data['AB'] = historical_data['IP'] * 3 + historical_data['H']
@@ -281,6 +283,8 @@ class BaseballStatsPreProcess:
         if 'Injury_Rate_Adj' not in historical_data.columns:
             historical_data['Injury_Rate_Adj'] = 0
             historical_data['Injury_Perf_Adj'] = 0
+        if 'Streak_Adjustment' not in historical_data.columns:
+            historical_data['Streak_Adjustment'] = 0.0  # Always 0 for historical data
 
         return pitching_data, historical_data
 
@@ -368,6 +372,8 @@ class BaseballStatsPreProcess:
         if 'Injury_Rate_Adj' not in batting_data.columns:
             batting_data['Injury_Rate_Adj'] = 0
             batting_data['Injury_Perf_Adj'] = 0
+        if 'Streak_Adjustment' not in batting_data.columns:
+            batting_data['Streak_Adjustment'] = 0.0  # Always 0 for aggregated data
 
         # Calculate derived stats for HISTORICAL data
         # Season is already set per row from the loop
@@ -394,6 +400,8 @@ class BaseballStatsPreProcess:
         if 'Injury_Rate_Adj' not in historical_data.columns:
             historical_data['Injury_Rate_Adj'] = 0
             historical_data['Injury_Perf_Adj'] = 0
+        if 'Streak_Adjustment' not in historical_data.columns:
+            historical_data['Streak_Adjustment'] = 0.0  # Always 0 for historical data
 
         return batting_data, historical_data
 
@@ -610,6 +618,7 @@ class BaseballStatsPreProcess:
             self.new_season_pitching_data[['ERA', 'WHIP', 'OBP', 'AVG_faced', 'Total_OB', 'Total_Outs', 'AB',
                                            'HLD', 'BS', 'Injured Days']] = 0
             self.new_season_pitching_data['Condition'] = 100
+            self.new_season_pitching_data['Streak_Adjustment'] = 0.0  # All players start season with no streak
             self.new_season_pitching_data.drop(['Total_OB', 'Total_Outs'], axis=1)
             self.new_season_pitching_data['Season'] = str(self.new_season)
             if self.new_season not in self.load_seasons:  # add a year to age if it is the next year
@@ -620,6 +629,7 @@ class BaseballStatsPreProcess:
             self.new_season_batting_data[self.numeric_bcols] = 0
             self.new_season_batting_data[['AVG', 'OBP', 'SLG', 'OPS', 'Total_OB', 'Total_Outs', 'Injured Days']] = 0
             self.new_season_batting_data['Condition'] = 100
+            self.new_season_batting_data['Streak_Adjustment'] = 0.0  # All players start season with no streak
             self.new_season_batting_data.drop(['Total_OB', 'Total_Outs'], axis=1)
             self.new_season_batting_data['Season'] = str(self.new_season)
             if self.new_season not in self.load_seasons:  # add a year to age if it is the next year

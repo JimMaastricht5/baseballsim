@@ -212,7 +212,9 @@ class BaseballSeason:
         """
         print(self.print_day_schedule(season_day_num))
         todays_games = self.schedule[season_day_num]
-        self.baseball_data.new_game_day()  # update rest and injury data for a new day, print DL injury list
+        # Pass team_to_follow as a list (if not None) to show hot/cold players
+        teams_list = [self.team_to_follow] if self.team_to_follow else None
+        self.baseball_data.new_game_day(teams_to_follow=teams_list)  # update rest, injury, and print lists
         for match_up in todays_games:  # run all games for a day, day starts at zero
             if 'OFF DAY' not in match_up:  # not an off day
                 print(f'Playing day #{season_day_num + 1}: {match_up[0]} away against {match_up[1]}')
@@ -242,7 +244,9 @@ class BaseballSeason:
         match_ups = []
         print(self.print_day_schedule(season_day_num) + '\n')
         todays_games = self.schedule[season_day_num]
-        self.baseball_data.new_game_day()  # update rest and injury data for a new day, print DL injury list
+        # Pass team_to_follow as a list (if not None) to show hot/cold players
+        teams_list = [self.team_to_follow] if self.team_to_follow else None
+        self.baseball_data.new_game_day(teams_to_follow=teams_list)  # update rest, injury, and print lists
         print(f'Simulating day #{season_day_num + 1} for league(s): {self.leagues_str}', end='')  # start sim wait line
         for match_up in todays_games:  # run all games for a day, day starts at zero
             if 'OFF DAY' not in match_up:  # not an off day
@@ -426,7 +430,7 @@ if __name__ == '__main__':
     startdt = datetime.datetime.now()
 
     # full season 162 games
-    num_games = 162
+    num_games = 10
     interactive = True
     fantasy = False
 
@@ -447,7 +451,7 @@ if __name__ == '__main__':
 
     # handle a single full season of MLB
     if not fantasy:
-        my_teams_to_follow = None  # or follow no team
+        my_teams_to_follow ='MIL'  # or None
         # series_schedule = [[['LAD', 'TOR']], [['LAD', 'TOR']],
         #                    [['TOR', 'LAD']], [['TOR', 'LAD']],
         #                    [['TOR', 'LAD']], [['LAD', 'TOR']],[['LAD', 'TOR']]]

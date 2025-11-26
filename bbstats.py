@@ -36,6 +36,10 @@ from bblogger import logger
 # PERFORMANCE: Pre-compile regex patterns for ~2-5x speedup in safe_literal_eval
 _LIST_PATTERN = re.compile(r"\[([^\]]+)\]")
 
+# Dynamic state fields that need to be synced from new_season data to gameplay data
+DYNAMIC_FIELDS = ['Condition', 'Injured Days', 'Injury Description',
+                  'Injury_Perf_Adj', 'Injury_Rate_Adj', 'Streak_Adjustment']
+
 
 class BaseballStats:
     def __init__(self, load_seasons: List[int], new_season: int, include_leagues: list = None,
@@ -250,6 +254,27 @@ class BaseballStats:
         if 'Injury Description' not in self.batting_data.columns:
             self.batting_data['Injury Description'] = ""
             self.new_season_batting_data['Injury Description'] = ""
+        return
+
+    def sync_dynamic_fields(self, target_pitching_df: DataFrame, target_batting_df: DataFrame) -> None:
+        """
+        Synchronize dynamic state fields from new_season data to target dataframes.
+        Dynamic fields include: condition, injuries, streaks - anything that changes during the season.
+
+        :param target_pitching_df: DataFrame to update with current pitching dynamic state
+        :param target_batting_df: DataFrame to update with current batting dynamic state
+        :return: None (modifies dataframes in place)
+        """
+        # Copy dynamic fields for pitchers
+        for field in DYNAMIC_FIELDS:
+            if field in self.new_season_pitching_data.columns and field in target_pitching_df.columns:
+                target_pitching_df.loc[:, field] = self.new_season_pitching_data.loc[:, field]
+
+        # Copy dynamic fields for batters
+        for field in DYNAMIC_FIELDS:
+            if field in self.new_season_batting_data.columns and field in target_batting_df.columns:
+                target_batting_df.loc[:, field] = self.new_season_batting_data.loc[:, field]
+
         return
 
     def game_results_to_season(self, box_score_class) -> None:
@@ -570,21 +595,7 @@ class BaseballStats:
                 (self.new_season_batting_data['Condition'] + random_changes).clip(lower=0, upper=100)
 
             # copy over results in new season to prior season for game management
-            self.pitching_data.loc[:, 'Condition'] = self.new_season_pitching_data.loc[:, 'Condition']
-            self.pitching_data = update_column_with_other_df(self.pitching_data, 'Injured Days',
-                                                             self.new_season_pitching_data, 'Injured Days')
-            # Copy injury descriptions
-            self.pitching_data.loc[:, 'Injury Description'] = self.new_season_pitching_data.loc[:, 'Injury Description']
-            # Copy streak adjustments
-            self.pitching_data.loc[:, 'Streak_Adjustment'] = self.new_season_pitching_data.loc[:, 'Streak_Adjustment']
-
-            self.batting_data.loc[:, 'Condition'] = self.new_season_batting_data.loc[:, 'Condition']
-            self.batting_data = update_column_with_other_df(self.batting_data, 'Injured Days',
-                                                            self.new_season_batting_data, 'Injured Days')
-            # Copy injury descriptions
-            self.batting_data.loc[:, 'Injury Description'] = self.new_season_batting_data.loc[:, 'Injury Description']
-            # Copy streak adjustments
-            self.batting_data.loc[:, 'Streak_Adjustment'] = self.new_season_batting_data.loc[:, 'Streak_Adjustment']
+            self.sync_dynamic_fields(self.pitching_data, self.batting_data)
         return
 
     def update_season_stats(self) -> None:

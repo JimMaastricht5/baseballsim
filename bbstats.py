@@ -21,6 +21,34 @@
 # SOFTWARE.
 #
 # JimMaastricht5@gmail.com
+"""
+Baseball statistics management and game state tracking.
+
+This module provides the core statistics management system for the baseball simulator,
+handling loading of preprocessed player data, calculating derived statistics (AVG, OBP,
+ERA, WHIP), managing player conditions (injuries, fatigue, hot/cold streaks), and
+accumulating game results into season statistics. Thread-safe for multi-game simulations.
+
+Key Features:
+- Loads both aggregated (career) and new season player statistics
+- Caches league-wide statistics for 2-3x performance improvement
+- Manages dynamic player state (condition, injuries, streaks)
+- Thread-safe stats updates via semaphore locking
+- Syncs condition and injury data between historical and new season stats
+- Calculates all derived baseball statistics (AVG, OBP, SLG, ERA, WHIP, etc.)
+
+Performance Optimizations:
+- Cached RNG (29x speedup) - see at_bat.py for shared instance
+- Pre-calculated league totals (2-3x speedup)
+- Pre-compiled regex patterns (2-5x speedup)
+- Return scalar values instead of size-1 arrays
+
+Data Structure:
+- pitching_data: Aggregated career pitching stats (indexed by Hashcode)
+- batting_data: Aggregated career batting stats (indexed by Hashcode)
+- new_season_pitching_data: Current season pitching stats
+- new_season_batting_data: Current season batting stats
+"""
 import ast
 import pandas as pd
 import numpy as np

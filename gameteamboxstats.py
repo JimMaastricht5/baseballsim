@@ -21,6 +21,14 @@
 # SOFTWARE.
 #
 # JimMaastricht5@gmail.com
+"""
+Team box score tracking and accumulation for baseball game simulation.
+
+This module manages in-game statistics for both batting and pitching, tracking
+individual player performance throughout a game. Box scores are accumulated from
+at-bat outcomes and later aggregated into season-long statistics. Handles player
+condition tracking, runs scored, and pitching statistics.
+"""
 import pandas as pd
 import bbstats
 import numpy as np
@@ -32,7 +40,32 @@ from typing import Dict, Union
 
 
 class TeamBoxScore:
+    """
+    Tracks and accumulates in-game statistics for a team's batters and pitchers.
+
+    Creates box score DataFrames for both batting and pitching that start at zero
+    and accumulate throughout the game. After the game, these are aggregated into
+    season statistics. Also tracks player condition changes and total hits/errors.
+
+    Attributes:
+        box_batting: DataFrame of batting statistics for the game
+        box_pitching: DataFrame of pitching statistics for the game
+        team_name: Three-letter team abbreviation
+        total_hits: Running total of team hits in game
+        total_errors: Running total of team errors in game
+        condition_change_per_day: Base condition change for fatigue (default 20)
+        game_batting_stats: Copy of box_batting without totals row
+        game_pitching_stats: Copy of box_pitching without totals row
+    """
     def __init__(self, lineup: DataFrame, pitching: DataFrame, team_name: str) -> None:
+        """
+        Initialize box score with team lineup and starting pitcher.
+
+        Args:
+            lineup: DataFrame of batting lineup with historical stats
+            pitching: DataFrame with starting pitcher stats
+            team_name: Three-letter team abbreviation
+        """
         # self.rnd = lambda: np.random.default_rng().uniform(low=0.0, high=1.001)  # random generator between 0 and 1
         self.box_printed = ''
         self.box_pitching = pitching.copy()
@@ -68,10 +101,27 @@ class TeamBoxScore:
         return
 
     def batters_faced(self, pitcher_index: int64) -> Union[int64, float64]:
+        """
+        Calculate total batters faced by a pitcher in this game.
+
+        Args:
+            pitcher_index: Player hashcode for the pitcher
+
+        Returns:
+            Union[int64, float64]: Total batters faced (H + BB + IP*3)
+        """
         pitcher_stats = self.box_pitching.loc[pitcher_index]  # Store the result of .loc[] in a variable
         return pitcher_stats.H + pitcher_stats.BB + pitcher_stats.IP * 3  # total batters faced
 
     def pitching_result(self, pitcher_index: int64, outcomes: OutCome, condition: Union[float64, int]) -> None:
+        """
+        Update pitcher's box score stats based on at-bat outcome.
+
+        Args:
+            pitcher_index: Player hashcode for the pitcher
+            outcomes: OutCome object with at-bat results
+            condition: Current pitcher condition (0-100)
+        """
         row = self.box_pitching.loc[pitcher_index]
         row['AB'] += (outcomes.score_book_cd != 'BB')  # add 1 if true
         if not outcomes.on_base_b:  # Handle outs
@@ -86,6 +136,12 @@ class TeamBoxScore:
         return
 
     def add_pitcher_to_box(self, new_pitcher: Series) -> None:
+        """
+        Add a relief pitcher to the box score when they enter the game.
+
+        Args:
+            new_pitcher: Series or DataFrame with pitcher's historical stats
+        """
         new_pitcher = new_pitcher if isinstance(new_pitcher, pd.DataFrame) else new_pitcher.to_frame().T
         new_pitcher = new_pitcher.assign(G=1, GS=0, CG=0, SHO=0, IP=0, AB=0, H=0, ER=0, SO=0, BB=0, HR=0,
                                          W=0, L=0, SV=0, BS=0, HLD=0, ERA=0,
@@ -94,6 +150,17 @@ class TeamBoxScore:
         return
 
     def pitching_win_loss_save(self, pitcher_index: int64, win_b: bool, save_b: bool) -> None:
+        """
+        Record win/loss and save for pitcher(s) at end of game.
+
+        Awards win or loss to specified pitcher. If save situation, credits
+        save to last pitcher and hold to second-to-last if they pitched <2 innings.
+
+        Args:
+            pitcher_index: Hashcode of pitcher to credit with win/loss
+            win_b: True if win, False if loss
+            save_b: True if save situation (close game, winning team)
+        """
         # set win loss records and save if applicable
         if win_b:  # win boolean, did this pitcher win or lose?
             self.box_pitching.loc[pitcher_index, ['W']] += 1
@@ -110,10 +177,23 @@ class TeamBoxScore:
         return
 
     def pitching_blown_save(self, pitcher_index):
+        """
+        Record a blown save for the pitcher.
+
+        Args:
+            pitcher_index: Hashcode of pitcher who blew the save
+        """
         self.box_pitching.loc[pitcher_index, ['BS']] = 1
         return
 
     def steal_result(self, runner_index: int32, steal: bool = True) -> None:
+        """
+        Record stolen base or caught stealing for runner.
+
+        Args:
+            runner_index: Hashcode of runner attempting steal
+            steal: True if successful steal, False if caught stealing
+        """
         runner_stats = self.box_batting.loc[runner_index].copy()
         if steal:
             runner_stats['SB'] += 1
@@ -123,6 +203,19 @@ class TeamBoxScore:
         return
 
     def batting_result(self, batter_index: int, outcomes: OutCome, players_scored_list: Dict[int32, str]) -> None:
+        """
+        Update batter's box score stats based on at-bat outcome.
+
+        Records AB, hits, RBIs, and other stats. Also credits runs to players who scored.
+
+        Args:
+            batter_index: Hashcode of batter
+            outcomes: OutCome object with at-bat results
+            players_scored_list: Dictionary of player hashcodes who scored this at-bat
+
+        Raises:
+            ValueError: If a player with hashcode 0 is in scoring list
+        """
         batter_stats = self.box_batting.loc[batter_index].copy()  # Store the row in a variable
         if outcomes.score_book_cd != 'BB':  # handle walks
             batter_stats['AB'] += 1
@@ -142,12 +235,24 @@ class TeamBoxScore:
         return
 
     def set_box_batting_condition(self) -> None:
+        """
+        Decrease player condition for all batters after the game.
+
+        Applies random condition decrease (normal distribution around condition_change_per_day)
+        and clips values between 0 and 100.
+        """
         self.box_batting['Condition'] = self.box_batting. \
             apply(lambda row: row['Condition'] - self.rnd_condition_chg(), axis=1)
         self.box_batting['Condition'] = self.box_batting['Condition'].clip(lower=0, upper=100)
         return
 
     def totals(self) -> None:
+        """
+        Calculate team totals for batting and pitching box scores.
+
+        Creates copies of box scores without totals (for season accumulation)
+        and generates team total rows for display.
+        """
         self.game_batting_stats = self.box_batting.copy()  # make a copy w/o totals for season accumulations
         self.game_pitching_stats = self.box_pitching.copy()  # make a copy w/o totals for season accumulations
         self.box_batting_totals = bbstats.team_batting_totals(self.box_batting)
@@ -155,6 +260,15 @@ class TeamBoxScore:
         return
 
     def print_boxes(self) -> str:
+        """
+        Format and return box scores as printable string.
+
+        Creates formatted strings for both batting and pitching box scores
+        with team totals row appended.
+
+        Returns:
+            str: Formatted box score text with batting and pitching stats
+        """
         batting_cols = ['Player', 'Team', 'Pos', 'Age', 'G', 'AB', 'R', 'H', '2B', '3B', 'HR', 'RBI',
                         'SB', 'CS', 'BB', 'SO', 'SH', 'SF', 'HBP']
         pitching_cols = ['Player', 'Team', 'Age', 'G', 'GS', 'CG', 'SHO', 'IP', 'H', '2B', '3B',
@@ -172,9 +286,23 @@ class TeamBoxScore:
         return self.box_printed
 
     def get_batter_game_stats(self):
+        """
+        Get batting statistics for accumulation into season stats.
+
+        Returns:
+            DataFrame: Copy of box_batting without totals row
+        """
         return self.game_batting_stats
 
     def get_pitcher_game_stats(self):
+        """
+        Get pitching statistics for accumulation into season stats.
+
+        Ensures 2B and 3B columns are integers before returning.
+
+        Returns:
+            DataFrame: Copy of box_pitching without totals row
+        """
         # 2b and 3b slide toward object types, make sure they are ints
         self.game_pitching_stats[['2B', '3B']] = self.game_pitching_stats[['2B', '3B']].astype(int)
         return self.game_pitching_stats

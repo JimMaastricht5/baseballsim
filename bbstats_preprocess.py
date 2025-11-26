@@ -21,6 +21,51 @@
 # SOFTWARE.
 #
 # JimMaastricht5@gmail.com
+"""
+Baseball statistics preprocessing and data standardization.
+
+This module handles the cleaning, transformation, and aggregation of raw MLB player
+statistics downloaded from RotoWire/Baseball-Reference. Creates two types of output files:
+
+1. **Aggregated Files** (for simulation):
+   - Career totals: `{seasons} aggr-stats-pp-Batting.csv`
+   - Career totals: `{seasons} aggr-stats-pp-Pitching.csv`
+   - One row per player with cumulative stats across all loaded seasons
+   - Indexed by player Hashcode
+
+2. **Historical Files** (for year-by-year analysis):
+   - Year-by-year: `{seasons} historical-Batting.csv`
+   - Year-by-year: `{seasons} historical-Pitching.csv`
+   - One row per player per season
+   - Indexed by Player_Season_Key (Hashcode_Year)
+
+3. **New Season Files** (for starting a new season):
+   - Projected stats: `{new_season} New-Season-stats-pp-Batting.csv`
+   - Projected stats: `{new_season} New-Season-stats-pp-Pitching.csv`
+   - Based on age-adjusted performance projections
+
+Key Features:
+- Handles multi-season data aggregation and de-duplication
+- Removes unwanted columns from raw data
+- Calculates derived statistics (OBP, SLG, OPS, ERA, WHIP, etc.)
+- Supports random league/team/player name generation for testing
+- Age-adjusted performance projections for future seasons
+- Merges salary data from historical records
+- Filters players by minimum playing time (AB >= 10, IP >= 5)
+- Team name remapping (e.g., OAK → ATH)
+
+Random Data Generation:
+- Randomizes team cities, mascots, and player names
+- Jiggers stats with normal distribution (±10% with scale=2)
+- Creates fictional leagues (ACB, NBL)
+- Maintains statistical relationships and distributions
+
+Age-Adjusted Projections:
+- Peak performance age: 29
+- Young players (21-25): Improvement curve (coeff=0.0008)
+- Declining players (30+): Decline curve (coeff=-0.0059)
+- Applies parabolic adjustment to OBP/OPS
+"""
 # data clean up and standardization for stats.  handles random generation if requested
 # data imported from https://www.rotowire.com/baseball/stats.php
 import pandas as pd

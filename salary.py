@@ -21,6 +21,28 @@
 # SOFTWARE.
 #
 # JimMaastricht5@gmail.com
+"""
+MLB player salary data loading and management.
+
+This module loads historical salary data from CSV files and merges it with player
+statistics by matching on player hashcodes. Provides utilities for handling missing
+salary data by filling with league minimum values.
+
+Key Functions:
+- retrieve_salary(): Loads salary CSV, reformats player names, creates hashcodes
+- fill_nan_salary(): Fills missing salary values with league minimum (default $740,000)
+- compare_strings(): Debug utility for comparing strings and identifying differences
+
+Salary Data Format:
+- Input: CSV with columns [Player (Last, First), Position, Salary, ...]
+- Output: DataFrame indexed by Hashcode with columns [Salary, MLS]
+- Player names converted from "Last, First" to "First Last" for hashcode matching
+
+Usage:
+    df_salary = retrieve_salary('mlb-salaries-2000-24.csv', hash_function)
+    df = pd.merge(df, df_salary, on='Hashcode', how='left')
+    df = fill_nan_salary(df, 'Salary', value=740000)  # 2024 league minimum
+"""
 import pandas as pd
 import hashlib
 import numpy as np

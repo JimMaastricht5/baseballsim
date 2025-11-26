@@ -296,12 +296,12 @@ class BaseballStats:
         # Copy dynamic fields for pitchers
         for field in DYNAMIC_FIELDS:
             if field in self.new_season_pitching_data.columns and field in target_pitching_df.columns:
-                target_pitching_df.loc[:, field] = self.new_season_pitching_data.loc[:, field]
+                target_pitching_df.loc[:, field] = self.new_season_pitching_data.loc[:, field].astype(target_pitching_df[field].dtype)
 
         # Copy dynamic fields for batters
         for field in DYNAMIC_FIELDS:
             if field in self.new_season_batting_data.columns and field in target_batting_df.columns:
-                target_batting_df.loc[:, field] = self.new_season_batting_data.loc[:, field]
+                target_batting_df.loc[:, field] = self.new_season_batting_data.loc[:, field].astype(target_batting_df[field].dtype)
 
         return
 

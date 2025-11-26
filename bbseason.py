@@ -433,7 +433,7 @@ if __name__ == '__main__':
     from bblogger import configure_logger
     configure_logger("INFO")
     
-    startdt = datetime.datetime.now()
+    start_time = datetime.datetime.now()
 
     # full season 162 games
     num_games = 162
@@ -472,5 +472,11 @@ if __name__ == '__main__':
         bbseasonSS.sim_full_season()
 
     # how long did that take?
-    print(startdt)
-    print(datetime.datetime.now())
+    end_time = datetime.datetime.now()
+    run_time = end_time - start_time
+    total_seconds = run_time.total_seconds()  # Get the total run time in seconds
+    minutes = int(total_seconds // 60)
+    seconds = int(total_seconds % 60)
+
+    print(f"Run time: {minutes} minutes and {seconds} seconds")
+    print(f"Run time (timedelta format): {run_time}")

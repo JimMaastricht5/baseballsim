@@ -243,6 +243,9 @@ class BaseballSeason:
         Check if any teams have reached GM assessment milestones (30, 60, 90, 120, 150 games).
         Run assessments for teams that are due.
         """
+        # Calculate current Sim WAR values before assessments
+        self.baseball_data.calculate_sim_war()
+
         for team_name, gm in self.gm_managers.items():
             games_played = self.team_games_played[team_name]
 
@@ -528,7 +531,7 @@ if __name__ == '__main__':
     start_time = datetime.datetime.now()
 
     # full season 162 games
-    num_games = 162
+    num_games = 31
     interactive = True
     fantasy = False
 

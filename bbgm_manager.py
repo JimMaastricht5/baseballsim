@@ -21,208 +21,690 @@
 # SOFTWARE.
 #
 # JimMaastricht5@gmail.com
-import json
-import bbstats
-import bbteam
+"""
+AI General Manager for baseball simulation.
+
+This module implements intelligent general managers that make roster decisions based on
+team performance, player value, and organizational strategy. Each GM has a unique strategy
+coefficient (alpha) that determines whether they prioritize winning now or building for
+the future.
+
+Key Features:
+- Dynamic strategy adjustment based on team performance (contending vs rebuilding)
+- Player valuation combining immediate and future value
+- Trade recommendations (buy/sell decisions)
+- Roster management (promote/demote/release decisions)
+- Contract and salary considerations
+- Age-adjusted player projections
+
+Alpha Strategy Coefficient (α):
+- α = 0.8-1.0: Aggressive contender (win now at all costs)
+- α = 0.6-0.8: Contending team (prioritize current season)
+- α = 0.4-0.6: Balanced approach (compete while building)
+- α = 0.2-0.4: Retooling team (sell vets, acquire prospects)
+- α = 0.0-0.2: Full rebuild (future assets only)
+
+Player Value Formula:
+    V_player = α * V_immediate + (1-α) * V_future
+
+    Where:
+    - V_immediate: Current season Sim_WAR, adjusted for health/streaks
+    - V_future: Age-adjusted potential value over remaining career
+    - α: Team strategy coefficient (win now vs win later)
+"""
+import pandas as pd
+import numpy as np
+from typing import Dict, List, Tuple, Optional
+from dataclasses import dataclass
 from bblogger import logger
 
 
-class Manager:
-    def __init__(self, team_name, load_batter_file, load_pitcher_file,
-                 load_seasons=2024, new_season=2025, baseball_data=None):
-        logger.debug("Initializing Manager for team: {}", team_name)
+@dataclass
+class TeamStrategy:
+    """
+    Represents a team's strategic approach to roster management.
+
+    Attributes:
+        alpha: Strategy coefficient (0.0-1.0) where high=win now, low=rebuild
+        games_back: Games behind division/wildcard leader
+        win_pct: Current winning percentage
+        stage: Description of team strategy stage
+    """
+    alpha: float
+    games_back: float
+    win_pct: float
+    stage: str
+
+
+@dataclass
+class PlayerValue:
+    """
+    Comprehensive player valuation for trade/roster decisions.
+
+    Attributes:
+        player_name: Player name
+        hashcode: Player unique identifier
+        total_value: Combined weighted value (immediate + future)
+        immediate_value: Current season value (Sim_WAR based)
+        future_value: Age-adjusted projected value
+        salary: Annual salary
+        value_per_dollar: Total value divided by salary
+        age: Player age
+        years_remaining: Contract years remaining (estimated)
+        team: Current team
+        position: Position(s) played
+    """
+    player_name: str
+    hashcode: int
+    total_value: float
+    immediate_value: float
+    future_value: float
+    salary: float
+    value_per_dollar: float
+    age: int
+    years_remaining: int
+    team: str
+    position: str
+
+
+class GMStrategy:
+    """
+    Determines team strategy (alpha coefficient) based on performance and standings.
+
+    The alpha coefficient determines how a GM weights immediate vs future value:
+    - High alpha (0.8+): Contending team prioritizes current season (buyers)
+    - Low alpha (0.2-): Rebuilding team prioritizes future assets (sellers)
+    """
+
+    def __init__(self):
+        """Initialize strategy calculator with league context parameters."""
+        # Alpha calculation parameters
+        self.alpha_max = 0.95  # Maximum alpha for elite contenders
+        self.alpha_min = 0.05  # Minimum alpha for full rebuild
+        self.alpha_balanced = 0.50  # Neutral strategy
+
+        # Performance thresholds
+        self.contender_win_pct = 0.550  # 89+ win pace (contending)
+        self.rebuild_win_pct = 0.450  # 73- win pace (rebuilding)
+        self.games_back_contender = 3.0  # Within 3 games = contending
+        self.games_back_rebuild = 10.0  # 10+ games back = rebuild
+
+    def calculate_alpha(self, team_record: Tuple[int, int], games_back: float,
+                       games_played: int, is_playoff_race: bool = True) -> TeamStrategy:
+        """
+        Calculate team's strategy coefficient based on current performance.
+
+        Formula combines:
+        1. Win percentage (40% weight) - overall team quality
+        2. Games back (40% weight) - playoff positioning
+        3. Season timing (20% weight) - urgency increases late season
+
+        Args:
+            team_record: Tuple of (wins, losses)
+            games_back: Games behind division/wildcard leader (negative if leading)
+            games_played: Games into the season (1-162)
+            is_playoff_race: Whether team is in realistic playoff contention
+
+        Returns:
+            TeamStrategy object with alpha, context, and description
+        """
+        wins, losses = team_record
+        win_pct = wins / (wins + losses) if (wins + losses) > 0 else 0.500
+
+        # Component 1: Win percentage signal (-1.0 to 1.0)
+        # Positive = above average, negative = below average
+        if win_pct >= self.contender_win_pct:
+            win_pct_signal = (win_pct - self.contender_win_pct) / (1.0 - self.contender_win_pct)
+        elif win_pct <= self.rebuild_win_pct:
+            win_pct_signal = (win_pct - self.rebuild_win_pct) / self.rebuild_win_pct
+        else:
+            # Between rebuild and contender thresholds - linear interpolation
+            win_pct_signal = (win_pct - self.rebuild_win_pct) / (self.contender_win_pct - self.rebuild_win_pct) * 2 - 1
+
+        # Component 2: Games back signal (-1.0 to 1.0)
+        # Negative games_back means team is leading
+        if games_back <= 0:  # Leading division
+            games_back_signal = min(1.0, abs(games_back) / 5.0)  # Cap at +1.0
+        elif games_back <= self.games_back_contender:  # Close to lead
+            games_back_signal = 0.5 * (1 - games_back / self.games_back_contender)
+        elif games_back >= self.games_back_rebuild:  # Far from playoffs
+            games_back_signal = -1.0
+        else:  # Between contender and rebuild
+            games_back_signal = -((games_back - self.games_back_contender) /
+                                  (self.games_back_rebuild - self.games_back_contender))
+
+        # Component 3: Season timing urgency (0.0 to 1.0)
+        # Early season: less urgent, Late season: more urgent
+        season_progress = games_played / 162.0
+        urgency = season_progress ** 2  # Quadratic urgency curve
+
+        # Combine signals with weights
+        base_signal = (0.40 * win_pct_signal +
+                      0.40 * games_back_signal +
+                      0.20 * urgency)
+
+        # If not in realistic playoff race, push toward rebuild regardless of record
+        if not is_playoff_race and games_back > self.games_back_rebuild:
+            base_signal = min(base_signal, -0.3)
+
+        # Convert signal to alpha (0.0 to 1.0)
+        # base_signal ranges from -1.0 (full rebuild) to +1.0 (max contender)
+        alpha = self.alpha_balanced + (base_signal * (self.alpha_balanced - self.alpha_min))
+        alpha = np.clip(alpha, self.alpha_min, self.alpha_max)
+
+        # Determine strategic stage
+        stage = self._determine_stage(alpha, win_pct, games_back)
+
+        logger.info(f"Strategy calculation: W-L={wins}-{losses} ({win_pct:.3f}), "
+                   f"GB={games_back:.1f}, G={games_played}, alpha={alpha:.3f}, Stage={stage}")
+
+        return TeamStrategy(
+            alpha=alpha,
+            games_back=games_back,
+            win_pct=win_pct,
+            stage=stage
+        )
+
+    def _determine_stage(self, alpha: float, win_pct: float, games_back: float) -> str:
+        """Classify team's strategic stage based on alpha and performance."""
+        if alpha >= 0.80:
+            return "Aggressive Contender"
+        elif alpha >= 0.60:
+            return "Contending"
+        elif alpha >= 0.40:
+            return "Balanced/Retooling"
+        elif alpha >= 0.20:
+            return "Rebuilding"
+        else:
+            return "Full Rebuild"
+
+
+class PlayerValuation:
+    """
+    Calculate player value considering immediate and future contributions.
+
+    Combines current performance (Sim_WAR) with age-adjusted future projections
+    to produce a strategy-weighted total value for roster decisions.
+    """
+
+    def __init__(self):
+        """Initialize valuation model with aging curves and projections."""
+        # Age curve parameters (based on MLB aging research)
+        self.peak_age = 29  # Peak performance age
+        self.career_start_age = 20  # Typical career start
+        self.career_end_age = 40  # Typical career end
+
+        # Value projection parameters
+        self.replacement_war = 0.0  # Replacement level (0 WAR)
+        self.discount_rate = 0.10  # 10% annual discount for future value
+
+        # Contract estimation (if not available)
+        self.min_years_remaining = 0  # Free agent
+        self.max_years_remaining = 6  # Long-term contract
+
+    def calculate_player_value(self, player_row: pd.Series, alpha: float,
+                               is_pitcher: bool = False) -> PlayerValue:
+        """
+        Calculate comprehensive player value with strategy weighting.
+
+        Args:
+            player_row: Player stats row from batting_data or pitching_data
+            alpha: Team strategy coefficient (0.0-1.0)
+            is_pitcher: Whether player is a pitcher
+
+        Returns:
+            PlayerValue dataclass with all valuation components
+        """
+        # Extract player attributes
+        player_name = player_row.get('Player', 'Unknown')
+        hashcode = player_row.name  # Index is Hashcode
+        age = player_row.get('Age', 30)
+        team = player_row.get('Team', '')
+        salary = player_row.get('Salary', 740000)  # League minimum default
+
+        # Get position (handle both string and list formats)
+        pos = player_row.get('Pos', 'P' if is_pitcher else 'Unknown')
+        if isinstance(pos, list):
+            position = ','.join(pos)
+        else:
+            position = str(pos) if pos else ('P' if is_pitcher else 'Unknown')
+
+        # Calculate immediate value (current season)
+        immediate_value = self._calculate_immediate_value(player_row, is_pitcher)
+
+        # Calculate future value (age-adjusted projections)
+        future_value = self._calculate_future_value(player_row, age, is_pitcher)
+
+        # Estimate contract years remaining
+        years_remaining = self._estimate_years_remaining(age, salary, is_pitcher)
+
+        # Weighted total value based on alpha
+        total_value = alpha * immediate_value + (1 - alpha) * future_value
+
+        # Value per dollar (for budget-conscious decisions)
+        value_per_dollar = total_value / (salary / 1_000_000) if salary > 0 else 0.0
+
+        return PlayerValue(
+            player_name=player_name,
+            hashcode=int(hashcode),
+            total_value=total_value,
+            immediate_value=immediate_value,
+            future_value=future_value,
+            salary=salary,
+            value_per_dollar=value_per_dollar,
+            age=age,
+            years_remaining=years_remaining,
+            team=team,
+            position=position
+        )
+
+    def _calculate_immediate_value(self, player_row: pd.Series, is_pitcher: bool) -> float:
+        """
+        Calculate immediate value based on current season performance.
+
+        Components:
+        - Base: Sim_WAR (current season performance)
+        - Adjustments: Injury status, streak, age trajectory
+        """
+        sim_war = player_row.get('Sim_WAR', 0.0)
+
+        # Adjustment 1: Account for games already played (project to full season)
+        games_played = player_row.get('G', 0)
+        if is_pitcher:
+            # Pitchers: use IP as playing time proxy
+            ip = player_row.get('IP', 0)
+            # Typical starter: 180 IP, reliever: 70 IP
+            expected_ip = 150  # Average expectation
+            playing_time_factor = expected_ip / max(ip, 1) if ip > 0 else 1.0
+        else:
+            # Position players: use games
+            expected_games = 140  # Account for rest days
+            playing_time_factor = expected_games / max(games_played, 1) if games_played > 0 else 1.0
+
+        # Cap projection factor (don't over-project from small samples)
+        playing_time_factor = min(playing_time_factor, 3.0)
+
+        # Project to full season if early in season
+        projected_war = sim_war * playing_time_factor
+
+        # Adjustment 2: Health/availability (injured players have reduced immediate value)
+        injured_days = player_row.get('Injured Days', 0)
+        health_factor = max(0.0, 1.0 - (injured_days / 162.0))  # Reduce by days lost
+
+        # Adjustment 3: Current streak (hot/cold affects short-term value)
+        streak_adj = player_row.get('Streak_Adjustment', 0.0)
+        streak_factor = 1.0 + (streak_adj * 0.5)  # Streak worth ±5% at extremes
+
+        immediate_value = projected_war * health_factor * streak_factor
+
+        return max(immediate_value, self.replacement_war)
+
+    def _calculate_future_value(self, player_row: pd.Series, age: int, is_pitcher: bool) -> float:
+        """
+        Calculate future value based on age-adjusted career projections.
+
+        Uses aging curves to project remaining career value, discounted by years.
+        Younger players have more future value, older players have less.
+        """
+        sim_war = player_row.get('Sim_WAR', 0.0)
+
+        # Estimate peak WAR based on current performance and age
+        # Players improve until peak age, then decline
+        if age < self.peak_age:
+            # Young player: project improvement to peak
+            years_to_peak = self.peak_age - age
+            improvement_rate = 0.15  # 15% improvement per year (aggressive for prospects)
+            peak_war = sim_war * (1 + improvement_rate) ** years_to_peak
+        else:
+            # Peak or declining: current performance is close to peak
+            peak_war = sim_war * 1.05  # Slight upside
+
+        # Project career trajectory from current age
+        years_remaining = max(0, self.career_end_age - age)
+        future_value_total = 0.0
+
+        for year_offset in range(1, min(years_remaining + 1, 10)):  # Look ahead max 10 years
+            future_age = age + year_offset
+
+            # Age curve: decline after peak
+            if future_age <= self.peak_age:
+                age_factor = min(1.0, future_age / self.peak_age)
+            else:
+                # Decline curve: -2% per year after 29 (position players)
+                #                -3% per year after 29 (pitchers)
+                decline_rate = 0.03 if is_pitcher else 0.02
+                years_past_peak = future_age - self.peak_age
+                age_factor = max(0.0, 1.0 - (decline_rate * years_past_peak))
+
+            # Project WAR for this future year
+            projected_war_year = peak_war * age_factor
+
+            # Discount future value (10% per year)
+            discount_factor = (1 - self.discount_rate) ** year_offset
+
+            # Add to cumulative future value
+            future_value_total += projected_war_year * discount_factor
+
+        return max(future_value_total, 0.0)
+
+    def _estimate_years_remaining(self, age: int, salary: float, is_pitcher: bool) -> int:
+        """
+        Estimate contract years remaining based on age and salary.
+
+        Heuristic approach:
+        - Young players (< 27): Likely on team control (2-5 years)
+        - Prime players (27-32) with high salary: Long contracts (3-6 years)
+        - Older players (33+): Short contracts (1-2 years)
+        - League minimum: Likely 1 year or arbitration
+        """
+        league_min = 740000
+
+        if salary <= league_min * 1.2:  # Near minimum
+            return 1 if age >= 30 else 2  # Short deal or arbitration
+        elif age < 27:
+            return 4  # Pre-arbitration or early arbitration
+        elif age >= 33:
+            return max(1, int(42 - age) // 3)  # Short deals late career
+        else:
+            # Prime age with salary: estimate based on salary
+            if salary >= 20_000_000:
+                return 5  # Star player, long deal
+            elif salary >= 10_000_000:
+                return 3  # Above-average, medium term
+            else:
+                return 2  # Average player, shorter term
+
+
+class AIGeneralManager:
+    """
+    AI General Manager that makes strategic roster decisions.
+
+    Evaluates roster every N games and makes recommendations for:
+    - Trades (which players to acquire/trade away)
+    - Promotions (call-ups from minors)
+    - Releases (cut unproductive veterans)
+    - Contract priorities (who to extend/let walk)
+    """
+
+    def __init__(self, team_name: str, assessment_frequency: int = 30):
+        """
+        Initialize AI GM for a specific team.
+
+        Args:
+            team_name: Team abbreviation (e.g., 'NYY', 'LAD')
+            assessment_frequency: How often (games) to reassess roster
+        """
         self.team_name = team_name
-        self.baseball_data = baseball_data
-        if self.baseball_data is None:
-            self.baseball_data = bbstats.BaseballStats(load_seasons=load_seasons, new_season=new_season,
-                                                       load_batter_file=load_batter_file,
-                                                       load_pitcher_file=load_pitcher_file)
-        self.team = None
-        self.setup_team()
-        # self.print_team()
-        # self.team.set_initial_lineup(show_lineup=True, show_bench=True)  # accept all defaults batting and pitching
-        # self.team.set_initial_batting_order()
-        # self.team.set_starting_rotation()
-        # self.team.set_closers()
-        # self.team.set_mid_relief()
-        return
+        self.assessment_frequency = assessment_frequency
+        self.last_assessment_game = 0
 
-    def setup_team(self):
-        logger.debug("Setting up team: {}", self.team_name)
-        self.team = bbteam.Team(team_name=self.team_name, baseball_data=self.baseball_data,
-                                interactive=True)
-        self.team.set_initial_lineup(show_lineup=False, show_bench=False)
-        return
+        # Initialize strategy calculator and valuation model
+        self.strategy_calculator = GMStrategy()
+        self.valuator = PlayerValuation()
 
-    def game_setup(self):
-        self.options()
-        return
+        # GM decision thresholds
+        self.min_value_to_keep = -0.5  # Release if below this WAR value
+        self.trade_value_threshold = 2.0  # Consider trading if value exceeds this
+        self.promotion_threshold = 1.0  # Promote prospects if projected above this
 
-    def options(self):
-        while True:
-            print("\nOptions:")
-            print("0. Accept the Team and Start the Game")
-            print("P. Print the Entire Team")
-            print("\t P1 Print the Pos Players")
-            print("\t P2 Print the Pitchers")
-            print("M. Move a Player to a new team.  Note: This resets lineups and rotations")
-            print("T. Trade Players between two teams.  Note: This resets lineups and rotations")
-            print("L. Change a Player in the Preferred Lineup")
-            print("R. Change the Preferred Starting Rotation")
-            print("Load. Load a Saved Team")
-            print("Reset. Reset Lineup to Default")
+        logger.info(f"Initialized AI GM for {team_name}, assessing every {assessment_frequency} games")
 
-            choice = input("\nEnter your choice: ").lower()
-            if choice == "p":
-                self.print_team()
-            elif choice == "p1":
-                self.team.print_available_batters(include_starters=True, current_season_stats=True)
-            elif choice == "p2":
-                self.team.print_available_pitchers(include_starters=True, current_season_stats=True)
-            elif choice == "l":
-                print("Changing lineup....2")
-                self.lineup_changes()
-            elif choice == "r":
-                self.pitching_rotation_changes()
-            elif choice == "load":
-                self.load_lineup()
-            elif choice == "reset":
-                self.team.set_initial_lineup(show_lineup=True, show_bench=True)  # defaults batting and pitching
-            elif choice == 'm':
-                self.move_a_player()  # move players between teams
-            elif choice == 't':
-                self.trade_players()  # move players between teams
-            elif choice == "0":
-                print("Starting game.")
-                break  # Exit the loop
-            else:
-                print("Invalid choice. Please try again.")
-        return
+    def should_assess(self, games_played: int) -> bool:
+        """
+        Determine if it's time for a roster assessment.
 
-    def pitching_rotation_changes(self):
-        while True:
-            try:
-                # self.team.print_available_pitchers(include_starters=True)
-                starting_rotation_order_num = float(input("\nEnter the spot in the starting rotation to change (1-5),"
-                                                        " 0 accepts the lineup: "))
-                if starting_rotation_order_num == 0:
-                    break
-                elif (not 1 <= starting_rotation_order_num <= 5) or not (
-                    abs(starting_rotation_order_num - round(starting_rotation_order_num) == 0)):
-                    print('Enter the spot in the starting rotation to change (1-5)')
-                    print(self.team.print_available_pitchers(include_starters=True, current_season_stats=True))
-                else:
-                    starting_rotation_order_num = int(starting_rotation_order_num)
-                    start_rotation_pitcher_num = int(
-                        input(f'Please enter the number of the pitcher you would like to be '
-                              f'in the starting rotation: '))
-            except ValueError:
-                break
+        Args:
+            games_played: Total games played by team this season
 
-            if (1 <= starting_rotation_order_num <= 5) and (abs(starting_rotation_order_num - round(starting_rotation_order_num) == 0)):
-                self.team.change_starting_rotation(starting_pitcher_num=start_rotation_pitcher_num,
-                                                   rotation_order_num=starting_rotation_order_num)
-        return
+        Returns:
+            True if assessment is due
+        """
+        if games_played >= self.last_assessment_game + self.assessment_frequency:
+            return True
+        return False
 
-    def lineup_changes(self):
-        # with print lineup and print bench set to true in bbgame it is not necessary to reprint them here
-        while True:
-            try:
-                batting_order_number = input("\nEnter the batting order number to change (1-9),  0 accepts the lineup: ")
-                if batting_order_number.lower == 'p1':
-                    print(self.team.print_available_batters(include_starters=True, current_season_stats=True))
-                else:
-                    batting_order_number = int(batting_order_number)
-                    if batting_order_number == 0:  # completed
-                        break
-                    elif (not 1 <= batting_order_number <= 9) or not (abs(batting_order_number - round(batting_order_number) == 0)):
-                        print('Enter a batting order position betweeen 1 and 9')
-                    else:
-                        player_index = int(input("Enter the index of the new player: "))
-                        batting_order_number = int(batting_order_number)
-            except ValueError:
-                break
+    def assess_roster(self, baseball_stats, team_record: Tuple[int, int],
+                     games_back: float, games_played: int) -> Dict:
+        """
+        Perform comprehensive roster assessment and generate recommendations.
 
-            if 1 <= batting_order_number <= 9 and abs(batting_order_number - round(batting_order_number) == 0):
-                self.team.change_lineup(target_batting_order_pos=batting_order_number, pos_player_bench_hashcode=player_index)
-                print("\nLineup updated!")
-            else:
-                print("Invalid input. Please enter valid batting order and player index numbers.")
-        return
+        Args:
+            baseball_stats: BaseballStats instance with current season data
+            team_record: Tuple of (wins, losses)
+            games_back: Games behind division/wildcard leader
+            games_played: Games into season
 
-    def move_a_player(self):
-        player_index = int(input("Enter the index of the player to move: "))
-        print(self.baseball_data.get_all_team_names())
-        new_team = str(input("Enter the name of the team the player is moving to: "))
-        self.move_multiple_players(new_team=new_team, players=[player_index])
-        self.team.reset_team_data()
-        self.team.set_initial_lineup()
-        return
+        Returns:
+            Dictionary with assessment results and recommendations
+        """
+        logger.info(f"\n{'='*60}")
+        logger.info(f"AI GM Assessment: {self.team_name} after {games_played} games")
+        logger.info(f"Record: {team_record[0]}-{team_record[1]}, GB: {games_back:.1f}")
+        logger.info(f"{'='*60}")
 
-    def trade_players(self):
-        team_a = str(input("Enter the name of the first team involved in the trade: "))
-        print(self.baseball_data.get_all_team_names())
-        self.baseball_data.print_current_season(teams=[team_a])
-        team_a_players = self.multiplayer_selection(team=team_a)
+        # Update last assessment
+        self.last_assessment_game = games_played
 
-        team_b = str(input("Enter the name of the second team involved in the trade: "))
-        print(self.baseball_data.get_all_team_names())
-        self.baseball_data.print_current_season(teams=[team_b])
-        team_b_players = self.multiplayer_selection(team=team_b)
+        # Step 1: Calculate team strategy (alpha)
+        strategy = self.strategy_calculator.calculate_alpha(
+            team_record, games_back, games_played
+        )
 
-        self.move_multiple_players(new_team=team_b, players=team_a_players)
-        self.move_multiple_players(new_team=team_a, players=team_b_players)
-        self.team.reset_team_data()
-        self.team.set_initial_lineup()
-        return
+        logger.info(f"Strategy: {strategy.stage} (alpha={strategy.alpha:.3f})")
+        logger.info(f"Win Pct: {strategy.win_pct:.3f}, Games Back: {strategy.games_back:.1f}")
 
-    def move_multiple_players(self, new_team: str, players: list):
-        for player in players:
-            print(new_team, player)
-            self.baseball_data.move_a_player_between_teams(player_index=player, new_team=new_team)
-        return
+        # Step 2: Value all players on roster
+        roster_values = self._value_roster(baseball_stats, strategy.alpha)
 
-    @staticmethod
-    def multiplayer_selection(team: str = ''):
-        players = []
-        player_num = ''
-        while player_num != "x":
-            player_num = str(input("Enter the player number (enter x when done): "))
-            try:
-                players.append(int(player_num))
-            except ValueError:
-                break
-        return players
+        # Step 3: Generate recommendations based on strategy
+        recommendations = self._generate_recommendations(
+            roster_values, strategy, baseball_stats
+        )
 
-    def load_lineup(self):
-        lineup_dict = {}
-        try:
-            with open(self.team_name + '_team.json', 'r') as f:
-                lineup_dict_str = json.load(f)
-                lineup_dict = {int(key): value for key, value in lineup_dict_str.items()}
-        except FileNotFoundError:  # create a default file
-            lineup_dict = {647549: 'LF', 239398: 'C', 224423: '1B', 302715: 'DH', 660657: 'CF', 520723: 'SS',
-                           299454: '3B', 46074: '2B', 752787: 'RF'}
-            # lineup_dict = self.team.line_up_dict()
-            with open(self.team_name + '_team.json', 'w') as f:
-                json.dump(lineup_dict, f)
-        self.team.set_initial_batting_order(lineup_dict)
-        return
+        # Step 4: Print summary
+        self._print_assessment_summary(strategy, roster_values, recommendations)
 
-    def print_team(self):
-        self.team.print_available_batters(include_starters=True, current_season_stats=True)
-        self.team.print_available_pitchers(include_starters=True)
-        return
+        return {
+            'strategy': strategy,
+            'roster_values': roster_values,
+            'recommendations': recommendations,
+            'games_played': games_played
+        }
+
+    def _value_roster(self, baseball_stats, alpha: float) -> Dict[str, List[PlayerValue]]:
+        """
+        Value all batters and pitchers on the roster.
+
+        Returns:
+            Dictionary with 'batters' and 'pitchers' lists of PlayerValue objects
+        """
+        roster_values = {'batters': [], 'pitchers': []}
+
+        # Value batters
+        team_batters = baseball_stats.new_season_batting_data[
+            baseball_stats.new_season_batting_data['Team'] == self.team_name
+        ]
+
+        for idx, batter_row in team_batters.iterrows():
+            value = self.valuator.calculate_player_value(batter_row, alpha, is_pitcher=False)
+            roster_values['batters'].append(value)
+
+        # Value pitchers
+        team_pitchers = baseball_stats.new_season_pitching_data[
+            baseball_stats.new_season_pitching_data['Team'] == self.team_name
+        ]
+
+        for idx, pitcher_row in team_pitchers.iterrows():
+            value = self.valuator.calculate_player_value(pitcher_row, alpha, is_pitcher=True)
+            roster_values['pitchers'].append(value)
+
+        # Sort by total value
+        roster_values['batters'].sort(key=lambda x: x.total_value, reverse=True)
+        roster_values['pitchers'].sort(key=lambda x: x.total_value, reverse=True)
+
+        return roster_values
+
+    def _generate_recommendations(self, roster_values: Dict, strategy: TeamStrategy,
+                                 baseball_stats) -> Dict[str, List]:
+        """
+        Generate trade and roster move recommendations based on strategy.
+
+        Returns:
+            Dictionary with 'trade_away', 'trade_targets', 'promote', 'release' lists
+        """
+        recommendations = {
+            'trade_away': [],  # Players to trade away
+            'trade_targets': [],  # Player types to target
+            'promote': [],  # Prospects to call up
+            'release': []  # Players to release
+        }
+
+        all_players = roster_values['batters'] + roster_values['pitchers']
+
+        # CONTENDING TEAM (High Alpha) - Buy mode
+        if strategy.alpha >= 0.60:
+            # Look to trade away: Low immediate value but high future value
+            # (Young prospects not helping now)
+            for player in all_players:
+                if (player.future_value > 2.0 and
+                    player.immediate_value < 1.0 and
+                    player.age < 25):
+                    recommendations['trade_away'].append({
+                        'player': player.player_name,
+                        'reason': f"Young prospect (age {player.age}) - higher future value ({player.future_value:.1f}) than immediate ({player.immediate_value:.1f})",
+                        'value': player.total_value
+                    })
+
+            # Look to acquire: High immediate value, low future value
+            # (Win-now veterans)
+            recommendations['trade_targets'].append({
+                'profile': 'Veteran bat (age 30+)',
+                'target_value': 'Immediate WAR > 2.0',
+                'reason': 'Add playoff-caliber production'
+            })
+            recommendations['trade_targets'].append({
+                'profile': 'Proven starter (age 30-35)',
+                'target_value': 'Immediate WAR > 2.5',
+                'reason': 'Strengthen rotation for stretch run'
+            })
+
+        # REBUILDING TEAM (Low Alpha) - Sell mode
+        elif strategy.alpha <= 0.40:
+            # Look to trade away: High immediate value but low future value
+            # (Veterans on expiring contracts)
+            for player in all_players:
+                if (player.immediate_value > 2.0 and
+                    player.future_value < 1.0 and
+                    player.age >= 30 and
+                    player.years_remaining <= 2):
+                    recommendations['trade_away'].append({
+                        'player': player.player_name,
+                        'reason': f"Veteran (age {player.age}) on short deal - peak trade value",
+                        'value': player.total_value
+                    })
+
+            # Look to acquire: Young players with upside
+            recommendations['trade_targets'].append({
+                'profile': 'Young position player (age 20-24)',
+                'target_value': 'Future WAR > 3.0',
+                'reason': 'Build core for future contention'
+            })
+            recommendations['trade_targets'].append({
+                'profile': 'High-ceiling pitching prospect',
+                'target_value': 'Future WAR > 4.0',
+                'reason': 'Develop rotation for future'
+            })
+
+        # BALANCED TEAM - Strategic moves only
+        else:
+            # Look for value inefficiencies
+            for player in all_players:
+                if player.value_per_dollar < 0.0 and player.salary > 5_000_000:
+                    recommendations['trade_away'].append({
+                        'player': player.player_name,
+                        'reason': f"Negative value (${player.salary/1e6:.1f}M) - salary relief",
+                        'value': player.total_value
+                    })
+
+        # RELEASES: Any strategy - cut unproductive players
+        for player in all_players:
+            if player.total_value < self.min_value_to_keep and player.salary <= 1_000_000:
+                recommendations['release'].append({
+                    'player': player.player_name,
+                    'reason': f"Below replacement level ({player.total_value:.2f} value)",
+                    'savings': player.salary
+                })
+
+        return recommendations
+
+    def _print_assessment_summary(self, strategy: TeamStrategy, roster_values: Dict,
+                                 recommendations: Dict) -> None:
+        """Print formatted assessment summary for GM review."""
+        print(f"\n{'='*60}")
+        print(f"AI GM ASSESSMENT: {self.team_name}")
+        print(f"{'='*60}")
+        print(f"Strategy: {strategy.stage} (alpha={strategy.alpha:.3f})")
+        print(f"Record: W-L {strategy.win_pct:.3f}, GB {strategy.games_back:.1f}")
+        print()
+
+        # Top valued players
+        print("TOP 5 MOST VALUABLE PLAYERS:")
+        all_players = roster_values['batters'] + roster_values['pitchers']
+        all_players.sort(key=lambda x: x.total_value, reverse=True)
+
+        for i, player in enumerate(all_players[:5], 1):
+            print(f"{i}. {player.player_name:20s} ({player.position:5s}, Age {player.age:2d}): "
+                  f"Value={player.total_value:5.2f} (Now={player.immediate_value:4.2f}, "
+                  f"Future={player.future_value:4.2f}) ${player.salary/1e6:6.2f}M")
+        print()
+
+        # Trade recommendations
+        if recommendations['trade_away']:
+            print("TRADE CANDIDATES (Consider Dealing):")
+            for i, trade in enumerate(recommendations['trade_away'][:5], 1):
+                print(f"{i}. {trade['player']:20s} - {trade['reason']}")
+            print()
+
+        if recommendations['trade_targets']:
+            print("TRADE TARGETS (Acquire Players Matching):")
+            for i, target in enumerate(recommendations['trade_targets'], 1):
+                print(f"{i}. {target['profile']:30s} - {target['reason']}")
+            print()
+
+        if recommendations['release']:
+            print("RELEASE CANDIDATES:")
+            for i, release in enumerate(recommendations['release'][:3], 1):
+                print(f"{i}. {release['player']:20s} - {release['reason']}")
+            print()
+
+        print(f"{'='*60}\n")
 
 
-# test code Main
 if __name__ == '__main__':
-    # Configure logger level - change to "DEBUG" for more detailed logs
+    """Test AI GM with sample data."""
     from bblogger import configure_logger
     configure_logger("INFO")
-    bbgm = Manager(team_name='MIL', load_seasons=2024, new_season=2025,
-                   load_batter_file='aggr-stats-pp-Batting.csv',
-                   load_pitcher_file='aggr-stats-pp-Pitching.csv')
-    bbgm.game_setup()
-    # bbgm.team.print_starting_lineups()  # reprint line up and loop to unused pos players at top
-    # bbgm.team.print_pos_not_in_lineup()  # lineup already printed
+
+    # Test strategy calculation
+    print("Testing GMStrategy calculations:")
+    print("-" * 60)
+
+    strategy_calc = GMStrategy()
+
+    # Test scenarios
+    scenarios = [
+        ((95, 50), -2.0, 145, "Division leader late season"),
+        ((88, 74), 3.5, 162, "Wild card race final game"),
+        ((72, 90), 15.0, 162, "Out of contention"),
+        ((45, 35), 5.0, 80, "Mediocre mid-season"),
+        ((30, 50), 12.0, 80, "Rebuild mode mid-season"),
+    ]
+
+    for record, gb, games, desc in scenarios:
+        strategy = strategy_calc.calculate_alpha(record, gb, games)
+        print(f"{desc}")
+        print(f"  Record: {record[0]}-{record[1]} ({strategy.win_pct:.3f}), GB: {gb:.1f}")
+        print(f"  Alpha: {strategy.alpha:.3f} - {strategy.stage}")
+        print()
+
+    print("\nAI GM module ready for integration with bbseason.py")

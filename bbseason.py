@@ -33,6 +33,7 @@ import random
 import pandas as pd
 import bbgame
 import bbstats
+import bbgm_manager
 import numpy as np
 from typing import List, Optional
 import threading
@@ -95,9 +96,23 @@ class BaseballSeason:
         if schedule is None:
             self.create_schedule()  # set schedule if not passed
         self.team_win_loss = {}
+        self.team_games_played = {}  # Track games played per team
         for team in self.teams:
             self.team_win_loss.update({team: [0, 0]})  # set team win loss to 0, 0
+            self.team_games_played[team] = 0  # Initialize games played
         self.team_city_dict = self.baseball_data.get_all_team_city_names()
+
+        # Initialize AI General Managers for each team
+        self.gm_managers = {}
+        self.gm_assessment_intervals = [30, 60, 90, 120, 150]  # Assess at these game milestones
+        for team in self.teams:
+            if team != 'OFF DAY':
+                self.gm_managers[team] = bbgm_manager.AIGeneralManager(
+                    team_name=team,
+                    assessment_frequency=30  # Will assess every 30 games
+                )
+        logger.info(f"Initialized {len(self.gm_managers)} AI General Managers")
+
         return
 
     def get_team_names(self) -> list:
@@ -179,6 +194,79 @@ class BaseballSeason:
             np.add(np.array(self.team_win_loss[away_team_name]), np.array(win_loss[0])))
         self.team_win_loss[home_team_name] = list(
             np.add(np.array(self.team_win_loss[home_team_name]), np.array(win_loss[1])))
+
+        # Increment games played for both teams
+        self.team_games_played[away_team_name] += 1
+        self.team_games_played[home_team_name] += 1
+        return
+
+    def calculate_games_back(self, team_name: str) -> float:
+        """
+        Calculate how many games back a team is from the division/league leader.
+
+        Args:
+            team_name: Team to calculate games back for
+
+        Returns:
+            Games back (negative if team is leading, 0.0 if tied for lead)
+        """
+        if team_name == 'OFF DAY':
+            return 0.0
+
+        # Get team's record
+        team_record = self.team_win_loss[team_name]
+        team_wins = team_record[0]
+        team_losses = team_record[1]
+
+        # Find leader (most wins)
+        max_wins = 0
+        leader_losses = 0
+
+        for other_team, record in self.team_win_loss.items():
+            if other_team != 'OFF DAY':
+                other_wins = record[0]
+                other_losses = record[1]
+
+                # Update leader if this team has more wins
+                # If tied in wins, use fewer losses as tiebreaker
+                if other_wins > max_wins or (other_wins == max_wins and other_losses < leader_losses):
+                    max_wins = other_wins
+                    leader_losses = other_losses
+
+        # Games back formula: ((Leader W - Team W) + (Team L - Leader L)) / 2
+        games_back = ((max_wins - team_wins) + (team_losses - leader_losses)) / 2.0
+
+        return games_back
+
+    def check_gm_assessments(self) -> None:
+        """
+        Check if any teams have reached GM assessment milestones (30, 60, 90, 120, 150 games).
+        Run assessments for teams that are due.
+        """
+        for team_name, gm in self.gm_managers.items():
+            games_played = self.team_games_played[team_name]
+
+            # Check if assessment is due
+            if gm.should_assess(games_played):
+                # Get team record
+                record = self.team_win_loss[team_name]
+                wins, losses = record[0], record[1]
+
+                # Calculate games back
+                games_back = self.calculate_games_back(team_name)
+
+                # Run GM assessment
+                logger.info(f"Running GM assessment for {team_name} after {games_played} games")
+                assessment = gm.assess_roster(
+                    baseball_stats=self.baseball_data,
+                    team_record=(wins, losses),
+                    games_back=games_back,
+                    games_played=games_played
+                )
+
+                # Could store assessment for later analysis
+                # self.gm_assessments[team_name].append(assessment)
+
         return
 
     def sim_start(self) -> None:
@@ -292,6 +380,10 @@ class BaseballSeason:
         self.sim_day_threaded(season_day_num=self.season_day_num)
         print(f'Standings for Day {self.season_day_num + 1}:')
         self.print_standings()
+
+        # Check if any teams are due for GM assessment (every 30 games)
+        self.check_gm_assessments()
+
         self.season_day_num = self.season_day_num + 1
         return
 

@@ -85,7 +85,7 @@ class InjuryType:
         self.general_injuries = {
             # Special cases with specific IL designations
             'Concussion': (7, 14),  # 7-day IL specific for concussions
-            'COVID-19 Protocol': (10, 21),
+         #   'COVID-19 Protocol': (10, 21),
             
             # Short-term
             'Illness': (3, 7),

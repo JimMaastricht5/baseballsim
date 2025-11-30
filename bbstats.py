@@ -504,9 +504,13 @@ class BaseballStats:
         """
         Print list of players with hot or cold streaks (similar to injury list)
         Only shows players with streaks >= +2.5% (Hot) or <= -2.5% (Cold)
-        :param teams_to_follow: List of team names to show, None shows all teams
+        :param teams_to_follow: List of team names to show, None means don't print anything
         :return: None
         """
+        # Only print if following specific teams
+        if not teams_to_follow:
+            return
+
         # Define columns for hot/cold display
         streak_cols_to_print = ['Player', 'Team', 'Pos/Role', 'Streak Status', 'Streak Value']
 
@@ -521,10 +525,9 @@ class BaseballStats:
             (self.new_season_batting_data['Streak_Adjustment'] <= -0.025)
         ].copy()
 
-        # Filter by teams if specified
-        if teams_to_follow:
-            hot_cold_pitchers = hot_cold_pitchers[hot_cold_pitchers['Team'].isin(teams_to_follow)]
-            hot_cold_batters = hot_cold_batters[hot_cold_batters['Team'].isin(teams_to_follow)]
+        # Filter by teams to follow
+        hot_cold_pitchers = hot_cold_pitchers[hot_cold_pitchers['Team'].isin(teams_to_follow)]
+        hot_cold_batters = hot_cold_batters[hot_cold_batters['Team'].isin(teams_to_follow)]
 
         # Only print if there are hot/cold players
         if hot_cold_pitchers.shape[0] > 0 or hot_cold_batters.shape[0] > 0:

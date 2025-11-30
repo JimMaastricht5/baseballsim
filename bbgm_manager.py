@@ -366,32 +366,61 @@ class PlayerValuation:
         """
         Calculate future value based on age-adjusted career projections.
 
-        Uses aging curves to project remaining career value, discounted by years.
+        Returns average annual WAR projection over next 3-5 years (not cumulative).
         Younger players have more future value, older players have less.
+
+        Note: This is designed to be comparable to immediate_value (single season WAR).
         """
         sim_war = player_row.get('Sim_WAR', 0.0)
 
+        # Use raw Sim_WAR without playing time adjustments for future projections
+        # (we want to project based on current per-game performance, not season totals)
+
         # Estimate peak WAR based on current performance and age
-        # Players improve until peak age, then decline
+        # Use more conservative improvement rates
         if age < self.peak_age:
             # Young player: project improvement to peak
             years_to_peak = self.peak_age - age
-            improvement_rate = 0.15  # 15% improvement per year (aggressive for prospects)
-            peak_war = sim_war * (1 + improvement_rate) ** years_to_peak
+
+            # More realistic improvement: 5-8% per year (not 15%)
+            # Plus cap based on current performance (don't project scrubs to be MVPs)
+            if sim_war < 1.0:
+                improvement_rate = 0.08  # Unproven players: high growth potential
+                max_peak = 3.0  # But cap their ceiling
+            elif sim_war < 2.0:
+                improvement_rate = 0.06  # Average players: moderate growth
+                max_peak = 4.5
+            else:
+                improvement_rate = 0.05  # Good players: slower improvement from high base
+                max_peak = 6.0  # Elite ceiling
+
+            peak_war = min(sim_war * (1 + improvement_rate) ** years_to_peak, max_peak)
         else:
             # Peak or declining: current performance is close to peak
             peak_war = sim_war * 1.05  # Slight upside
+            peak_war = min(peak_war, 7.0)  # Cap at MVP-level
 
-        # Project career trajectory from current age
-        years_remaining = max(0, self.career_end_age - age)
+        # Cap peak WAR at realistic levels
+        # Even elite players rarely exceed 8-9 WAR in a season
+        if is_pitcher:
+            peak_war = min(peak_war, 6.0)  # Best pitchers: 5-6 WAR
+        else:
+            peak_war = min(peak_war, 8.0)  # Best position players: 7-8 WAR
+
+        # Project average annual value over next 3-5 years (not cumulative!)
+        # This makes future_value comparable to immediate_value
+        projection_years = min(5, max(1, self.career_end_age - age))
         future_value_total = 0.0
+        discount_total = 0.0
 
-        for year_offset in range(1, min(years_remaining + 1, 10)):  # Look ahead max 10 years
+        for year_offset in range(1, projection_years + 1):
             future_age = age + year_offset
 
             # Age curve: decline after peak
             if future_age <= self.peak_age:
-                age_factor = min(1.0, future_age / self.peak_age)
+                # Growing toward peak
+                age_factor = 0.85 + (0.15 * (future_age - 20) / (self.peak_age - 20))
+                age_factor = min(1.0, max(0.7, age_factor))
             else:
                 # Decline curve: -2% per year after 29 (position players)
                 #                -3% per year after 29 (pitchers)
@@ -402,13 +431,17 @@ class PlayerValuation:
             # Project WAR for this future year
             projected_war_year = peak_war * age_factor
 
-            # Discount future value (10% per year)
-            discount_factor = (1 - self.discount_rate) ** year_offset
+            # Discount future value (15% per year - prefer current value)
+            discount_factor = (1 - 0.15) ** year_offset
 
-            # Add to cumulative future value
+            # Add to weighted average
             future_value_total += projected_war_year * discount_factor
+            discount_total += discount_factor
 
-        return max(future_value_total, 0.0)
+        # Return weighted average annual WAR (not cumulative sum)
+        avg_future_war = future_value_total / max(discount_total, 1.0)
+
+        return max(avg_future_war, 0.0)
 
     def _estimate_years_remaining(self, age: int, salary: float, is_pitcher: bool) -> int:
         """
@@ -607,7 +640,7 @@ class AIGeneralManager:
                     player.immediate_value < 1.5):
                     recommendations['trade_away'].append({
                         'player': player.player_name,
-                        'reason': f"Prospect (age {player.age}) - future ({player.future_value:.1f}) > now ({player.immediate_value:.1f}), trade chip for upgrade",
+                        'reason': f"Prospect (age {player.age}) - future projection ({player.future_value:.1f} WAR/yr) > current ({player.immediate_value:.1f}), trade chip",
                         'value': player.total_value
                     })
                 # Underperforming veterans with bad contracts
@@ -706,6 +739,7 @@ class AIGeneralManager:
                                      is_contender: bool) -> List[Dict]:
         """
         Scan league for specific players matching team's trade needs.
+        Optimized to filter DataFrame before iterating for better performance.
 
         Args:
             baseball_stats: BaseballStats with league-wide data
@@ -720,98 +754,102 @@ class AIGeneralManager:
         # Get team's games played for consistent valuation
         team_games_played = strategy.games_played if hasattr(strategy, 'games_played') else 150
 
+        # Pre-filter to exclude own team (much faster than checking in loop)
+        other_batters = baseball_stats.new_season_batting_data[
+            baseball_stats.new_season_batting_data['Team'] != self.team_name
+        ]
+        other_pitchers = baseball_stats.new_season_pitching_data[
+            baseball_stats.new_season_pitching_data['Team'] != self.team_name
+        ]
+
         if is_contender:
-            # CONTENDERS: Look for veteran impact players
-            # Scan batters for veteran bats
-            for idx, batter_row in baseball_stats.new_season_batting_data.iterrows():
-                team = batter_row.get('Team', '')
-                if team == self.team_name:  # Skip own team
-                    continue
+            # CONTENDERS: Look for veteran impact players (age-filtered before iteration)
+            veteran_batters = other_batters[other_batters['Age'] >= 28]
 
-                age = batter_row.get('Age', 30)
-                # Filter: Veterans (30+) with high immediate value
-                if age >= 28:
-                    player_value = self.valuator.calculate_player_value(
-                        batter_row, strategy.alpha, team_games_played, is_pitcher=False
-                    )
-                    if player_value.immediate_value >= 1.5:  # Solid contributors
-                        targets.append({
-                            'player': player_value.player_name,
-                            'team': team,
-                            'position': player_value.position,
-                            'age': age,
-                            'value': player_value.immediate_value,
-                            'type': 'BAT',
-                            'reason': f"Veteran bat - {player_value.immediate_value:.1f} WAR now"
-                        })
+            # Only evaluate players with significant playing time (faster pre-filter)
+            active_veteran_batters = veteran_batters[veteran_batters['AB'] >= 50]
 
-            # Scan pitchers for impact arms
-            for idx, pitcher_row in baseball_stats.new_season_pitching_data.iterrows():
-                team = pitcher_row.get('Team', '')
-                if team == self.team_name:
-                    continue
+            for idx, batter_row in active_veteran_batters.iterrows():
+                player_value = self.valuator.calculate_player_value(
+                    batter_row, strategy.alpha, team_games_played, is_pitcher=False
+                )
+                if player_value.immediate_value >= 1.5:  # Solid contributors
+                    targets.append({
+                        'player': player_value.player_name,
+                        'team': batter_row['Team'],
+                        'position': player_value.position,
+                        'age': batter_row['Age'],
+                        'value': player_value.immediate_value,
+                        'type': 'BAT',
+                        'reason': f"Veteran bat - {player_value.immediate_value:.1f} WAR this season"
+                    })
+                    if len(targets) >= 10:  # Early exit after finding enough candidates
+                        break
 
-                age = pitcher_row.get('Age', 30)
-                if age >= 27 and age <= 35:  # Prime-age pitchers
-                    player_value = self.valuator.calculate_player_value(
-                        pitcher_row, strategy.alpha, team_games_played, is_pitcher=True
-                    )
-                    if player_value.immediate_value >= 1.8:  # Impact starters
-                        targets.append({
-                            'player': player_value.player_name,
-                            'team': team,
-                            'position': 'P',
-                            'age': age,
-                            'value': player_value.immediate_value,
-                            'type': 'PITCH',
-                            'reason': f"Impact arm - {player_value.immediate_value:.1f} WAR now"
-                        })
+            # Prime-age pitchers with significant IP
+            prime_pitchers = other_pitchers[(other_pitchers['Age'] >= 27) &
+                                           (other_pitchers['Age'] <= 35) &
+                                           (other_pitchers['IP'] >= 20)]
+
+            for idx, pitcher_row in prime_pitchers.iterrows():
+                player_value = self.valuator.calculate_player_value(
+                    pitcher_row, strategy.alpha, team_games_played, is_pitcher=True
+                )
+                if player_value.immediate_value >= 1.8:  # Impact starters
+                    targets.append({
+                        'player': player_value.player_name,
+                        'team': pitcher_row['Team'],
+                        'position': 'P',
+                        'age': pitcher_row['Age'],
+                        'value': player_value.immediate_value,
+                        'type': 'PITCH',
+                        'reason': f"Impact arm - {player_value.immediate_value:.1f} WAR this season"
+                    })
+                    if len(targets) >= 15:  # Early exit
+                        break
 
         else:
-            # REBUILDERS: Look for young players with upside
-            # Scan for young position players
-            for idx, batter_row in baseball_stats.new_season_batting_data.iterrows():
-                team = batter_row.get('Team', '')
-                if team == self.team_name:
-                    continue
+            # REBUILDERS: Young players with upside (pre-filtered)
+            young_batters = other_batters[(other_batters['Age'] <= 25) &
+                                         (other_batters['AB'] >= 30)]
 
-                age = batter_row.get('Age', 30)
-                if age <= 25:  # Young players
-                    player_value = self.valuator.calculate_player_value(
-                        batter_row, strategy.alpha, team_games_played, is_pitcher=False
-                    )
-                    if player_value.future_value >= 2.5:  # High ceiling
-                        targets.append({
-                            'player': player_value.player_name,
-                            'team': team,
-                            'position': player_value.position,
-                            'age': age,
-                            'value': player_value.future_value,
-                            'type': 'BAT',
-                            'reason': f"Young prospect - {player_value.future_value:.1f} future WAR"
-                        })
+            for idx, batter_row in young_batters.iterrows():
+                player_value = self.valuator.calculate_player_value(
+                    batter_row, strategy.alpha, team_games_played, is_pitcher=False
+                )
+                if player_value.future_value >= 2.5:
+                    targets.append({
+                        'player': player_value.player_name,
+                        'team': batter_row['Team'],
+                        'position': player_value.position,
+                        'age': batter_row['Age'],
+                        'value': player_value.future_value,
+                        'type': 'BAT',
+                        'reason': f"Young prospect - {player_value.future_value:.1f} WAR/yr projection"
+                    })
+                    if len(targets) >= 10:
+                        break
 
-            # Scan for young pitchers
-            for idx, pitcher_row in baseball_stats.new_season_pitching_data.iterrows():
-                team = pitcher_row.get('Team', '')
-                if team == self.team_name:
-                    continue
+            # Young pitchers
+            young_pitchers = other_pitchers[(other_pitchers['Age'] <= 26) &
+                                           (other_pitchers['IP'] >= 15)]
 
-                age = pitcher_row.get('Age', 30)
-                if age <= 26:
-                    player_value = self.valuator.calculate_player_value(
-                        pitcher_row, strategy.alpha, team_games_played, is_pitcher=True
-                    )
-                    if player_value.future_value >= 3.0:
-                        targets.append({
-                            'player': player_value.player_name,
-                            'team': team,
-                            'position': 'P',
-                            'age': age,
-                            'value': player_value.future_value,
-                            'type': 'PITCH',
-                            'reason': f"Young arm - {player_value.future_value:.1f} future WAR"
-                        })
+            for idx, pitcher_row in young_pitchers.iterrows():
+                player_value = self.valuator.calculate_player_value(
+                    pitcher_row, strategy.alpha, team_games_played, is_pitcher=True
+                )
+                if player_value.future_value >= 3.0:
+                    targets.append({
+                        'player': player_value.player_name,
+                        'team': pitcher_row['Team'],
+                        'position': 'P',
+                        'age': pitcher_row['Age'],
+                        'value': player_value.future_value,
+                        'type': 'PITCH',
+                        'reason': f"Young arm - {player_value.future_value:.1f} WAR/yr projection"
+                    })
+                    if len(targets) >= 15:
+                        break
 
         # Sort by value and return top 5
         targets.sort(key=lambda x: x['value'], reverse=True)
@@ -829,13 +867,14 @@ class AIGeneralManager:
 
         # Top valued players
         print("TOP 5 MOST VALUABLE PLAYERS:")
+        print("(Value = weighted blend of current season + projected avg WAR)")
         all_players = roster_values['batters'] + roster_values['pitchers']
         all_players.sort(key=lambda x: x.total_value, reverse=True)
 
         for i, player in enumerate(all_players[:5], 1):
             print(f"{i}. {player.player_name:20s} ({player.position:5s}, Age {player.age:2d}): "
-                  f"Value={player.total_value:5.2f} (Now={player.immediate_value:4.2f}, "
-                  f"Future={player.future_value:4.2f}) ${player.salary/1e6:6.2f}M")
+                  f"Value={player.total_value:5.2f} (Current={player.immediate_value:4.2f} WAR, "
+                  f"Future Avg={player.future_value:4.2f} WAR/yr) ${player.salary/1e6:6.2f}M")
         print()
 
         # Trade recommendations

@@ -243,6 +243,11 @@ class BaseballSeason:
         Check if any teams have reached GM assessment milestones (30, 60, 90, 120, 150 games).
         Run assessments for teams that are due.
         """
+        # Skip GM assessments if season is complete (avoids expensive calculations after final game)
+        # The milestones are 30, 60, 90, 120, 150 games, so no assessment should run after 162
+        if self.season_day_num >= self.season_length:
+            return
+
         # Calculate current Sim WAR values before assessments
         self.baseball_data.calculate_sim_war()
 

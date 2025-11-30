@@ -531,7 +531,7 @@ if __name__ == '__main__':
     start_time = datetime.datetime.now()
 
     # full season 162 games
-    num_games = 31
+    num_games = 162
     interactive = True
     fantasy = False
 
@@ -552,7 +552,8 @@ if __name__ == '__main__':
 
     # handle a single full season of MLB
     if not fantasy:
-        my_teams_to_follow ='MIL'  # or None
+        # my_teams_to_follow ='MIL'  # or None
+        my_teams_to_follow = None
         # series_schedule = [[['LAD', 'TOR']], [['LAD', 'TOR']],
         #                    [['TOR', 'LAD']], [['TOR', 'LAD']],
         #                    [['TOR', 'LAD']], [['LAD', 'TOR']],[['LAD', 'TOR']]]

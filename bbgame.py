@@ -210,7 +210,7 @@ class Game:
         for ii in range(0, 3):  # print each row
             print_line = ''
             for jj in range(0, len(row_to_col[ii])):
-                print_line = print_line + str(row_to_col[ii][jj]) + '\t'
+                print_line = print_line + f'{str(row_to_col[ii][jj]):>4}'
             self.game_recap += print_line + '\n'
             # print(print_line)
         self.game_recap += '\n'

@@ -504,9 +504,13 @@ class BaseballStats:
         """
         Print list of players with hot or cold streaks (similar to injury list)
         Only shows players with streaks >= +2.5% (Hot) or <= -2.5% (Cold)
-        :param teams_to_follow: List of team names to show, None shows all teams
+        :param teams_to_follow: List of team names to show, None means don't print anything
         :return: None
         """
+        # Only print if following specific teams
+        if not teams_to_follow:
+            return
+
         # Define columns for hot/cold display
         streak_cols_to_print = ['Player', 'Team', 'Pos/Role', 'Streak Status', 'Streak Value']
 
@@ -521,10 +525,9 @@ class BaseballStats:
             (self.new_season_batting_data['Streak_Adjustment'] <= -0.025)
         ].copy()
 
-        # Filter by teams if specified
-        if teams_to_follow:
-            hot_cold_pitchers = hot_cold_pitchers[hot_cold_pitchers['Team'].isin(teams_to_follow)]
-            hot_cold_batters = hot_cold_batters[hot_cold_batters['Team'].isin(teams_to_follow)]
+        # Filter by teams to follow
+        hot_cold_pitchers = hot_cold_pitchers[hot_cold_pitchers['Team'].isin(teams_to_follow)]
+        hot_cold_batters = hot_cold_batters[hot_cold_batters['Team'].isin(teams_to_follow)]
 
         # Only print if there are hot/cold players
         if hot_cold_pitchers.shape[0] > 0 or hot_cold_batters.shape[0] > 0:
@@ -643,14 +646,18 @@ class BaseballStats:
         :return: None
         """
         with self.semaphore:
+            logger.info('Calculating team pitching stats...')
             self.new_season_pitching_data = \
                 team_pitching_stats(self.new_season_pitching_data[self.new_season_pitching_data['IP'] > 0].fillna(0))
+            logger.info('Calculating team batting stats...')
             self.new_season_batting_data = \
                 team_batting_stats(self.new_season_batting_data[self.new_season_batting_data['AB'] > 0].fillna(0))
             logger.debug('Updated season pitching stats:\n{}', self.new_season_pitching_data.to_string(justify="right"))
 
             # Calculate Sim WAR after updating stats
+            logger.info('Calculating player WAR values...')
             self.calculate_sim_war()
+            logger.info('Season statistics update complete.')
         return
 
     def calculate_sim_war(self) -> None:
@@ -665,116 +672,118 @@ class BaseballStats:
         - Adjustments: Age performance, injury performance impact, games lost to injury
 
         Results stored in 'Sim_WAR' column for both batting and pitching dataframes.
-        Thread-safe for concurrent access.
+
+        NOTE: This function should be called from within a semaphore-protected context.
+        It does NOT acquire its own semaphore to avoid deadlock.
 
         :return: None (modifies dataframes in place)
         """
-        with self.semaphore:
-            # ===== BATTER SIM WAR =====
-            batting_df = self.new_season_batting_data
+        # NOTE: No semaphore here - caller must hold it
+        # ===== BATTER SIM WAR =====
+        batting_df = self.new_season_batting_data
 
-            # Filter batters with playing time
-            active_batters = batting_df['AB'] >= 10
+        # Filter batters with playing time
+        active_batters = batting_df['AB'] >= 10
 
-            if active_batters.sum() > 0:
-                # Calculate wOBA (weighted On-Base Average)
-                # Weights: BB=0.69, HBP=0.72, 1B=0.88, 2B=1.24, 3B=1.56, HR=1.95
-                singles = batting_df['H'] - batting_df['2B'] - batting_df['3B'] - batting_df['HR']
-                woba_numerator = (0.69 * batting_df['BB'] +
-                                 0.72 * batting_df['HBP'] +
-                                 0.88 * singles +
-                                 1.24 * batting_df['2B'] +
-                                 1.56 * batting_df['3B'] +
-                                 1.95 * batting_df['HR'])
-                plate_appearances = batting_df['AB'] + batting_df['BB'] + batting_df['HBP'] + batting_df['SF']
-                woba = np.where(plate_appearances > 0, woba_numerator / plate_appearances, 0.0)
+        if active_batters.sum() > 0:
+            # Calculate wOBA (weighted On-Base Average)
+            # Weights: BB=0.69, HBP=0.72, 1B=0.88, 2B=1.24, 3B=1.56, HR=1.95
+            singles = batting_df['H'] - batting_df['2B'] - batting_df['3B'] - batting_df['HR']
+            woba_numerator = (0.69 * batting_df['BB'] +
+                             0.72 * batting_df['HBP'] +
+                             0.88 * singles +
+                             1.24 * batting_df['2B'] +
+                             1.56 * batting_df['3B'] +
+                             1.95 * batting_df['HR'])
+            plate_appearances = batting_df['AB'] + batting_df['BB'] + batting_df['HBP'] + batting_df['SF']
+            woba = np.where(plate_appearances > 0, woba_numerator / plate_appearances, 0.0)
 
-                # League average wOBA (calculate from all active batters)
-                league_woba = np.mean(woba[active_batters])
+            # League average wOBA (calculate from all active batters)
+            league_woba = np.mean(woba[active_batters])
 
-                # Offensive runs above average: ((wOBA - lgAvg) / 1.15) * PA
-                # 1.15 is wOBA scale factor to convert to runs
-                runs_above_avg = ((woba - league_woba) / 1.15) * plate_appearances
+            # Offensive runs above average: ((wOBA - lgAvg) / 1.15) * PA
+            # 1.15 is wOBA scale factor to convert to runs
+            runs_above_avg = ((woba - league_woba) / 1.15) * plate_appearances
 
-                # Convert runs to wins (~10 runs = 1 WAR)
-                base_war = runs_above_avg / 10.0
+            # Convert runs to wins (~10 runs = 1 WAR)
+            base_war = runs_above_avg / 10.0
 
-                # Apply adjustments
-                # 1. Age adjustment (already calculated in preprocessing)
-                age_factor = 1.0 + batting_df['Age_Adjustment']
+            # Apply adjustments
+            # 1. Age adjustment (already calculated in preprocessing)
+            age_factor = 1.0 + batting_df['Age_Adjustment']
 
-                # 2. Injury performance adjustment (reduces performance if recovering from injury)
-                injury_perf_factor = 1.0 + batting_df['Injury_Perf_Adj']
+            # 2. Injury performance adjustment (reduces performance if recovering from injury)
+            injury_perf_factor = 1.0 + batting_df['Injury_Perf_Adj']
 
-                # 3. Injury rate adjustment (players more prone to injury are less valuable)
-                # Reduce value by injury_rate_adj percentage
-                injury_rate_factor = 1.0 - (batting_df['Injury_Rate_Adj'] * 0.5)  # 50% weight
+            # 3. Injury rate adjustment (players more prone to injury are less valuable)
+            # Reduce value by injury_rate_adj percentage
+            injury_rate_factor = 1.0 - (batting_df['Injury_Rate_Adj'] * 0.5)  # 50% weight
 
-                # 4. Games missed adjustment (currently injured players have 0 value for missed games)
-                # Estimate games played based on G column vs expected (assume 162 game season)
-                games_played = batting_df['G']
-                # Expected value: adjust WAR proportionally for games missed to injury
-                # But don't double-count current injury status - focus on games already missed
+            # 4. Games missed adjustment (currently injured players have 0 value for missed games)
+            # Estimate games played based on G column vs expected (assume 162 game season)
+            games_played = batting_df['G']
+            # Expected value: adjust WAR proportionally for games missed to injury
+            # But don't double-count current injury status - focus on games already missed
 
-                # Combine all factors
-                sim_war = base_war * age_factor * injury_perf_factor * injury_rate_factor
+            # Combine all factors
+            sim_war = base_war * age_factor * injury_perf_factor * injury_rate_factor
 
-                # Set Sim_WAR column (vectorized)
-                batting_df['Sim_WAR'] = np.where(active_batters, sim_war, 0.0)
+            # Set Sim_WAR column (vectorized)
+            batting_df['Sim_WAR'] = np.where(active_batters, sim_war, 0.0)
 
-                logger.debug('Calculated Sim WAR for batters: min={:.2f}, max={:.2f}, avg={:.2f}',
-                           batting_df['Sim_WAR'].min(), batting_df['Sim_WAR'].max(),
-                           batting_df['Sim_WAR'].mean())
-            else:
-                batting_df['Sim_WAR'] = 0.0
+            logger.debug('Calculated Sim WAR for batters: min={:.2f}, max={:.2f}, avg={:.2f}',
+                       batting_df['Sim_WAR'].min(), batting_df['Sim_WAR'].max(),
+                       batting_df['Sim_WAR'].mean())
+        else:
+            batting_df['Sim_WAR'] = 0.0
 
-            # ===== PITCHER SIM WAR =====
-            pitching_df = self.new_season_pitching_data
+        # ===== PITCHER SIM WAR =====
+        pitching_df = self.new_season_pitching_data
 
-            # Filter pitchers with playing time
-            active_pitchers = pitching_df['IP'] >= 5
+        # Filter pitchers with playing time
+        active_pitchers = pitching_df['IP'] >= 5
 
-            if active_pitchers.sum() > 0:
-                # Calculate FIP (Fielding Independent Pitching)
-                # FIP = ((13*HR + 3*BB - 2*SO) / IP) + constant
-                # FIP constant ~3.10 to match ERA scale
-                fip_constant = 3.10
-                fip_numerator = (13 * pitching_df['HR'] + 3 * pitching_df['BB'] - 2 * pitching_df['SO'])
-                fip = np.where(pitching_df['IP'] > 0,
-                              (fip_numerator / pitching_df['IP']) + fip_constant,
-                              0.0)
+        if active_pitchers.sum() > 0:
+            # Calculate FIP (Fielding Independent Pitching)
+            # FIP = ((13*HR + 3*BB - 2*SO) / IP) + constant
+            # FIP constant ~3.10 to match ERA scale
+            fip_constant = 3.10
+            fip_numerator = (13 * pitching_df['HR'] + 3 * pitching_df['BB'] - 2 * pitching_df['SO'])
+            fip = np.where(pitching_df['IP'] > 0,
+                          (fip_numerator / pitching_df['IP']) + fip_constant,
+                          0.0)
 
-                # League average FIP
-                league_fip = np.mean(fip[active_pitchers])
+            # League average FIP
+            league_fip = np.mean(fip[active_pitchers])
 
-                # Runs prevented above average: ((lgFIP - playerFIP) / 9) * IP
-                # Divide by 9 to convert from per-9-innings rate to per-inning rate
-                runs_prevented = ((league_fip - fip) / 9.0) * pitching_df['IP']
+            # Runs prevented above average: ((lgFIP - playerFIP) / 9) * IP
+            # Divide by 9 to convert from per-9-innings rate to per-inning rate
+            runs_prevented = ((league_fip - fip) / 9.0) * pitching_df['IP']
 
-                # Convert runs to wins (~10 runs = 1 WAR)
-                base_war = runs_prevented / 10.0
+            # Convert runs to wins (~10 runs = 1 WAR)
+            base_war = runs_prevented / 10.0
 
-                # Apply adjustments
-                # 1. Age adjustment
-                age_factor = 1.0 + pitching_df['Age_Adjustment']
+            # Apply adjustments
+            # 1. Age adjustment
+            age_factor = 1.0 + pitching_df['Age_Adjustment']
 
-                # 2. Injury performance adjustment
-                injury_perf_factor = 1.0 + pitching_df['Injury_Perf_Adj']
+            # 2. Injury performance adjustment
+            injury_perf_factor = 1.0 + pitching_df['Injury_Perf_Adj']
 
-                # 3. Injury rate adjustment (pitchers prone to injury are less valuable)
-                injury_rate_factor = 1.0 - (pitching_df['Injury_Rate_Adj'] * 0.5)
+            # 3. Injury rate adjustment (pitchers prone to injury are less valuable)
+            injury_rate_factor = 1.0 - (pitching_df['Injury_Rate_Adj'] * 0.5)
 
-                # Combine all factors
-                sim_war = base_war * age_factor * injury_perf_factor * injury_rate_factor
+            # Combine all factors
+            sim_war = base_war * age_factor * injury_perf_factor * injury_rate_factor
 
-                # Set Sim_WAR column (vectorized)
-                pitching_df['Sim_WAR'] = np.where(active_pitchers, sim_war, 0.0)
+            # Set Sim_WAR column (vectorized)
+            pitching_df['Sim_WAR'] = np.where(active_pitchers, sim_war, 0.0)
 
-                logger.debug('Calculated Sim WAR for pitchers: min={:.2f}, max={:.2f}, avg={:.2f}',
-                           pitching_df['Sim_WAR'].min(), pitching_df['Sim_WAR'].max(),
-                           pitching_df['Sim_WAR'].mean())
-            else:
-                pitching_df['Sim_WAR'] = 0.0
+            logger.debug('Calculated Sim WAR for pitchers: min={:.2f}, max={:.2f}, avg={:.2f}',
+                       pitching_df['Sim_WAR'].min(), pitching_df['Sim_WAR'].max(),
+                       pitching_df['Sim_WAR'].mean())
+        else:
+            pitching_df['Sim_WAR'] = 0.0
 
         return
 
@@ -1055,6 +1064,9 @@ def team_batting_totals(batting_df: DataFrame) -> DataFrame:
     df = batting_df[['AB', 'R', 'H', '2B', '3B', 'HR', 'RBI', 'SB', 'CS', 'BB', 'SO',
                      'SH', 'SF', 'HBP']].sum().astype(int)
     df['G'] = np.max(batting_df['G'])
+    # Add Sim_WAR if it exists (sum of all player values)
+    if 'Sim_WAR' in batting_df.columns:
+        df['Sim_WAR'] = batting_df['Sim_WAR'].sum()
     df = df.to_frame().T
     df = team_batting_stats(df, filter_stats=False)
     return df
@@ -1070,6 +1082,9 @@ def team_pitching_totals(pitching_df: DataFrame) -> DataFrame:
                       'HLD']].sum().astype(int)
     df = df.to_frame().T
     df = df.assign(G=np.max(pitching_df['G']))
+    # Add Sim_WAR if it exists (sum of all player values)
+    if 'Sim_WAR' in pitching_df.columns:
+        df['Sim_WAR'] = pitching_df['Sim_WAR'].sum()
     df = team_pitching_stats(df, filter_stats=False)
     return df
 

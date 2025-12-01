@@ -143,43 +143,95 @@ class BaseballSeason:
 
     def print_day_schedule(self, day: int) -> str:
         """
-        prints the schedule for the day passed in, prints days off last
+        prints the schedule for the day in compact 2-column format
         :param day: integer of the day in season, e.g., 161
         :return: str with printed schedule text
         """
         schedule_str = ''
         game_day_off = ''
         day_schedule = self.schedule[day]
-        schedule_str += f'Games for day {day + 1}:\n'
-        # print(f'Games for day {day + 1}:')
+        games = []
+
+        # Collect games and off days
         for game in day_schedule:
             if 'OFF DAY' not in game:
-                schedule_str += f'{game[0]} vs. {game[1]}\n'
-                # print(f'{game[0]} vs. {game[1]}')
+                games.append(f'{game[0]:>3} @ {game[1]:<3}')
             else:
-                game_day_off = game[0] if game[0] != 'OFF DAY' else game[1]  # find the team with the off game
+                game_day_off = game[0] if game[0] != 'OFF DAY' else game[1]
+
+        # Print header
+        schedule_str += f'Day {day + 1} Games:\n'
+
+        # Print games in 2 columns
+        if games:
+            mid_point = (len(games) + 1) // 2
+            for i in range(mid_point):
+                left_game = games[i]
+                if i + mid_point < len(games):
+                    right_game = games[i + mid_point]
+                    schedule_str += f'{left_game}   {right_game}\n'
+                else:
+                    schedule_str += f'{left_game}\n'
+
+        # Print off day at the end
         if game_day_off != '':
-            schedule_str += f'{game_day_off} has the day off\n\n'
-            # print(f{game_day_off} has the day off)
-        # print('')
-        # print(schedule_str)
+            schedule_str += f'({game_day_off} - Off Day)\n'
+
+        schedule_str += '\n'
         return schedule_str
 
     def print_standings(self) -> None:
         """
-        print the current standings
+        print the current standings with GB and Win% in compact 2-column format
         :return: None
         """
         teaml, winl, lossl = [], [], []
         for team in self.team_win_loss:
             if team != 'OFF DAY':
                 win_loss = self.team_win_loss[team]
-                team = team if self.team_city_dict[team] == team else f'{self.team_city_dict[team]} ({team})'
-                teaml.append(team)
+                teaml.append(team)  # Use abbreviation only for compact display
                 winl.append(win_loss[0])
                 lossl.append(win_loss[1])
-        df = pd.DataFrame({'Team': teaml, 'Win': winl, 'Loss': lossl})
-        print(df.sort_values('Win', ascending=False).to_string(index=False, justify='center'))
+
+        # Create DataFrame and calculate stats
+        df = pd.DataFrame({'Team': teaml, 'W': winl, 'L': lossl})
+        df['Pct'] = df['W'] / (df['W'] + df['L'])
+        df = df.sort_values('W', ascending=False).reset_index(drop=True)
+
+        # Calculate Games Back from leader
+        max_wins = df['W'].iloc[0]
+        leader_losses = df['L'].iloc[0]
+        df['GB'] = ((max_wins - df['W']) + (df['L'] - leader_losses)) / 2.0
+        df['GB'] = df['GB'].apply(lambda x: '-' if x == 0 else f'{x:.1f}')
+
+        # Format for display
+        df['W-L'] = df['W'].astype(str) + '-' + df['L'].astype(str)
+        df['Pct'] = df['Pct'].apply(lambda x: f'{x:.3f}')
+        display_df = df[['Team', 'W-L', 'Pct', 'GB']]
+
+        # Split into 2 columns for compact display
+        n_teams = len(display_df)
+        mid_point = (n_teams + 1) // 2
+
+        left_half = display_df.iloc[:mid_point].reset_index(drop=True)
+        right_half = display_df.iloc[mid_point:].reset_index(drop=True)
+
+        # Print header
+        print(f"{'Team':<5} {'W-L':<8} {'Pct':<6} {'GB':<5}   {'Team':<5} {'W-L':<8} {'Pct':<6} {'GB':<5}")
+        print('-' * 60)
+
+        # Print rows side by side
+        for i in range(mid_point):
+            left_row = left_half.iloc[i]
+            left_line = f"{left_row['Team']:<5} {left_row['W-L']:<8} {left_row['Pct']:<6} {left_row['GB']:<5}"
+
+            if i < len(right_half):
+                right_row = right_half.iloc[i]
+                right_line = f"{right_row['Team']:<5} {right_row['W-L']:<8} {right_row['Pct']:<6} {right_row['GB']:<5}"
+                print(f"{left_line}   {right_line}")
+            else:
+                print(left_line)
+
         print('')
         return
 
@@ -243,10 +295,13 @@ class BaseballSeason:
         Check if any teams have reached GM assessment milestones (30, 60, 90, 120, 150 games).
         Run assessments for teams that are due.
         """
-        # Skip GM assessments if season is complete (avoids expensive calculations after final game)
-        # The milestones are 30, 60, 90, 120, 150 games, so no assessment should run after 162
-        if self.season_day_num >= self.season_length:
-            return
+        # Skip GM assessments after game 150 milestone (last assessment)
+        # This avoids expensive calculations late in the season
+        # Check max games played by any team to handle uneven schedules
+        if self.team_games_played:
+            max_games = max(self.team_games_played.values())
+            if max_games > 150:  # Last milestone is 150 games
+                return
 
         # Calculate current Sim WAR values before assessments
         self.baseball_data.calculate_sim_war()
@@ -297,6 +352,7 @@ class BaseballSeason:
         print end of season info and update end of season stats
         :return: None
         """
+        print('\nCalculating final season statistics...')
         self.baseball_data.update_season_stats()
         print(f'\n\n****** End of {self.new_season} season ******')
         print(f'{self.new_season} Season Standings:')

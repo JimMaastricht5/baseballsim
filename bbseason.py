@@ -304,7 +304,9 @@ class BaseballSeason:
                 return
 
         # Calculate current Sim WAR values before assessments
-        self.baseball_data.calculate_sim_war()
+        # NOTE: calculate_sim_war() requires semaphore protection
+        with self.baseball_data.semaphore:
+            self.baseball_data.calculate_sim_war()
 
         for team_name, gm in self.gm_managers.items():
             games_played = self.team_games_played[team_name]

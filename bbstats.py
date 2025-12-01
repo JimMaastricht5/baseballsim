@@ -1064,6 +1064,9 @@ def team_batting_totals(batting_df: DataFrame) -> DataFrame:
     df = batting_df[['AB', 'R', 'H', '2B', '3B', 'HR', 'RBI', 'SB', 'CS', 'BB', 'SO',
                      'SH', 'SF', 'HBP']].sum().astype(int)
     df['G'] = np.max(batting_df['G'])
+    # Add Sim_WAR if it exists (sum of all player values)
+    if 'Sim_WAR' in batting_df.columns:
+        df['Sim_WAR'] = batting_df['Sim_WAR'].sum()
     df = df.to_frame().T
     df = team_batting_stats(df, filter_stats=False)
     return df
@@ -1079,6 +1082,9 @@ def team_pitching_totals(pitching_df: DataFrame) -> DataFrame:
                       'HLD']].sum().astype(int)
     df = df.to_frame().T
     df = df.assign(G=np.max(pitching_df['G']))
+    # Add Sim_WAR if it exists (sum of all player values)
+    if 'Sim_WAR' in pitching_df.columns:
+        df['Sim_WAR'] = pitching_df['Sim_WAR'].sum()
     df = team_pitching_stats(df, filter_stats=False)
     return df
 

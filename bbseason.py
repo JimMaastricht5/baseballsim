@@ -363,6 +363,58 @@ class BaseballSeason:
         if self.team_to_follow != '' and self.team_to_follow in self.baseball_data.get_all_team_names():
             self.baseball_data.print_current_season(teams=[self.team_to_follow], summary_only_b=False)
         self.baseball_data.print_current_season(teams=self.teams, summary_only_b=not self.season_chatty)
+
+        # Perform AI GM end-of-season evaluations
+        print(f'\n\n****** AI GM End-of-Season Evaluations ******\n')
+        self._perform_gm_evaluations()
+
+        return
+
+    def _perform_gm_evaluations(self) -> None:
+        """
+        Perform end-of-season evaluations for all AI GMs.
+        Calculates final standings and calls each GM's evaluation method.
+        """
+        # Calculate final standings (sorted by wins)
+        standings = []
+        for team in self.teams:
+            # Skip invalid team entries
+            if team and team != 'OFF DAY' and team in self.team_win_loss:
+                wins, losses = self.team_win_loss[team]
+                win_pct = wins / (wins + losses) if (wins + losses) > 0 else 0.0
+                standings.append({
+                    'team': team,
+                    'wins': wins,
+                    'losses': losses,
+                    'win_pct': win_pct
+                })
+
+        # Sort by wins (descending), then by losses (ascending)
+        standings.sort(key=lambda x: (x['wins'], -x['losses']), reverse=True)
+
+        # Assign standings positions
+        team_standings = {s['team']: idx + 1 for idx, s in enumerate(standings)}
+        total_teams = len(standings)
+
+        # Perform evaluation for each GM (only for teams with valid standings)
+        for team_name, gm in self.gm_managers.items():
+            if team_name in team_standings and team_name in self.team_win_loss:
+                standing = team_standings[team_name]
+                record = self.team_win_loss[team_name]
+                games_back = self.calculate_games_back(team_name)
+
+                gm.perform_end_of_season_evaluation(
+                    baseball_stats=self.baseball_data,
+                    team_record=(record[0], record[1]),
+                    final_standing=standing,
+                    total_teams=total_teams,
+                    games_back=games_back
+                )
+
+        # Print all player stats after GM evaluations
+        print(f'\n\n****** Complete Player Statistics ******\n')
+        self.baseball_data.print_current_season(teams=None, summary_only_b=False)
+
         return
 
     def sim_day(self, season_day_num: int) -> None:

@@ -271,6 +271,8 @@ class BaseballStatsPreProcess:
         pitching_data = self.group_col_to_list(df=pitching_data, key_col='Hashcode', col='League', new_col='Leagues')
         # Create Years_Included column - list of seasons this player appeared in
         pitching_data = self.group_col_to_list(df=pitching_data, key_col='Hashcode', col='Season', new_col='Years_Included')
+        # Sort by Season to ensure most recent year's Team/League are kept during de-duplication
+        pitching_data = pitching_data.sort_values('Season', ascending=True)
         pitching_data = self.de_dup_df(df=pitching_data, key_name='Hashcode', dup_column_names='Hashcode',
                                        stats_cols_to_sum=stats_pcols_sum, drop_dups=True)
         pitching_data = pitching_data.set_index('Hashcode')
@@ -382,6 +384,8 @@ class BaseballStatsPreProcess:
         batting_data = self.group_col_to_list(df=batting_data, key_col='Hashcode', col='League', new_col='Leagues')
         # Create Years_Included column - list of seasons this player appeared in
         batting_data = self.group_col_to_list(df=batting_data, key_col='Hashcode', col='Season', new_col='Years_Included')
+        # Sort by Season to ensure most recent year's Team/League are kept during de-duplication
+        batting_data = batting_data.sort_values('Season', ascending=True)
         batting_data = self.de_dup_df(df=batting_data, key_name='Hashcode', dup_column_names='Hashcode',
                                       stats_cols_to_sum=stats_bcols_sum, drop_dups=True)
         batting_data = batting_data.set_index('Hashcode')

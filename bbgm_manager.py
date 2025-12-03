@@ -48,9 +48,20 @@ Player Value Formula:
     V_player = α * V_immediate + (1-α) * V_future
 
     Where:
-    - V_immediate: Current season Sim_WAR, adjusted for health/streaks
+    - V_immediate: Current season Sim_WAR, adjusted for playing time
     - V_future: Age-adjusted potential value over remaining career
     - α: Team strategy coefficient (win now vs win later)
+
+Design Philosophy:
+    GMs evaluate players based on OBSERVABLE factors only:
+    - Performance stats (Sim_WAR, batting/pitching stats)
+    - Age (visible)
+    - Games/IP played (visible)
+    - Injury history (days missed)
+
+    GMs do NOT see internal simulation adjustment factors:
+    - Age_Adjustment, Injury_Rate_Adj, Injury_Perf_Adj, Streak_Adjustment
+    These are hidden simulation mechanics. The GM only sees the results (WAR and stats).
 """
 import pandas as pd
 import numpy as np
@@ -307,9 +318,13 @@ class PlayerValuation:
         """
         Calculate immediate value based on current season performance.
 
+        The GM evaluates players based on observable performance (Sim_WAR) and visible factors
+        like games played and injury history. Internal simulation adjustments are NOT visible
+        to the GM - they only see the results (stats and WAR).
+
         Components:
-        - Base: Sim_WAR (current season performance)
-        - Adjustments: Playing time ratio (normalized by team games), injury status, streak
+        - Base: Sim_WAR (calculated purely from observable stats - H, 2B, HR, BB, SO, IP, etc.)
+        - Adjustment: Playing time ratio (observable - games/IP played vs expected)
 
         Args:
             player_row: Player stats row
@@ -318,47 +333,45 @@ class PlayerValuation:
         """
         sim_war = player_row.get('Sim_WAR', 0.0)
 
-        # Adjustment 1: Normalize playing time by team's season progress
-        # The key insight: a player's value should be consistent regardless of when we assess
-        # If team has played 81 games and player has played 40 (49%), they're on pace for ~79 games (49% of 162)
+        # Sim_WAR is calculated from observable stats only (like real-world WAR)
+        # Age/injury/streak factors affect in-game performance, but WAR measures the results
+
+        # Only adjustment: Normalize by playing time (observable factor)
+        # If player has only played 50% of team games, scale their value accordingly
         player_games = player_row.get('G', 0)
 
-        if team_games_played > 0:
-            # Calculate what % of team games the player has participated in
+        if team_games_played > 0 and player_games > 0:
+            # Calculate participation rate
             participation_rate = player_games / team_games_played
-            # Most regulars play ~90% of games, bench players ~40%
-            # We don't project forward; instead we assess their current contribution rate
-            playing_time_factor = min(participation_rate / 0.85, 1.2)  # Normalize to "regular" (85% participation)
+
+            # For pitchers, weight IP more heavily than games
+            if is_pitcher:
+                ip = player_row.get('IP', 0)
+                games_started = player_row.get('GS', 0)
+
+                # Estimate expected IP based on role
+                if games_started > 0:
+                    # Starter: expect ~5.5 IP per GS over the season
+                    expected_ip_per_gs = 5.5
+                    expected_ip = games_started * expected_ip_per_gs
+                    ip_rate = ip / expected_ip if expected_ip > 0 else 1.0
+                else:
+                    # Reliever: expect ~1 IP per G
+                    expected_ip = player_games * 1.0
+                    ip_rate = ip / expected_ip if expected_ip > 0 else 1.0
+
+                # Blend participation rate and IP rate
+                playing_time_factor = (participation_rate + ip_rate) / 2.0
+            else:
+                # For batters, just use participation rate
+                playing_time_factor = participation_rate
+
+            # Cap at reasonable bounds (0.3 to 1.2)
+            playing_time_factor = max(0.3, min(playing_time_factor, 1.2))
         else:
             playing_time_factor = 1.0
 
-        if is_pitcher:
-            # For pitchers, also consider IP as additional context
-            ip = player_row.get('IP', 0)
-            # Typical starter: ~180 IP/season, reliever: ~70 IP/season
-            # Adjust based on role expectation
-            if ip > 0:
-                ip_per_game = ip / max(player_games, 1)
-                # Starters avg ~6 IP/appearance, relievers ~1 IP/appearance
-                # Use IP rate to modulate the playing time factor
-                if ip_per_game >= 3.0:  # Likely a starter
-                    ip_factor = min(ip / 100, 1.5)  # Expect ~100+ IP for assessment
-                else:  # Likely a reliever
-                    ip_factor = min(ip / 40, 1.5)  # Expect ~40+ IP for assessment
-                playing_time_factor = (playing_time_factor + ip_factor) / 2
-
-        # Apply playing time adjustment to base WAR
-        projected_war = sim_war * playing_time_factor
-
-        # Adjustment 2: Health/availability (injured players have reduced immediate value)
-        injured_days = player_row.get('Injured Days', 0)
-        health_factor = max(0.0, 1.0 - (injured_days / 162.0))  # Reduce by days lost
-
-        # Adjustment 3: Current streak (hot/cold affects short-term value)
-        streak_adj = player_row.get('Streak_Adjustment', 0.0)
-        streak_factor = 1.0 + (streak_adj * 0.5)  # Streak worth ±5% at extremes
-
-        immediate_value = projected_war * health_factor * streak_factor
+        immediate_value = sim_war * playing_time_factor
 
         return max(immediate_value, self.replacement_war)
 
@@ -904,6 +917,177 @@ class AIGeneralManager:
             print()
 
         print(f"{'='*60}\n")
+
+    def perform_end_of_season_evaluation(self, baseball_stats, team_record: Tuple[int, int],
+                                         final_standing: int, total_teams: int, games_back: float) -> None:
+        """
+        Perform comprehensive end-of-season team evaluation and print to console.
+
+        This is the GM's final assessment of the season - reviewing what worked,
+        what didn't, and setting offseason priorities.
+
+        Args:
+            baseball_stats: BaseballStats instance with full season data
+            team_record: Final record as (wins, losses)
+            final_standing: Team's final standing (1 = first place, etc.)
+            total_teams: Total number of teams in league
+            games_back: Games back from division leader
+        """
+        wins, losses = team_record
+        win_pct = wins / (wins + losses) if (wins + losses) > 0 else 0.500
+        games_played = wins + losses
+
+        print(f"\n{'='*70}")
+        print(f"END OF SEASON EVALUATION: {self.team_name}")
+        print(f"{'='*70}")
+        print(f"Final Record: {wins}-{losses} ({win_pct:.3f})")
+        print(f"Final Standing: {final_standing} of {total_teams}")
+        print(f"Games Back: {games_back:.1f}")
+        print()
+
+        # Calculate final strategy
+        strategy = self.strategy_calculator.calculate_alpha(
+            team_record, games_back, games_played
+        )
+
+        # Season Assessment
+        print("SEASON ASSESSMENT:")
+        print("-" * 70)
+        self._evaluate_season_success(wins, losses, final_standing, total_teams)
+        print()
+
+        # Calculate final Sim WAR to get updated player values
+        baseball_stats.calculate_sim_war()
+
+        # Value all players with final season stats
+        roster_values = self._value_roster(baseball_stats, strategy.alpha, games_played)
+
+        # Top Performers
+        print("TOP PERFORMERS THIS SEASON:")
+        print("-" * 70)
+        self._highlight_top_performers(roster_values)
+        print()
+
+        # Disappointments
+        print("UNDERPERFORMERS / CONCERNS:")
+        print("-" * 70)
+        self._highlight_disappointments(roster_values)
+        print()
+
+        # Offseason Strategy
+        print("OFFSEASON STRATEGY:")
+        print("-" * 70)
+        self._outline_offseason_priorities(strategy, roster_values)
+        print()
+
+        # Offseason Moves
+        recommendations = self._generate_recommendations(
+            roster_values, strategy, baseball_stats
+        )
+
+        if recommendations['trade_away']:
+            print("PLAYERS TO SHOP THIS OFFSEASON:")
+            for i, trade in enumerate(recommendations['trade_away'][:5], 1):
+                print(f"  {i}. {trade['player']:20s} - {trade['reason']}")
+            print()
+
+        if recommendations.get('specific_targets'):
+            print("OFFSEASON ACQUISITION TARGETS:")
+            for i, target in enumerate(recommendations['specific_targets'][:5], 1):
+                print(f"  {i}. {target['player']:20s} ({target['team']}, Age {target['age']}) - {target['reason']}")
+            print()
+
+        if recommendations['release']:
+            print("ROSTER CUTS:")
+            for i, release in enumerate(recommendations['release'][:3], 1):
+                print(f"  {i}. {release['player']:20s} - {release['reason']}")
+            print()
+
+        print(f"{'='*70}")
+        print(f"End of {self.team_name} Evaluation")
+        print(f"{'='*70}\n")
+
+    def _evaluate_season_success(self, wins: int, losses: int, standing: int, total_teams: int) -> None:
+        """Evaluate whether the season was a success or disappointment."""
+        win_pct = wins / (wins + losses)
+
+        if standing == 1:
+            assessment = "OUTSTANDING - Division Champions!"
+        elif standing <= 3 and total_teams >= 10:
+            assessment = "SUCCESS - Playoff contention"
+        elif standing <= total_teams // 3:
+            assessment = "SOLID - Upper tier finish"
+        elif win_pct >= 0.500:
+            assessment = "ACCEPTABLE - Above .500, room for improvement"
+        elif win_pct >= 0.450:
+            assessment = "DISAPPOINTING - Below expectations"
+        else:
+            assessment = "POOR - Significant rebuild needed"
+
+        print(f"Overall: {assessment}")
+        print(f"The team finished with a {win_pct:.3f} winning percentage.")
+
+        if win_pct >= 0.550:
+            print("This was a competitive, winning season.")
+        elif win_pct >= 0.500:
+            print("The team was competitive but needs improvement to contend.")
+        elif win_pct >= 0.450:
+            print("The team struggled to stay competitive this season.")
+        else:
+            print("This was a rebuilding year with many lessons learned.")
+
+    def _highlight_top_performers(self, roster_values: Dict) -> None:
+        """Highlight the top 5 players who performed best this season."""
+        all_players = roster_values['batters'] + roster_values['pitchers']
+        all_players.sort(key=lambda x: x.immediate_value, reverse=True)
+
+        for i, player in enumerate(all_players[:5], 1):
+            print(f"{i}. {player.player_name:20s} ({player.position:5s}, Age {player.age:2d})")
+            print(f"   {player.immediate_value:4.1f} WAR - Key contributor to the team's success")
+
+    def _highlight_disappointments(self, roster_values: Dict) -> None:
+        """Highlight underperforming players or areas of concern."""
+        all_players = roster_values['batters'] + roster_values['pitchers']
+
+        # Find underperformers: high salary but low production
+        disappointments = [
+            p for p in all_players
+            if p.salary > 5_000_000 and p.immediate_value < 1.0
+        ]
+        disappointments.sort(key=lambda x: x.immediate_value)
+
+        if disappointments:
+            for i, player in enumerate(disappointments[:5], 1):
+                value_per_m = player.immediate_value / (player.salary / 1_000_000)
+                print(f"{i}. {player.player_name:20s} ({player.position:5s}, Age {player.age:2d})")
+                print(f"   {player.immediate_value:4.1f} WAR on ${player.salary/1e6:.1f}M salary "
+                      f"({value_per_m:.2f} WAR per $M)")
+        else:
+            print("No major disappointments - most players performed to expectations.")
+
+    def _outline_offseason_priorities(self, strategy: TeamStrategy, roster_values: Dict) -> None:
+        """Outline the team's offseason priorities based on performance."""
+        print(f"Team Strategy: {strategy.stage} (alpha={strategy.alpha:.3f})")
+        print()
+
+        if strategy.alpha >= 0.60:
+            print("PRIORITY: WIN NOW")
+            print("  - Aggressively pursue impact veterans")
+            print("  - Fill gaps with proven players")
+            print("  - Package prospects for immediate upgrades")
+            print("  - Focus on playoff-caliber roster construction")
+        elif strategy.alpha >= 0.40:
+            print("PRIORITY: BALANCED APPROACH")
+            print("  - Make smart, value-based moves")
+            print("  - Balance present and future")
+            print("  - Develop young talent while staying competitive")
+            print("  - Avoid overpaying for marginal improvements")
+        else:
+            print("PRIORITY: REBUILD FOR FUTURE")
+            print("  - Trade veterans for young talent and prospects")
+            print("  - Accumulate draft picks and international bonus pool money")
+            print("  - Give playing time to young players")
+            print("  - Build foundation for 2-3 years out")
 
 
 if __name__ == '__main__':

@@ -662,14 +662,20 @@ class BaseballStats:
 
     def calculate_sim_war(self) -> None:
         """
-        Calculate dynamic Sim WAR (Player Value) based on current season performance.
-        This metric reflects in-season value considering performance, age adjustments,
-        injury impact, and playing time.
+        Calculate dynamic Sim WAR (Player Value) based on OBSERVABLE season performance.
+
+        This metric reflects player value based purely on their statistical output - like real-world WAR.
+        It does NOT apply internal simulation adjustment factors (age, injury, streak) because those
+        already influenced the in-game performance that produced these stats.
 
         Formula components:
         - Batters: Offensive value based on wOBA vs league average, scaled by PA
         - Pitchers: Run prevention value based on FIP vs league average, scaled by IP
-        - Adjustments: Age performance, injury performance impact, games lost to injury
+
+        Design Philosophy:
+        - Adjustment factors affect IN-GAME performance (at-bats, pitching)
+        - WAR measures the RESULTS of those performances (observable stats)
+        - Applying adjustments to WAR would be double-counting
 
         Results stored in 'Sim_WAR' column for both batting and pitching dataframes.
 
@@ -706,27 +712,8 @@ class BaseballStats:
             runs_above_avg = ((woba - league_woba) / 1.15) * plate_appearances
 
             # Convert runs to wins (~10 runs = 1 WAR)
-            base_war = runs_above_avg / 10.0
-
-            # Apply adjustments
-            # 1. Age adjustment (already calculated in preprocessing)
-            age_factor = 1.0 + batting_df['Age_Adjustment']
-
-            # 2. Injury performance adjustment (reduces performance if recovering from injury)
-            injury_perf_factor = 1.0 + batting_df['Injury_Perf_Adj']
-
-            # 3. Injury rate adjustment (players more prone to injury are less valuable)
-            # Reduce value by injury_rate_adj percentage
-            injury_rate_factor = 1.0 - (batting_df['Injury_Rate_Adj'] * 0.5)  # 50% weight
-
-            # 4. Games missed adjustment (currently injured players have 0 value for missed games)
-            # Estimate games played based on G column vs expected (assume 162 game season)
-            games_played = batting_df['G']
-            # Expected value: adjust WAR proportionally for games missed to injury
-            # But don't double-count current injury status - focus on games already missed
-
-            # Combine all factors
-            sim_war = base_war * age_factor * injury_perf_factor * injury_rate_factor
+            # This is the final WAR - based purely on observable stats
+            sim_war = runs_above_avg / 10.0
 
             # Set Sim_WAR column (vectorized)
             batting_df['Sim_WAR'] = np.where(active_batters, sim_war, 0.0)
@@ -742,6 +729,9 @@ class BaseballStats:
 
         # Filter pitchers with playing time
         active_pitchers = pitching_df['IP'] >= 5
+
+        # Debug output for season end
+        logger.info(f'Pitcher WAR calculation: {len(pitching_df)} total pitchers, {active_pitchers.sum()} active (IP >= 5)')
 
         if active_pitchers.sum() > 0:
             # Calculate FIP (Fielding Independent Pitching)
@@ -761,20 +751,8 @@ class BaseballStats:
             runs_prevented = ((league_fip - fip) / 9.0) * pitching_df['IP']
 
             # Convert runs to wins (~10 runs = 1 WAR)
-            base_war = runs_prevented / 10.0
-
-            # Apply adjustments
-            # 1. Age adjustment
-            age_factor = 1.0 + pitching_df['Age_Adjustment']
-
-            # 2. Injury performance adjustment
-            injury_perf_factor = 1.0 + pitching_df['Injury_Perf_Adj']
-
-            # 3. Injury rate adjustment (pitchers prone to injury are less valuable)
-            injury_rate_factor = 1.0 - (pitching_df['Injury_Rate_Adj'] * 0.5)
-
-            # Combine all factors
-            sim_war = base_war * age_factor * injury_perf_factor * injury_rate_factor
+            # This is the final WAR - based purely on observable stats
+            sim_war = runs_prevented / 10.0
 
             # Set Sim_WAR column (vectorized)
             pitching_df['Sim_WAR'] = np.where(active_pitchers, sim_war, 0.0)
@@ -1029,18 +1007,20 @@ def team_pitching_stats(df: DataFrame, filter_stats: bool=True) -> DataFrame:
     """
     # OPTIMIZED: Filter first (creates new df), or copy only if not filtering
     if filter_stats:
-        df = df[(df['IP'] > 0) & (df['AB'] > 0)]  # Boolean indexing creates a new dataframe
+        # For pitchers, only require IP > 0 (not AB, since most pitchers don't bat)
+        df = df[df['IP'] > 0]  # Boolean indexing creates a new dataframe
     else:
         df = df.copy()  # Copy only when not filtering to avoid modifying caller's data
 
     df['AB'] = trunc_col(df['AB'], 0)
     df['IP'] = trunc_col(df['IP'], 2)
-    df['AVG'] = trunc_col(df['H'] / df['AB'], 3)
-    df['OBP'] = trunc_col((df['H'] + df['BB']) / (df['AB'] + df['BB']), 3)
+    # Only calculate batting stats if pitcher has at-bats (NL pitchers, two-way players)
+    df['AVG'] = trunc_col(np.where(df['AB'] > 0, df['H'] / df['AB'], 0), 3)
+    df['OBP'] = trunc_col(np.where(df['AB'] + df['BB'] > 0, (df['H'] + df['BB']) / (df['AB'] + df['BB']), 0), 3)
 
-    # Calculate 'SLG' column
+    # Calculate 'SLG' column (only for pitchers with at-bats)
     slg_numerator = (df['H'] - df['2B'] - df['3B'] - df['HR']) + df['2B'] * 2 + df['3B'] * 3 + df['HR'] * 4
-    df['SLG'] = trunc_col(slg_numerator / df['AB'], 3)
+    df['SLG'] = trunc_col(np.where(df['AB'] > 0, slg_numerator / df['AB'], 0), 3)
     # Calculate 'OPS' column
     df['OPS'] = trunc_col(df['OBP'] + df['SLG'], 3)
     # Calculate 'WHIP' and 'ERA' columns
@@ -1114,21 +1094,25 @@ def fill_nan_with_value(df, column_name, value=0):
 
 def format_positions(pos):
     """
-    Format positions by removing brackets and quotes, but keeping commas.
+    Format positions compactly by removing brackets, quotes, and using slash separator.
     Handles both list and string representations.
-    
+
     :param pos: Position(s) as list or string
-    :return: Formatted string of positions
+    :return: Compact formatted string of positions (e.g., "1B/OF" instead of "1B, OF")
     """
     if isinstance(pos, list):
-        return ", ".join(pos)
+        # Limit to first 3 positions for compactness
+        positions = pos[:3] if len(pos) > 3 else pos
+        return "/".join(positions)
     elif isinstance(pos, str):
         # Check if it looks like a string representation of a list
         if pos.startswith('[') and pos.endswith(']'):
             # Remove brackets and split by comma, then clean up quotes and spaces
             items = pos[1:-1].split(',')
             cleaned_items = [item.strip().strip("'\"") for item in items]
-            return ", ".join(cleaned_items)
+            # Limit to first 3 positions for compactness
+            positions = cleaned_items[:3] if len(cleaned_items) > 3 else cleaned_items
+            return "/".join(positions)
     # Return the original if no formatting is needed
     return pos
 

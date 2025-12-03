@@ -453,8 +453,6 @@ class Game:
             self.game_recap += f'Following team: {team_to_follow}\n'
             self.chatty = True
             self.print_box_score_b = True
-            # if self.interactive:
-            #     pass  # ??? need to handle interactive
         while self.is_game_end() is False:
             self.sim_half_inning()
         self.end_game()

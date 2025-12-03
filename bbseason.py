@@ -364,6 +364,9 @@ class BaseballSeason:
             self.baseball_data.print_current_season(teams=[self.team_to_follow], summary_only_b=False)
         self.baseball_data.print_current_season(teams=self.teams, summary_only_b=not self.season_chatty)
 
+        # Save final season statistics to CSV files
+        self.baseball_data.save_season_stats()
+
         # Perform AI GM end-of-season evaluations
         print(f'\n\n****** AI GM End-of-Season Evaluations ******\n')
         self._perform_gm_evaluations()

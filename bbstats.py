@@ -757,9 +757,15 @@ class BaseballStats:
             # Set Sim_WAR column (vectorized)
             pitching_df['Sim_WAR'] = np.where(active_pitchers, sim_war, 0.0)
 
-            logger.debug('Calculated Sim WAR for pitchers: min={:.2f}, max={:.2f}, avg={:.2f}',
-                       pitching_df['Sim_WAR'].min(), pitching_df['Sim_WAR'].max(),
-                       pitching_df['Sim_WAR'].mean())
+            logger.info(f'League average FIP: {league_fip:.2f}')
+            logger.info(f'Pitcher WAR range: {pitching_df[active_pitchers]["Sim_WAR"].min():.2f} to {pitching_df[active_pitchers]["Sim_WAR"].max():.2f}, avg={pitching_df[active_pitchers]["Sim_WAR"].mean():.2f}')
+
+            # Log a sample pitcher for verification (temporarily store FIP in dataframe)
+            pitching_df['_temp_fip'] = fip
+            sample_pitchers = pitching_df[active_pitchers].nlargest(3, 'IP')
+            for idx, p in sample_pitchers.iterrows():
+                logger.info(f'Sample: {p.get("Player", "Unknown")} - IP:{p["IP"]:.1f} FIP:{p["_temp_fip"]:.2f} WAR:{p["Sim_WAR"]:.2f}')
+            pitching_df.drop(columns=['_temp_fip'], inplace=True)
         else:
             pitching_df['Sim_WAR'] = 0.0
 
@@ -834,6 +840,39 @@ class BaseballStats:
                           summary_only_b=summary_only_b)
         return
 
+    def save_season_stats(self) -> None:
+        """
+        Save final season statistics to CSV files.
+        Creates files: {new_season} Final-Season-stats-pp-Batting.csv and
+                      {new_season} Final-Season-stats-pp-Pitching.csv
+        :return: None
+        """
+        # Calculate final stats for both batting and pitching
+        final_batting_data = team_batting_stats(
+            self.new_season_batting_data[self.new_season_batting_data['AB'] > 0].fillna(0),
+            filter_stats=False
+        )
+        final_pitching_data = team_pitching_stats(
+            self.new_season_pitching_data[self.new_season_pitching_data['IP'] > 0].fillna(0),
+            filter_stats=False
+        )
+
+        # Create file names
+        batting_filename = f"{self.new_season} Final-Season-stats-pp-Batting.csv"
+        pitching_filename = f"{self.new_season} Final-Season-stats-pp-Pitching.csv"
+
+        # Save to CSV files
+        final_batting_data.to_csv(batting_filename, index=True, index_label='Hashcode')
+        final_pitching_data.to_csv(pitching_filename, index=True, index_label='Hashcode')
+
+        logger.info(f'Saved final season batting stats to {batting_filename}')
+        logger.info(f'Saved final season pitching stats to {pitching_filename}')
+        print(f'\nFinal season statistics saved to:')
+        print(f'  - {batting_filename}')
+        print(f'  - {pitching_filename}')
+
+        return
+
     def print_season(self, df_b: DataFrame, df_p: DataFrame, teams: List[str],
                      summary_only_b: bool = False, condition_text: bool = True) -> None:
         """
@@ -859,10 +898,10 @@ class BaseballStats:
         # Rename 'Injured Days' to 'Estimated Days Remaining' for pitchers
         if 'Injured Days' in df_p_display.columns:
             df_p_display = df_p_display.rename(columns={'Injured Days': 'Estimated Days Remaining'})
-        
+
         # Rename index to remove the separate "Hashcode" line
         df_p_display = df_p_display.rename_axis(None)
-        
+
         df_totals = team_pitching_totals(df_p_display)
         if summary_only_b is False:
             print(df_p_display[self.pcols_to_print].to_string(justify='right', index_names=False))  # print entire team
@@ -876,14 +915,14 @@ class BaseballStats:
         # Rename 'Injured Days' to 'Estimated Days Remaining' for batters
         if 'Injured Days' in df_b_display.columns:
             df_b_display = df_b_display.rename(columns={'Injured Days': 'Estimated Days Remaining'})
-        
+
         # Format positions to remove brackets and quotes, but keep commas
         if 'Pos' in df_b_display.columns:
             df_b_display['Pos'] = df_b_display['Pos'].apply(format_positions)
-        
+
         # Rename index to remove the separate "Hashcode" line
         df_b_display = df_b_display.rename_axis(None)
-        
+
         df_totals = team_batting_totals(df_b_display)
         if summary_only_b is False:
             print(df_b_display[self.bcols_to_print].to_string(justify='right', index_names=False))  # print entire team

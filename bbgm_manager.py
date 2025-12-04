@@ -100,6 +100,7 @@ class PlayerValue:
         total_value: Combined weighted value (immediate + future)
         immediate_value: Current season value (Sim_WAR based)
         future_value: Age-adjusted projected value
+        sim_war: Raw Sim_WAR value (unadjusted)
         salary: Annual salary
         value_per_dollar: Total value divided by salary
         age: Player age
@@ -112,6 +113,7 @@ class PlayerValue:
     total_value: float
     immediate_value: float
     future_value: float
+    sim_war: float
     salary: float
     value_per_dollar: float
     age: int
@@ -284,6 +286,9 @@ class PlayerValuation:
         else:
             position = str(pos) if pos else ('P' if is_pitcher else 'Unknown')
 
+        # Get raw Sim_WAR value
+        sim_war = player_row.get('Sim_WAR', 0.0)
+
         # Calculate immediate value (current season)
         immediate_value = self._calculate_immediate_value(player_row, team_games_played, is_pitcher)
 
@@ -305,6 +310,7 @@ class PlayerValuation:
             total_value=total_value,
             immediate_value=immediate_value,
             future_value=future_value,
+            sim_war=sim_war,
             salary=salary,
             value_per_dollar=value_per_dollar,
             age=age,
@@ -736,14 +742,18 @@ class AIGeneralManager:
                 recommendations['release'].append({
                     'player': player.player_name,
                     'reason': f"Below replacement level (value={player.total_value:.2f})",
-                    'savings': player.salary
+                    'savings': player.salary,
+                    'sim_war': player.sim_war,
+                    'immediate_value': player.immediate_value
                 })
             # Also release highly negative value players even with higher salaries (salary dumps)
             elif player.total_value < -0.5 and player.salary <= 5_000_000:
                 recommendations['release'].append({
                     'player': player.player_name,
                     'reason': f"Negative value ({player.total_value:.2f}) hurting team, salary dump at ${player.salary/1e6:.1f}M",
-                    'savings': player.salary
+                    'savings': player.salary,
+                    'sim_war': player.sim_war,
+                    'immediate_value': player.immediate_value
                 })
 
         return recommendations
@@ -886,8 +896,8 @@ class AIGeneralManager:
 
         for i, player in enumerate(all_players[:5], 1):
             print(f"{i}. {player.player_name:20s} ({player.position:5s}, Age {player.age:2d}): "
-                  f"Value={player.total_value:5.2f} (Current={player.immediate_value:4.2f} WAR, "
-                  f"Future Avg={player.future_value:4.2f} WAR/yr) ${player.salary/1e6:6.2f}M")
+                  f"Value={player.total_value:5.2f} (Sim_WAR={player.sim_war:4.2f}, Current={player.immediate_value:4.2f}, "
+                  f"Future Avg={player.future_value:4.2f}/yr) ${player.salary/1e6:6.2f}M")
         print()
 
         # Trade recommendations
@@ -913,7 +923,8 @@ class AIGeneralManager:
         if recommendations['release']:
             print("RELEASE CANDIDATES:")
             for i, release in enumerate(recommendations['release'][:3], 1):
-                print(f"{i}. {release['player']:20s} - {release['reason']}")
+                print(f"{i}. {release['player']:20s} - Sim_WAR: {release.get('sim_war', 0.0):4.2f}, Value: {release.get('immediate_value', 0.0):4.2f}")
+                print(f"   {release['reason']}")
             print()
 
         print(f"{'='*60}\n")
@@ -1000,7 +1011,8 @@ class AIGeneralManager:
         if recommendations['release']:
             print("ROSTER CUTS:")
             for i, release in enumerate(recommendations['release'][:3], 1):
-                print(f"  {i}. {release['player']:20s} - {release['reason']}")
+                print(f"  {i}. {release['player']:20s} - Sim_WAR: {release.get('sim_war', 0.0):4.2f}, Value: {release.get('immediate_value', 0.0):4.2f}")
+                print(f"     {release['reason']}")
             print()
 
         print(f"{'='*70}")
@@ -1043,7 +1055,7 @@ class AIGeneralManager:
 
         for i, player in enumerate(all_players[:5], 1):
             print(f"{i}. {player.player_name:20s} ({player.position:5s}, Age {player.age:2d})")
-            print(f"   {player.immediate_value:4.1f} WAR - Key contributor to the team's success")
+            print(f"   Sim_WAR: {player.sim_war:4.1f}, Value: {player.immediate_value:4.1f} - Key contributor to the team's success")
 
     def _highlight_disappointments(self, roster_values: Dict) -> None:
         """Highlight underperforming players or areas of concern."""
@@ -1060,8 +1072,8 @@ class AIGeneralManager:
             for i, player in enumerate(disappointments[:5], 1):
                 value_per_m = player.immediate_value / (player.salary / 1_000_000)
                 print(f"{i}. {player.player_name:20s} ({player.position:5s}, Age {player.age:2d})")
-                print(f"   {player.immediate_value:4.1f} WAR on ${player.salary/1e6:.1f}M salary "
-                      f"({value_per_m:.2f} WAR per $M)")
+                print(f"   Sim_WAR: {player.sim_war:4.1f}, Value: {player.immediate_value:4.1f} on ${player.salary/1e6:.1f}M salary "
+                      f"({value_per_m:.2f} Value per $M)")
         else:
             print("No major disappointments - most players performed to expectations.")
 

@@ -707,17 +707,31 @@ class BaseballStats:
             # League average wOBA (calculate from all active batters)
             league_woba = np.mean(woba[active_batters])
 
-            # Offensive runs above average: ((wOBA - lgAvg) / 1.15) * PA
+            # Replacement level wOBA (roughly 0.020 below league average)
+            # This matches real WAR methodology which compares to replacement level, not average
+            replacement_woba = league_woba - 0.020
+
+            # Offensive runs above replacement: ((wOBA - replacement) / 1.15) * PA
             # 1.15 is wOBA scale factor to convert to runs
-            runs_above_avg = ((woba - league_woba) / 1.15) * plate_appearances
+            runs_above_replacement = ((woba - replacement_woba) / 1.15) * plate_appearances
 
             # Convert runs to wins (~10 runs = 1 WAR)
-            # This is the final WAR - based purely on observable stats
-            sim_war = runs_above_avg / 10.0
+            # This is the base offensive WAR - based purely on observable offensive stats
+            sim_war = runs_above_replacement / 10.0
+
+            # Add Def_WAR if it exists (captures defense/baserunning from prior season)
+            if 'Def_WAR' in batting_df.columns:
+                # Def_WAR is a per-season value from prior year, scale by games played
+                games_played = batting_df['G']
+                # Scale Def_WAR by participation rate (G/162)
+                scaled_def_war = batting_df['Def_WAR'] * (games_played / 162.0)
+                sim_war = sim_war + scaled_def_war
 
             # Set Sim_WAR column (vectorized)
             batting_df['Sim_WAR'] = np.where(active_batters, sim_war, 0.0)
 
+            logger.debug('League average wOBA: {:.3f}, Replacement level wOBA: {:.3f}',
+                       league_woba, replacement_woba)
             logger.debug('Calculated Sim WAR for batters: min={:.2f}, max={:.2f}, avg={:.2f}',
                        batting_df['Sim_WAR'].min(), batting_df['Sim_WAR'].max(),
                        batting_df['Sim_WAR'].mean())
@@ -746,18 +760,32 @@ class BaseballStats:
             # League average FIP
             league_fip = np.mean(fip[active_pitchers])
 
-            # Runs prevented above average: ((lgFIP - playerFIP) / 9) * IP
+            # Replacement level FIP (roughly 1.0 runs per 9 IP worse than league average)
+            # This matches real WAR methodology which compares to replacement level, not average
+            replacement_fip = league_fip + 1.0
+
+            # Runs prevented above replacement: ((replacementFIP - playerFIP) / 9) * IP
             # Divide by 9 to convert from per-9-innings rate to per-inning rate
-            runs_prevented = ((league_fip - fip) / 9.0) * pitching_df['IP']
+            runs_above_replacement = ((replacement_fip - fip) / 9.0) * pitching_df['IP']
 
             # Convert runs to wins (~10 runs = 1 WAR)
-            # This is the final WAR - based purely on observable stats
-            sim_war = runs_prevented / 10.0
+            # This is the base pitching WAR - based purely on observable pitching stats
+            sim_war = runs_above_replacement / 10.0
+
+            # Add Def_WAR if it exists (captures fielding from prior season)
+            # Note: For pitchers, Def_WAR is typically small (fielding by pitcher)
+            if 'Def_WAR' in pitching_df.columns:
+                # Def_WAR is a per-season value from prior year, scale by games/IP
+                games_played = pitching_df['G']
+                # Scale Def_WAR by participation rate (G/35 for starters, G/70 for relievers)
+                # Use simplified scaling: G/50 as middle ground
+                scaled_def_war = pitching_df['Def_WAR'] * (games_played / 50.0)
+                sim_war = sim_war + scaled_def_war
 
             # Set Sim_WAR column (vectorized)
             pitching_df['Sim_WAR'] = np.where(active_pitchers, sim_war, 0.0)
 
-            logger.info(f'League average FIP: {league_fip:.2f}')
+            logger.info(f'League average FIP: {league_fip:.2f}, Replacement level FIP: {replacement_fip:.2f}')
             logger.info(f'Pitcher WAR range: {pitching_df[active_pitchers]["Sim_WAR"].min():.2f} to {pitching_df[active_pitchers]["Sim_WAR"].max():.2f}, avg={pitching_df[active_pitchers]["Sim_WAR"].mean():.2f}')
 
             # Log a sample pitcher for verification (temporarily store FIP in dataframe)

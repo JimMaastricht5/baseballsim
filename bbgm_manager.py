@@ -539,7 +539,7 @@ class AIGeneralManager:
         return False
 
     def assess_roster(self, baseball_stats, team_record: Tuple[int, int],
-                     games_back: float, games_played: int) -> Dict:
+                     games_back: float, games_played: int, should_print: bool = True) -> Dict:
         """
         Perform comprehensive roster assessment and generate recommendations.
 
@@ -548,6 +548,7 @@ class AIGeneralManager:
             team_record: Tuple of (wins, losses)
             games_back: Games behind division/wildcard leader
             games_played: Games into season
+            should_print: Whether to print assessment summary to console
 
         Returns:
             Dictionary with assessment results and recommendations
@@ -576,8 +577,9 @@ class AIGeneralManager:
             roster_values, strategy, baseball_stats
         )
 
-        # Step 4: Print summary
-        self._print_assessment_summary(strategy, roster_values, recommendations)
+        # Step 4: Print summary (conditional)
+        if should_print:
+            self._print_assessment_summary(strategy, roster_values, recommendations)
 
         return {
             'strategy': strategy,
@@ -930,7 +932,8 @@ class AIGeneralManager:
         print(f"{'='*60}\n")
 
     def perform_end_of_season_evaluation(self, baseball_stats, team_record: Tuple[int, int],
-                                         final_standing: int, total_teams: int, games_back: float) -> None:
+                                         final_standing: int, total_teams: int, games_back: float,
+                                         should_print: bool = True) -> None:
         """
         Perform comprehensive end-of-season team evaluation and print to console.
 
@@ -943,29 +946,16 @@ class AIGeneralManager:
             final_standing: Team's final standing (1 = first place, etc.)
             total_teams: Total number of teams in league
             games_back: Games back from division leader
+            should_print: Whether to print evaluation to console
         """
         wins, losses = team_record
         win_pct = wins / (wins + losses) if (wins + losses) > 0 else 0.500
         games_played = wins + losses
 
-        print(f"\n{'='*70}")
-        print(f"END OF SEASON EVALUATION: {self.team_name}")
-        print(f"{'='*70}")
-        print(f"Final Record: {wins}-{losses} ({win_pct:.3f})")
-        print(f"Final Standing: {final_standing} of {total_teams}")
-        print(f"Games Back: {games_back:.1f}")
-        print()
-
         # Calculate final strategy
         strategy = self.strategy_calculator.calculate_alpha(
             team_record, games_back, games_played
         )
-
-        # Season Assessment
-        print("SEASON ASSESSMENT:")
-        print("-" * 70)
-        self._evaluate_season_success(wins, losses, final_standing, total_teams)
-        print()
 
         # Calculate final Sim WAR to get updated player values
         baseball_stats.calculate_sim_war()
@@ -973,51 +963,67 @@ class AIGeneralManager:
         # Value all players with final season stats
         roster_values = self._value_roster(baseball_stats, strategy.alpha, games_played)
 
-        # Top Performers
-        print("TOP PERFORMERS THIS SEASON:")
-        print("-" * 70)
-        self._highlight_top_performers(roster_values)
-        print()
-
-        # Disappointments
-        print("UNDERPERFORMERS / CONCERNS:")
-        print("-" * 70)
-        self._highlight_disappointments(roster_values)
-        print()
-
-        # Offseason Strategy
-        print("OFFSEASON STRATEGY:")
-        print("-" * 70)
-        self._outline_offseason_priorities(strategy, roster_values)
-        print()
-
         # Offseason Moves
         recommendations = self._generate_recommendations(
             roster_values, strategy, baseball_stats
         )
 
-        if recommendations['trade_away']:
-            print("PLAYERS TO SHOP THIS OFFSEASON:")
-            for i, trade in enumerate(recommendations['trade_away'][:5], 1):
-                print(f"  {i}. {trade['player']:20s} - {trade['reason']}")
+        # Only print if should_print is True
+        if should_print:
+            print(f"\n{'='*70}")
+            print(f"END OF SEASON EVALUATION: {self.team_name}")
+            print(f"{'='*70}")
+            print(f"Final Record: {wins}-{losses} ({win_pct:.3f})")
+            print(f"Final Standing: {final_standing} of {total_teams}")
+            print(f"Games Back: {games_back:.1f}")
             print()
 
-        if recommendations.get('specific_targets'):
-            print("OFFSEASON ACQUISITION TARGETS:")
-            for i, target in enumerate(recommendations['specific_targets'][:5], 1):
-                print(f"  {i}. {target['player']:20s} ({target['team']}, Age {target['age']}) - {target['reason']}")
+            # Season Assessment
+            print("SEASON ASSESSMENT:")
+            print("-" * 70)
+            self._evaluate_season_success(wins, losses, final_standing, total_teams)
             print()
 
-        if recommendations['release']:
-            print("ROSTER CUTS:")
-            for i, release in enumerate(recommendations['release'][:3], 1):
-                print(f"  {i}. {release['player']:20s} - Sim_WAR: {release.get('sim_war', 0.0):4.2f}, Value: {release.get('immediate_value', 0.0):4.2f}")
-                print(f"     {release['reason']}")
+            # Top Performers
+            print("TOP PERFORMERS THIS SEASON:")
+            print("-" * 70)
+            self._highlight_top_performers(roster_values)
             print()
 
-        print(f"{'='*70}")
-        print(f"End of {self.team_name} Evaluation")
-        print(f"{'='*70}\n")
+            # Disappointments
+            print("UNDERPERFORMERS / CONCERNS:")
+            print("-" * 70)
+            self._highlight_disappointments(roster_values)
+            print()
+
+            # Offseason Strategy
+            print("OFFSEASON STRATEGY:")
+            print("-" * 70)
+            self._outline_offseason_priorities(strategy, roster_values)
+            print()
+
+            if recommendations['trade_away']:
+                print("PLAYERS TO SHOP THIS OFFSEASON:")
+                for i, trade in enumerate(recommendations['trade_away'][:5], 1):
+                    print(f"  {i}. {trade['player']:20s} - {trade['reason']}")
+                print()
+
+            if recommendations.get('specific_targets'):
+                print("OFFSEASON ACQUISITION TARGETS:")
+                for i, target in enumerate(recommendations['specific_targets'][:5], 1):
+                    print(f"  {i}. {target['player']:20s} ({target['team']}, Age {target['age']}) - {target['reason']}")
+                print()
+
+            if recommendations['release']:
+                print("ROSTER CUTS:")
+                for i, release in enumerate(recommendations['release'][:3], 1):
+                    print(f"  {i}. {release['player']:20s} - Sim_WAR: {release.get('sim_war', 0.0):4.2f}, Value: {release.get('immediate_value', 0.0):4.2f}")
+                    print(f"     {release['reason']}")
+                print()
+
+            print(f"{'='*70}")
+            print(f"End of {self.team_name} Evaluation")
+            print(f"{'='*70}\n")
 
     def _evaluate_season_success(self, wins: int, losses: int, standing: int, total_teams: int) -> None:
         """Evaluate whether the season was a success or disappointment."""

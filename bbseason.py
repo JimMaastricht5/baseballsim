@@ -290,6 +290,18 @@ class BaseballSeason:
 
         return games_back
 
+    def _get_teams_to_print(self) -> Optional[List[str]]:
+        """
+        Get list of teams to print AI GM output for.
+        Returns None to print all teams, or a list of team names to print.
+        """
+        if self.team_to_follow is None or self.team_to_follow == '':
+            return None  # Print all teams
+        elif isinstance(self.team_to_follow, list):
+            return self.team_to_follow  # Already a list
+        else:
+            return [self.team_to_follow]  # Convert string to list
+
     def check_gm_assessments(self) -> None:
         """
         Check if any teams have reached GM assessment milestones (30, 60, 90, 120, 150 games).
@@ -308,6 +320,9 @@ class BaseballSeason:
         with self.baseball_data.semaphore:
             self.baseball_data.calculate_sim_war()
 
+        # Determine which teams to print
+        teams_to_print = self._get_teams_to_print()
+
         for team_name, gm in self.gm_managers.items():
             games_played = self.team_games_played[team_name]
 
@@ -320,13 +335,17 @@ class BaseballSeason:
                 # Calculate games back
                 games_back = self.calculate_games_back(team_name)
 
+                # Determine if this team should print
+                should_print = teams_to_print is None or team_name in teams_to_print
+
                 # Run GM assessment
                 logger.info(f"Running GM assessment for {team_name} after {games_played} games")
                 assessment = gm.assess_roster(
                     baseball_stats=self.baseball_data,
                     team_record=(wins, losses),
                     games_back=games_back,
-                    games_played=games_played
+                    games_played=games_played,
+                    should_print=should_print
                 )
 
                 # Could store assessment for later analysis
@@ -399,6 +418,9 @@ class BaseballSeason:
         team_standings = {s['team']: idx + 1 for idx, s in enumerate(standings)}
         total_teams = len(standings)
 
+        # Determine which teams to print
+        teams_to_print = self._get_teams_to_print()
+
         # Perform evaluation for each GM (only for teams with valid standings)
         for team_name, gm in self.gm_managers.items():
             if team_name in team_standings and team_name in self.team_win_loss:
@@ -406,12 +428,16 @@ class BaseballSeason:
                 record = self.team_win_loss[team_name]
                 games_back = self.calculate_games_back(team_name)
 
+                # Determine if this team should print
+                should_print = teams_to_print is None or team_name in teams_to_print
+
                 gm.perform_end_of_season_evaluation(
                     baseball_stats=self.baseball_data,
                     team_record=(record[0], record[1]),
                     final_standing=standing,
                     total_teams=total_teams,
-                    games_back=games_back
+                    games_back=games_back,
+                    should_print=should_print
                 )
 
         # Print all player stats after GM evaluations
@@ -655,13 +681,13 @@ if __name__ == '__main__':
 
     # multiple seasons for majors and minors of random league
     if fantasy:
-        my_teams_to_follow = 'AUG'
+        my_team_to_follow = 'AUG'
         bbseasonMS = MultiBaseballSeason(load_seasons=[2023, 2024, 2025], new_season=2026,
                                          season_length=num_games, series_length=3, rotation_len=5,
                                          majors_minors=['ACB', 'NBL'],
                                          season_interactive=interactive,
                                          season_chatty=False, season_print_lineup_b=False,
-                                         season_print_box_score_b=False, season_team_to_follow=my_teams_to_follow,
+                                         season_print_box_score_b=False, season_team_to_follow=my_team_to_follow,
                                          load_batter_file='aggr-stats-pp-Batting.csv',
                                          load_pitcher_file='aggr-stats-pp-Pitching.csv')
         bbseasonMS.sim_start()
@@ -670,8 +696,10 @@ if __name__ == '__main__':
 
     # handle a single full season of MLB
     if not fantasy:
-        # my_teams_to_follow ='MIL'  # or None
-        my_teams_to_follow = None
+        my_team_to_follow ='MIL'  # or None
+        # my_team_to_follow = None
+
+        # set a series schedule if you just want to simulate a playoff series or use the team_list param
         # series_schedule = [[['LAD', 'TOR']], [['LAD', 'TOR']],
         #                    [['TOR', 'LAD']], [['TOR', 'LAD']],
         #                    [['TOR', 'LAD']], [['LAD', 'TOR']],[['LAD', 'TOR']]]
@@ -679,7 +707,7 @@ if __name__ == '__main__':
                                     season_length=num_games, series_length=7, rotation_len=5,
                                     season_interactive=interactive,
                                     season_chatty=False, season_print_lineup_b=False,
-                                    season_print_box_score_b=False, season_team_to_follow=my_teams_to_follow,
+                                    season_print_box_score_b=False, season_team_to_follow=my_team_to_follow,
                                     load_batter_file='aggr-stats-pp-Batting.csv',  # 'random-aggr-stats-pp-Batting.csv',
                                     load_pitcher_file='aggr-stats-pp-Pitching.csv')
                                     # schedule=series_schedule)

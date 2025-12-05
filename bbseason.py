@@ -670,7 +670,7 @@ class MultiBaseballSeason:
 if __name__ == '__main__':
     # Configure logger level - change to "DEBUG" for more detailed logs
     from bblogger import configure_logger
-    configure_logger("INFO")
+    configure_logger("WARNING")
     
     start_time = datetime.datetime.now()
 

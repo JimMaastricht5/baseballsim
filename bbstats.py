@@ -100,7 +100,6 @@ class BaseballStats:
         self.bcols_to_print = ['Player', 'League', 'Team', 'Pos', 'Age', 'G', 'AB', 'R', 'H', '2B', '3B', 'HR', 'RBI',
                                'SB', 'CS', 'BB', 'SO', 'SH', 'SF', 'HBP', 'AVG', 'OBP', 'SLG',
                                'OPS', 'Sim_WAR', 'Status', 'Estimated Days Remaining', 'Injury Description', 'Streak Status', 'Condition']
-        self.injury_cols_to_print = ['Player', 'Team', 'Age', 'Status', 'Estimated Days Remaining', 'Injury Description']  # Days Remaining to see time
         self.include_leagues = include_leagues
         logger.debug("Initializing BaseballStats with seasons: {}", load_seasons)
         self.load_seasons = [load_seasons] if not isinstance(load_seasons, list) else load_seasons
@@ -481,23 +480,38 @@ class BaseballStats:
         self.new_season_pitching_data['Status'] = get_status_vectorized(self.new_season_pitching_data, True)
         self.new_season_batting_data['Status'] = get_status_vectorized(self.new_season_batting_data, False)
 
-        # Print the disabled lists
+        # Print the disabled lists in compact format
         print(f'Season Disabled Lists:')
-        if self.new_season_pitching_data[self.new_season_pitching_data["Injured Days"] > 0].shape[0] > 0:
-            df = self.new_season_pitching_data[self.new_season_pitching_data["Injured Days"] > 0]
-            df = df.rename(columns={'Injured Days': 'Estimated Days Remaining'})
-            # Remove the index name to avoid the separate "Hashcode" line
-            df = df.rename_axis(None)
-            print(f'{df[self.injury_cols_to_print].to_string(justify="right", index_names=False)}\n')
-        if self.new_season_batting_data[self.new_season_batting_data["Injured Days"] > 0].shape[0] > 0:
-            df = self.new_season_batting_data[self.new_season_batting_data["Injured Days"] > 0]
-            df = df.rename(columns={'Injured Days': 'Estimated Days Remaining'})
-            # Format positions to remove brackets and quotes, but keep commas
-            if 'Pos' in df.columns:
-                df['Pos'] = df['Pos'].apply(format_positions)
-            # Remove the index name to avoid the separate "Hashcode" line
-            df = df.rename_axis(None)
-            print(f'{df[self.injury_cols_to_print].to_string(justify="right", index_names=False)}\n')
+
+        # Helper function to print injuries by IL type
+        def print_injuries_by_il_type(df, player_type='Pitchers'):
+            if df[df["Injured Days"] > 0].shape[0] == 0:
+                return
+
+            injured_df = df[df["Injured Days"] > 0].copy()
+            print(f'\n{player_type}:')
+
+            # Group by Status (IL type)
+            for il_type in ['60-Day IL', '15-Day IL', '10-Day IL', '7-Day IL']:
+                il_group = injured_df[injured_df['Status'] == il_type]
+                if il_group.shape[0] > 0:
+                    count = il_group.shape[0]
+                    # Build compact list: Player(TEAM) - Injury
+                    injury_list = []
+                    for idx, row in il_group.iterrows():
+                        player = row['Player']
+                        team = row['Team']
+                        injury = row['Injury Description']
+                        injury_list.append(f"{player}({team}) - {injury}")
+
+                    # Print in compact format
+                    print(f"  {il_type} ({count}): {', '.join(injury_list)}")
+
+        # Print pitchers and batters
+        print_injuries_by_il_type(self.new_season_pitching_data, 'Pitchers')
+        print_injuries_by_il_type(self.new_season_batting_data, 'Batters')
+        print()  # Add blank line after injury lists
+
         return
 
     def print_hot_cold_players(self, teams_to_follow: Optional[List[str]] = None) -> None:
@@ -561,8 +575,8 @@ class BaseballStats:
         Injured players' streaks are frozen until they return to action.
 
         Logic:
-        - Small random walk: ±0.5% to ±1.5% per game (mean 0%, std 0.005)
-        - Regression to mean: Pull streak toward 0 by 2% of current value
+        - Small random walk: ±0.4% to ±1.2% per game (mean 0%, std 0.004, reduced from 0.005)
+        - Regression to mean: Pull streak toward 0 by 4% of current value (increased from 2%)
         - Bounds checking: Enforce -10% to +10% limits
 
         VECTORIZED: Processes all active players at once for ~20-100x speedup
@@ -576,11 +590,11 @@ class BaseballStats:
             # Get current streaks for active pitchers
             current_streaks = self.new_season_pitching_data.loc[active_pitchers, 'Streak_Adjustment']
 
-            # Generate all random changes at once
-            random_changes = np.random.normal(loc=0.0, scale=0.005, size=n_active_pitchers)
+            # Generate all random changes at once (reduced volatility: 0.005 -> 0.004)
+            random_changes = np.random.normal(loc=0.0, scale=0.004, size=n_active_pitchers)
 
-            # Vectorized regression calculation
-            regression = -0.02 * current_streaks
+            # Vectorized regression calculation (increased regression: 0.02 -> 0.04)
+            regression = -0.04 * current_streaks
 
             # Calculate new streaks and enforce bounds
             new_streaks = np.clip(current_streaks + random_changes + regression, -0.10, 0.10)
@@ -594,8 +608,8 @@ class BaseballStats:
 
         if n_active_batters > 0:
             current_streaks = self.new_season_batting_data.loc[active_batters, 'Streak_Adjustment']
-            random_changes = np.random.normal(loc=0.0, scale=0.005, size=n_active_batters)
-            regression = -0.02 * current_streaks
+            random_changes = np.random.normal(loc=0.0, scale=0.004, size=n_active_batters)
+            regression = -0.04 * current_streaks
             new_streaks = np.clip(current_streaks + random_changes + regression, -0.10, 0.10)
             self.new_season_batting_data.loc[active_batters, 'Streak_Adjustment'] = new_streaks
 

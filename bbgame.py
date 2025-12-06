@@ -29,7 +29,7 @@ import random
 import bbbaserunners
 import datetime
 from pandas.core.series import Series
-from typing import List, Tuple
+from typing import List, Tuple, Optional
 import queue
 from bblogger import logger
 
@@ -41,6 +41,7 @@ class Game:
     def __init__(self, away_team_name: str = '', home_team_name: str = '', baseball_data=None,
                  game_num: int = 1, rotation_len: int = 5,
                  print_lineup: bool = False, chatty: bool = False, print_box_score_b: bool = False,
+                 team_to_follow: Optional[List[str]] = None,
                  load_seasons: List[int] = 2025, new_season: int = 2026,
                  starting_pitchers: None = None, starting_lineups: None = None,
                  load_batter_file: str = 'player-stats-Batters.csv',
@@ -56,6 +57,7 @@ class Game:
         :param print_lineup: true will print the lineup prior to the game
         :param chatty: prints more output to console
         :param print_box_score_b: true prints the final box score
+        :param team_to_follow: list of team abbreviations to follow in detail (enables print_lineup, chatty, print_box_score_b)
         :param load_seasons: list of integers with years of prior season being used to calc probabilities
         :param new_season: int of new season year
         :param starting_pitchers: optional hashcode for the starting pitchers in a list form [away, home]
@@ -81,8 +83,28 @@ class Game:
             self.team_names = random.sample(list(self.baseball_data.batting_data.Team.unique()), 2)
         self.game_num = game_num  # number of games into season
         self.rotation_len = rotation_len  # number of starting pitchers to rotate over
+
+        # Check if this game involves a team to follow and control detailed output
+        team_to_follow = team_to_follow if team_to_follow is not None else []
+        is_followed_game = any(team in team_to_follow for team in self.team_names)
+
+        # If team_to_follow list is not empty, only show details for followed teams' games
+        if len(team_to_follow) > 0:
+            if is_followed_game:
+                print_lineup = True
+                chatty = True
+                print_box_score_b = True
+            else:
+                # Not a followed game, suppress detailed output
+                print_lineup = False
+                chatty = False
+                print_box_score_b = False
+        # else: use the passed-in flags (season-level defaults)
+
         self.chatty = chatty
         self.print_box_score_b = print_box_score_b
+        self.team_to_follow = team_to_follow
+        self.is_followed_game = is_followed_game
         logger.debug(f"Initializing Game: {away_team_name} vs {home_team_name}, game #{game_num}")
         if starting_pitchers is None:
             starting_pitchers = [None, None]
@@ -213,7 +235,6 @@ class Game:
                 print_line = print_line + f'{str(row_to_col[ii][jj]):>4}'
             self.game_recap += print_line + '\n'
             # print(print_line)
-        self.game_recap += '\n'
         # print('')
         return
 
@@ -437,22 +458,20 @@ class Game:
         if self.print_box_score_b:  # print or not to print...
             self.game_recap += self.teams[AWAY].box_score.print_boxes()
             self.game_recap += self.teams[HOME].box_score.print_boxes()
-        self.game_recap += 'Final:\n'
         self.print_inning_score()
         return
 
     def sim_game(self, team_to_follow: str = '') -> Tuple[List[int], List[int], List[List[int]], str]:
         """
         simulate an entire game
-        :param team_to_follow: three character abbrev of a team that the user is following, prints more detail
+        :param team_to_follow: DEPRECATED - now handled in __init__ via team_to_follow list parameter
         :return: tuple contains a list of total score for each team, inning by inning score and win loss records,
             and the output string
         """
-        self.game_recap += f'{self.team_names[0]} vs. {self.team_names[1]}\n'
-        if team_to_follow in self.team_names:
-            self.game_recap += f'Following team: {team_to_follow}\n'
-            self.chatty = True
-            self.print_box_score_b = True
+        self.game_recap += f'{self.team_names[0]} vs. {self.team_names[1]} - Final:\n'
+        if self.is_followed_game:
+            followed_teams_in_game = [team for team in self.team_names if team in self.team_to_follow]
+            self.game_recap += f'Following team(s): {", ".join(followed_teams_in_game)}\n'
         while self.is_game_end() is False:
             self.sim_half_inning()
         self.end_game()
@@ -461,10 +480,10 @@ class Game:
     def sim_game_threaded(self, q: queue) -> None:
         """
         handles input and output using the queue for multi-threading
-        :param q: queue for data exchange
+        :param q: queue for data exchange (output only, team_to_follow now passed via __init__)
         :return: None
         """
-        g_score, g_innings, g_win_loss, final_game_recap = self.sim_game(team_to_follow=q.get())
+        g_score, g_innings, g_win_loss, final_game_recap = self.sim_game()
         q.put((g_score, g_innings, g_win_loss, self.teams[AWAY].box_score, self.teams[HOME].box_score, final_game_recap))  # results on q
         return
 

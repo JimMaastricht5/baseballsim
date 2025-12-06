@@ -48,7 +48,7 @@ class BaseballSeason:
                  season_length: int = 6, series_length: int = 3,
                  rotation_len: int = 5, include_leagues: list = None, season_interactive: bool = False,
                  season_print_lineup_b: bool = False, season_print_box_score_b: bool = False,
-                 season_chatty: bool = False, season_team_to_follow: str = None,
+                 season_chatty: bool = False, season_team_to_follow: Optional[List[str]] = None,
                  load_batter_file: str = 'aggr-stats-pp-Batting.csv',
                  load_pitcher_file: str = 'aggr-stats-pp-Pitching.csv',
                  schedule: list = None) -> None:
@@ -64,7 +64,7 @@ class BaseballSeason:
         :param season_print_lineup_b: if true print lineups
         :param season_print_box_score_b: if true print box scores
         :param season_chatty: if true provide more detail
-        :param season_team_to_follow: if none skip otherwise follow this team in gory detail
+        :param season_team_to_follow: list of team abbreviations to follow in detail (e.g., ['NYM', 'BOS'])
         :param load_batter_file: name of the file with batter data, year will be added to the front of the text
         :param load_pitcher_file: name of the file for the pitcher data, year will be added to the front of the text
         :return: None
@@ -82,7 +82,7 @@ class BaseballSeason:
         self.print_lineup_b = season_print_lineup_b
         self.print_box_score_b = season_print_box_score_b
         self.season_chatty = season_chatty
-        self.team_to_follow = season_team_to_follow
+        self.team_to_follow = season_team_to_follow if season_team_to_follow is not None else []
         logger.debug("Initializing BaseballSeason with seasons: {}, new season: {}", load_seasons, new_season)
         self.baseball_data = bbstats.BaseballStats(load_seasons=self.load_seasons, new_season=new_season,
                                                    include_leagues=include_leagues, load_batter_file=load_batter_file,
@@ -453,8 +453,8 @@ class BaseballSeason:
         """
         print(self.print_day_schedule(season_day_num))
         todays_games = self.schedule[season_day_num]
-        # Pass team_to_follow as a list (if not None) to show hot/cold players
-        teams_list = [self.team_to_follow] if self.team_to_follow else None
+        # Pass team_to_follow list (if not empty) to show hot/cold players
+        teams_list = self.team_to_follow if len(self.team_to_follow) > 0 else None
         self.baseball_data.new_game_day(teams_to_follow=teams_list)  # update rest, injury, and print lists
         for match_up in todays_games:  # run all games for a day, day starts at zero
             if 'OFF DAY' not in match_up:  # not an off day
@@ -463,8 +463,8 @@ class BaseballSeason:
                                    baseball_data=self.baseball_data, game_num=season_day_num,
                                    rotation_len=self.rotation_len, print_lineup=self.print_lineup_b,
                                    chatty=self.season_chatty, print_box_score_b=self.print_box_score_b,
-                                   interactive=self.interactive)
-                score, inning, win_loss_list, game_recap = game.sim_game(team_to_follow=self.team_to_follow)
+                                   team_to_follow=self.team_to_follow, interactive=self.interactive)
+                score, inning, win_loss_list, game_recap = game.sim_game()
                 self.update_win_loss(away_team_name=match_up[0], home_team_name=match_up[1], win_loss=win_loss_list)
                 print(game_recap)
                 print(f'Final: {match_up[0]} {score[0]} {match_up[1]} {score[1]}')
@@ -485,8 +485,8 @@ class BaseballSeason:
         match_ups = []
         print(self.print_day_schedule(season_day_num) + '\n')
         todays_games = self.schedule[season_day_num]
-        # Pass team_to_follow as a list (if not None) to show hot/cold players
-        teams_list = [self.team_to_follow] if self.team_to_follow else None
+        # Pass team_to_follow list (if not empty) to show hot/cold players
+        teams_list = self.team_to_follow if len(self.team_to_follow) > 0 else None
         self.baseball_data.new_game_day(teams_to_follow=teams_list)  # update rest, injury, and print lists
         print(f'Simulating day #{season_day_num + 1} for league(s): {self.leagues_str}', end='')  # start sim wait line
         for match_up in todays_games:  # run all games for a day, day starts at zero
@@ -496,9 +496,8 @@ class BaseballSeason:
                                    baseball_data=self.baseball_data, game_num=season_day_num,
                                    rotation_len=self.rotation_len, print_lineup=self.print_lineup_b,
                                    chatty=self.season_chatty, print_box_score_b=self.print_box_score_b,
-                                   interactive=self.interactive)
+                                   team_to_follow=self.team_to_follow, interactive=self.interactive)
                 q = queue.Queue()
-                q.put(self.team_to_follow)
                 thread = threading.Thread(target=game.sim_game_threaded, args=(q,))
                 threads.append(thread)
                 queues.append(q)
@@ -552,7 +551,7 @@ class MultiBaseballSeason:
                  season_length: int = 6, series_length: int = 3,
                  rotation_len: int = 5, majors_minors: list = None, season_interactive: bool = False,
                  season_print_lineup_b: bool = False, season_print_box_score_b: bool = False,
-                 season_chatty: bool = False, season_team_to_follow: str = None,
+                 season_chatty: bool = False, season_team_to_follow: Optional[List[str]] = None,
                  load_batter_file: str = 'stats-pp-Batting.csv',
                  load_pitcher_file: str = 'stats-pp-Pitching.csv') -> None:
         """
@@ -567,7 +566,7 @@ class MultiBaseballSeason:
                 :param season_print_lineup_b: if true print lineups
                 :param season_print_box_score_b: if true print box scores
                 :param season_chatty: if true provide more detail
-                :param season_team_to_follow: if none skip otherwise follow this team in gory detail
+                :param season_team_to_follow: list of team abbreviations to follow in detail (e.g., ['NYM', 'BOS'])
                 :param load_batter_file: name of the file with batter data, year will be added to the front of the text
                 :param load_pitcher_file: name of the file for the pitcher data, year will be added to the front of name
                 :return: None
@@ -589,7 +588,7 @@ class MultiBaseballSeason:
         self.print_lineup_b = season_print_lineup_b
         self.print_box_score_b = season_print_box_score_b
         self.season_chatty = season_chatty
-        self.team_to_follow = season_team_to_follow
+        self.team_to_follow = season_team_to_follow if season_team_to_follow is not None else []
         self.load_batter_file = load_batter_file
         self.load_pitcher_file = load_pitcher_file
         logger.debug("Initializing MultiBaseballSeason with seasons: {}, new season: {}", load_seasons, new_season)
@@ -681,7 +680,7 @@ if __name__ == '__main__':
 
     # multiple seasons for majors and minors of random league
     if fantasy:
-        my_team_to_follow = 'AUG'
+        my_team_to_follow = ['AUG']  # List of teams to follow
         bbseasonMS = MultiBaseballSeason(load_seasons=[2023, 2024, 2025], new_season=2026,
                                          season_length=num_games, series_length=3, rotation_len=5,
                                          majors_minors=['ACB', 'NBL'],
@@ -696,8 +695,8 @@ if __name__ == '__main__':
 
     # handle a single full season of MLB
     if not fantasy:
-        my_team_to_follow ='MIL'  # or None
-        # my_team_to_follow = None
+        my_team_to_follow = ['MIL']  # List of teams to follow, e.g., ['MIL', 'NYM'] for multiple
+        # my_team_to_follow = None  # or set to None for no followed teams
 
         # set a series schedule if you just want to simulate a playoff series or use the team_list param
         # series_schedule = [[['LAD', 'TOR']], [['LAD', 'TOR']],

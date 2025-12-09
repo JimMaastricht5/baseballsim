@@ -162,27 +162,21 @@ class BaseballSeason:
         # Print header
         schedule_str += f'Day {day + 1} Games:\n'
 
-        # Print games in 2 columns
+        # Print games in 5 columns
         if games:
-            mid_point = (len(games) + 1) // 2
-            for i in range(mid_point):
-                left_game = games[i]
-                if i + mid_point < len(games):
-                    right_game = games[i + mid_point]
-                    schedule_str += f'{left_game}   {right_game}\n'
-                else:
-                    schedule_str += f'{left_game}\n'
+            games_per_line = 5
+            for i in range(0, len(games), games_per_line):
+                line_games = games[i:i+games_per_line]
+                schedule_str += '   '.join(line_games) + '\n'
 
         # Print off day at the end
         if game_day_off != '':
-            schedule_str += f'({game_day_off} - Off Day)\n'
-
-        schedule_str += '\n'
+            schedule_str += f'({game_day_off} - Off Day)'
         return schedule_str
 
     def print_standings(self) -> None:
         """
-        print the current standings with GB and Win% in compact 2-column format
+        print the current standings with GB and Win% in compact 3-column format
         :return: None
         """
         teaml, winl, lossl = [], [], []
@@ -209,28 +203,35 @@ class BaseballSeason:
         df['Pct'] = df['Pct'].apply(lambda x: f'{x:.3f}')
         display_df = df[['Team', 'W-L', 'Pct', 'GB']]
 
-        # Split into 2 columns for compact display
+        # Split into 3 columns for compact display
         n_teams = len(display_df)
-        mid_point = (n_teams + 1) // 2
+        teams_per_col = (n_teams + 2) // 3  # Round up to distribute evenly
 
-        left_half = display_df.iloc[:mid_point].reset_index(drop=True)
-        right_half = display_df.iloc[mid_point:].reset_index(drop=True)
+        col1 = display_df.iloc[:teams_per_col].reset_index(drop=True)
+        col2 = display_df.iloc[teams_per_col:teams_per_col*2].reset_index(drop=True)
+        col3 = display_df.iloc[teams_per_col*2:].reset_index(drop=True)
 
         # Print header
-        print(f"{'Team':<5} {'W-L':<8} {'Pct':<6} {'GB':<5}   {'Team':<5} {'W-L':<8} {'Pct':<6} {'GB':<5}")
-        print('-' * 60)
+        print(f"{'Team':<5} {'W-L':<8} {'Pct':<6} {'GB':<5}   {'Team':<5} {'W-L':<8} {'Pct':<6} {'GB':<5}   {'Team':<5} {'W-L':<8} {'Pct':<6} {'GB':<5}")
+        print('-' * 90)
 
         # Print rows side by side
-        for i in range(mid_point):
-            left_row = left_half.iloc[i]
-            left_line = f"{left_row['Team']:<5} {left_row['W-L']:<8} {left_row['Pct']:<6} {left_row['GB']:<5}"
+        for i in range(teams_per_col):
+            line_parts = []
 
-            if i < len(right_half):
-                right_row = right_half.iloc[i]
-                right_line = f"{right_row['Team']:<5} {right_row['W-L']:<8} {right_row['Pct']:<6} {right_row['GB']:<5}"
-                print(f"{left_line}   {right_line}")
-            else:
-                print(left_line)
+            if i < len(col1):
+                row = col1.iloc[i]
+                line_parts.append(f"{row['Team']:<5} {row['W-L']:<8} {row['Pct']:<6} {row['GB']:<5}")
+
+            if i < len(col2):
+                row = col2.iloc[i]
+                line_parts.append(f"{row['Team']:<5} {row['W-L']:<8} {row['Pct']:<6} {row['GB']:<5}")
+
+            if i < len(col3):
+                row = col3.iloc[i]
+                line_parts.append(f"{row['Team']:<5} {row['W-L']:<8} {row['Pct']:<6} {row['GB']:<5}")
+
+            print("   ".join(line_parts))
 
         print('')
         return
@@ -762,7 +763,7 @@ if __name__ == '__main__':
         #                    [['TOR', 'LAD']], [['TOR', 'LAD']],
         #                    [['TOR', 'LAD']], [['LAD', 'TOR']],[['LAD', 'TOR']]]
         bbseasonSS = BaseballSeason(load_seasons=[2023, 2024, 2025], new_season=2026,
-                                    season_length=num_games, series_length=7, rotation_len=5,
+                                    season_length=num_games, series_length=3, rotation_len=5,
                                     season_interactive=interactive,
                                     season_chatty=False, season_print_lineup_b=False,
                                     season_print_box_score_b=False, season_team_to_follow=my_team_to_follow,

@@ -90,15 +90,12 @@ class Game:
 
         # If team_to_follow list is not empty, only show details for followed teams' games
         if len(team_to_follow) > 0:
-            if is_followed_game:
-                print_lineup = True
-                chatty = True
-                print_box_score_b = True
-            else:
+            if not is_followed_game:
                 # Not a followed game, suppress detailed output
                 print_lineup = False
                 chatty = False
                 print_box_score_b = False
+            # else: is_followed_game - use the passed-in flags from season settings
         # else: use the passed-in flags (season-level defaults)
 
         self.chatty = chatty
@@ -258,14 +255,14 @@ class Game:
     @staticmethod
     def format_compact_games(game_summaries: list) -> str:
         """
-        Format multiple game summaries side-by-side (3-4 games per line)
+        Format multiple game summaries side-by-side (5 games per line)
         :param game_summaries: list of dicts from get_compact_summary()
         :return: formatted string with games side-by-side
         """
         if not game_summaries:
             return ''
 
-        games_per_line = 3
+        games_per_line = 5
         game_separator = '     '  # 5 spaces between games
         output = ''
 
@@ -515,17 +512,16 @@ class Game:
         self.print_inning_score()
         return
 
-    def sim_game(self, team_to_follow: str = '') -> Tuple[List[int], List[int], List[List[int]], str]:
+    def sim_game(self) -> Tuple[List[int], List[int], List[List[int]], str]:
         """
         simulate an entire game
-        :param team_to_follow: DEPRECATED - now handled in __init__ via team_to_follow list parameter
         :return: tuple contains a list of total score for each team, inning by inning score and win loss records,
             and the output string
         """
-        self.game_recap += f'{self.team_names[0]} vs. {self.team_names[1]} - Final:\n'
-        if self.is_followed_game:
-            followed_teams_in_game = [team for team in self.team_names if team in self.team_to_follow]
-            self.game_recap += f'Following team(s): {", ".join(followed_teams_in_game)}\n'
+        # self.game_recap += f'{self.team_names[0]} vs. {self.team_names[1]} - Final:\n'
+        # if self.is_followed_game:
+        #     followed_teams_in_game = [team for team in self.team_names if team in self.team_to_follow]
+        #     # self.game_recap += f'Following team(s): {", ".join(followed_teams_in_game)}\n'
         while self.is_game_end() is False:
             self.sim_half_inning()
         self.end_game()

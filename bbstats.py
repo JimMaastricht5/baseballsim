@@ -338,7 +338,7 @@ class BaseballStats:
                 self.new_season_batting_data.loc[batter_indices, 'Condition'] = \
                     batting_box_score.loc[batter_indices, 'Condition']
                 self.new_season_batting_data.loc[batter_indices, 'Injured Days'] = \
-                    batting_box_score.loc[batter_indices, 'Injured Days']
+                    batting_box_score.loc[batter_indices, 'Injured Days'].astype('int64')
 
             # VECTORIZED: Update all pitchers who played in the game at once (no loop!)
             if len(pitching_box_score) > 0:
@@ -352,7 +352,7 @@ class BaseballStats:
                 self.new_season_pitching_data.loc[pitcher_indices, 'Condition'] = \
                     pitching_box_score.loc[pitcher_indices, 'Condition']
                 self.new_season_pitching_data.loc[pitcher_indices, 'Injured Days'] = \
-                    pitching_box_score.loc[pitcher_indices, 'Injured Days']
+                    pitching_box_score.loc[pitcher_indices, 'Injured Days'].astype('int64')
         return
 
     def calculate_per_game_injury_odds(self, age: int, injury_rate: float, injury_rate_adjustment: float) -> float:

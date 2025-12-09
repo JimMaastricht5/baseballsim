@@ -533,47 +533,71 @@ class BaseballStats:
         if not teams_to_follow:
             return
 
-        # Define columns for hot/cold display
-        streak_cols_to_print = ['Player', 'Team', 'Pos/Role', 'Streak Status', 'Streak Value']
-
         # Filter for hot/cold players only (not Normal)
-        hot_cold_pitchers = self.new_season_pitching_data[
-            (self.new_season_pitching_data['Streak_Adjustment'] >= 0.025) |
-            (self.new_season_pitching_data['Streak_Adjustment'] <= -0.025)
+        hot_pitchers = self.new_season_pitching_data[
+            self.new_season_pitching_data['Streak_Adjustment'] >= 0.025
         ].copy()
-
-        hot_cold_batters = self.new_season_batting_data[
-            (self.new_season_batting_data['Streak_Adjustment'] >= 0.025) |
-            (self.new_season_batting_data['Streak_Adjustment'] <= -0.025)
+        cold_pitchers = self.new_season_pitching_data[
+            self.new_season_pitching_data['Streak_Adjustment'] <= -0.025
+        ].copy()
+        hot_batters = self.new_season_batting_data[
+            self.new_season_batting_data['Streak_Adjustment'] >= 0.025
+        ].copy()
+        cold_batters = self.new_season_batting_data[
+            self.new_season_batting_data['Streak_Adjustment'] <= -0.025
         ].copy()
 
         # Filter by teams to follow
-        hot_cold_pitchers = hot_cold_pitchers[hot_cold_pitchers['Team'].isin(teams_to_follow)]
-        hot_cold_batters = hot_cold_batters[hot_cold_batters['Team'].isin(teams_to_follow)]
+        hot_pitchers = hot_pitchers[hot_pitchers['Team'].isin(teams_to_follow)]
+        cold_pitchers = cold_pitchers[cold_pitchers['Team'].isin(teams_to_follow)]
+        hot_batters = hot_batters[hot_batters['Team'].isin(teams_to_follow)]
+        cold_batters = cold_batters[cold_batters['Team'].isin(teams_to_follow)]
 
         # Only print if there are hot/cold players
-        if hot_cold_pitchers.shape[0] > 0 or hot_cold_batters.shape[0] > 0:
-            print(f'Hot & Cold Players:')
+        if (hot_pitchers.shape[0] > 0 or hot_batters.shape[0] > 0 or
+            cold_pitchers.shape[0] > 0 or cold_batters.shape[0] > 0):
 
-            if hot_cold_pitchers.shape[0] > 0:
-                df = hot_cold_pitchers.copy()
-                df['Streak Status'] = df['Streak_Adjustment'].apply(streak_txt_f)
-                df['Streak Value'] = df['Streak_Adjustment'].apply(lambda x: f"{x:+.1%}")
-                df['Pos/Role'] = 'P'  # Pitcher
-                df = df.rename_axis(None)
-                print(f'{df[streak_cols_to_print].to_string(justify="right", index_names=False)}\n')
+            # Print Hot players
+            if hot_pitchers.shape[0] > 0 or hot_batters.shape[0] > 0:
+                print('Hot:')
+                self._print_streak_players(hot_pitchers, hot_batters)
 
-            if hot_cold_batters.shape[0] > 0:
-                df = hot_cold_batters.copy()
-                df['Streak Status'] = df['Streak_Adjustment'].apply(streak_txt_f)
-                df['Streak Value'] = df['Streak_Adjustment'].apply(lambda x: f"{x:+.1%}")
-                if 'Pos' in df.columns:
-                    df['Pos/Role'] = df['Pos'].apply(format_positions)
-                else:
-                    df['Pos/Role'] = ''
-                df = df.rename_axis(None)
-                print(f'{df[streak_cols_to_print].to_string(justify="right", index_names=False)}\n')
+            # Print Cold players
+            if cold_pitchers.shape[0] > 0 or cold_batters.shape[0] > 0:
+                print('Cold:')
+                self._print_streak_players(cold_pitchers, cold_batters)
         return
+
+    def _print_streak_players(self, pitchers: DataFrame, batters: DataFrame) -> None:
+        """
+        Helper method to print hot or cold players in consistent format (one line)
+        :param pitchers: DataFrame of pitchers with streaks
+        :param batters: DataFrame of batters with streaks
+        :return: None
+        """
+        players = []
+
+        # Add pitchers
+        if pitchers.shape[0] > 0:
+            for _, row in pitchers.iterrows():
+                player_name = row['Player']
+                obp_change = f"{row['Streak_Adjustment']:+.1%}"
+                players.append(f"{player_name} (P) {obp_change}")
+
+        # Add batters
+        if batters.shape[0] > 0:
+            for _, row in batters.iterrows():
+                player_name = row['Player']
+                if 'Pos' in row and row['Pos']:
+                    pos = format_positions(row['Pos'])
+                else:
+                    pos = ''
+                obp_change = f"{row['Streak_Adjustment']:+.1%}"
+                players.append(f"{player_name} ({pos}) {obp_change}")
+
+        # Print all players on one line
+        if players:
+            print(', '.join(players) + '\n')
 
     def update_streaks(self) -> None:
         """

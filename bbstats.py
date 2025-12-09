@@ -272,26 +272,38 @@ class BaseballStats:
         self.batting_data[bcols_to_convert] = self.batting_data[bcols_to_convert].astype(float)
         self.new_season_pitching_data[pcols_to_convert] = self.new_season_pitching_data[pcols_to_convert].astype(float)
         self.new_season_batting_data[bcols_to_convert] = self.new_season_batting_data[bcols_to_convert].astype(float)
-        
-        # Add 'Injury Description' column if it doesn't exist
-        if 'Injury Description' not in self.pitching_data.columns:
-            self.pitching_data['Injury Description'] = ""
-            self.new_season_pitching_data['Injury Description'] = ""
 
-        if 'Injury Description' not in self.batting_data.columns:
-            self.batting_data['Injury Description'] = ""
-            self.new_season_batting_data['Injury Description'] = ""
-
-        # Initialize Sim_WAR column if it doesn't exist
-        if 'Sim_WAR' not in self.pitching_data.columns:
-            self.pitching_data['Sim_WAR'] = 0.0
-            self.new_season_pitching_data['Sim_WAR'] = 0.0
-
-        if 'Sim_WAR' not in self.batting_data.columns:
-            self.batting_data['Sim_WAR'] = 0.0
-            self.new_season_batting_data['Sim_WAR'] = 0.0
+        # Add columns if they don't exist using helper method
+        self._ensure_column_exists([self.pitching_data, self.new_season_pitching_data], 'Injury Description', "")
+        self._ensure_column_exists([self.batting_data, self.new_season_batting_data], 'Injury Description', "")
+        self._ensure_column_exists([self.pitching_data, self.new_season_pitching_data], 'Sim_WAR', 0.0)
+        self._ensure_column_exists([self.batting_data, self.new_season_batting_data], 'Sim_WAR', 0.0)
 
         return
+
+    def _ensure_column_exists(self, df_list: List[DataFrame], column_name: str, default_value) -> None:
+        """
+        Helper method to ensure a column exists in multiple dataframes with a default value
+        :param df_list: List of dataframes to check/update
+        :param column_name: Name of the column to ensure exists
+        :param default_value: Default value to use if column doesn't exist
+        :return: None
+        """
+        for df in df_list:
+            if column_name not in df.columns:
+                df[column_name] = default_value
+
+    def _sync_fields(self, source_df: DataFrame, target_df: DataFrame, field_list: List[str]) -> None:
+        """
+        Helper method to sync fields from source to target dataframe
+        :param source_df: Source dataframe to copy from
+        :param target_df: Target dataframe to copy to
+        :param field_list: List of field names to sync
+        :return: None (modifies target_df in place)
+        """
+        for field in field_list:
+            if field in source_df.columns and field in target_df.columns:
+                target_df.loc[:, field] = source_df.loc[:, field].astype(target_df[field].dtype)
 
     def sync_dynamic_fields(self, target_pitching_df: DataFrame, target_batting_df: DataFrame) -> None:
         """
@@ -303,14 +315,10 @@ class BaseballStats:
         :return: None (modifies dataframes in place)
         """
         # Copy dynamic fields for pitchers
-        for field in DYNAMIC_FIELDS:
-            if field in self.new_season_pitching_data.columns and field in target_pitching_df.columns:
-                target_pitching_df.loc[:, field] = self.new_season_pitching_data.loc[:, field].astype(target_pitching_df[field].dtype)
+        self._sync_fields(self.new_season_pitching_data, target_pitching_df, DYNAMIC_FIELDS)
 
         # Copy dynamic fields for batters
-        for field in DYNAMIC_FIELDS:
-            if field in self.new_season_batting_data.columns and field in target_batting_df.columns:
-                target_batting_df.loc[:, field] = self.new_season_batting_data.loc[:, field].astype(target_batting_df[field].dtype)
+        self._sync_fields(self.new_season_batting_data, target_batting_df, DYNAMIC_FIELDS)
 
         return
 

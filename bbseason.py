@@ -190,6 +190,8 @@ class BaseballSeason:
         # Create DataFrame and calculate stats
         df = pd.DataFrame({'Team': teaml, 'W': winl, 'L': lossl})
         df['Pct'] = df['W'] / (df['W'] + df['L'])
+        # Replace NaN (0-0 teams) with 0.000
+        df['Pct'] = df['Pct'].fillna(0.0)
         df = df.sort_values('W', ascending=False).reset_index(drop=True)
 
         # Calculate Games Back from leader
@@ -235,6 +237,42 @@ class BaseballSeason:
 
         print('')
         return
+
+    def _process_and_print_game_results(self, game_results: List[tuple]) -> None:
+        """
+        Helper method to process and print game results in either followed or compact format
+        :param game_results: List of tuples (match_up, score, game_recap, away_box_score, home_box_score)
+        :return: None
+        """
+        followed_games = []
+        compact_summaries = []
+
+        for match_up, score, game_recap, away_box_score, home_box_score in game_results:
+            # Check if this was a followed game
+            is_followed = any(team in self.team_to_follow for team in match_up) if self.team_to_follow else True
+
+            if is_followed:
+                followed_games.append(game_recap)
+            else:
+                # Store compact summary for non-followed games
+                compact_summaries.append({
+                    'away_team': match_up[0],
+                    'home_team': match_up[1],
+                    'away_r': score[0],
+                    'home_r': score[1],
+                    'away_h': away_box_score.total_hits,
+                    'home_h': home_box_score.total_hits,
+                    'away_e': away_box_score.total_errors,
+                    'home_e': home_box_score.total_errors
+                })
+
+        # Print followed games first (full format)
+        for game_recap in followed_games:
+            print(game_recap)
+
+        # Print non-followed games in compact format (5 per line)
+        if compact_summaries:
+            print(bbgame.Game.format_compact_games(compact_summaries))
 
     def update_win_loss(self, away_team_name: str, home_team_name: str, win_loss: List[List[int]]) -> None:
         """
@@ -458,9 +496,8 @@ class BaseballSeason:
         teams_list = self.team_to_follow if len(self.team_to_follow) > 0 else None
         self.baseball_data.new_game_day(teams_to_follow=teams_list)  # update rest, injury, and print lists
 
-        # Separate followed and non-followed games
-        followed_games = []
-        compact_summaries = []
+        # Collect game results
+        game_results = []
 
         for match_up in todays_games:  # run all games for a day, day starts at zero
             if 'OFF DAY' not in match_up:  # not an off day
@@ -474,33 +511,11 @@ class BaseballSeason:
                 self.baseball_data.game_results_to_season(box_score_class=game.teams[AWAY].box_score)
                 self.baseball_data.game_results_to_season(box_score_class=game.teams[HOME].box_score)
 
-                # Check if this was a followed game
-                is_followed = any(team in self.team_to_follow for team in match_up) if self.team_to_follow else True
+                # Store results for processing
+                game_results.append((match_up, score, game_recap, game.teams[AWAY].box_score, game.teams[HOME].box_score))
 
-                if is_followed:
-                    followed_games.append(game_recap)
-                else:
-                    # Store compact summary for non-followed games
-                    compact_summaries.append({
-                        'away_team': match_up[0],
-                        'home_team': match_up[1],
-                        'away_r': score[0],
-                        'home_r': score[1],
-                        'away_h': game.teams[AWAY].box_score.total_hits,
-                        'home_h': game.teams[HOME].box_score.total_hits,
-                        'away_e': game.teams[AWAY].box_score.total_errors,
-                        'home_e': game.teams[HOME].box_score.total_errors
-                    })
-                # end of game
-            # end of all games for one day
-
-        # Print followed games first (full format)
-        for game_recap in followed_games:
-            print(game_recap)
-
-        # Print non-followed games in compact format (3 per line)
-        if compact_summaries:
-            print(bbgame.Game.format_compact_games(compact_summaries))
+        # Process and print all game results
+        self._process_and_print_game_results(game_results)
 
         return
 
@@ -535,9 +550,8 @@ class BaseballSeason:
                 print('.', end='')
         print('')
 
-        # Separate followed and non-followed games
-        followed_games = []
-        compact_summaries = []
+        # Collect game results
+        game_results = []
 
         for ii, thread in enumerate(threads):  # wait for all results, loop over games played, no off days
             thread.join()
@@ -547,32 +561,11 @@ class BaseballSeason:
             self.baseball_data.game_results_to_season(box_score_class=away_box_score)
             self.baseball_data.game_results_to_season(box_score_class=home_box_score)
 
-            # Check if this was a followed game
-            is_followed = any(team in self.team_to_follow for team in match_up) if self.team_to_follow else True
+            # Store results for processing
+            game_results.append((match_up, score, game_recap, away_box_score, home_box_score))
 
-            if is_followed:
-                # Store full recap for followed games
-                followed_games.append(game_recap)
-            else:
-                # Store compact summary for non-followed games
-                compact_summaries.append({
-                    'away_team': match_up[0],
-                    'home_team': match_up[1],
-                    'away_r': score[0],
-                    'home_r': score[1],
-                    'away_h': away_box_score.total_hits,
-                    'home_h': home_box_score.total_hits,
-                    'away_e': away_box_score.total_errors,
-                    'home_e': home_box_score.total_errors
-                })
-
-        # Print followed games first (full format)
-        for game_recap in followed_games:
-            print(game_recap)
-
-        # Print non-followed games in compact format (3 per line)
-        if compact_summaries:
-            print(bbgame.Game.format_compact_games(compact_summaries))
+        # Process and print all game results
+        self._process_and_print_game_results(game_results)
 
         # end of all games for one day
         return

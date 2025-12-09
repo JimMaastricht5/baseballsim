@@ -220,23 +220,77 @@ class Game:
 
     def print_inning_score(self) -> None:
         """
-        print inning by inning score
+        print inning by inning score - full format for followed games
         :return: None
         """
-        print_inning_score = self.inning_score.copy()
-        print_inning_score.append(['R', self.total_score[AWAY], self.total_score[HOME]])
-        print_inning_score.append(['H', self.teams[AWAY].box_score.total_hits, self.teams[HOME].box_score.total_hits])
-        print_inning_score.append(['E', self.teams[AWAY].box_score.total_errors,
-                                   self.teams[HOME].box_score.total_errors])
-        row_to_col = list(zip(*print_inning_score))
-        for ii in range(0, 3):  # print each row
-            print_line = ''
-            for jj in range(0, len(row_to_col[ii])):
-                print_line = print_line + f'{str(row_to_col[ii][jj]):>4}'
-            self.game_recap += print_line + '\n'
-            # print(print_line)
-        # print('')
+        if self.is_followed_game:
+            # Full inning-by-inning format for followed games
+            print_inning_score = self.inning_score.copy()
+            print_inning_score.append(['R', self.total_score[AWAY], self.total_score[HOME]])
+            print_inning_score.append(['H', self.teams[AWAY].box_score.total_hits, self.teams[HOME].box_score.total_hits])
+            print_inning_score.append(['E', self.teams[AWAY].box_score.total_errors,
+                                       self.teams[HOME].box_score.total_errors])
+            row_to_col = list(zip(*print_inning_score))
+            for ii in range(0, 3):  # print each row
+                print_line = ''
+                for jj in range(0, len(row_to_col[ii])):
+                    print_line = print_line + f'{str(row_to_col[ii][jj]):>4}'
+                self.game_recap += print_line + '\n'
+        # Compact format handled separately in get_compact_summary()
         return
+
+    def get_compact_summary(self) -> dict:
+        """
+        Returns compact game summary for non-followed games
+        :return: dict with team names and RHE stats
+        """
+        return {
+            'away_team': self.team_names[AWAY],
+            'home_team': self.team_names[HOME],
+            'away_r': self.total_score[AWAY],
+            'home_r': self.total_score[HOME],
+            'away_h': self.teams[AWAY].box_score.total_hits,
+            'home_h': self.teams[HOME].box_score.total_hits,
+            'away_e': self.teams[AWAY].box_score.total_errors,
+            'home_e': self.teams[HOME].box_score.total_errors
+        }
+
+    @staticmethod
+    def format_compact_games(game_summaries: list) -> str:
+        """
+        Format multiple game summaries side-by-side (3-4 games per line)
+        :param game_summaries: list of dicts from get_compact_summary()
+        :return: formatted string with games side-by-side
+        """
+        if not game_summaries:
+            return ''
+
+        games_per_line = 3
+        game_separator = '     '  # 5 spaces between games
+        output = ''
+
+        for i in range(0, len(game_summaries), games_per_line):
+            batch = game_summaries[i:i+games_per_line]
+
+            # Header line with R H E repeated
+            header_parts = []
+            for _ in batch:
+                header_parts.append('     R   H   E')
+            output += game_separator.join(header_parts) + '\n'
+
+            # Away teams line
+            away_parts = []
+            for game in batch:
+                away_parts.append(f'{game["away_team"]:>3} {game["away_r"]:>2}  {game["away_h"]:>2}   {game["away_e"]:>1}')
+            output += game_separator.join(away_parts) + '\n'
+
+            # Home teams line
+            home_parts = []
+            for game in batch:
+                home_parts.append(f'{game["home_team"]:>3} {game["home_r"]:>2}  {game["home_h"]:>2}   {game["home_e"]:>1}')
+            output += game_separator.join(home_parts) + '\n\n'
+
+        return output
 
     def pitching_sit(self, pitching: Series, pitch_switch: bool) -> bool:
         """

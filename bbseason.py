@@ -456,9 +456,13 @@ class BaseballSeason:
         # Pass team_to_follow list (if not empty) to show hot/cold players
         teams_list = self.team_to_follow if len(self.team_to_follow) > 0 else None
         self.baseball_data.new_game_day(teams_to_follow=teams_list)  # update rest, injury, and print lists
+
+        # Separate followed and non-followed games
+        followed_games = []
+        compact_summaries = []
+
         for match_up in todays_games:  # run all games for a day, day starts at zero
             if 'OFF DAY' not in match_up:  # not an off day
-                print(f'Playing day #{season_day_num + 1}: {match_up[0]} away against {match_up[1]}')
                 game = bbgame.Game(away_team_name=match_up[0], home_team_name=match_up[1],
                                    baseball_data=self.baseball_data, game_num=season_day_num,
                                    rotation_len=self.rotation_len, print_lineup=self.print_lineup_b,
@@ -466,13 +470,37 @@ class BaseballSeason:
                                    team_to_follow=self.team_to_follow, interactive=self.interactive)
                 score, inning, win_loss_list, game_recap = game.sim_game()
                 self.update_win_loss(away_team_name=match_up[0], home_team_name=match_up[1], win_loss=win_loss_list)
-                print(game_recap)
-                print(f'Final: {match_up[0]} {score[0]} {match_up[1]} {score[1]}')
                 self.baseball_data.game_results_to_season(box_score_class=game.teams[AWAY].box_score)
                 self.baseball_data.game_results_to_season(box_score_class=game.teams[HOME].box_score)
-                print('')
+
+                # Check if this was a followed game
+                is_followed = any(team in self.team_to_follow for team in match_up) if self.team_to_follow else True
+
+                if is_followed:
+                    followed_games.append(game_recap)
+                else:
+                    # Store compact summary for non-followed games
+                    compact_summaries.append({
+                        'away_team': match_up[0],
+                        'home_team': match_up[1],
+                        'away_r': score[0],
+                        'home_r': score[1],
+                        'away_h': game.teams[AWAY].box_score.total_hits,
+                        'home_h': game.teams[HOME].box_score.total_hits,
+                        'away_e': game.teams[AWAY].box_score.total_errors,
+                        'home_e': game.teams[HOME].box_score.total_errors
+                    })
                 # end of game
             # end of all games for one day
+
+        # Print followed games first (full format)
+        for game_recap in followed_games:
+            print(game_recap)
+
+        # Print non-followed games in compact format (3 per line)
+        if compact_summaries:
+            print(bbgame.Game.format_compact_games(compact_summaries))
+
         return
 
     def sim_day_threaded(self, season_day_num: int) -> None:
@@ -505,15 +533,46 @@ class BaseballSeason:
                 thread.start()
                 print('.', end='')
         print('')
+
+        # Separate followed and non-followed games
+        followed_games = []
+        compact_summaries = []
+
         for ii, thread in enumerate(threads):  # wait for all results, loop over games played, no off days
             thread.join()
             (score, inning, win_loss_list, away_box_score, home_box_score, game_recap) = queues[ii].get()
             match_up = match_ups[ii]
             self.update_win_loss(away_team_name=match_up[0], home_team_name=match_up[1], win_loss=win_loss_list)
-            print(game_recap)
-            # print(f'Final: {match_up[0]} {score[0]} {match_up[1]} {score[1]}')
             self.baseball_data.game_results_to_season(box_score_class=away_box_score)
             self.baseball_data.game_results_to_season(box_score_class=home_box_score)
+
+            # Check if this was a followed game
+            is_followed = any(team in self.team_to_follow for team in match_up) if self.team_to_follow else True
+
+            if is_followed:
+                # Store full recap for followed games
+                followed_games.append(game_recap)
+            else:
+                # Store compact summary for non-followed games
+                compact_summaries.append({
+                    'away_team': match_up[0],
+                    'home_team': match_up[1],
+                    'away_r': score[0],
+                    'home_r': score[1],
+                    'away_h': away_box_score.total_hits,
+                    'home_h': home_box_score.total_hits,
+                    'away_e': away_box_score.total_errors,
+                    'home_e': home_box_score.total_errors
+                })
+
+        # Print followed games first (full format)
+        for game_recap in followed_games:
+            print(game_recap)
+
+        # Print non-followed games in compact format (3 per line)
+        if compact_summaries:
+            print(bbgame.Game.format_compact_games(compact_summaries))
+
         # end of all games for one day
         return
 

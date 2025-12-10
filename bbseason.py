@@ -48,7 +48,7 @@ class BaseballSeason:
                  season_length: int = 6, series_length: int = 3,
                  rotation_len: int = 5, include_leagues: list = None, season_interactive: bool = False,
                  season_print_lineup_b: bool = False, season_print_box_score_b: bool = False,
-                 season_chatty: bool = False, season_team_to_follow: str = None,
+                 season_chatty: bool = False, season_team_to_follow: Optional[List[str]] = None,
                  load_batter_file: str = 'aggr-stats-pp-Batting.csv',
                  load_pitcher_file: str = 'aggr-stats-pp-Pitching.csv',
                  schedule: list = None) -> None:
@@ -64,7 +64,7 @@ class BaseballSeason:
         :param season_print_lineup_b: if true print lineups
         :param season_print_box_score_b: if true print box scores
         :param season_chatty: if true provide more detail
-        :param season_team_to_follow: if none skip otherwise follow this team in gory detail
+        :param season_team_to_follow: list of team abbreviations to follow in detail (e.g., ['NYM', 'BOS'])
         :param load_batter_file: name of the file with batter data, year will be added to the front of the text
         :param load_pitcher_file: name of the file for the pitcher data, year will be added to the front of the text
         :return: None
@@ -82,7 +82,7 @@ class BaseballSeason:
         self.print_lineup_b = season_print_lineup_b
         self.print_box_score_b = season_print_box_score_b
         self.season_chatty = season_chatty
-        self.team_to_follow = season_team_to_follow
+        self.team_to_follow = season_team_to_follow if season_team_to_follow is not None else []
         logger.debug("Initializing BaseballSeason with seasons: {}, new season: {}", load_seasons, new_season)
         self.baseball_data = bbstats.BaseballStats(load_seasons=self.load_seasons, new_season=new_season,
                                                    include_leagues=include_leagues, load_batter_file=load_batter_file,
@@ -162,27 +162,21 @@ class BaseballSeason:
         # Print header
         schedule_str += f'Day {day + 1} Games:\n'
 
-        # Print games in 2 columns
+        # Print games in 5 columns
         if games:
-            mid_point = (len(games) + 1) // 2
-            for i in range(mid_point):
-                left_game = games[i]
-                if i + mid_point < len(games):
-                    right_game = games[i + mid_point]
-                    schedule_str += f'{left_game}   {right_game}\n'
-                else:
-                    schedule_str += f'{left_game}\n'
+            games_per_line = 5
+            for i in range(0, len(games), games_per_line):
+                line_games = games[i:i+games_per_line]
+                schedule_str += '   '.join(line_games) + '\n'
 
         # Print off day at the end
         if game_day_off != '':
-            schedule_str += f'({game_day_off} - Off Day)\n'
-
-        schedule_str += '\n'
+            schedule_str += f'({game_day_off} - Off Day)'
         return schedule_str
 
     def print_standings(self) -> None:
         """
-        print the current standings with GB and Win% in compact 2-column format
+        print the current standings with GB and Win% in compact 3-column format
         :return: None
         """
         teaml, winl, lossl = [], [], []
@@ -196,6 +190,8 @@ class BaseballSeason:
         # Create DataFrame and calculate stats
         df = pd.DataFrame({'Team': teaml, 'W': winl, 'L': lossl})
         df['Pct'] = df['W'] / (df['W'] + df['L'])
+        # Replace NaN (0-0 teams) with 0.000
+        df['Pct'] = df['Pct'].fillna(0.0)
         df = df.sort_values('W', ascending=False).reset_index(drop=True)
 
         # Calculate Games Back from leader
@@ -209,31 +205,74 @@ class BaseballSeason:
         df['Pct'] = df['Pct'].apply(lambda x: f'{x:.3f}')
         display_df = df[['Team', 'W-L', 'Pct', 'GB']]
 
-        # Split into 2 columns for compact display
+        # Split into 3 columns for compact display
         n_teams = len(display_df)
-        mid_point = (n_teams + 1) // 2
+        teams_per_col = (n_teams + 2) // 3  # Round up to distribute evenly
 
-        left_half = display_df.iloc[:mid_point].reset_index(drop=True)
-        right_half = display_df.iloc[mid_point:].reset_index(drop=True)
+        col1 = display_df.iloc[:teams_per_col].reset_index(drop=True)
+        col2 = display_df.iloc[teams_per_col:teams_per_col*2].reset_index(drop=True)
+        col3 = display_df.iloc[teams_per_col*2:].reset_index(drop=True)
 
         # Print header
-        print(f"{'Team':<5} {'W-L':<8} {'Pct':<6} {'GB':<5}   {'Team':<5} {'W-L':<8} {'Pct':<6} {'GB':<5}")
-        print('-' * 60)
+        print(f"{'Team':<5} {'W-L':<8} {'Pct':<6} {'GB':<5}   {'Team':<5} {'W-L':<8} {'Pct':<6} {'GB':<5}   {'Team':<5} {'W-L':<8} {'Pct':<6} {'GB':<5}")
+        print('-' * 90)
 
         # Print rows side by side
-        for i in range(mid_point):
-            left_row = left_half.iloc[i]
-            left_line = f"{left_row['Team']:<5} {left_row['W-L']:<8} {left_row['Pct']:<6} {left_row['GB']:<5}"
+        for i in range(teams_per_col):
+            line_parts = []
 
-            if i < len(right_half):
-                right_row = right_half.iloc[i]
-                right_line = f"{right_row['Team']:<5} {right_row['W-L']:<8} {right_row['Pct']:<6} {right_row['GB']:<5}"
-                print(f"{left_line}   {right_line}")
-            else:
-                print(left_line)
+            if i < len(col1):
+                row = col1.iloc[i]
+                line_parts.append(f"{row['Team']:<5} {row['W-L']:<8} {row['Pct']:<6} {row['GB']:<5}")
+
+            if i < len(col2):
+                row = col2.iloc[i]
+                line_parts.append(f"{row['Team']:<5} {row['W-L']:<8} {row['Pct']:<6} {row['GB']:<5}")
+
+            if i < len(col3):
+                row = col3.iloc[i]
+                line_parts.append(f"{row['Team']:<5} {row['W-L']:<8} {row['Pct']:<6} {row['GB']:<5}")
+
+            print("   ".join(line_parts))
 
         print('')
         return
+
+    def _process_and_print_game_results(self, game_results: List[tuple]) -> None:
+        """
+        Helper method to process and print game results in either followed or compact format
+        :param game_results: List of tuples (match_up, score, game_recap, away_box_score, home_box_score)
+        :return: None
+        """
+        followed_games = []
+        compact_summaries = []
+
+        for match_up, score, game_recap, away_box_score, home_box_score in game_results:
+            # Check if this was a followed game
+            is_followed = any(team in self.team_to_follow for team in match_up) if self.team_to_follow else True
+
+            if is_followed:
+                followed_games.append(game_recap)
+            else:
+                # Store compact summary for non-followed games
+                compact_summaries.append({
+                    'away_team': match_up[0],
+                    'home_team': match_up[1],
+                    'away_r': score[0],
+                    'home_r': score[1],
+                    'away_h': away_box_score.total_hits,
+                    'home_h': home_box_score.total_hits,
+                    'away_e': away_box_score.total_errors,
+                    'home_e': home_box_score.total_errors
+                })
+
+        # Print followed games first (full format)
+        for game_recap in followed_games:
+            print(game_recap)
+
+        # Print non-followed games in compact format (5 per line)
+        if compact_summaries:
+            print(bbgame.Game.format_compact_games(compact_summaries))
 
     def update_win_loss(self, away_team_name: str, home_team_name: str, win_loss: List[List[int]]) -> None:
         """
@@ -290,6 +329,18 @@ class BaseballSeason:
 
         return games_back
 
+    def _get_teams_to_print(self) -> Optional[List[str]]:
+        """
+        Get list of teams to print AI GM output for.
+        Returns None to print all teams, or a list of team names to print.
+        """
+        if self.team_to_follow is None or self.team_to_follow == '':
+            return None  # Print all teams
+        elif isinstance(self.team_to_follow, list):
+            return self.team_to_follow  # Already a list
+        else:
+            return [self.team_to_follow]  # Convert string to list
+
     def check_gm_assessments(self) -> None:
         """
         Check if any teams have reached GM assessment milestones (30, 60, 90, 120, 150 games).
@@ -308,6 +359,9 @@ class BaseballSeason:
         with self.baseball_data.semaphore:
             self.baseball_data.calculate_sim_war()
 
+        # Determine which teams to print
+        teams_to_print = self._get_teams_to_print()
+
         for team_name, gm in self.gm_managers.items():
             games_played = self.team_games_played[team_name]
 
@@ -320,13 +374,17 @@ class BaseballSeason:
                 # Calculate games back
                 games_back = self.calculate_games_back(team_name)
 
+                # Determine if this team should print
+                should_print = teams_to_print is None or team_name in teams_to_print
+
                 # Run GM assessment
                 logger.info(f"Running GM assessment for {team_name} after {games_played} games")
                 assessment = gm.assess_roster(
                     baseball_stats=self.baseball_data,
                     team_record=(wins, losses),
                     games_back=games_back,
-                    games_played=games_played
+                    games_played=games_played,
+                    should_print=should_print
                 )
 
                 # Could store assessment for later analysis
@@ -363,6 +421,68 @@ class BaseballSeason:
         if self.team_to_follow != '' and self.team_to_follow in self.baseball_data.get_all_team_names():
             self.baseball_data.print_current_season(teams=[self.team_to_follow], summary_only_b=False)
         self.baseball_data.print_current_season(teams=self.teams, summary_only_b=not self.season_chatty)
+
+        # Save final season statistics to CSV files
+        self.baseball_data.save_season_stats()
+
+        # Perform AI GM end-of-season evaluations
+        print(f'\n\n****** AI GM End-of-Season Evaluations ******\n')
+        self._perform_gm_evaluations()
+
+        return
+
+    def _perform_gm_evaluations(self) -> None:
+        """
+        Perform end-of-season evaluations for all AI GMs.
+        Calculates final standings and calls each GM's evaluation method.
+        """
+        # Calculate final standings (sorted by wins)
+        standings = []
+        for team in self.teams:
+            # Skip invalid team entries
+            if team and team != 'OFF DAY' and team in self.team_win_loss:
+                wins, losses = self.team_win_loss[team]
+                win_pct = wins / (wins + losses) if (wins + losses) > 0 else 0.0
+                standings.append({
+                    'team': team,
+                    'wins': wins,
+                    'losses': losses,
+                    'win_pct': win_pct
+                })
+
+        # Sort by wins (descending), then by losses (ascending)
+        standings.sort(key=lambda x: (x['wins'], -x['losses']), reverse=True)
+
+        # Assign standings positions
+        team_standings = {s['team']: idx + 1 for idx, s in enumerate(standings)}
+        total_teams = len(standings)
+
+        # Determine which teams to print
+        teams_to_print = self._get_teams_to_print()
+
+        # Perform evaluation for each GM (only for teams with valid standings)
+        for team_name, gm in self.gm_managers.items():
+            if team_name in team_standings and team_name in self.team_win_loss:
+                standing = team_standings[team_name]
+                record = self.team_win_loss[team_name]
+                games_back = self.calculate_games_back(team_name)
+
+                # Determine if this team should print
+                should_print = teams_to_print is None or team_name in teams_to_print
+
+                gm.perform_end_of_season_evaluation(
+                    baseball_stats=self.baseball_data,
+                    team_record=(record[0], record[1]),
+                    final_standing=standing,
+                    total_teams=total_teams,
+                    games_back=games_back,
+                    should_print=should_print
+                )
+
+        # Print all player stats after GM evaluations
+        print(f'\n\n****** Complete Player Statistics ******\n')
+        self.baseball_data.print_current_season(teams=None, summary_only_b=False)
+
         return
 
     def sim_day(self, season_day_num: int) -> None:
@@ -372,26 +492,31 @@ class BaseballSeason:
         """
         print(self.print_day_schedule(season_day_num))
         todays_games = self.schedule[season_day_num]
-        # Pass team_to_follow as a list (if not None) to show hot/cold players
-        teams_list = [self.team_to_follow] if self.team_to_follow else None
+        # Pass team_to_follow list (if not empty) to show hot/cold players
+        teams_list = self.team_to_follow if len(self.team_to_follow) > 0 else None
         self.baseball_data.new_game_day(teams_to_follow=teams_list)  # update rest, injury, and print lists
+
+        # Collect game results
+        game_results = []
+
         for match_up in todays_games:  # run all games for a day, day starts at zero
             if 'OFF DAY' not in match_up:  # not an off day
-                print(f'Playing day #{season_day_num + 1}: {match_up[0]} away against {match_up[1]}')
                 game = bbgame.Game(away_team_name=match_up[0], home_team_name=match_up[1],
                                    baseball_data=self.baseball_data, game_num=season_day_num,
                                    rotation_len=self.rotation_len, print_lineup=self.print_lineup_b,
                                    chatty=self.season_chatty, print_box_score_b=self.print_box_score_b,
-                                   interactive=self.interactive)
-                score, inning, win_loss_list, game_recap = game.sim_game(team_to_follow=self.team_to_follow)
+                                   team_to_follow=self.team_to_follow, interactive=self.interactive)
+                score, inning, win_loss_list, game_recap = game.sim_game()
                 self.update_win_loss(away_team_name=match_up[0], home_team_name=match_up[1], win_loss=win_loss_list)
-                print(game_recap)
-                print(f'Final: {match_up[0]} {score[0]} {match_up[1]} {score[1]}')
                 self.baseball_data.game_results_to_season(box_score_class=game.teams[AWAY].box_score)
                 self.baseball_data.game_results_to_season(box_score_class=game.teams[HOME].box_score)
-                print('')
-                # end of game
-            # end of all games for one day
+
+                # Store results for processing
+                game_results.append((match_up, score, game_recap, game.teams[AWAY].box_score, game.teams[HOME].box_score))
+
+        # Process and print all game results
+        self._process_and_print_game_results(game_results)
+
         return
 
     def sim_day_threaded(self, season_day_num: int) -> None:
@@ -404,8 +529,8 @@ class BaseballSeason:
         match_ups = []
         print(self.print_day_schedule(season_day_num) + '\n')
         todays_games = self.schedule[season_day_num]
-        # Pass team_to_follow as a list (if not None) to show hot/cold players
-        teams_list = [self.team_to_follow] if self.team_to_follow else None
+        # Pass team_to_follow list (if not empty) to show hot/cold players
+        teams_list = self.team_to_follow if len(self.team_to_follow) > 0 else None
         self.baseball_data.new_game_day(teams_to_follow=teams_list)  # update rest, injury, and print lists
         print(f'Simulating day #{season_day_num + 1} for league(s): {self.leagues_str}', end='')  # start sim wait line
         for match_up in todays_games:  # run all games for a day, day starts at zero
@@ -415,9 +540,8 @@ class BaseballSeason:
                                    baseball_data=self.baseball_data, game_num=season_day_num,
                                    rotation_len=self.rotation_len, print_lineup=self.print_lineup_b,
                                    chatty=self.season_chatty, print_box_score_b=self.print_box_score_b,
-                                   interactive=self.interactive)
+                                   team_to_follow=self.team_to_follow, interactive=self.interactive)
                 q = queue.Queue()
-                q.put(self.team_to_follow)
                 thread = threading.Thread(target=game.sim_game_threaded, args=(q,))
                 threads.append(thread)
                 queues.append(q)
@@ -425,15 +549,24 @@ class BaseballSeason:
                 thread.start()
                 print('.', end='')
         print('')
+
+        # Collect game results
+        game_results = []
+
         for ii, thread in enumerate(threads):  # wait for all results, loop over games played, no off days
             thread.join()
             (score, inning, win_loss_list, away_box_score, home_box_score, game_recap) = queues[ii].get()
             match_up = match_ups[ii]
             self.update_win_loss(away_team_name=match_up[0], home_team_name=match_up[1], win_loss=win_loss_list)
-            print(game_recap)
-            # print(f'Final: {match_up[0]} {score[0]} {match_up[1]} {score[1]}')
             self.baseball_data.game_results_to_season(box_score_class=away_box_score)
             self.baseball_data.game_results_to_season(box_score_class=home_box_score)
+
+            # Store results for processing
+            game_results.append((match_up, score, game_recap, away_box_score, home_box_score))
+
+        # Process and print all game results
+        self._process_and_print_game_results(game_results)
+
         # end of all games for one day
         return
 
@@ -471,7 +604,7 @@ class MultiBaseballSeason:
                  season_length: int = 6, series_length: int = 3,
                  rotation_len: int = 5, majors_minors: list = None, season_interactive: bool = False,
                  season_print_lineup_b: bool = False, season_print_box_score_b: bool = False,
-                 season_chatty: bool = False, season_team_to_follow: str = None,
+                 season_chatty: bool = False, season_team_to_follow: Optional[List[str]] = None,
                  load_batter_file: str = 'stats-pp-Batting.csv',
                  load_pitcher_file: str = 'stats-pp-Pitching.csv') -> None:
         """
@@ -486,7 +619,7 @@ class MultiBaseballSeason:
                 :param season_print_lineup_b: if true print lineups
                 :param season_print_box_score_b: if true print box scores
                 :param season_chatty: if true provide more detail
-                :param season_team_to_follow: if none skip otherwise follow this team in gory detail
+                :param season_team_to_follow: list of team abbreviations to follow in detail (e.g., ['NYM', 'BOS'])
                 :param load_batter_file: name of the file with batter data, year will be added to the front of the text
                 :param load_pitcher_file: name of the file for the pitcher data, year will be added to the front of name
                 :return: None
@@ -508,7 +641,7 @@ class MultiBaseballSeason:
         self.print_lineup_b = season_print_lineup_b
         self.print_box_score_b = season_print_box_score_b
         self.season_chatty = season_chatty
-        self.team_to_follow = season_team_to_follow
+        self.team_to_follow = season_team_to_follow if season_team_to_follow is not None else []
         self.load_batter_file = load_batter_file
         self.load_pitcher_file = load_pitcher_file
         logger.debug("Initializing MultiBaseballSeason with seasons: {}, new season: {}", load_seasons, new_season)
@@ -589,7 +722,7 @@ class MultiBaseballSeason:
 if __name__ == '__main__':
     # Configure logger level - change to "DEBUG" for more detailed logs
     from bblogger import configure_logger
-    configure_logger("INFO")
+    configure_logger("WARNING")
     
     start_time = datetime.datetime.now()
 
@@ -600,13 +733,13 @@ if __name__ == '__main__':
 
     # multiple seasons for majors and minors of random league
     if fantasy:
-        my_teams_to_follow = 'AUG'
+        my_team_to_follow = ['AUG']  # List of teams to follow
         bbseasonMS = MultiBaseballSeason(load_seasons=[2023, 2024, 2025], new_season=2026,
                                          season_length=num_games, series_length=3, rotation_len=5,
                                          majors_minors=['ACB', 'NBL'],
                                          season_interactive=interactive,
                                          season_chatty=False, season_print_lineup_b=False,
-                                         season_print_box_score_b=False, season_team_to_follow=my_teams_to_follow,
+                                         season_print_box_score_b=False, season_team_to_follow=my_team_to_follow,
                                          load_batter_file='aggr-stats-pp-Batting.csv',
                                          load_pitcher_file='aggr-stats-pp-Pitching.csv')
         bbseasonMS.sim_start()
@@ -615,16 +748,18 @@ if __name__ == '__main__':
 
     # handle a single full season of MLB
     if not fantasy:
-        # my_teams_to_follow ='MIL'  # or None
-        my_teams_to_follow = None
+        my_team_to_follow = ['MIL']  # List of teams to follow, e.g., ['MIL', 'NYM'] for multiple
+        # my_team_to_follow = None  # or set to None for no followed teams
+
+        # set a series schedule if you just want to simulate a playoff series or use the team_list param
         # series_schedule = [[['LAD', 'TOR']], [['LAD', 'TOR']],
         #                    [['TOR', 'LAD']], [['TOR', 'LAD']],
         #                    [['TOR', 'LAD']], [['LAD', 'TOR']],[['LAD', 'TOR']]]
         bbseasonSS = BaseballSeason(load_seasons=[2023, 2024, 2025], new_season=2026,
-                                    season_length=num_games, series_length=7, rotation_len=5,
+                                    season_length=num_games, series_length=3, rotation_len=5,
                                     season_interactive=interactive,
                                     season_chatty=False, season_print_lineup_b=False,
-                                    season_print_box_score_b=False, season_team_to_follow=my_teams_to_follow,
+                                    season_print_box_score_b=False, season_team_to_follow=my_team_to_follow,
                                     load_batter_file='aggr-stats-pp-Batting.csv',  # 'random-aggr-stats-pp-Batting.csv',
                                     load_pitcher_file='aggr-stats-pp-Pitching.csv')
                                     # schedule=series_schedule)

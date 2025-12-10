@@ -100,7 +100,6 @@ class BaseballStats:
         self.bcols_to_print = ['Player', 'League', 'Team', 'Pos', 'Age', 'G', 'AB', 'R', 'H', '2B', '3B', 'HR', 'RBI',
                                'SB', 'CS', 'BB', 'SO', 'SH', 'SF', 'HBP', 'AVG', 'OBP', 'SLG',
                                'OPS', 'Sim_WAR', 'Status', 'Estimated Days Remaining', 'Injury Description', 'Streak Status', 'Condition']
-        self.injury_cols_to_print = ['Player', 'Team', 'Age', 'Status', 'Estimated Days Remaining', 'Injury Description']  # Days Remaining to see time
         self.include_leagues = include_leagues
         logger.debug("Initializing BaseballStats with seasons: {}", load_seasons)
         self.load_seasons = [load_seasons] if not isinstance(load_seasons, list) else load_seasons
@@ -273,26 +272,38 @@ class BaseballStats:
         self.batting_data[bcols_to_convert] = self.batting_data[bcols_to_convert].astype(float)
         self.new_season_pitching_data[pcols_to_convert] = self.new_season_pitching_data[pcols_to_convert].astype(float)
         self.new_season_batting_data[bcols_to_convert] = self.new_season_batting_data[bcols_to_convert].astype(float)
-        
-        # Add 'Injury Description' column if it doesn't exist
-        if 'Injury Description' not in self.pitching_data.columns:
-            self.pitching_data['Injury Description'] = ""
-            self.new_season_pitching_data['Injury Description'] = ""
 
-        if 'Injury Description' not in self.batting_data.columns:
-            self.batting_data['Injury Description'] = ""
-            self.new_season_batting_data['Injury Description'] = ""
-
-        # Initialize Sim_WAR column if it doesn't exist
-        if 'Sim_WAR' not in self.pitching_data.columns:
-            self.pitching_data['Sim_WAR'] = 0.0
-            self.new_season_pitching_data['Sim_WAR'] = 0.0
-
-        if 'Sim_WAR' not in self.batting_data.columns:
-            self.batting_data['Sim_WAR'] = 0.0
-            self.new_season_batting_data['Sim_WAR'] = 0.0
+        # Add columns if they don't exist using helper method
+        self._ensure_column_exists([self.pitching_data, self.new_season_pitching_data], 'Injury Description', "")
+        self._ensure_column_exists([self.batting_data, self.new_season_batting_data], 'Injury Description', "")
+        self._ensure_column_exists([self.pitching_data, self.new_season_pitching_data], 'Sim_WAR', 0.0)
+        self._ensure_column_exists([self.batting_data, self.new_season_batting_data], 'Sim_WAR', 0.0)
 
         return
+
+    def _ensure_column_exists(self, df_list: List[DataFrame], column_name: str, default_value) -> None:
+        """
+        Helper method to ensure a column exists in multiple dataframes with a default value
+        :param df_list: List of dataframes to check/update
+        :param column_name: Name of the column to ensure exists
+        :param default_value: Default value to use if column doesn't exist
+        :return: None
+        """
+        for df in df_list:
+            if column_name not in df.columns:
+                df[column_name] = default_value
+
+    def _sync_fields(self, source_df: DataFrame, target_df: DataFrame, field_list: List[str]) -> None:
+        """
+        Helper method to sync fields from source to target dataframe
+        :param source_df: Source dataframe to copy from
+        :param target_df: Target dataframe to copy to
+        :param field_list: List of field names to sync
+        :return: None (modifies target_df in place)
+        """
+        for field in field_list:
+            if field in source_df.columns and field in target_df.columns:
+                target_df.loc[:, field] = source_df.loc[:, field].astype(target_df[field].dtype)
 
     def sync_dynamic_fields(self, target_pitching_df: DataFrame, target_batting_df: DataFrame) -> None:
         """
@@ -304,14 +315,10 @@ class BaseballStats:
         :return: None (modifies dataframes in place)
         """
         # Copy dynamic fields for pitchers
-        for field in DYNAMIC_FIELDS:
-            if field in self.new_season_pitching_data.columns and field in target_pitching_df.columns:
-                target_pitching_df.loc[:, field] = self.new_season_pitching_data.loc[:, field].astype(target_pitching_df[field].dtype)
+        self._sync_fields(self.new_season_pitching_data, target_pitching_df, DYNAMIC_FIELDS)
 
         # Copy dynamic fields for batters
-        for field in DYNAMIC_FIELDS:
-            if field in self.new_season_batting_data.columns and field in target_batting_df.columns:
-                target_batting_df.loc[:, field] = self.new_season_batting_data.loc[:, field].astype(target_batting_df[field].dtype)
+        self._sync_fields(self.new_season_batting_data, target_batting_df, DYNAMIC_FIELDS)
 
         return
 
@@ -339,7 +346,7 @@ class BaseballStats:
                 self.new_season_batting_data.loc[batter_indices, 'Condition'] = \
                     batting_box_score.loc[batter_indices, 'Condition']
                 self.new_season_batting_data.loc[batter_indices, 'Injured Days'] = \
-                    batting_box_score.loc[batter_indices, 'Injured Days']
+                    batting_box_score.loc[batter_indices, 'Injured Days'].astype('int64')
 
             # VECTORIZED: Update all pitchers who played in the game at once (no loop!)
             if len(pitching_box_score) > 0:
@@ -353,7 +360,7 @@ class BaseballStats:
                 self.new_season_pitching_data.loc[pitcher_indices, 'Condition'] = \
                     pitching_box_score.loc[pitcher_indices, 'Condition']
                 self.new_season_pitching_data.loc[pitcher_indices, 'Injured Days'] = \
-                    pitching_box_score.loc[pitcher_indices, 'Injured Days']
+                    pitching_box_score.loc[pitcher_indices, 'Injured Days'].astype('int64')
         return
 
     def calculate_per_game_injury_odds(self, age: int, injury_rate: float, injury_rate_adjustment: float) -> float:
@@ -481,23 +488,38 @@ class BaseballStats:
         self.new_season_pitching_data['Status'] = get_status_vectorized(self.new_season_pitching_data, True)
         self.new_season_batting_data['Status'] = get_status_vectorized(self.new_season_batting_data, False)
 
-        # Print the disabled lists
+        # Print the disabled lists in compact format
         print(f'Season Disabled Lists:')
-        if self.new_season_pitching_data[self.new_season_pitching_data["Injured Days"] > 0].shape[0] > 0:
-            df = self.new_season_pitching_data[self.new_season_pitching_data["Injured Days"] > 0]
-            df = df.rename(columns={'Injured Days': 'Estimated Days Remaining'})
-            # Remove the index name to avoid the separate "Hashcode" line
-            df = df.rename_axis(None)
-            print(f'{df[self.injury_cols_to_print].to_string(justify="right", index_names=False)}\n')
-        if self.new_season_batting_data[self.new_season_batting_data["Injured Days"] > 0].shape[0] > 0:
-            df = self.new_season_batting_data[self.new_season_batting_data["Injured Days"] > 0]
-            df = df.rename(columns={'Injured Days': 'Estimated Days Remaining'})
-            # Format positions to remove brackets and quotes, but keep commas
-            if 'Pos' in df.columns:
-                df['Pos'] = df['Pos'].apply(format_positions)
-            # Remove the index name to avoid the separate "Hashcode" line
-            df = df.rename_axis(None)
-            print(f'{df[self.injury_cols_to_print].to_string(justify="right", index_names=False)}\n')
+
+        # Helper function to print injuries by IL type
+        def print_injuries_by_il_type(df, player_type='Pitchers'):
+            if df[df["Injured Days"] > 0].shape[0] == 0:
+                return
+
+            injured_df = df[df["Injured Days"] > 0].copy()
+            print(f'\n{player_type}:')
+
+            # Group by Status (IL type)
+            for il_type in ['60-Day IL', '15-Day IL', '10-Day IL', '7-Day IL']:
+                il_group = injured_df[injured_df['Status'] == il_type]
+                if il_group.shape[0] > 0:
+                    count = il_group.shape[0]
+                    # Build compact list: Player(TEAM) - Injury
+                    injury_list = []
+                    for idx, row in il_group.iterrows():
+                        player = row['Player']
+                        team = row['Team']
+                        injury = row['Injury Description']
+                        injury_list.append(f"{player}({team}) - {injury}")
+
+                    # Print in compact format
+                    print(f"  {il_type} ({count}): {', '.join(injury_list)}")
+
+        # Print pitchers and batters
+        print_injuries_by_il_type(self.new_season_pitching_data, 'Pitchers')
+        print_injuries_by_il_type(self.new_season_batting_data, 'Batters')
+        print()  # Add blank line after injury lists
+
         return
 
     def print_hot_cold_players(self, teams_to_follow: Optional[List[str]] = None) -> None:
@@ -511,47 +533,71 @@ class BaseballStats:
         if not teams_to_follow:
             return
 
-        # Define columns for hot/cold display
-        streak_cols_to_print = ['Player', 'Team', 'Pos/Role', 'Streak Status', 'Streak Value']
-
         # Filter for hot/cold players only (not Normal)
-        hot_cold_pitchers = self.new_season_pitching_data[
-            (self.new_season_pitching_data['Streak_Adjustment'] >= 0.025) |
-            (self.new_season_pitching_data['Streak_Adjustment'] <= -0.025)
+        hot_pitchers = self.new_season_pitching_data[
+            self.new_season_pitching_data['Streak_Adjustment'] >= 0.025
         ].copy()
-
-        hot_cold_batters = self.new_season_batting_data[
-            (self.new_season_batting_data['Streak_Adjustment'] >= 0.025) |
-            (self.new_season_batting_data['Streak_Adjustment'] <= -0.025)
+        cold_pitchers = self.new_season_pitching_data[
+            self.new_season_pitching_data['Streak_Adjustment'] <= -0.025
+        ].copy()
+        hot_batters = self.new_season_batting_data[
+            self.new_season_batting_data['Streak_Adjustment'] >= 0.025
+        ].copy()
+        cold_batters = self.new_season_batting_data[
+            self.new_season_batting_data['Streak_Adjustment'] <= -0.025
         ].copy()
 
         # Filter by teams to follow
-        hot_cold_pitchers = hot_cold_pitchers[hot_cold_pitchers['Team'].isin(teams_to_follow)]
-        hot_cold_batters = hot_cold_batters[hot_cold_batters['Team'].isin(teams_to_follow)]
+        hot_pitchers = hot_pitchers[hot_pitchers['Team'].isin(teams_to_follow)]
+        cold_pitchers = cold_pitchers[cold_pitchers['Team'].isin(teams_to_follow)]
+        hot_batters = hot_batters[hot_batters['Team'].isin(teams_to_follow)]
+        cold_batters = cold_batters[cold_batters['Team'].isin(teams_to_follow)]
 
         # Only print if there are hot/cold players
-        if hot_cold_pitchers.shape[0] > 0 or hot_cold_batters.shape[0] > 0:
-            print(f'Hot & Cold Players:')
+        if (hot_pitchers.shape[0] > 0 or hot_batters.shape[0] > 0 or
+            cold_pitchers.shape[0] > 0 or cold_batters.shape[0] > 0):
 
-            if hot_cold_pitchers.shape[0] > 0:
-                df = hot_cold_pitchers.copy()
-                df['Streak Status'] = df['Streak_Adjustment'].apply(streak_txt_f)
-                df['Streak Value'] = df['Streak_Adjustment'].apply(lambda x: f"{x:+.1%}")
-                df['Pos/Role'] = 'P'  # Pitcher
-                df = df.rename_axis(None)
-                print(f'{df[streak_cols_to_print].to_string(justify="right", index_names=False)}\n')
+            # Print Hot players
+            if hot_pitchers.shape[0] > 0 or hot_batters.shape[0] > 0:
+                print('Hot:')
+                self._print_streak_players(hot_pitchers, hot_batters)
 
-            if hot_cold_batters.shape[0] > 0:
-                df = hot_cold_batters.copy()
-                df['Streak Status'] = df['Streak_Adjustment'].apply(streak_txt_f)
-                df['Streak Value'] = df['Streak_Adjustment'].apply(lambda x: f"{x:+.1%}")
-                if 'Pos' in df.columns:
-                    df['Pos/Role'] = df['Pos'].apply(format_positions)
-                else:
-                    df['Pos/Role'] = ''
-                df = df.rename_axis(None)
-                print(f'{df[streak_cols_to_print].to_string(justify="right", index_names=False)}\n')
+            # Print Cold players
+            if cold_pitchers.shape[0] > 0 or cold_batters.shape[0] > 0:
+                print('Cold:')
+                self._print_streak_players(cold_pitchers, cold_batters)
         return
+
+    def _print_streak_players(self, pitchers: DataFrame, batters: DataFrame) -> None:
+        """
+        Helper method to print hot or cold players in consistent format (one line)
+        :param pitchers: DataFrame of pitchers with streaks
+        :param batters: DataFrame of batters with streaks
+        :return: None
+        """
+        players = []
+
+        # Add pitchers
+        if pitchers.shape[0] > 0:
+            for _, row in pitchers.iterrows():
+                player_name = row['Player']
+                obp_change = f"{row['Streak_Adjustment']:+.1%}"
+                players.append(f"{player_name} (P) {obp_change}")
+
+        # Add batters
+        if batters.shape[0] > 0:
+            for _, row in batters.iterrows():
+                player_name = row['Player']
+                if 'Pos' in row and row['Pos']:
+                    pos = format_positions(row['Pos'])
+                else:
+                    pos = ''
+                obp_change = f"{row['Streak_Adjustment']:+.1%}"
+                players.append(f"{player_name} ({pos}) {obp_change}")
+
+        # Print all players on one line
+        if players:
+            print(', '.join(players) + '\n')
 
     def update_streaks(self) -> None:
         """
@@ -561,8 +607,8 @@ class BaseballStats:
         Injured players' streaks are frozen until they return to action.
 
         Logic:
-        - Small random walk: ±0.5% to ±1.5% per game (mean 0%, std 0.005)
-        - Regression to mean: Pull streak toward 0 by 2% of current value
+        - Small random walk: ±0.4% to ±1.2% per game (mean 0%, std 0.004, reduced from 0.005)
+        - Regression to mean: Pull streak toward 0 by 4% of current value (increased from 2%)
         - Bounds checking: Enforce -10% to +10% limits
 
         VECTORIZED: Processes all active players at once for ~20-100x speedup
@@ -576,11 +622,11 @@ class BaseballStats:
             # Get current streaks for active pitchers
             current_streaks = self.new_season_pitching_data.loc[active_pitchers, 'Streak_Adjustment']
 
-            # Generate all random changes at once
-            random_changes = np.random.normal(loc=0.0, scale=0.005, size=n_active_pitchers)
+            # Generate all random changes at once (reduced volatility: 0.005 -> 0.004)
+            random_changes = np.random.normal(loc=0.0, scale=0.004, size=n_active_pitchers)
 
-            # Vectorized regression calculation
-            regression = -0.02 * current_streaks
+            # Vectorized regression calculation (increased regression: 0.02 -> 0.04)
+            regression = -0.04 * current_streaks
 
             # Calculate new streaks and enforce bounds
             new_streaks = np.clip(current_streaks + random_changes + regression, -0.10, 0.10)
@@ -594,8 +640,8 @@ class BaseballStats:
 
         if n_active_batters > 0:
             current_streaks = self.new_season_batting_data.loc[active_batters, 'Streak_Adjustment']
-            random_changes = np.random.normal(loc=0.0, scale=0.005, size=n_active_batters)
-            regression = -0.02 * current_streaks
+            random_changes = np.random.normal(loc=0.0, scale=0.004, size=n_active_batters)
+            regression = -0.04 * current_streaks
             new_streaks = np.clip(current_streaks + random_changes + regression, -0.10, 0.10)
             self.new_season_batting_data.loc[active_batters, 'Streak_Adjustment'] = new_streaks
 
@@ -662,14 +708,20 @@ class BaseballStats:
 
     def calculate_sim_war(self) -> None:
         """
-        Calculate dynamic Sim WAR (Player Value) based on current season performance.
-        This metric reflects in-season value considering performance, age adjustments,
-        injury impact, and playing time.
+        Calculate dynamic Sim WAR (Player Value) based on OBSERVABLE season performance.
+
+        This metric reflects player value based purely on their statistical output - like real-world WAR.
+        It does NOT apply internal simulation adjustment factors (age, injury, streak) because those
+        already influenced the in-game performance that produced these stats.
 
         Formula components:
         - Batters: Offensive value based on wOBA vs league average, scaled by PA
         - Pitchers: Run prevention value based on FIP vs league average, scaled by IP
-        - Adjustments: Age performance, injury performance impact, games lost to injury
+
+        Design Philosophy:
+        - Adjustment factors affect IN-GAME performance (at-bats, pitching)
+        - WAR measures the RESULTS of those performances (observable stats)
+        - Applying adjustments to WAR would be double-counting
 
         Results stored in 'Sim_WAR' column for both batting and pitching dataframes.
 
@@ -701,36 +753,31 @@ class BaseballStats:
             # League average wOBA (calculate from all active batters)
             league_woba = np.mean(woba[active_batters])
 
-            # Offensive runs above average: ((wOBA - lgAvg) / 1.15) * PA
+            # Replacement level wOBA (roughly 0.020 below league average)
+            # This matches real WAR methodology which compares to replacement level, not average
+            replacement_woba = league_woba - 0.020
+
+            # Offensive runs above replacement: ((wOBA - replacement) / 1.15) * PA
             # 1.15 is wOBA scale factor to convert to runs
-            runs_above_avg = ((woba - league_woba) / 1.15) * plate_appearances
+            runs_above_replacement = ((woba - replacement_woba) / 1.15) * plate_appearances
 
             # Convert runs to wins (~10 runs = 1 WAR)
-            base_war = runs_above_avg / 10.0
+            # This is the base offensive WAR - based purely on observable offensive stats
+            sim_war = runs_above_replacement / 10.0
 
-            # Apply adjustments
-            # 1. Age adjustment (already calculated in preprocessing)
-            age_factor = 1.0 + batting_df['Age_Adjustment']
-
-            # 2. Injury performance adjustment (reduces performance if recovering from injury)
-            injury_perf_factor = 1.0 + batting_df['Injury_Perf_Adj']
-
-            # 3. Injury rate adjustment (players more prone to injury are less valuable)
-            # Reduce value by injury_rate_adj percentage
-            injury_rate_factor = 1.0 - (batting_df['Injury_Rate_Adj'] * 0.5)  # 50% weight
-
-            # 4. Games missed adjustment (currently injured players have 0 value for missed games)
-            # Estimate games played based on G column vs expected (assume 162 game season)
-            games_played = batting_df['G']
-            # Expected value: adjust WAR proportionally for games missed to injury
-            # But don't double-count current injury status - focus on games already missed
-
-            # Combine all factors
-            sim_war = base_war * age_factor * injury_perf_factor * injury_rate_factor
+            # Add Def_WAR if it exists (captures defense/baserunning from prior season)
+            if 'Def_WAR' in batting_df.columns:
+                # Def_WAR is a per-season value from prior year, scale by games played
+                games_played = batting_df['G']
+                # Scale Def_WAR by participation rate (G/162)
+                scaled_def_war = batting_df['Def_WAR'] * (games_played / 162.0)
+                sim_war = sim_war + scaled_def_war
 
             # Set Sim_WAR column (vectorized)
             batting_df['Sim_WAR'] = np.where(active_batters, sim_war, 0.0)
 
+            logger.debug('League average wOBA: {:.3f}, Replacement level wOBA: {:.3f}',
+                       league_woba, replacement_woba)
             logger.debug('Calculated Sim WAR for batters: min={:.2f}, max={:.2f}, avg={:.2f}',
                        batting_df['Sim_WAR'].min(), batting_df['Sim_WAR'].max(),
                        batting_df['Sim_WAR'].mean())
@@ -742,6 +789,9 @@ class BaseballStats:
 
         # Filter pitchers with playing time
         active_pitchers = pitching_df['IP'] >= 5
+
+        # Debug output for season end
+        logger.info(f'Pitcher WAR calculation: {len(pitching_df)} total pitchers, {active_pitchers.sum()} active (IP >= 5)')
 
         if active_pitchers.sum() > 0:
             # Calculate FIP (Fielding Independent Pitching)
@@ -756,32 +806,40 @@ class BaseballStats:
             # League average FIP
             league_fip = np.mean(fip[active_pitchers])
 
-            # Runs prevented above average: ((lgFIP - playerFIP) / 9) * IP
+            # Replacement level FIP (roughly 1.0 runs per 9 IP worse than league average)
+            # This matches real WAR methodology which compares to replacement level, not average
+            replacement_fip = league_fip + 1.0
+
+            # Runs prevented above replacement: ((replacementFIP - playerFIP) / 9) * IP
             # Divide by 9 to convert from per-9-innings rate to per-inning rate
-            runs_prevented = ((league_fip - fip) / 9.0) * pitching_df['IP']
+            runs_above_replacement = ((replacement_fip - fip) / 9.0) * pitching_df['IP']
 
             # Convert runs to wins (~10 runs = 1 WAR)
-            base_war = runs_prevented / 10.0
+            # This is the base pitching WAR - based purely on observable pitching stats
+            sim_war = runs_above_replacement / 10.0
 
-            # Apply adjustments
-            # 1. Age adjustment
-            age_factor = 1.0 + pitching_df['Age_Adjustment']
-
-            # 2. Injury performance adjustment
-            injury_perf_factor = 1.0 + pitching_df['Injury_Perf_Adj']
-
-            # 3. Injury rate adjustment (pitchers prone to injury are less valuable)
-            injury_rate_factor = 1.0 - (pitching_df['Injury_Rate_Adj'] * 0.5)
-
-            # Combine all factors
-            sim_war = base_war * age_factor * injury_perf_factor * injury_rate_factor
+            # Add Def_WAR if it exists (captures fielding from prior season)
+            # Note: For pitchers, Def_WAR is typically small (fielding by pitcher)
+            if 'Def_WAR' in pitching_df.columns:
+                # Def_WAR is a per-season value from prior year, scale by games/IP
+                games_played = pitching_df['G']
+                # Scale Def_WAR by participation rate (G/35 for starters, G/70 for relievers)
+                # Use simplified scaling: G/50 as middle ground
+                scaled_def_war = pitching_df['Def_WAR'] * (games_played / 50.0)
+                sim_war = sim_war + scaled_def_war
 
             # Set Sim_WAR column (vectorized)
             pitching_df['Sim_WAR'] = np.where(active_pitchers, sim_war, 0.0)
 
-            logger.debug('Calculated Sim WAR for pitchers: min={:.2f}, max={:.2f}, avg={:.2f}',
-                       pitching_df['Sim_WAR'].min(), pitching_df['Sim_WAR'].max(),
-                       pitching_df['Sim_WAR'].mean())
+            logger.info(f'League average FIP: {league_fip:.2f}, Replacement level FIP: {replacement_fip:.2f}')
+            logger.info(f'Pitcher WAR range: {pitching_df[active_pitchers]["Sim_WAR"].min():.2f} to {pitching_df[active_pitchers]["Sim_WAR"].max():.2f}, avg={pitching_df[active_pitchers]["Sim_WAR"].mean():.2f}')
+
+            # Log a sample pitcher for verification (temporarily store FIP in dataframe)
+            pitching_df['_temp_fip'] = fip
+            sample_pitchers = pitching_df[active_pitchers].nlargest(3, 'IP')
+            for idx, p in sample_pitchers.iterrows():
+                logger.info(f'Sample: {p.get("Player", "Unknown")} - IP:{p["IP"]:.1f} FIP:{p["_temp_fip"]:.2f} WAR:{p["Sim_WAR"]:.2f}')
+            pitching_df.drop(columns=['_temp_fip'], inplace=True)
         else:
             pitching_df['Sim_WAR'] = 0.0
 
@@ -856,6 +914,39 @@ class BaseballStats:
                           summary_only_b=summary_only_b)
         return
 
+    def save_season_stats(self) -> None:
+        """
+        Save final season statistics to CSV files.
+        Creates files: {new_season} Final-Season-stats-pp-Batting.csv and
+                      {new_season} Final-Season-stats-pp-Pitching.csv
+        :return: None
+        """
+        # Calculate final stats for both batting and pitching
+        final_batting_data = team_batting_stats(
+            self.new_season_batting_data[self.new_season_batting_data['AB'] > 0].fillna(0),
+            filter_stats=False
+        )
+        final_pitching_data = team_pitching_stats(
+            self.new_season_pitching_data[self.new_season_pitching_data['IP'] > 0].fillna(0),
+            filter_stats=False
+        )
+
+        # Create file names
+        batting_filename = f"{self.new_season} Final-Season-stats-pp-Batting.csv"
+        pitching_filename = f"{self.new_season} Final-Season-stats-pp-Pitching.csv"
+
+        # Save to CSV files
+        final_batting_data.to_csv(batting_filename, index=True, index_label='Hashcode')
+        final_pitching_data.to_csv(pitching_filename, index=True, index_label='Hashcode')
+
+        logger.info(f'Saved final season batting stats to {batting_filename}')
+        logger.info(f'Saved final season pitching stats to {pitching_filename}')
+        print(f'\nFinal season statistics saved to:')
+        print(f'  - {batting_filename}')
+        print(f'  - {pitching_filename}')
+
+        return
+
     def print_season(self, df_b: DataFrame, df_p: DataFrame, teams: List[str],
                      summary_only_b: bool = False, condition_text: bool = True) -> None:
         """
@@ -881,10 +972,10 @@ class BaseballStats:
         # Rename 'Injured Days' to 'Estimated Days Remaining' for pitchers
         if 'Injured Days' in df_p_display.columns:
             df_p_display = df_p_display.rename(columns={'Injured Days': 'Estimated Days Remaining'})
-        
+
         # Rename index to remove the separate "Hashcode" line
         df_p_display = df_p_display.rename_axis(None)
-        
+
         df_totals = team_pitching_totals(df_p_display)
         if summary_only_b is False:
             print(df_p_display[self.pcols_to_print].to_string(justify='right', index_names=False))  # print entire team
@@ -898,14 +989,14 @@ class BaseballStats:
         # Rename 'Injured Days' to 'Estimated Days Remaining' for batters
         if 'Injured Days' in df_b_display.columns:
             df_b_display = df_b_display.rename(columns={'Injured Days': 'Estimated Days Remaining'})
-        
+
         # Format positions to remove brackets and quotes, but keep commas
         if 'Pos' in df_b_display.columns:
             df_b_display['Pos'] = df_b_display['Pos'].apply(format_positions)
-        
+
         # Rename index to remove the separate "Hashcode" line
         df_b_display = df_b_display.rename_axis(None)
-        
+
         df_totals = team_batting_totals(df_b_display)
         if summary_only_b is False:
             print(df_b_display[self.bcols_to_print].to_string(justify='right', index_names=False))  # print entire team
@@ -1029,18 +1120,20 @@ def team_pitching_stats(df: DataFrame, filter_stats: bool=True) -> DataFrame:
     """
     # OPTIMIZED: Filter first (creates new df), or copy only if not filtering
     if filter_stats:
-        df = df[(df['IP'] > 0) & (df['AB'] > 0)]  # Boolean indexing creates a new dataframe
+        # For pitchers, only require IP > 0 (not AB, since most pitchers don't bat)
+        df = df[df['IP'] > 0]  # Boolean indexing creates a new dataframe
     else:
         df = df.copy()  # Copy only when not filtering to avoid modifying caller's data
 
     df['AB'] = trunc_col(df['AB'], 0)
     df['IP'] = trunc_col(df['IP'], 2)
-    df['AVG'] = trunc_col(df['H'] / df['AB'], 3)
-    df['OBP'] = trunc_col((df['H'] + df['BB']) / (df['AB'] + df['BB']), 3)
+    # Only calculate batting stats if pitcher has at-bats (NL pitchers, two-way players)
+    df['AVG'] = trunc_col(np.where(df['AB'] > 0, df['H'] / df['AB'], 0), 3)
+    df['OBP'] = trunc_col(np.where(df['AB'] + df['BB'] > 0, (df['H'] + df['BB']) / (df['AB'] + df['BB']), 0), 3)
 
-    # Calculate 'SLG' column
+    # Calculate 'SLG' column (only for pitchers with at-bats)
     slg_numerator = (df['H'] - df['2B'] - df['3B'] - df['HR']) + df['2B'] * 2 + df['3B'] * 3 + df['HR'] * 4
-    df['SLG'] = trunc_col(slg_numerator / df['AB'], 3)
+    df['SLG'] = trunc_col(np.where(df['AB'] > 0, slg_numerator / df['AB'], 0), 3)
     # Calculate 'OPS' column
     df['OPS'] = trunc_col(df['OBP'] + df['SLG'], 3)
     # Calculate 'WHIP' and 'ERA' columns
@@ -1114,21 +1207,25 @@ def fill_nan_with_value(df, column_name, value=0):
 
 def format_positions(pos):
     """
-    Format positions by removing brackets and quotes, but keeping commas.
+    Format positions compactly by removing brackets, quotes, and using slash separator.
     Handles both list and string representations.
-    
+
     :param pos: Position(s) as list or string
-    :return: Formatted string of positions
+    :return: Compact formatted string of positions (e.g., "1B/OF" instead of "1B, OF")
     """
     if isinstance(pos, list):
-        return ", ".join(pos)
+        # Limit to first 3 positions for compactness
+        positions = pos[:3] if len(pos) > 3 else pos
+        return "/".join(positions)
     elif isinstance(pos, str):
         # Check if it looks like a string representation of a list
         if pos.startswith('[') and pos.endswith(']'):
             # Remove brackets and split by comma, then clean up quotes and spaces
             items = pos[1:-1].split(',')
             cleaned_items = [item.strip().strip("'\"") for item in items]
-            return ", ".join(cleaned_items)
+            # Limit to first 3 positions for compactness
+            positions = cleaned_items[:3] if len(cleaned_items) > 3 else cleaned_items
+            return "/".join(positions)
     # Return the original if no formatting is needed
     return pos
 

@@ -25,7 +25,7 @@
 # 2. uv python list
 # 3. uv python pin 3.14t
 # 4. uv sync
-# 5. uv run -- python -X gil=0 bbseason.py
+# 5. uv run -- python -X gil=0 bbseason.py or PYTHON_GIL=0 from Pycharm
 # JimMaastricht5@gmail.com
 import datetime
 import queue

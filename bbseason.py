@@ -21,11 +21,12 @@
 # SOFTWARE.
 #
 # notes on multi-threading
-# 1.uv python install 3.14t
+# 1.uv python install 3.13t or 3.14t
 # 2. uv python list
-# 3. uv python pin 3.14t
-# 4. uv sync
-# 5. uv run -- python -X gil=0 bbseason.py or PYTHON_GIL=0 from Pycharm
+# 3. uv python pin 3.13t
+# 4. pip install PySide6  (is not full supported in uv for 3.13 or 3.14)
+# 5. uv sync
+# 6. uv run -- python -X gil=0 bbseason.py or PYTHON_GIL=0 from Pycharm
 # JimMaastricht5@gmail.com
 import datetime
 import queue

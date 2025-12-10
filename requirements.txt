@@ -3,6 +3,7 @@ pandas
 keyboard
 loguru
 # pygame
+# PySide6>=6.5.0  # Removed - using built-in tkinter instead for Python 3.14t compatibility
 requests
 # lxml
 # html5lib

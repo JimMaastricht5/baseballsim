@@ -1,16 +1,19 @@
+# --- Copyright Notice ---
+# Copyright (c) 2024 Jim Maastricht
 """
-Entry point for the baseball season simulation UI.
+PRIMARY FUNCTION:
+- main(): Initializes the tkinter root window and instantiates the
+  SeasonMainWindow class to launch the application.
 
-Launches the tkinter application with the main window.
-
-Usage:
+USAGE:
     python bbseason_ui.py
 
-Optional command-line arguments (for future enhancement):
+OPTIONAL COMMAND-LINE ARGUMENTS (Future Enhancement):
     --seasons 2023,2024,2025    Years to load stats from
     --new-season 2026           Season to simulate
     --follow NYM,LAD            Teams to follow in detail
-    --random                    Use random data
+    --random                    Use random data (appends "random" to file name)
+Contact: JimMaastricht5@gmail.com
 """
 
 import tkinter as tk

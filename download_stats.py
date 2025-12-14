@@ -1,31 +1,24 @@
-#!/usr/bin/env python3
 """
-MIT License
+--- Copyright Notice ---
+Copyright (c) 2024 Jim Maastricht
 
-2024 Jim Maastricht
+--- File Context and Purpose ---
+DESCRIPTION: Manages the automated downloading of historical and current MLB player
+statistics (batting and pitching) from Baseball Reference using Selenium WebDriver.
+The tool navigates the required pages, simulates the CSV export steps, captures the
+CSV data displayed on the screen, and saves it to local files for subsequent
+preprocessing by the `BaseballStatsPreProcess` module.
 
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
+WARNING: This script currently requires manual intervention to click the
+"Share & Export" -> "Get Table as CSV" link in the opened browser window.
 
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
+PRIMARY CLASS:
+- StatsDownloader: Handles the initiation of the browser, navigation, data
+  extraction, file saving, and cleanup.
 
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
-
-JimMaastricht5@gmail.com
-
-Automated downloader for RotoWire baseball statistics
-Downloads batting and pitching stats, saves as CSV files, and runs preprocessing
+DEPENDENCIES: requests, pandas, subprocess, sys, os, time, selenium,
+              webdriver-manager, bbstats_preprocess, bblogger.
+Contact: JimMaastricht5@gmail.com
 """
 
 import requests

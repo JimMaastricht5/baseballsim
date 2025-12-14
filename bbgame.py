@@ -1,26 +1,20 @@
-# MIT License
-#
-# 2024 Jim Maastricht
-#
-# Permission is hereby granted, free of charge, to any person obtaining a copy
-# of this software and associated documentation files (the "Software"), to deal
-# in the Software without restriction, including without limitation the rights
-# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-# copies of the Software, and to permit persons to whom the Software is
-# furnished to do so, subject to the following conditions:
-#
-# The above copyright notice and this permission notice shall be included in all
-# copies or substantial portions of the Software.
-#
-# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-# SOFTWARE.
-#
-# JimMaastricht5@gmail.com
+"""
+--- Copyright Notice ---
+Copyright (c) 2024 Jim Maastricht
+
+--- File Context and Purpose ---
+DESCRIPTION: Core module for simulating a single baseball game between two teams.
+Manages game state (score, innings, outs, runners), handles pitcher changes,
+resolves at-bats, and updates game statistics for the involved players and teams.
+
+PRIMARY CLASS:
+- Game: Manages the details and simulation flow for an individual game, supporting
+  both single-threaded (`sim_game`) and multi-threaded (`sim_game_threaded`) execution.
+
+DEPENDENCIES: bbstats, bbteam, at_bat, bbbaserunners, bblogger.
+
+Contact: JimMaastricht5@gmail.com
+"""
 import bbstats
 import bbteam
 import at_bat

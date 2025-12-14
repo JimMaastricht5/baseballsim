@@ -1,15 +1,46 @@
 markdown
 # Baseball Simulator
 
-A comprehensive baseball simulation system that models real-world baseball scenarios including team performance, player statistics, and game outcomes.
+The provided code consists of two main parts: a Python script for 
+preprocessing baseball statistics and a separate script for 
+creating a user interface (UI) using Tkinter.
 
-## Project Overview
-
-This project simulates baseball seasons with detailed team and player statistics. It includes:
+This project simulates baseball seasons with detailed team and player statistics. 
+It includes:
 - Season scheduling and game simulation
 - Player performance tracking and evaluation
 - Team standings and record management
-- Interactive and threaded game simulation modes
+- UI  and threaded game simulation modes
+
+### Baseball Data Preprocessing
+
+The first part of the code is in the file BaseballStatsPreProcess.py. This script handles the preprocessing of baseball statistics, including loading data, processing it, and simulating new seasons based on existing data. Here are some key features:
+
+1. **Loading Data**: The script can load existing season data from CSV files.
+2. **Processing Data**: It processes the data to calculate various performance metrics, such as WAR (Wins Above Replacement), age adjustments, and more.
+3. **Simulating New Seasons**: It simulates new seasons based on either partial existing season data or completely random data.
+
+#### Key Classes and Methods
+
+- BaseballStatsPreProcess: This is the main class that handles the entire preprocessing pipeline.
+  - __init__: Initializes the class with parameters such as load seasons, new season, random data generation, and file paths for loading data.
+  - create_hash: Generates a hashcode for each player based on their name.
+  - get_pitching_seasons and get_batting_seasons: Load pitching and batting data from CSV files.
+  - calc_age_adjustment: Applies an age adjustment to performance metrics based on the player's age.
+
+### User Interface (UI)
+
+The second part of the code is in the file bbseason_ui.py. This script creates a graphical user interface using Tkinter to interact with the baseball season simulation. Here are some key features:
+
+1. **Main Window**: The UI has a main window where users can specify parameters for the simulation.
+2. **Event Handling**: It handles events such as closing the window and updating settings based on user input.
+
+#### Key Classes and Methods
+
+- SeasonMainWindow: This is the main class that creates the Tkinter window.
+  - __init__: Initializes the window, sets up UI components, and binds event handlers.
+  - on_close: Handles the window close event.
+  - Other methods handle UI interactions and data processing.
 
 ## Key Features
 
@@ -39,7 +70,7 @@ This project simulates baseball seasons with detailed team and player statistics
 
 ## Usage
 
-The simulator can be run in interactive mode or as a batch process. It automatically handles:
+The simulator can be run in UI mode or as a batch process. It automatically handles:
 - Team roster management
 - Player injury tracking
 - Rest scheduling
@@ -77,3 +108,4 @@ game.
 4. uv python pin 3.14t
 5. uv sync
 6. uv run -- python -X gil=0 bbseason.py
+7. uv run -- python -X gil=0 bbseason_ui.py

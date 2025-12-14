@@ -1,8 +1,24 @@
+# --- Copyright Notice ---
+# Copyright (c) 2024 Jim Maastricht
 """
-Baseball Simulation Logger Configuration Module
+--- File Context and Purpose ---
 
-This module configures the loguru logger for use throughout the baseball simulation application.
+FILE: bblogger.py (Implied)
+DESCRIPTION: Configures and manages the logging system for the baseball
+simulation application using the loguru library. It sets up handlers for both
+console (stderr) output and file logging (logs/baseball_sim.log).
+
+PRIMARY FUNCTION:
+- configure_logger(): Initializes or reconfigures the loguru logger with a
+  specified logging level, ensuring logs are written to the console and a file.
+
+EXPORTS:
+- logger: The configured loguru logger instance.
+- configure_logger: The function to adjust logging levels at runtime.
+
+Contact: JimMaastricht5@gmail.com
 """
+
 from loguru import logger
 import sys
 import os

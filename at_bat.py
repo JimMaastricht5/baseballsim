@@ -1,26 +1,24 @@
-# MIT License
-#
-# 2024 Jim Maastricht
-#
-# Permission is hereby granted, free of charge, to any person obtaining a copy
-# of this software and associated documentation files (the "Software"), to deal
-# in the Software without restriction, including without limitation the rights
-# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-# copies of the Software, and to permit persons to whom the Software is
-# furnished to do so, subject to the following conditions:
-#
-# The above copyright notice and this permission notice shall be included in all
-# copies or substantial portions of the Software.
-#
-# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-# SOFTWARE.
-#
-# JimMaastricht5@gmail.com
+"""
+--- Copyright Notice ---
+Copyright (c) 2024 Jim Maastricht
+
+--- File Context and Purpose ---
+FILE: at_bat.py (Implied)
+DESCRIPTION: Contains the core logic for simulating the outcome of a single
+baseball at-bat based on the statistical probabilities of the batter, the pitcher,
+and the league environment. It utilizes the Odds Ratio formula for probability
+adjustment.
+
+PRIMARY CLASSES:
+- OutCome: Acts as a translator for scorebook codes ('H', 'BB', 'SO', etc.) into
+  game mechanics: runners advanced, outs recorded, and whether the batter reached base.
+- SimAB: Calculates the probability of various events (On Base, HR, K, etc.) using
+  the Odds Ratio and determines the final outcome of the at-bat.
+DEPENDENCIES: bbstats, bblogger.
+
+Contact: JimMaastricht5@gmail.com
+"""
+
 import numpy as np
 import warnings
 import bbstats

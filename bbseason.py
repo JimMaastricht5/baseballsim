@@ -1,33 +1,32 @@
-# MIT License
-#
-# 2024 Jim Maastricht
-#
-# Permission is hereby granted, free of charge, to any person obtaining a copy
-# of this software and associated documentation files (the "Software"), to deal
-# in the Software without restriction, including without limitation the rights
-# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-# copies of the Software, and to permit persons to whom the Software is
-# furnished to do so, subject to the following conditions:
-#
-# The above copyright notice and this permission notice shall be included in all
-# copies or substantial portions of the Software.
-#
-# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-# SOFTWARE.
-#
-# notes on multi-threading
-# 1.uv python install 3.13t or 3.14t
-# 2. uv python list
-# 3. uv python pin 3.13t
-# 4. pip install PySide6  (is not full supported in uv for 3.13 or 3.14)
-# 5. uv sync
-# 6. uv run -- python -X gil=0 bbseason.py or PYTHON_GIL=0 from Pycharm
-# JimMaastricht5@gmail.com
+# --- Copyright Notice ---
+# Copyright (c) 2024 Jim Maastricht
+"""
+--- File Context and Purpose ---
+
+FILE: bbseason.py
+DESCRIPTION: Manages the simulation of a full baseball season, including
+league-wide scheduling, running games (both single-threaded and multi-threaded),
+updating standings, and managing AI General Manager assessments.
+
+PRIMARY CLASSES:
+- BaseballSeason: Manages a single league's season simulation (e.g., MLB).
+- MultiBaseballSeason: Manages the simulation of multiple concurrent leagues
+  (e.g., Majors and Minors) with potential player movement.
+
+DEPENDENCIES: bbgame, bbstats, bbgm_manager, bblogger.
+--- Technical Notes ---
+
+notes on multi-threading
+1. uv python install 3.13t or 3.14t
+2. uv python list
+3. uv python pin 3.13t
+4. pip install PySide6 (is not full supported in uv for 3.13 or 3.14)
+5. uv sync
+6. uv run -- python -X gil=0 bbseason.py or PYTHON_GIL=0 from Pycharm
+
+Contact: JimMaastricht5@gmail.com
+"""
+
 import datetime
 import queue
 import random

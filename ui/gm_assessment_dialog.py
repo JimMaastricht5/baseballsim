@@ -1,4 +1,7 @@
 """
+--- Copyright Notice ---
+Copyright (c) 2024 Jim Maastricht
+
 GM Assessment Dialog for tkinter UI.
 
 Displays comprehensive AI GM roster assessment in a formatted dialog window.

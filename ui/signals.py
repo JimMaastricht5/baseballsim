@@ -1,4 +1,7 @@
 """
+--- Copyright Notice ---
+Copyright (c) 2024 Jim Maastricht
+
 Queue-based signaling for thread-safe communication between SeasonWorker and UI.
 
 Uses Python's queue.Queue instead of Qt signals for tkinter compatibility.

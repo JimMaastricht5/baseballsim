@@ -1,7 +1,10 @@
 """
-UI-aware subclass of BaseballSeason that emits Qt signals instead of printing.
+--- Copyright Notice ---
+Copyright (c) 2024 Jim Maastricht
 
-This class overrides specific methods from BaseballSeason to emit signals
+UI-aware subclass of BaseballSeason that uses queue-based signals instead of printing.
+
+This class overrides specific methods from BaseballSeason to emit queue-based signals
 for UI updates while preserving all simulation logic.
 """
 
@@ -16,11 +19,11 @@ from bblogger import logger
 
 class UIBaseballSeason(bbseason.BaseballSeason):
     """
-    BaseballSeason subclass that emits Qt signals instead of printing to console.
+    BaseballSeason subclass that emits queue-based signals instead of printing to console.
 
     Overrides:
-    - _process_and_print_game_results(): Emits game_completed and day_completed signals
-    - check_gm_assessments(): Emits gm_assessment_ready signal for followed teams
+    - _process_and_print_game_results(): Emits game_completed and day_completed signals via queues
+    - check_gm_assessments(): Emits gm_assessment_ready signal for followed teams via queues
     - print_standings(): Suppressed (standings emitted with day_completed)
 
     All other simulation logic remains unchanged from BaseballSeason.

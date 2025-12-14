@@ -33,7 +33,7 @@ import random
 import pandas as pd
 import bbgame
 import bbstats
-import bbgm_manager
+import bb_aigm_manager
 import numpy as np
 from typing import List, Optional
 import threading
@@ -107,7 +107,7 @@ class BaseballSeason:
         self.gm_assessment_intervals = [30, 60, 90, 120, 150]  # Assess at these game milestones
         for team in self.teams:
             if team != 'OFF DAY':
-                self.gm_managers[team] = bbgm_manager.AIGeneralManager(
+                self.gm_managers[team] = bb_aigm_manager.AIGeneralManager(
                     team_name=team,
                     assessment_frequency=30  # Will assess every 30 games
                 )

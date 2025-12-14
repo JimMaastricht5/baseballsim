@@ -1,6 +1,7 @@
-# --- Copyright Notice ---
-# Copyright (c) 2024 Jim Maastricht
 """
+--- Copyright Notice ---
+Copyright (c) 2024 Jim Maastricht
+
 PRIMARY FUNCTION:
 - main(): Initializes the tkinter root window and instantiates the
   SeasonMainWindow class to launch the application.

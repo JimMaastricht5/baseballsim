@@ -1,4 +1,7 @@
 """
+--- Copyright Notice ---
+Copyright (c) 2024 Jim Maastricht
+
 Main window for the baseball season simulation UI using tkinter.
 
 Provides the primary interface with toolbar controls, standings display,
@@ -42,9 +45,10 @@ class SeasonMainWindow:
         self.worker = None
 
         # Track games for progressive display
-        self.current_day_schedule = []  # List of (away_team, home_team) tuples
+        self.current_day_schedule = []  # List of (away_team, home_tuple) tuples
         self.current_day_results = {}   # Dict: {(away, home): game_data}
         self.followed_game_recaps = []  # List of (away, home, recap_text) for followed games
+        self.current_day_num = 0  # Track current day number for header
 
         # Setup UI components
         self._create_toolbar()
@@ -170,7 +174,7 @@ class SeasonMainWindow:
         )
 
         # Configure text tags for formatting
-        self.games_text.tag_configure("header", font=("Arial", 11, "bold"), foreground="#2e5090")
+        self.games_text.tag_configure("header", font=("Arial", 12, "bold"), foreground="#2e5090")
         self.games_text.tag_configure("day_header", font=("Arial", 12, "bold"), foreground="#1a3d6b", spacing3=10)
         self.games_text.tag_configure("followed_game", background="#ffffcc", spacing1=5, spacing3=5)
         self.games_text.tag_configure("separator", foreground="#888888")
@@ -199,8 +203,8 @@ class SeasonMainWindow:
         )
 
         # Configure text tags for formatting
-        self.schedule_text.tag_configure("day_header", font=("Arial", 10, "bold"), foreground="#1a3d6b", spacing1=5, spacing3=3)
-        self.schedule_text.tag_configure("current_day", background="#ffeecc", font=("Arial", 10, "bold"), foreground="#1a3d6b", spacing1=5, spacing3=3)
+        self.schedule_text.tag_configure("day_header", font=("Arial", 12, "bold"), foreground="#1a3d6b", spacing1=5, spacing3=3)
+        self.schedule_text.tag_configure("current_day", background="#ffeecc", font=("Arial", 12, "bold"), foreground="#1a3d6b", spacing1=5, spacing3=3)
         self.schedule_text.tag_configure("matchup", font=("Courier", 9), lmargin1=20, lmargin2=20)
 
         self.schedule_text.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
@@ -294,6 +298,135 @@ class SeasonMainWindow:
 
         self.notebook.add(gm_assessment_frame, text="GM Assessments")
 
+        # Tab 5: Admin (Player Management)
+        admin_frame = tk.Frame(self.notebook)
+
+        # Header with instructions
+        admin_header = tk.Label(
+            admin_frame,
+            text="Player Management - Move players between teams",
+            font=("Arial", 11, "bold"),
+            pady=5
+        )
+        admin_header.pack()
+
+        # Search frame
+        search_frame = tk.Frame(admin_frame)
+        search_frame.pack(fill=tk.X, padx=10, pady=5)
+
+        tk.Label(search_frame, text="Search:", font=("Arial", 10)).pack(side=tk.LEFT, padx=5)
+        self.admin_search_var = tk.StringVar()
+        self.admin_search_var.trace('w', lambda *args: self._filter_admin_players())
+        search_entry = tk.Entry(search_frame, textvariable=self.admin_search_var, width=30, font=("Arial", 10))
+        search_entry.pack(side=tk.LEFT, padx=5)
+
+        tk.Label(search_frame, text="Team Filter:", font=("Arial", 10)).pack(side=tk.LEFT, padx=15)
+        self.admin_team_filter_var = tk.StringVar(value="All Teams")
+        self.admin_team_filter_var.trace('w', lambda *args: self._filter_admin_players())
+        team_filter_combo = ttk.Combobox(
+            search_frame,
+            textvariable=self.admin_team_filter_var,
+            width=15,
+            state="readonly"
+        )
+        team_filter_combo['values'] = ['All Teams']  # Will be populated when worker starts
+        team_filter_combo.pack(side=tk.LEFT, padx=5)
+        self.admin_team_filter_combo = team_filter_combo
+
+        # Player list frame with treeview
+        list_frame = tk.Frame(admin_frame)
+        list_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=5)
+
+        # Scrollbars for treeview
+        tree_scroll_y = ttk.Scrollbar(list_frame, orient=tk.VERTICAL)
+        tree_scroll_y.pack(side=tk.RIGHT, fill=tk.Y)
+
+        tree_scroll_x = ttk.Scrollbar(list_frame, orient=tk.HORIZONTAL)
+        tree_scroll_x.pack(side=tk.BOTTOM, fill=tk.X)
+
+        # Treeview for players
+        self.admin_players_tree = ttk.Treeview(
+            list_frame,
+            columns=("player", "pos", "team", "age", "type", "hashcode"),
+            show="headings",
+            height=20,
+            yscrollcommand=tree_scroll_y.set,
+            xscrollcommand=tree_scroll_x.set
+        )
+        tree_scroll_y.config(command=self.admin_players_tree.yview)
+        tree_scroll_x.config(command=self.admin_players_tree.xview)
+
+        # Define column headings
+        self.admin_players_tree.heading("player", text="Player Name")
+        self.admin_players_tree.heading("pos", text="Position")
+        self.admin_players_tree.heading("team", text="Current Team")
+        self.admin_players_tree.heading("age", text="Age")
+        self.admin_players_tree.heading("type", text="Type")
+        self.admin_players_tree.heading("hashcode", text="Hashcode")
+
+        # Configure column widths
+        self.admin_players_tree.column("player", width=200, anchor=tk.W)
+        self.admin_players_tree.column("pos", width=60, anchor=tk.CENTER)
+        self.admin_players_tree.column("team", width=80, anchor=tk.CENTER)
+        self.admin_players_tree.column("age", width=50, anchor=tk.CENTER)
+        self.admin_players_tree.column("type", width=80, anchor=tk.CENTER)
+        self.admin_players_tree.column("hashcode", width=100, anchor=tk.CENTER)
+
+        self.admin_players_tree.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+
+        # Store full player list for filtering
+        self.admin_all_players = []
+
+        # Action frame
+        action_frame = tk.Frame(admin_frame)
+        action_frame.pack(fill=tk.X, padx=10, pady=10)
+
+        tk.Label(action_frame, text="Move selected player to:", font=("Arial", 10, "bold")).pack(side=tk.LEFT, padx=5)
+        self.admin_dest_team_var = tk.StringVar()
+        dest_team_combo = ttk.Combobox(
+            action_frame,
+            textvariable=self.admin_dest_team_var,
+            width=15,
+            state="readonly"
+        )
+        dest_team_combo['values'] = []  # Will be populated when worker starts
+        dest_team_combo.pack(side=tk.LEFT, padx=5)
+        self.admin_dest_team_combo = dest_team_combo
+
+        move_btn = tk.Button(
+            action_frame,
+            text="Move Player",
+            command=self._admin_move_player,
+            bg="#4CAF50",
+            fg="white",
+            font=("Arial", 10, "bold"),
+            width=15
+        )
+        move_btn.pack(side=tk.LEFT, padx=20)
+
+        save_btn = tk.Button(
+            action_frame,
+            text="Save Changes to CSV",
+            command=self._admin_save_changes,
+            bg="#2196F3",
+            fg="white",
+            font=("Arial", 10, "bold"),
+            width=20
+        )
+        save_btn.pack(side=tk.LEFT, padx=10)
+
+        # Status message
+        self.admin_status_label = tk.Label(
+            admin_frame,
+            text="Ready. Select a player and destination team, then click 'Move Player'.",
+            font=("Arial", 9),
+            fg="#666666",
+            anchor=tk.W
+        )
+        self.admin_status_label.pack(fill=tk.X, padx=10, pady=5)
+
+        self.notebook.add(admin_frame, text="Admin")
+
         paned_window.add(notebook_frame, minsize=600)
 
         # Set initial sash position (30% for standings, 70% for content)
@@ -365,6 +498,9 @@ class SeasonMainWindow:
         # Start worker thread
         self.worker.daemon = True  # Thread will exit when main program exits
         self.worker.start()
+
+        # Load admin players after a short delay (wait for season to initialize)
+        self.root.after(1000, self._load_admin_players)
 
         # Update UI state
         self._update_button_states(simulation_running=True, paused=False)
@@ -493,11 +629,14 @@ class SeasonMainWindow:
         # Schedule next poll in 100ms
         self.root.after(100, self._poll_queues)
 
-    # Event handlers (same logic as Qt version, but update tkinter widgets)
+    # Event handlers (same logic as archived Qt version, but update tkinter widgets)
 
     def on_day_started(self, day_num, schedule_text):
         """Handle day_started message."""
         logger.debug(f"Day {day_num + 1} started")
+
+        # Store current day number for header
+        self.current_day_num = day_num
 
         # Update day counter
         self.day_label.config(text=f"Day: {day_num + 1} / 162")
@@ -918,12 +1057,11 @@ class SeasonMainWindow:
         """Rebuild the entire games display with current results."""
         self.games_text.config(state=tk.NORMAL)
 
-        # Extract day header from first line
-        first_line = self.games_text.get("1.0", "2.0")
-
         # Clear and rebuild
         self.games_text.delete(1.0, tk.END)
-        self.games_text.insert(tk.END, first_line)  # Restore day header
+
+        # Restore day header with proper formatting
+        self.games_text.insert(tk.END, f"═══ Day {self.current_day_num + 1} ═══\n\n", "day_header")
 
         # Display updated grid
         self._display_games_grid()
@@ -1044,6 +1182,254 @@ class SeasonMainWindow:
                     status
                 ),
                 tags=tags
+            )
+
+    def _load_admin_players(self):
+        """
+        Load all players from baseball_data into the admin tab.
+        Called when simulation starts.
+        """
+        if not self.worker or not self.worker.season:
+            self.admin_status_label.config(text="Start simulation to load players", fg="#ff6600")
+            return
+
+        try:
+            baseball_data = self.worker.season.baseball_data
+            self.admin_all_players = []
+
+            # Load batters
+            batting_df = baseball_data.new_season_batting_data
+            for idx, row in batting_df.iterrows():
+                self.admin_all_players.append({
+                    'player': row['Player'],
+                    'pos': row.get('Pos', 'Unknown'),
+                    'team': row['Team'],
+                    'age': int(row.get('Age', 0)),
+                    'type': 'Batter',
+                    'hashcode': idx
+                })
+
+            # Load pitchers
+            pitching_df = baseball_data.new_season_pitching_data
+            for idx, row in pitching_df.iterrows():
+                self.admin_all_players.append({
+                    'player': row['Player'],
+                    'pos': 'P',
+                    'team': row['Team'],
+                    'age': int(row.get('Age', 0)),
+                    'type': 'Pitcher',
+                    'hashcode': idx
+                })
+
+            # Sort by player name
+            self.admin_all_players.sort(key=lambda x: x['player'])
+
+            # Populate team dropdowns
+            all_teams = sorted(set(p['team'] for p in self.admin_all_players))
+            self.admin_team_filter_combo['values'] = ['All Teams'] + all_teams
+            self.admin_dest_team_combo['values'] = all_teams
+
+            # Display all players initially
+            self._filter_admin_players()
+
+            self.admin_status_label.config(
+                text=f"Loaded {len(self.admin_all_players)} players. Ready to make moves.",
+                fg="#006600"
+            )
+            logger.info(f"Admin tab loaded {len(self.admin_all_players)} players")
+
+        except Exception as e:
+            logger.error(f"Error loading admin players: {e}")
+            self.admin_status_label.config(text=f"Error loading players: {e}", fg="#cc0000")
+
+    def _filter_admin_players(self):
+        """
+        Filter and display players based on search text and team filter.
+        """
+        if not self.admin_all_players:
+            return
+
+        # Get filter values
+        search_text = self.admin_search_var.get().lower()
+        team_filter = self.admin_team_filter_var.get()
+
+        # Clear current display
+        for item in self.admin_players_tree.get_children():
+            self.admin_players_tree.delete(item)
+
+        # Filter players
+        filtered_players = []
+        for player in self.admin_all_players:
+            # Filter by search text (player name)
+            if search_text and search_text not in player['player'].lower():
+                continue
+
+            # Filter by team
+            if team_filter != "All Teams" and player['team'] != team_filter:
+                continue
+
+            filtered_players.append(player)
+
+        # Display filtered players
+        for player in filtered_players:
+            self.admin_players_tree.insert(
+                "",
+                tk.END,
+                values=(
+                    player['player'],
+                    player['pos'],
+                    player['team'],
+                    player['age'],
+                    player['type'],
+                    player['hashcode']
+                )
+            )
+
+        # Update status
+        if search_text or team_filter != "All Teams":
+            self.admin_status_label.config(
+                text=f"Showing {len(filtered_players)} of {len(self.admin_all_players)} players",
+                fg="#666666"
+            )
+
+    def _admin_move_player(self):
+        """
+        Move selected player to destination team.
+        """
+        # Check if simulation is running (not paused)
+        if self.worker and self.worker.is_alive() and not self.worker._paused:
+            messagebox.showwarning(
+                "Simulation Running",
+                "Please pause the simulation before moving players."
+            )
+            return
+
+        # Check if worker/season exists
+        if not self.worker or not self.worker.season:
+            messagebox.showwarning(
+                "No Simulation",
+                "Please start a simulation before moving players."
+            )
+            return
+
+        # Get selected player
+        selected_items = self.admin_players_tree.selection()
+        if not selected_items:
+            messagebox.showwarning(
+                "No Player Selected",
+                "Please select a player to move."
+            )
+            return
+
+        selected_item = selected_items[0]
+        values = self.admin_players_tree.item(selected_item, 'values')
+        player_name = values[0]
+        current_team = values[2]
+        hashcode = int(values[5])
+
+        # Get destination team
+        dest_team = self.admin_dest_team_var.get()
+        if not dest_team:
+            messagebox.showwarning(
+                "No Destination Team",
+                "Please select a destination team."
+            )
+            return
+
+        # Check if moving to same team
+        if current_team == dest_team:
+            messagebox.showinfo(
+                "Same Team",
+                f"{player_name} is already on {current_team}."
+            )
+            return
+
+        # Confirm move
+        confirm = messagebox.askyesno(
+            "Confirm Move",
+            f"Move {player_name} from {current_team} to {dest_team}?"
+        )
+
+        if not confirm:
+            return
+
+        try:
+            # Perform move
+            baseball_data = self.worker.season.baseball_data
+            baseball_data.move_a_player_between_teams(hashcode, dest_team)
+
+            # Update in-memory list
+            for player in self.admin_all_players:
+                if player['hashcode'] == hashcode:
+                    player['team'] = dest_team
+                    break
+
+            # Update treeview
+            self.admin_players_tree.item(selected_item, values=(
+                values[0], values[1], dest_team, values[3], values[4], values[5]
+            ))
+
+            self.admin_status_label.config(
+                text=f"Moved {player_name} from {current_team} to {dest_team}. Click 'Save Changes' to persist.",
+                fg="#006600"
+            )
+            logger.info(f"Moved player {hashcode} ({player_name}) from {current_team} to {dest_team}")
+
+        except Exception as e:
+            logger.error(f"Error moving player: {e}")
+            messagebox.showerror(
+                "Move Failed",
+                f"Error moving player: {str(e)}"
+            )
+
+    def _admin_save_changes(self):
+        """
+        Save all player movements to CSV files.
+        """
+        if not self.worker or not self.worker.season:
+            messagebox.showwarning(
+                "No Simulation",
+                "Please start a simulation before saving."
+            )
+            return
+
+        # Confirm save
+        confirm = messagebox.askyesno(
+            "Confirm Save",
+            "Save all player movements to New-Season-stats CSV files?\n\n"
+            "This will overwrite the existing files."
+        )
+
+        if not confirm:
+            return
+
+        try:
+            baseball_data = self.worker.season.baseball_data
+            new_season = baseball_data.new_season
+
+            # Save the files
+            baseball_data.save_new_season_stats()
+
+            # Show success message
+            messagebox.showinfo(
+                "Save Successful",
+                f"Player movements saved successfully!\n\n"
+                f"Files updated:\n"
+                f"  - {new_season} New-Season-stats-pp-Batting.csv\n"
+                f"  - {new_season} New-Season-stats-pp-Pitching.csv"
+            )
+
+            self.admin_status_label.config(
+                text="Changes saved to CSV files successfully!",
+                fg="#006600"
+            )
+            logger.info("Saved player movements to New-Season-stats CSV files")
+
+        except Exception as e:
+            logger.error(f"Error saving changes: {e}")
+            messagebox.showerror(
+                "Save Failed",
+                f"Error saving changes: {str(e)}"
             )
 
     def on_close(self):

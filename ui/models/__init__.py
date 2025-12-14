@@ -1,3 +1,3 @@
 """
-Data models for Qt table views.
+Data models for UI views.
 """

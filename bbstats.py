@@ -929,6 +929,30 @@ class BaseballStats:
 
         return
 
+    def save_new_season_stats(self) -> None:
+        """
+        Save current New-Season statistics to CSV files.
+        Used for saving player movements/trades made in the admin UI.
+        Creates files: {new_season} New-Season-stats-pp-Batting.csv and
+                      {new_season} New-Season-stats-pp-Pitching.csv
+        :return: None
+        """
+        # Create file names
+        batting_filename = f"{self.new_season} New-Season-stats-pp-Batting.csv"
+        pitching_filename = f"{self.new_season} New-Season-stats-pp-Pitching.csv"
+
+        # Save to CSV files (with Hashcode as index)
+        self.new_season_batting_data.to_csv(batting_filename, index=True, index_label='Hashcode')
+        self.new_season_pitching_data.to_csv(pitching_filename, index=True, index_label='Hashcode')
+
+        logger.info(f'Saved new season batting stats to {batting_filename}')
+        logger.info(f'Saved new season pitching stats to {pitching_filename}')
+        print(f'\nNew season statistics saved to:')
+        print(f'  - {batting_filename}')
+        print(f'  - {pitching_filename}')
+
+        return
+
     def print_season(self, df_b: DataFrame, df_p: DataFrame, teams: List[str],
                      summary_only_b: bool = False, condition_text: bool = True) -> None:
         """

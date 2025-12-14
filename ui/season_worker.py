@@ -1,4 +1,7 @@
 """
+--- Copyright Notice ---
+Copyright (c) 2024 Jim Maastricht
+
 Worker thread for running baseball season simulation.
 
 This threading.Thread wraps the BaseballSeason simulation, running it in a
@@ -17,17 +20,17 @@ class SeasonWorker(threading.Thread):
     Background worker thread for season simulation.
 
     Runs the baseball season simulation in a separate thread from the UI,
-    emitting Qt signals for all state changes. Supports pause/resume and
+    putting messages on queues for all state changes. Supports pause/resume and
     day-by-day stepping controls.
 
     Attributes:
-        signals (SeasonSignals): Signal emitter for UI updates
+        signals (SeasonSignals): Queue-based signal emitter for UI updates
         season: BaseballSeason instance (None until run())
         _paused (bool): Pause flag
         _step_mode (bool): Single-step mode flag
         _stopped (bool): Stop flag for termination
-        _pause_mutex (QMutex): Mutex for pause condition
-        _pause_condition (QWaitCondition): Condition for waiting when paused
+        _pause_lock (threading.Lock): Lock for pause state synchronization
+        _pause_event (threading.Event): Event for waiting when paused
     """
 
     def __init__(self, load_seasons=None, new_season=2026,

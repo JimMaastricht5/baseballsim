@@ -1,33 +1,20 @@
-# MIT License
-#
-# 2024 Jim Maastricht
-#
-# Permission is hereby granted, free of charge, to any person obtaining a copy
-# of this software and associated documentation files (the "Software"), to deal
-# in the Software without restriction, including without limitation the rights
-# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-# copies of the Software, and to permit persons to whom the Software is
-# furnished to do so, subject to the following conditions:
-#
-# The above copyright notice and this permission notice shall be included in all
-# copies or substantial portions of the Software.
-#
-# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-# SOFTWARE.
-#
-# JimMaastricht5@gmail.com
 """
-Baseball base runner tracking and advancement system.
+--- Copyright Notice ---
+Copyright (c) 2024 Jim Maastricht
 
-This module handles the movement of base runners during game simulation, including
-walks, hits, double plays, stolen bases, and scoring. Runners are tracked using
-player hashcodes, with special positions for at-bat, bases 1-3, and scoring positions.
+--- File Context and Purpose ---
+DESCRIPTION: Manages the position and movement of base runners during a simulated
+baseball game. It tracks players on the bases (1st, 2nd, 3rd) and the batter (At-Bat),
+and handles all forms of base advancement and scoring based on the outcome of an
+at-bat, including special scenarios like walks, double plays, and sacrifice flies.
+
+PRIMARY CLASS:
+- Bases: Tracks runners using player hashcodes in an 8-position array and provides
+  methods for movement, scoring, and status checks.
+
+Contact: JimMaastricht5@gmail.com
 """
+
 import numpy as np
 from numpy import bool_, int32
 from typing import Union

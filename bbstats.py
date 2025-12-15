@@ -1,29 +1,9 @@
-# MIT License
-#
-# 2024 Jim Maastricht
-#
-# Permission is hereby granted, free of charge, to any person obtaining a copy
-# of this software and associated documentation files (the "Software"), to deal
-# in the Software without restriction, including without limitation the rights
-# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-# copies of the Software, and to permit persons to whom the Software is
-# furnished to do so, subject to the following conditions:
-#
-# The above copyright notice and this permission notice shall be included in all
-# copies or substantial portions of the Software.
-#
-# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-# SOFTWARE.
-#
-# JimMaastricht5@gmail.com
 """
-Baseball statistics management and game state tracking.
+--- Copyright Notice ---
+Copyright (c) 2024 Jim Maastricht
 
+--- File Context and Purpose ---
+Baseball statistics management and game state tracking.
 This module provides the core statistics management system for the baseball simulator,
 handling loading of preprocessed player data, calculating derived statistics (AVG, OBP,
 ERA, WHIP), managing player conditions (injuries, fatigue, hot/cold streaks), and
@@ -48,6 +28,8 @@ Data Structure:
 - batting_data: Aggregated career batting stats (indexed by Hashcode)
 - new_season_pitching_data: Current season pitching stats
 - new_season_batting_data: Current season batting stats
+
+Contact: JimMaastricht5@gmail.com
 """
 import ast
 import pandas as pd
@@ -942,6 +924,30 @@ class BaseballStats:
         logger.info(f'Saved final season batting stats to {batting_filename}')
         logger.info(f'Saved final season pitching stats to {pitching_filename}')
         print(f'\nFinal season statistics saved to:')
+        print(f'  - {batting_filename}')
+        print(f'  - {pitching_filename}')
+
+        return
+
+    def save_new_season_stats(self) -> None:
+        """
+        Save current New-Season statistics to CSV files.
+        Used for saving player movements/trades made in the admin UI.
+        Creates files: {new_season} New-Season-stats-pp-Batting.csv and
+                      {new_season} New-Season-stats-pp-Pitching.csv
+        :return: None
+        """
+        # Create file names
+        batting_filename = f"{self.new_season} New-Season-stats-pp-Batting.csv"
+        pitching_filename = f"{self.new_season} New-Season-stats-pp-Pitching.csv"
+
+        # Save to CSV files (with Hashcode as index)
+        self.new_season_batting_data.to_csv(batting_filename, index=True, index_label='Hashcode')
+        self.new_season_pitching_data.to_csv(pitching_filename, index=True, index_label='Hashcode')
+
+        logger.info(f'Saved new season batting stats to {batting_filename}')
+        logger.info(f'Saved new season pitching stats to {pitching_filename}')
+        print(f'\nNew season statistics saved to:')
         print(f'  - {batting_filename}')
         print(f'  - {pitching_filename}')
 

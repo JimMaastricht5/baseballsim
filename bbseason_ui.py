@@ -23,7 +23,9 @@ from ui.main_window_tk import SeasonMainWindow
 from bblogger import logger
 
 
-def main():
+def main(load_seasons=[2023, 2024, 2025], new_season = 2026, season_length = 162, series_length = 3,
+         rotation_len = 5, season_chatty = False, season_print_lineup_b = False,
+         season_print_box_score_b = False, season_team_to_follow = None):
     """
     Main entry point for the UI application.
 
@@ -36,7 +38,9 @@ def main():
     root = tk.Tk()
 
     # Create main window
-    window = SeasonMainWindow(root)
+    window = SeasonMainWindow(root, load_seasons, new_season, season_length, series_length, rotation_len,
+                              season_chatty,season_print_lineup_b, season_print_box_score_b,
+                              season_team_to_follow)
 
     # Handle window close
     root.protocol("WM_DELETE_WINDOW", window.on_close)
@@ -48,4 +52,13 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    main(load_seasons = [2023, 2024, 2025],
+         new_season = 2026,
+         season_length = 162,
+         series_length = 3,
+         rotation_len = 5,
+         season_chatty = False,
+         season_print_lineup_b = False,
+         season_print_box_score_b = False,
+         season_team_to_follow = ['MIL']
+         )

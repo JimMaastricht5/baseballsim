@@ -34,8 +34,9 @@ class SeasonWorker(threading.Thread):
     """
 
     def __init__(self, load_seasons=None, new_season=2026,
-                 team_to_follow=None, random_data=False,
-                 rotation_len=5, num_games=162, only_nl_b=False):
+                rotation_len=5, series_length=3, season_length=162, season_chatty=False,
+                season_print_lineup_b=False, season_print_box_score_b=False,
+                team_to_follow=None):
         """
         Initialize season worker with simulation parameters.
 
@@ -43,10 +44,8 @@ class SeasonWorker(threading.Thread):
             load_seasons (list): Years to load stats from (e.g., [2023, 2024, 2025])
             new_season (int): Season year to simulate
             team_to_follow (list): Teams to follow in detail (e.g., ['NYM', 'LAD'])
-            random_data (bool): Use randomized data instead of real stats
             rotation_len (int): Pitcher rotation length (default 5)
-            num_games (int): Number of games per team (default 162)
-            only_nl_b (bool): Simulate only National League
+            season_length (int): Number of games per team (default 162)
         """
         super().__init__()
 
@@ -54,10 +53,14 @@ class SeasonWorker(threading.Thread):
         self.load_seasons = load_seasons or [2023, 2024, 2025]
         self.new_season = new_season
         self.team_to_follow = team_to_follow or []
-        self.random_data = random_data
+        self.random_data = False
         self.rotation_len = rotation_len
-        self.num_games = num_games
-        self.only_nl_b = only_nl_b
+        self.series_length = series_length
+        self.num_games = season_length
+        self.season_chatty = season_chatty
+        self.season_print_lineup_b = season_print_lineup_b
+        self.season_print_box_score_b = season_print_box_score_b
+        self.only_nl_b = False
 
         # Create signal emitter
         self.signals = SeasonSignals()
@@ -94,13 +97,12 @@ class SeasonWorker(threading.Thread):
                 new_season=self.new_season,
                 team_list=None,  # Use all teams
                 season_length=self.num_games,
-                series_length=3,  # Standard 3-game series
+                series_length=self.series_length,  # Standard 3-game series
                 rotation_len=self.rotation_len,
                 include_leagues=None if not self.only_nl_b else ['NL'],
-                season_interactive=False,  # Not interactive in UI mode
-                season_print_lineup_b=False,  # Suppress console output
-                season_print_box_score_b=False,  # Suppress console output
-                season_chatty=False,  # Suppress verbose output
+                season_print_lineup_b=self.season_print_lineup_b,  # Suppress console output
+                season_print_box_score_b=self.season_print_box_score_b,  # Suppress console output
+                season_chatty=self.season_chatty,  # Suppress verbose output
                 season_team_to_follow=self.team_to_follow,
                 load_batter_file='aggr-stats-pp-Batting.csv',
                 load_pitcher_file='aggr-stats-pp-Pitching.csv',

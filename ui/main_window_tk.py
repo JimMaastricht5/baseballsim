@@ -30,7 +30,9 @@ class SeasonMainWindow:
     - Status bar frame with day counter and simulation status
     """
 
-    def __init__(self, root):
+    def __init__(self, root, load_seasons, new_season, season_length, series_length,
+                 rotation_len, season_chatty, season_print_lineup_b, season_print_box_score_b,
+                 season_team_to_follow):
         """
         Initialize the main window and UI components.
 
@@ -38,6 +40,15 @@ class SeasonMainWindow:
             root (tk.Tk): The root tkinter window
         """
         self.root = root
+        self.load_seasons = load_seasons
+        self.new_season = new_season
+        self.season_length = season_length
+        self.series_length = series_length
+        self.rotation_len = rotation_len
+        self.season_chatty = season_chatty
+        self.season_print_lineup_b = season_print_lineup_b
+        self.season_print_box_score_b = season_print_box_score_b
+        self.season_team_to_follow = season_team_to_follow
         self.root.title("Baseball Season Simulator")
         self.root.geometry("1200x800")
 
@@ -481,13 +492,15 @@ class SeasonMainWindow:
 
         # Create worker with simulation parameters
         self.worker = SeasonWorker(
-            load_seasons=[2023, 2024, 2025],
-            new_season=2026,
-            team_to_follow=['NYM'],  # Default followed team
-            random_data=False,
-            rotation_len=5,
-            num_games=162,
-            only_nl_b=False
+            self.load_seasons,
+            self.new_season,
+            self.rotation_len,
+            self.series_length,
+            self.season_length,
+            self.season_chatty,
+            self.season_print_lineup_b,
+            self.season_print_box_score_b,
+            self.season_team_to_follow
         )
 
         # Reset progress indicators

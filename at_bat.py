@@ -157,8 +157,13 @@ class SimAB:
         if the batter reached base was it a walk?
         :return: true if walk
         """
-        return self.rng() < self.odds_ratio(((self.batting.BB + self.BB_adjustment) / self.batting.Total_OB),
-                                            ((self.pitching.BB + self.BB_adjustment) / self.pitching.Total_OB),
+        # Safeguard against division by zero - use league average if no data
+        batter_bb_rate = ((self.batting.BB + self.BB_adjustment) / self.batting.Total_OB) if self.batting.Total_OB > 0 else \
+                         ((self.league_batting_Total_BB + self.BB_adjustment) / self.league_batting_Total_OB)
+        pitcher_bb_rate = ((self.pitching.BB + self.BB_adjustment) / self.pitching.Total_OB) if self.pitching.Total_OB > 0 else \
+                          ((self.league_batting_Total_BB + self.BB_adjustment) / self.league_batting_Total_OB)
+
+        return self.rng() < self.odds_ratio(batter_bb_rate, pitcher_bb_rate,
                                             ((self.league_batting_Total_BB + self.BB_adjustment) /
                                              self.league_batting_Total_OB),
                                             stat_type='BB')
@@ -168,9 +173,13 @@ class SimAB:
         if the batter reached base with it a hit by pitch?
         :return: true if HBP
         """
-        # return self.rng() < (self.HBP_rate + self.HBP_adjustment)
-        return self.rng() < self.odds_ratio((self.batting['HBP'] / self.batting.Total_Outs),
-                                            (self.pitching['HBP'] / self.pitching.Total_Outs),
+        # Safeguard against division by zero - use league average if no data
+        batter_hbp_rate = (self.batting['HBP'] / self.batting.Total_Outs) if self.batting.Total_Outs > 0 else \
+                          float64(self.HBP_rate + self.HBP_adjustment)
+        pitcher_hbp_rate = (self.pitching['HBP'] / self.pitching.Total_Outs) if self.pitching.Total_Outs > 0 else \
+                           float64(self.HBP_rate + self.HBP_adjustment)
+
+        return self.rng() < self.odds_ratio(batter_hbp_rate, pitcher_hbp_rate,
                                             float64((self.HBP_rate + self.HBP_adjustment)), stat_type='HBP')
 
     def hr(self) -> bool:
@@ -178,42 +187,49 @@ class SimAB:
         if the batter reached base was it a home run?
         :return: true if HR
         """
-        return self.rng() < self.odds_ratio(((self.batting.HR + self.HR_adjustment) / self.batting.Total_OB),
-                                            ((self.pitching.HR + self.HR_adjustment) / self.pitching.Total_OB),
-                                            ((self.league_batting_Total_HR + self.HR_adjustment) /
-                                            self.league_batting_Total_OB),
-                                            stat_type='HR')
+        # Safeguard against division by zero - use league average if no data
+        league_hr_rate = (self.league_batting_Total_HR + self.HR_adjustment) / self.league_batting_Total_OB
+        batter_hr_rate = ((self.batting.HR + self.HR_adjustment) / self.batting.Total_OB) if self.batting.Total_OB > 0 else league_hr_rate
+        pitcher_hr_rate = ((self.pitching.HR + self.HR_adjustment) / self.pitching.Total_OB) if self.pitching.Total_OB > 0 else league_hr_rate
+
+        return self.rng() < self.odds_ratio(batter_hr_rate, pitcher_hr_rate, league_hr_rate, stat_type='HR')
 
     def triple(self) -> bool:
         """
         if the batter reached base was it a triple?
         :return: true if triple
         """
+        # Safeguard against division by zero - use league average if no data
+        league_3b_rate = self.league_batting_Total_3B / self.league_batting_Total_OB
+        batter_3b_rate = (self.batting['3B'] / self.batting.Total_OB) if self.batting.Total_OB > 0 else league_3b_rate
+
         # do not have league pitching total for 3b so push it to zero and make it a neutral factor
-        return self.rng() < self.odds_ratio(hitter_stat=(self.batting['3B'] / self.batting.Total_OB), pitcher_stat=.016,
-                                            league_stat=(self.league_batting_Total_3B / self.league_batting_Total_OB),
-                                            stat_type='3B')
+        return self.rng() < self.odds_ratio(hitter_stat=batter_3b_rate, pitcher_stat=.016,
+                                            league_stat=league_3b_rate, stat_type='3B')
 
     def double(self) -> Union[bool, bool_]:
         """
         if the batter reached base was it a double?
         :return: true if double, allows for either numpy bool or builtin python bool
         """
+        # Safeguard against division by zero - use league average if no data
+        league_2b_rate = (self.league_batting_Total_2B + self.DBL_adjustment) / self.league_batting_Total_OB
+        batter_2b_rate = ((self.batting['2B'] + self.DBL_adjustment) / self.batting.Total_OB) if self.batting.Total_OB > 0 else league_2b_rate
+
         # do not have league pitching total for 2b so push it to zero and make it a neutral factor
-        return self.rng() < self.odds_ratio(hitter_stat=((self.batting['2B'] + self.DBL_adjustment) /
-                                                         self.batting.Total_OB), pitcher_stat=.200,
-                                            league_stat=((self.league_batting_Total_2B + self.DBL_adjustment) /
-                                                         self.league_batting_Total_OB),
-                                            stat_type='2B')
+        return self.rng() < self.odds_ratio(hitter_stat=batter_2b_rate, pitcher_stat=.200,
+                                            league_stat=league_2b_rate, stat_type='2B')
 
     def k(self) -> bool:
         """
         if the batter was out was it a strike out?
         :return: true if K
         """
-        return self.rng() < self.odds_ratio((self.batting['SO'] / self.batting.Total_Outs),
-                                            (self.pitching['SO'] / self.pitching.Total_Outs),
-                                            self.league_K_rate_per_AB, stat_type='SO')
+        # Safeguard against division by zero - use league average if no data
+        batter_k_rate = (self.batting['SO'] / self.batting.Total_Outs) if self.batting.Total_Outs > 0 else self.league_K_rate_per_AB
+        pitcher_k_rate = (self.pitching['SO'] / self.pitching.Total_Outs) if self.pitching.Total_Outs > 0 else self.league_K_rate_per_AB
+
+        return self.rng() < self.odds_ratio(batter_k_rate, pitcher_k_rate, self.league_K_rate_per_AB, stat_type='SO')
 
     def gb_fo_lo(self, outs: int = 0, runner_on_first: bool = False, runner_on_third: bool = False) -> str:
         """
@@ -227,7 +243,9 @@ class SimAB:
         self.dice_roll = self.rng()
         if self.dice_roll <= self.league_GB:  # ground out
             score_book_cd = 'GB'
-            if runner_on_first and outs <= 1 and self.rng() <= (self.batting['GIDP'] / self.batting['AB']):
+            # Safeguard against division by zero - use league average if no data
+            gidp_rate = (self.batting['GIDP'] / self.batting['AB']) if self.batting['AB'] > 0 else self.dp_chance
+            if runner_on_first and outs <= 1 and self.rng() <= gidp_rate:
             # if runner_on_first and outs <= 1 and self.rng() <= self.dp_chance:
                 score_book_cd = 'DP'
             elif runner_on_first and outs <= 1 and self.rng() <= self.league_GB_FC:

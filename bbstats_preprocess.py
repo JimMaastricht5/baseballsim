@@ -166,10 +166,21 @@ class BaseballStatsPreProcess:
                 # If val is already a list, add each non-empty item
                 for item in val:
                     if item and str(item).strip():
-                        groups[key].add(item)
+                        # Split comma-separated values to handle position strings like "P,SS,2B"
+                        if ',' in str(item):
+                            for subitem in str(item).split(','):
+                                if subitem.strip():
+                                    groups[key].add(subitem.strip())
+                        else:
+                            groups[key].add(item)
             elif val and isinstance(val, str) and val.strip():
-                # If val is a non-empty string
-                groups[key].add(val)
+                # If val is a non-empty string, split on comma for positions
+                if ',' in val:
+                    for subitem in val.split(','):
+                        if subitem.strip():
+                            groups[key].add(subitem.strip())
+                else:
+                    groups[key].add(val)
             elif val and not isinstance(val, str):
                 # Handle other types (int, float, etc.)
                 groups[key].add(val)

@@ -40,7 +40,8 @@ class Game:
                  starting_pitchers: None = None, starting_lineups: None = None,
                  load_batter_file: str = 'player-stats-Batters.csv',
                  load_pitcher_file: str = 'player-stats-Pitching.csv',
-                 interactive: bool = False, show_bench: bool = False, debug: bool = False) -> None:
+                 interactive: bool = False, show_bench: bool = False, debug: bool = False,
+                 play_by_play_callback=None) -> None:
         """
         class manages the details of an individual game
         :param away_team_name: away team name is a 3 character all caps abbreviation
@@ -141,6 +142,7 @@ class Game:
         self.steal_multiplier = 1.7  # rate of steals per on base is not generating the desired result so increase it
         self.interactive = interactive  # is this game being controlled by a human or straight sim
         self.manager = None
+        self.play_by_play_callback = play_by_play_callback  # callback for real-time play-by-play updates
         return
 
     def team_pitching(self) -> int:
@@ -209,12 +211,20 @@ class Game:
         self.total_score[self.team_hitting()] += number_of_runs  # update total score
         return
 
-    def print_inning_score(self) -> None:
+    def print_inning_score(self, final: bool = False) -> None:
         """
         print inning by inning score - full format for followed games
+        :param final: True if called at end of game (from end_game), False if during game
         :return: None
         """
-        if self.is_followed_game:
+        if self.is_followed_game and final:
+            # Only print full table with "Final" heading when game is complete
+            # Add "Final" heading with blank line above
+            final_heading = '\nFinal\n'
+            self.game_recap += final_heading
+            if self.play_by_play_callback:
+                self.play_by_play_callback(final_heading)
+
             # Full inning-by-inning format for followed games
             print_inning_score = self.inning_score.copy()
             print_inning_score.append(['R', self.total_score[AWAY], self.total_score[HOME]])
@@ -226,7 +236,10 @@ class Game:
                 print_line = ''
                 for jj in range(0, len(row_to_col[ii])):
                     print_line = print_line + f'{str(row_to_col[ii][jj]):>4}'
-                self.game_recap += print_line + '\n'
+                print_line += '\n'
+                self.game_recap += print_line
+                if self.play_by_play_callback:
+                    self.play_by_play_callback(print_line)
         # Compact format handled separately in get_compact_summary()
         return
 
@@ -302,8 +315,14 @@ class Game:
                 pitch_switch = True  # we switched pitcher this inning
                 self.is_save_sit[self.team_pitching()] = self.save_sit()
                 if self.chatty and pitch_switch:
-                    self.game_recap += f'Manager has made the call to the bull pen.  Pitching change....\n'
-                    self.game_recap += f'\t{pitching.Player} has entered the game for {self.team_names[self.team_pitching()]}\n'
+                    play_text = f'Manager has made the call to the bull pen.  Pitching change....\n'
+                    self.game_recap += play_text
+                    if self.play_by_play_callback:
+                        self.play_by_play_callback(play_text)
+                    play_text = f'\t{pitching.Player} has entered the game for {self.team_names[self.team_pitching()]}\n'
+                    self.game_recap += play_text
+                    if self.play_by_play_callback:
+                        self.play_by_play_callback(play_text)
                     # print(f'\tManager has made the call to the bull pen.  Pitching change....')
                     # print(f'\t{pitching.Player} has entered the game for {self.team_names[self.team_pitching()]}')
         return pitch_switch
@@ -345,14 +364,23 @@ class Game:
                     self.bases.push_a_runner(1, 2)  # move runner from 1st to second
                     self.teams[self.team_hitting()].box_score.steal_result(runner_key, True)  # stole the base
                     if self.chatty:
-                        self.game_recap += f'\t{runner_stats.Player} stole 2nd base!\n'
-                        self.game_recap += f'\t{self.bases.describe_runners()}\n'
+                        play_text = f'\t{runner_stats.Player} stole 2nd base!\n'
+                        self.game_recap += play_text
+                        if self.play_by_play_callback:
+                            self.play_by_play_callback(play_text)
+                        play_text = f'\t{self.bases.describe_runners()}\n'
+                        self.game_recap += play_text
+                        if self.play_by_play_callback:
+                            self.play_by_play_callback(play_text)
                 else:
                     self.teams[self.team_hitting()].box_score.steal_result(runner_key, False)  # caught stealing
                     self.bases.remove_runner(1)  # runner was on first and never made it to second on the out
                     if self.chatty:
                         self.outs += 1  # this could result in the third out
-                        self.game_recap += f'\t{runner_stats.Player} was caught stealing for out number {self.outs}\n'
+                        play_text = f'\t{runner_stats.Player} was caught stealing for out number {self.outs}\n'
+                        self.game_recap += play_text
+                        if self.play_by_play_callback:
+                            self.play_by_play_callback(play_text)
         return
 
     def is_extra_innings(self) -> bool:
@@ -401,9 +429,12 @@ class Game:
                                                                  self.bases.player_scored)
         if self.chatty:
             out_text = 'Out' if self.outs <= 1 else 'Outs'
-            self.game_recap += (f'Pitcher: {pitching.Player} against {self.team_names[self.team_hitting()]} '
+            play_text = (f'Pitcher: {pitching.Player} against {self.team_names[self.team_hitting()]} '
                   f'batter #{self.batting_num[self.team_hitting()]} {batting.Player} - '
                   f'{self.outcomes.score_book_cd}, {self.outs} {out_text}\n')
+            self.game_recap += play_text
+            if self.play_by_play_callback:
+                self.play_by_play_callback(play_text)
 
         self.prior_batter_out_name[self.team_hitting()] = batting.Player
         self.prior_batter_out_num[self.team_hitting()] = cur_batter_index
@@ -417,7 +448,10 @@ class Game:
         pitch_switch = False  # did we switch pitchers this inning, don't sub if closer came in
         top_or_bottom = 'top' if self.top_bottom == 0 else 'bottom'
         if self.chatty:
-            self.game_recap += f'\nStarting the {top_or_bottom} of inning {self.inning[self.team_hitting()]}.\n'
+            play_text = f'\nStarting the {top_or_bottom} of inning {self.inning[self.team_hitting()]}.\n'
+            self.game_recap += play_text
+            if self.play_by_play_callback:
+                self.play_by_play_callback(play_text)
         self.extra_innings()  # set runner on second if it is extra innings
         while self.outs < 3:
             # check for pitching change due to fatigue or game sit
@@ -436,11 +470,17 @@ class Game:
                 for player_id in self.bases.player_scored.keys():
                     players = players + ', ' + self.bases.player_scored[player_id] if players != '' \
                         else self.bases.player_scored[player_id]
-                self.game_recap += (f'\tScored {self.bases.runs_scored} run(s)!  ({players})\n'
+                play_text = (f'\tScored {self.bases.runs_scored} run(s)!  ({players})\n'
                       f'\tThe score is {self.team_names[0]} {self.total_score[0]} to'
                       f' {self.team_names[1]} {self.total_score[1]}\n')
+                self.game_recap += play_text
+                if self.play_by_play_callback:
+                    self.play_by_play_callback(play_text)
             if self.bases.count_runners() >= 1 and self.outs < 3 and self.chatty:  # leave out batter check for runner
-                self.game_recap += f'\t{self.bases.describe_runners()}\n'
+                play_text = f'\t{self.bases.describe_runners()}\n'
+                self.game_recap += play_text
+                if self.play_by_play_callback:
+                    self.play_by_play_callback(play_text)
             self.batting_num[self.team_hitting()] = self.batting_num[self.team_hitting()] + 1 \
                 if (self.batting_num[self.team_hitting()] + 1) <= 9 else 1  # wrap around lineup
             # check for walk off
@@ -451,9 +491,12 @@ class Game:
         self.update_inning_score(number_of_runs=0)  # push a zero on the board if no runs score this half inning
         self.bases.clear_bases()
         if self.chatty:
-            self.game_recap += (f'\nCompleted {top_or_bottom} half of inning {self.inning[self.team_hitting()]}\n'
+            play_text = (f'\nCompleted {top_or_bottom} half of inning {self.inning[self.team_hitting()]}\n'
                   f'The score is {self.team_names[0]} {self.total_score[0]} to {self.team_names[1]} '
                   f'{self.total_score[1]}\n')
+            self.game_recap += play_text
+            if self.play_by_play_callback:
+                self.play_by_play_callback(play_text)
             self.print_inning_score()
         self.inning[self.team_hitting()] += 1
         self.top_bottom = 0 if self.top_bottom == 1 else 1  # switch teams hitting and pitching
@@ -503,7 +546,7 @@ class Game:
         if self.print_box_score_b:  # print or not to print...
             self.game_recap += self.teams[AWAY].box_score.print_boxes()
             self.game_recap += self.teams[HOME].box_score.print_boxes()
-        self.print_inning_score()
+        self.print_inning_score(final=True)  # Pass final=True to print the Final heading and score table
         return
 
     def sim_game(self) -> Tuple[List[int], List[int], List[List[int]], str]:

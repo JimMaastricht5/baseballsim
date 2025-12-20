@@ -268,6 +268,18 @@ class BaseballStatsPreProcess:
         pitching_data = pitching_data.sort_values('Season', ascending=True)
         pitching_data = self.de_dup_df(df=pitching_data, key_name='Hashcode', dup_column_names='Hashcode',
                                        stats_cols_to_sum=stats_pcols_sum, drop_dups=True)
+
+        # Filter to only keep players who appeared in the most recent season
+        most_recent_season = max(load_seasons)
+        pitching_data['In_Recent_Season'] = pitching_data['Years_Included'].apply(
+            lambda years: most_recent_season in years if isinstance(years, list) else False
+        )
+        players_before_filter = len(pitching_data)
+        pitching_data = pitching_data[pitching_data['In_Recent_Season']]
+        pitching_data = pitching_data.drop('In_Recent_Season', axis=1)
+        players_after_filter = len(pitching_data)
+        print(f"Pitchers: Filtered {players_before_filter - players_after_filter} players not in {most_recent_season} season (kept {players_after_filter})")
+
         pitching_data = pitching_data.set_index('Hashcode')
 
         # Apply random data jigger if needed (to both datasets)
@@ -285,7 +297,7 @@ class BaseballStatsPreProcess:
         pitching_data['OBP'] = pitching_data['WHIP'] / (3 + pitching_data['WHIP'])  # bat reached / number faced
         pitching_data['Total_OB'] = pitching_data['H'] + pitching_data['BB']  # + pitching_data['HBP']
         pitching_data['Total_Outs'] = pitching_data['IP'] * 3  # 3 outs per inning
-        pitching_data = pitching_data[pitching_data['IP'] >= 5]  # drop pitchers without enough innings
+        pitching_data = pitching_data[pitching_data['IP'] >= 1]  # drop pitchers without any meaningful innings (reduced from 5 to 1)
         pitching_data['AVG_faced'] = (pitching_data['Total_OB'] + pitching_data['Total_Outs']) / pitching_data.G
         pitching_data['Game_Fatigue_Factor'] = 0
         pitching_data['Condition'] = 100
@@ -310,7 +322,7 @@ class BaseballStatsPreProcess:
         historical_data['OBP'] = historical_data['WHIP'] / (3 + historical_data['WHIP'])
         historical_data['Total_OB'] = historical_data['H'] + historical_data['BB']
         historical_data['Total_Outs'] = historical_data['IP'] * 3
-        historical_data = historical_data[historical_data['IP'] >= 5]
+        historical_data = historical_data[historical_data['IP'] >= 1]  # drop pitchers without any meaningful innings (reduced from 5 to 1)
         historical_data['AVG_faced'] = (historical_data['Total_OB'] + historical_data['Total_Outs']) / historical_data.G
         historical_data['Game_Fatigue_Factor'] = 0
         historical_data['Condition'] = 100
@@ -381,6 +393,18 @@ class BaseballStatsPreProcess:
         batting_data = batting_data.sort_values('Season', ascending=True)
         batting_data = self.de_dup_df(df=batting_data, key_name='Hashcode', dup_column_names='Hashcode',
                                       stats_cols_to_sum=stats_bcols_sum, drop_dups=True)
+
+        # Filter to only keep players who appeared in the most recent season
+        most_recent_season = max(load_seasons)
+        batting_data['In_Recent_Season'] = batting_data['Years_Included'].apply(
+            lambda years: most_recent_season in years if isinstance(years, list) else False
+        )
+        players_before_filter = len(batting_data)
+        batting_data = batting_data[batting_data['In_Recent_Season']]
+        batting_data = batting_data.drop('In_Recent_Season', axis=1)
+        players_after_filter = len(batting_data)
+        print(f"Batters: Filtered {players_before_filter - players_after_filter} players not in {most_recent_season} season (kept {players_after_filter})")
+
         batting_data = batting_data.set_index('Hashcode')
 
         # Apply random data jigger if needed (to both datasets)
@@ -516,7 +540,7 @@ class BaseballStatsPreProcess:
                 self.pitching_data_historical['Season'] == prior_season
             ].copy()
 
-            # Filter for meaningful playing time
+            # Filter for meaningful playing time (using IP >= 5 for Def_WAR calculation since we need reliable stats)
             prior_p = prior_p[prior_p['IP'] >= 5].copy()
 
             if len(prior_p) > 0:

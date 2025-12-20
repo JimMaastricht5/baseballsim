@@ -51,7 +51,7 @@ class SeasonMainWindow:
         self.season_print_box_score_b = season_print_box_score_b
         self.season_team_to_follow = season_team_to_follow or 'MIL'  # Single string, defaults to 'MIL'
         self.root.title("Baseball Season Simulator")
-        self.root.geometry("1200x800")
+        self.root.geometry("1500x900")
 
         # Season worker (created when simulation starts)
         self.worker = None
@@ -224,7 +224,7 @@ class SeasonMainWindow:
 
         self.notebook.add(schedule_frame, text="Schedule")
 
-        # Tab 3: Injuries (Treeview for sortable injury list)
+        # Tab 3: League IL (Treeview for sortable injury list)
         injuries_frame = tk.Frame(self.notebook)
 
         # Header with injury count
@@ -232,7 +232,7 @@ class SeasonMainWindow:
         injuries_header_frame.pack(fill=tk.X, pady=5)
 
         self.injuries_header_label = tk.Label(
-            injuries_header_frame, text="Injury Report",
+            injuries_header_frame, text="League IL Report",
             font=("Arial", 11, "bold")
         )
         self.injuries_header_label.pack()
@@ -262,7 +262,7 @@ class SeasonMainWindow:
 
         self.injuries_tree = ttk.Treeview(
             injuries_tree_frame,
-            columns=("player", "team", "pos", "injury", "days", "status"),
+            columns=("player", "team", "pos", "injury", "status"),
             show="headings",
             height=20,
             yscrollcommand=injuries_scrollbar.set
@@ -274,16 +274,14 @@ class SeasonMainWindow:
         self.injuries_tree.heading("team", text="Team", command=lambda: self._sort_injuries("team"))
         self.injuries_tree.heading("pos", text="Pos", command=lambda: self._sort_injuries("pos"))
         self.injuries_tree.heading("injury", text="Injury", command=lambda: self._sort_injuries("injury"))
-        self.injuries_tree.heading("days", text="Days Left", command=lambda: self._sort_injuries("days"))
         self.injuries_tree.heading("status", text="Status", command=lambda: self._sort_injuries("status"))
 
         # Configure column widths
         self.injuries_tree.column("player", width=150, anchor=tk.W)
         self.injuries_tree.column("team", width=60, anchor=tk.CENTER)
         self.injuries_tree.column("pos", width=50, anchor=tk.CENTER)
-        self.injuries_tree.column("injury", width=200, anchor=tk.W)
-        self.injuries_tree.column("days", width=80, anchor=tk.CENTER)
-        self.injuries_tree.column("status", width=100, anchor=tk.CENTER)
+        self.injuries_tree.column("injury", width=250, anchor=tk.W)
+        self.injuries_tree.column("status", width=120, anchor=tk.CENTER)
 
         # Tags for injury status
         self.injuries_tree.tag_configure("IL", background="#ffcccc")  # Red for IL
@@ -293,10 +291,10 @@ class SeasonMainWindow:
 
         # Store injury data for sorting
         self.injuries_data_cache = []
-        self.injuries_sort_column = "days"  # Default sort by days remaining
-        self.injuries_sort_reverse = True  # Descending
+        self.injuries_sort_column = "status"  # Default sort by status
+        self.injuries_sort_reverse = False  # Ascending
 
-        self.notebook.add(injuries_frame, text="Injuries")
+        self.notebook.add(injuries_frame, text="League IL")
 
         # Tab 4: Team Tab with nested sub-tabs
         team_tab_frame = tk.Frame(self.notebook)
@@ -479,9 +477,9 @@ class SeasonMainWindow:
     def _create_roster_treeview(self, parent, is_batter=True):
         """Create Treeview for roster data."""
         if is_batter:
-            columns = ("Player", "Pos", "PA", "AB", "R", "H", "HR", "RBI", "AVG", "OBP", "SLG", "Condition", "Status")
+            columns = ("Player", "Pos", "AB", "R", "H", "2B", "3B", "HR", "RBI", "BB", "K", "AVG", "OBP", "SLG", "Condition", "Status")
         else:
-            columns = ("Player", "Type", "W", "L", "IP", "ERA", "WHIP", "SV", "SO", "BB", "Condition", "Status")
+            columns = ("Player", "G", "GS", "W", "L", "IP", "H", "R", "ER", "HR", "BB", "SO", "ERA", "WHIP", "SV", "Condition", "Status")
 
         tree = ttk.Treeview(parent, columns=columns, show="headings", height=15)
 
@@ -490,20 +488,26 @@ class SeasonMainWindow:
             tree.heading(col, text=col)
             if col == "Player":
                 tree.column(col, width=150, anchor=tk.W)
-            elif col in ["Pos", "Type", "Status"]:
-                tree.column(col, width=60, anchor=tk.CENTER)
-            elif col in ["PA", "AB", "R", "H", "HR", "RBI", "W", "L", "SV", "SO", "BB", "Condition"]:
-                tree.column(col, width=50, anchor=tk.CENTER)
+            elif col in ["Pos", "Status"]:
+                tree.column(col, width=70, anchor=tk.CENTER)
+            elif col in ["AB", "R", "H", "2B", "3B", "HR", "RBI", "BB", "K", "G", "GS", "W", "L", "ER", "SV", "SO", "Condition"]:
+                tree.column(col, width=45, anchor=tk.CENTER)
             elif col in ["AVG", "OBP", "SLG", "ERA", "WHIP"]:
-                tree.column(col, width=60, anchor=tk.CENTER)
+                tree.column(col, width=55, anchor=tk.CENTER)
+            elif col == "IP":
+                tree.column(col, width=50, anchor=tk.CENTER)
             else:
-                tree.column(col, width=80, anchor=tk.CENTER)
+                tree.column(col, width=50, anchor=tk.CENTER)
 
         # Add scrollbar
         scrollbar = ttk.Scrollbar(parent, orient=tk.VERTICAL, command=tree.yview)
         tree.configure(yscrollcommand=scrollbar.set)
         scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
         tree.pack(fill=tk.BOTH, expand=True)
+
+        # Configure tags for injury highlighting
+        tree.tag_configure("day_to_day", background="#fff4cc")  # Yellow for day-to-day (<10 days)
+        tree.tag_configure("injured", background="#ffcccc")  # Red for IL (>=10 days)
 
         return tree
 
@@ -614,13 +618,15 @@ class SeasonMainWindow:
             self._update_roster_tree(self.pos_players_tree, sorted_batters, is_batter=True)
 
             # Sort pitchers by IP (innings pitched)
+            # NOTE: Display ALL pitchers on team roster, including those with 0 IP
             if 'IP' in pitching_df.columns and pitching_df['IP'].sum() > 0:
+                # Sort by IP descending (pitchers with 0 IP will appear at bottom)
                 sorted_pitchers = pitching_df.sort_values('IP', ascending=False)
             else:
-                # No IP stats yet, just use as-is
-                sorted_pitchers = pitching_df
+                # No IP stats yet, sort by player name for consistency
+                sorted_pitchers = pitching_df.sort_values('Player') if 'Player' in pitching_df.columns else pitching_df
 
-            # Update pitchers tree
+            # Update pitchers tree (includes all team pitchers regardless of IP)
             self._update_roster_tree(self.pitchers_tree, sorted_pitchers, is_batter=False)
 
             logger.info(f"Roster updated for {team}: {len(batting_df)} batters, {len(pitching_df)} pitchers")
@@ -629,6 +635,20 @@ class SeasonMainWindow:
             logger.error(f"Error updating roster: {e}")
             import traceback
             logger.error(traceback.format_exc())
+
+    @staticmethod
+    def _condition_to_text(condition):
+        """Convert numeric condition (0-100) to descriptive text."""
+        if condition >= 95:
+            return "Excellent"
+        elif condition >= 85:
+            return "Good"
+        elif condition >= 70:
+            return "Fair"
+        elif condition >= 50:
+            return "Tired"
+        else:
+            return "Fatigued"
 
     def _update_roster_tree(self, tree, data_df, is_batter=True):
         """Update roster Treeview with data."""
@@ -655,35 +675,52 @@ class SeasonMainWindow:
                     values = (
                         row.get('Player', 'Unknown'),
                         pos,
-                        int(row.get('PA', 0)),
                         int(row.get('AB', 0)),
                         int(row.get('R', 0)),
                         int(row.get('H', 0)),
+                        int(row.get('2B', 0)),
+                        int(row.get('3B', 0)),
                         int(row.get('HR', 0)),
                         int(row.get('RBI', 0)),
+                        int(row.get('BB', 0)),
+                        int(row.get('SO', 0)),
                         f"{float(row.get('AVG', 0)):.3f}",
                         f"{float(row.get('OBP', 0)):.3f}",
                         f"{float(row.get('SLG', 0)):.3f}",
-                        int(row.get('Condition', 100)),
+                        self._condition_to_text(int(row.get('Condition', 100))),
                         row.get('Status', 'Healthy')
                     )
                 else:
                     values = (
                         row.get('Player', 'Unknown'),
-                        'SP' if int(row.get('GS', 0)) > 0 else 'RP',
+                        int(row.get('G', 0)),
+                        int(row.get('GS', 0)),
                         int(row.get('W', 0)),
                         int(row.get('L', 0)),
                         f"{float(row.get('IP', 0)):.1f}",
+                        int(row.get('H', 0)),
+                        int(row.get('R', 0)),
+                        int(row.get('ER', 0)),
+                        int(row.get('HR', 0)),
+                        int(row.get('BB', 0)),
+                        int(row.get('SO', 0)),
                         f"{float(row.get('ERA', 0)):.2f}",
                         f"{float(row.get('WHIP', 0)):.2f}",
                         int(row.get('SV', 0)),
-                        int(row.get('SO', 0)),
-                        int(row.get('BB', 0)),
-                        int(row.get('Condition', 100)),
+                        self._condition_to_text(int(row.get('Condition', 100))),
                         row.get('Status', 'Healthy')
                     )
 
-                tree.insert("", tk.END, values=values)
+                # Determine injury tag based on Injured Days
+                injured_days = int(row.get('Injured Days', 0))
+                tags = ()
+                if injured_days > 0:
+                    if injured_days < 10:
+                        tags = ("day_to_day",)
+                    else:
+                        tags = ("injured",)
+
+                tree.insert("", tk.END, values=values, tags=tags)
             except Exception as e:
                 logger.warning(f"Error inserting roster row for {row.get('Player', 'Unknown')}: {e}")
 
@@ -1247,9 +1284,9 @@ class SeasonMainWindow:
 
         # Update header with count
         if selected_team == "All Teams":
-            count_text = f"Injury Report ({len(filtered_list)} injured)"
+            count_text = f"League IL Report ({len(filtered_list)} injured)"
         else:
-            count_text = f"Injury Report - {selected_team} ({len(filtered_list)} injured)"
+            count_text = f"League IL Report - {selected_team} ({len(filtered_list)} injured)"
         self.injuries_header_label.config(text=count_text)
 
         # Clear existing items
@@ -1258,8 +1295,26 @@ class SeasonMainWindow:
 
         # Insert injury data
         for injury in filtered_list:
-            status = injury['status']
-            tags = (status,)  # Use status as tag for color coding
+            days = injury['days_remaining']
+
+            # Clean up position formatting (remove brackets and quotes)
+            pos = injury['position']
+            if isinstance(pos, list):
+                pos = pos[0] if pos else 'Unknown'
+            pos = str(pos).replace('[', '').replace(']', '').replace("'", '').replace('"', '').strip()
+
+            # Create descriptive status based on days remaining
+            if days >= 60:
+                status_text = "60-Day IL"
+                tag_status = "IL"
+            elif days >= 10:
+                status_text = "10-Day IL"
+                tag_status = "IL"
+            else:
+                status_text = "Day-to-Day"
+                tag_status = "Day-to-Day"
+
+            tags = (tag_status,)  # Use tag status for color coding
 
             self.injuries_tree.insert(
                 "",
@@ -1267,10 +1322,9 @@ class SeasonMainWindow:
                 values=(
                     injury['player'],
                     injury['team'],
-                    injury['position'],
+                    pos,
                     injury['injury'],
-                    injury['days_remaining'],
-                    status
+                    status_text
                 ),
                 tags=tags
             )
@@ -1515,8 +1569,8 @@ class SeasonMainWindow:
         else:
             self.injuries_sort_column = column
             # Default directions
-            if column == "days":
-                self.injuries_sort_reverse = True  # Longest injuries first
+            if column == "status":
+                self.injuries_sort_reverse = True  # Longest injuries first (by days_remaining)
             else:
                 self.injuries_sort_reverse = False  # Ascending for text
 
@@ -1535,17 +1589,16 @@ class SeasonMainWindow:
             data.sort(key=lambda x: x['position'], reverse=self.injuries_sort_reverse)
         elif column == "injury":
             data.sort(key=lambda x: x['injury'], reverse=self.injuries_sort_reverse)
-        elif column == "days":
-            data.sort(key=lambda x: x['days_remaining'], reverse=self.injuries_sort_reverse)
         elif column == "status":
-            data.sort(key=lambda x: x['status'], reverse=self.injuries_sort_reverse)
+            # Sort by days_remaining for status column (since status is now "10-Day IL", "60-Day IL", etc.)
+            data.sort(key=lambda x: x['days_remaining'], reverse=self.injuries_sort_reverse)
 
         # Update header with filtered count
         selected_team = self.injuries_team_var.get()
         if selected_team == "All Teams":
-            count_text = f"Injury Report ({len(data)} injured)"
+            count_text = f"League IL Report ({len(data)} injured)"
         else:
-            count_text = f"Injury Report - {selected_team} ({len(data)} injured)"
+            count_text = f"League IL Report - {selected_team} ({len(data)} injured)"
         self.injuries_header_label.config(text=count_text)
 
         # Clear and repopulate
@@ -1553,8 +1606,26 @@ class SeasonMainWindow:
             self.injuries_tree.delete(item)
 
         for injury in data:
-            status = injury['status']
-            tags = (status,)
+            days = injury['days_remaining']
+
+            # Clean up position formatting (remove brackets and quotes)
+            pos = injury['position']
+            if isinstance(pos, list):
+                pos = pos[0] if pos else 'Unknown'
+            pos = str(pos).replace('[', '').replace(']', '').replace("'", '').replace('"', '').strip()
+
+            # Create descriptive status based on days remaining
+            if days >= 60:
+                status_text = "60-Day IL"
+                tag_status = "IL"
+            elif days >= 10:
+                status_text = "10-Day IL"
+                tag_status = "IL"
+            else:
+                status_text = "Day-to-Day"
+                tag_status = "Day-to-Day"
+
+            tags = (tag_status,)
 
             self.injuries_tree.insert(
                 "",
@@ -1562,10 +1633,9 @@ class SeasonMainWindow:
                 values=(
                     injury['player'],
                     injury['team'],
-                    injury['position'],
+                    pos,
                     injury['injury'],
-                    injury['days_remaining'],
-                    status
+                    status_text
                 ),
                 tags=tags
             )

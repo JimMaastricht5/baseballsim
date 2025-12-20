@@ -18,6 +18,7 @@ Contact: JimMaastricht5@gmail.com
 """
 
 import tkinter as tk
+import datetime
 
 from ui.main_window_tk import SeasonMainWindow
 from bblogger import logger
@@ -52,6 +53,7 @@ def main(load_seasons=[2023, 2024, 2025], new_season = 2026, season_length = 162
 
 
 if __name__ == "__main__":
+    start_time = datetime.datetime.now()
     main(load_seasons = [2023, 2024, 2025],
          new_season = 2026,
          season_length = 162,
@@ -62,3 +64,12 @@ if __name__ == "__main__":
          season_print_box_score_b = False,
          season_team_to_follow = 'MIL'  # Single team string (defaults to 'MIL' if None)
          )
+
+    # how long did that take?
+    end_time = datetime.datetime.now()
+    run_time = end_time - start_time
+    total_seconds = run_time.total_seconds()  # Get the total run time in seconds
+    minutes = int(total_seconds // 60)
+    seconds = int(total_seconds % 60)
+    print(f'Total run time: {minutes} minutes, {seconds} seconds')
+

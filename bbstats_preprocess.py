@@ -166,10 +166,21 @@ class BaseballStatsPreProcess:
                 # If val is already a list, add each non-empty item
                 for item in val:
                     if item and str(item).strip():
-                        groups[key].add(item)
+                        # Split comma-separated values to handle position strings like "P,SS,2B"
+                        if ',' in str(item):
+                            for subitem in str(item).split(','):
+                                if subitem.strip():
+                                    groups[key].add(subitem.strip())
+                        else:
+                            groups[key].add(item)
             elif val and isinstance(val, str) and val.strip():
-                # If val is a non-empty string
-                groups[key].add(val)
+                # If val is a non-empty string, split on comma for positions
+                if ',' in val:
+                    for subitem in val.split(','):
+                        if subitem.strip():
+                            groups[key].add(subitem.strip())
+                else:
+                    groups[key].add(val)
             elif val and not isinstance(val, str):
                 # Handle other types (int, float, etc.)
                 groups[key].add(val)
@@ -195,6 +206,71 @@ class BaseballStatsPreProcess:
     def translate_pos(self, digit_string):
         return ''.join(self.digit_pos_map.get(digit, digit) + ',' for digit in digit_string).rstrip(',')
 
+    def calculate_trend_projection(self, historical_df: DataFrame, hashcode: int,
+                                    stat_col: str, target_year: int) -> tuple:
+        """
+        Calculate linear regression trend and project to target year.
+
+        Uses numpy.polyfit to compute a linear trend line from a player's year-by-year
+        historical stats, then extrapolates to the target year. This allows projecting
+        future performance based on whether a player is improving or declining.
+
+        Args:
+            historical_df: Year-by-year data with 'Season' and 'Hashcode' columns
+            hashcode: Player's unique identifier
+            stat_col: Column name to project (e.g., 'H', 'BB', 'AB')
+            target_year: Year to project to (e.g., 2026)
+
+        Returns:
+            tuple: (projected_value, method, years_used)
+                - projected_value: float, clamped to >= 0
+                - method: str, one of ["Trend", "Recent_Year", "Insufficient_Data"]
+                - years_used: int, number of data points used (0, 1, 2, or 3)
+
+        Edge Cases:
+            - No data (0 years): Returns (0.0, "Insufficient_Data", 0)
+            - Single year (1 year): Returns (recent_value, "Recent_Year", 1)
+            - Negative projection: Clamped to 0.0 (can't have negative stats)
+            - NaN values: Filled with 0.0
+        """
+        # Extract player's historical data
+        player_data = historical_df[historical_df['Hashcode'] == hashcode].copy()
+
+        if len(player_data) == 0:
+            return 0.0, "Insufficient_Data", 0
+
+        # Sort by Season chronologically
+        player_data = player_data.sort_values('Season')
+
+        # Check data availability
+        num_years = len(player_data)
+
+        if num_years == 1:
+            # Use most recent year unchanged
+            recent_value = player_data.iloc[-1][stat_col]
+            # Handle NaN
+            if pd.isna(recent_value):
+                recent_value = 0.0
+            return max(0.0, float(recent_value)), "Recent_Year", 1
+
+        # Perform linear regression (need at least 2 points)
+        years = player_data['Season'].values.astype(float)
+        values = player_data[stat_col].fillna(0).values.astype(float)
+
+        # Use polyfit to calculate linear trend
+        import warnings
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")  # Ignore all warnings from polyfit
+            slope, intercept = np.polyfit(years, values, deg=1)
+
+        # Project to target year
+        projected = slope * target_year + intercept
+
+        # Clamp to 0 (can't have negative stats)
+        projected = max(0.0, projected)
+
+        return projected, "Trend", num_years
+
     def de_dup_df(self, df: DataFrame, key_name: str, dup_column_names: str,
                   stats_cols_to_sum: List[str], drop_dups: bool = False) -> DataFrame:
         dup_hashcodes = self.find_duplicate_rows(df=df, column_names=dup_column_names)
@@ -203,8 +279,116 @@ class BaseballStatsPreProcess:
             for dfcol_name in stats_cols_to_sum:
                 df.loc[df[key_name] == dfrow_key, dfcol_name] = df_rows[dfcol_name].sum()
         if drop_dups:
-            df = df.drop_duplicates(subset='Hashcode', keep='last')
+            # Use key_name for deduplication, not hardcoded 'Hashcode'
+            df = df.drop_duplicates(subset=key_name, keep='last')
         return df
+
+    def apply_trend_based_aggregation(self, historical_df: DataFrame,
+                                       stats_to_project: List[str],
+                                       is_pitching: bool = False) -> DataFrame:
+        """
+        Replace simple summation with trend-based projection to target year.
+
+        For each player, projects their statistics to a future year (e.g., 2026) based on
+        linear regression trends calculated from their year-by-year historical performance.
+        This accounts for improving or declining player performance rather than treating
+        all seasons equally.
+
+        Args:
+            historical_df: Year-by-year historical data with Season and Hashcode columns
+            stats_to_project: List of stat column names to apply trends to
+            is_pitching: Boolean, True for pitchers, False for batters
+
+        Returns:
+            DataFrame: Aggregated data with trend projections, indexed by Hashcode
+
+        Process:
+            1. For each unique player (by Hashcode):
+               - Extract their historical year-by-year stats
+               - For each stat column, calculate linear regression trend
+               - Project to target year (max(seasons) + 1)
+            2. Add metadata: Projection_Method, Trend_Years_Used, Years_Included
+            3. Return DataFrame ready for derived stat calculations (OBP, SLG, etc.)
+        """
+        # Get unique players
+        unique_players = historical_df['Hashcode'].unique()
+
+        # Target projection year (one year beyond the most recent in data)
+        target_year = historical_df['Season'].max() + 1
+
+        # Initialize result list
+        results = []
+
+        # Projection counters for logging
+        projection_methods = []
+
+        for hashcode in unique_players:
+            # Get player's historical data
+            player_historical = historical_df[historical_df['Hashcode'] == hashcode]
+
+            # Get most recent season data as template
+            most_recent = player_historical.sort_values('Season', ascending=False).iloc[0].copy()
+
+            # Track projection metadata for this player
+            player_methods = []
+            player_years_used = []
+
+            # Apply trends to each stat
+            for stat_col in stats_to_project:
+                projected_value, method, years_used = self.calculate_trend_projection(
+                    historical_df, hashcode, stat_col, target_year
+                )
+                most_recent[stat_col] = projected_value
+                player_methods.append(method)
+                player_years_used.append(years_used)
+
+            # Use first stat's method as overall method (they should all be the same)
+            overall_method = player_methods[0] if player_methods else "Insufficient_Data"
+            overall_years = player_years_used[0] if player_years_used else 0
+
+            # Add metadata columns
+            most_recent['Projection_Method'] = overall_method
+            most_recent['Trend_Years_Used'] = overall_years
+
+            # Collect years player appeared in
+            years_included = player_historical['Season'].tolist()
+            most_recent['Years_Included'] = years_included  # Don't wrap in extra brackets
+
+            # Collect Teams and Leagues from all seasons
+            teams_list = player_historical['Team'].unique().tolist()
+            leagues_list = player_historical['League'].unique().tolist()
+            most_recent['Teams'] = teams_list
+            most_recent['Leagues'] = leagues_list
+
+            # For batting data, also collect Pos (pitchers don't have Pos column in the same way)
+            if not is_pitching and 'Pos' in player_historical.columns:
+                pos_list = []
+                for pos_entry in player_historical['Pos'].values:
+                    if isinstance(pos_entry, list):
+                        pos_list.extend(pos_entry)
+                    elif pd.notna(pos_entry):
+                        pos_list.append(pos_entry)
+                pos_list = list(set(pos_list))  # Remove duplicates
+                most_recent['Pos'] = pos_list
+
+            projection_methods.append(overall_method)
+            results.append(most_recent)
+
+        # Combine into DataFrame
+        aggregated_df = pd.DataFrame(results)
+
+        # Add logging
+        trend_count = sum(1 for m in projection_methods if m == 'Trend')
+        recent_count = sum(1 for m in projection_methods if m == 'Recent_Year')
+        insufficient_count = sum(1 for m in projection_methods if m == 'Insufficient_Data')
+
+        player_type = "Pitchers" if is_pitching else "Batters"
+        print(f"{player_type} projection summary:")
+        print(f"  - Trend-based: {trend_count} players")
+        print(f"  - Recent year: {recent_count} players")
+        print(f"  - Insufficient data: {insufficient_count} players")
+
+        return aggregated_df
 
     def get_pitching_seasons(self, pitcher_file: str, load_seasons: List[int]) -> tuple:
         # Returns tuple of (aggregated_df, historical_df)
@@ -248,15 +432,27 @@ class BaseballStatsPreProcess:
                                         stats_cols_to_sum=stats_pcols_sum, drop_dups=True)
         historical_data = historical_data.set_index('Player_Season_Key')
 
-        # *** Create AGGREGATED data (career totals) - one row per player ***
-        pitching_data = self.group_col_to_list(df=pitching_data, key_col='Hashcode', col='Team', new_col='Teams')
-        pitching_data = self.group_col_to_list(df=pitching_data, key_col='Hashcode', col='League', new_col='Leagues')
-        # Create Years_Included column - list of seasons this player appeared in
-        pitching_data = self.group_col_to_list(df=pitching_data, key_col='Hashcode', col='Season', new_col='Years_Included')
-        # Sort by Season to ensure most recent year's Team/League are kept during de-duplication
-        pitching_data = pitching_data.sort_values('Season', ascending=True)
-        pitching_data = self.de_dup_df(df=pitching_data, key_name='Hashcode', dup_column_names='Hashcode',
-                                       stats_cols_to_sum=stats_pcols_sum, drop_dups=True)
+        # *** Create AGGREGATED data (trend-based projections) - one row per player ***
+        # Apply trend-based projection to 2026 instead of simple summation
+        stats_to_project = ['G', 'GS', 'CG', 'SHO', 'IP', 'H', 'ER', 'SO', 'BB', 'HR', 'W', 'L', 'SV', 'HBP', 'BK', 'WP']
+        pitching_data = self.apply_trend_based_aggregation(
+            historical_df=historical_data.reset_index(),
+            stats_to_project=stats_to_project,
+            is_pitching=True
+        )
+        # Note: Teams, Leagues, and Years_Included are now set inside apply_trend_based_aggregation
+
+        # Filter to only keep players who appeared in the most recent season
+        most_recent_season = max(load_seasons)
+        pitching_data['In_Recent_Season'] = pitching_data['Years_Included'].apply(
+            lambda years: most_recent_season in years if isinstance(years, list) else False
+        )
+        players_before_filter = len(pitching_data)
+        pitching_data = pitching_data[pitching_data['In_Recent_Season']]
+        pitching_data = pitching_data.drop('In_Recent_Season', axis=1)
+        players_after_filter = len(pitching_data)
+        print(f"Pitchers: Filtered {players_before_filter - players_after_filter} players not in {most_recent_season} season (kept {players_after_filter})")
+
         pitching_data = pitching_data.set_index('Hashcode')
 
         # Apply random data jigger if needed (to both datasets)
@@ -270,11 +466,11 @@ class BaseballStatsPreProcess:
         pitching_data['2B'] = 0
         pitching_data['3B'] = 0
         pitching_data['HBP'] = 0
-        pitching_data['Season'] = str(load_seasons)  # List of all seasons
+        pitching_data['Season'] = str(max(load_seasons) + 1)  # Projected year (e.g., 2026)
         pitching_data['OBP'] = pitching_data['WHIP'] / (3 + pitching_data['WHIP'])  # bat reached / number faced
         pitching_data['Total_OB'] = pitching_data['H'] + pitching_data['BB']  # + pitching_data['HBP']
         pitching_data['Total_Outs'] = pitching_data['IP'] * 3  # 3 outs per inning
-        pitching_data = pitching_data[pitching_data['IP'] >= 5]  # drop pitchers without enough innings
+        pitching_data = pitching_data[pitching_data['IP'] >= 1]  # drop pitchers without any meaningful innings (reduced from 5 to 1)
         pitching_data['AVG_faced'] = (pitching_data['Total_OB'] + pitching_data['Total_Outs']) / pitching_data.G
         pitching_data['Game_Fatigue_Factor'] = 0
         pitching_data['Condition'] = 100
@@ -299,7 +495,7 @@ class BaseballStatsPreProcess:
         historical_data['OBP'] = historical_data['WHIP'] / (3 + historical_data['WHIP'])
         historical_data['Total_OB'] = historical_data['H'] + historical_data['BB']
         historical_data['Total_Outs'] = historical_data['IP'] * 3
-        historical_data = historical_data[historical_data['IP'] >= 5]
+        historical_data = historical_data[historical_data['IP'] >= 1]  # drop pitchers without any meaningful innings (reduced from 5 to 1)
         historical_data['AVG_faced'] = (historical_data['Total_OB'] + historical_data['Total_Outs']) / historical_data.G
         historical_data['Game_Fatigue_Factor'] = 0
         historical_data['Condition'] = 100
@@ -337,7 +533,7 @@ class BaseballStatsPreProcess:
         batting_data = salary.fill_nan_salary(batting_data, 'Salary')  # set league min for missing data
         batting_data = salary.fill_nan_salary(batting_data, 'MLS', 0)  # set min for missing data
         batting_data['Pos'] = batting_data['Pos'].apply(self.remove_non_numeric).apply(self.translate_pos)
-        batting_data = self.group_col_to_list(df=batting_data, key_col='Hashcode', col='Pos', new_col='Pos')
+        # DON'T group by Hashcode yet - we need year-by-year data for historical file
         batting_data['Team'] = batting_data['Team'].apply(lambda x: x if x in self.nl + self.al else '' )
         batting_data['League'] = batting_data['Team'].apply(
                 lambda x: 'NL' if x in self.nl else ('AL' if x in self.al else '') )
@@ -350,6 +546,7 @@ class BaseballStatsPreProcess:
         )
 
         # *** Create HISTORICAL data (year-by-year) - one row per player per season ***
+        # Must do this BEFORE grouping by Hashcode to preserve year-by-year data
         historical_data = batting_data.copy()
         historical_data = self.group_col_to_list(df=historical_data, key_col='Player_Season_Key', col='Pos', new_col='Pos')
         historical_data = self.group_col_to_list(df=historical_data, key_col='Player_Season_Key', col='Team', new_col='Teams')
@@ -360,16 +557,27 @@ class BaseballStatsPreProcess:
                                         stats_cols_to_sum=stats_bcols_sum, drop_dups=True)
         historical_data = historical_data.set_index('Player_Season_Key')
 
-        # *** Create AGGREGATED data (career totals) - one row per player ***
-        batting_data = self.group_col_to_list(df=batting_data, key_col='Hashcode', col='Pos', new_col='Pos')
-        batting_data = self.group_col_to_list(df=batting_data, key_col='Hashcode', col='Team', new_col='Teams')
-        batting_data = self.group_col_to_list(df=batting_data, key_col='Hashcode', col='League', new_col='Leagues')
-        # Create Years_Included column - list of seasons this player appeared in
-        batting_data = self.group_col_to_list(df=batting_data, key_col='Hashcode', col='Season', new_col='Years_Included')
-        # Sort by Season to ensure most recent year's Team/League are kept during de-duplication
-        batting_data = batting_data.sort_values('Season', ascending=True)
-        batting_data = self.de_dup_df(df=batting_data, key_name='Hashcode', dup_column_names='Hashcode',
-                                      stats_cols_to_sum=stats_bcols_sum, drop_dups=True)
+        # *** Create AGGREGATED data (trend-based projections) - one row per player ***
+        # Apply trend-based projection to 2026 instead of simple summation
+        stats_to_project = ['G', 'AB', 'R', 'H', '2B', '3B', 'HR', 'RBI', 'SB', 'CS', 'BB', 'SO', 'SH', 'SF', 'HBP', 'GIDP']
+        batting_data = self.apply_trend_based_aggregation(
+            historical_df=historical_data.reset_index(),
+            stats_to_project=stats_to_project,
+            is_pitching=False
+        )
+        # Note: Pos, Teams, Leagues, and Years_Included are now set inside apply_trend_based_aggregation
+
+        # Filter to only keep players who appeared in the most recent season
+        most_recent_season = max(load_seasons)
+        batting_data['In_Recent_Season'] = batting_data['Years_Included'].apply(
+            lambda years: most_recent_season in years if isinstance(years, list) else False
+        )
+        players_before_filter = len(batting_data)
+        batting_data = batting_data[batting_data['In_Recent_Season']]
+        batting_data = batting_data.drop('In_Recent_Season', axis=1)
+        players_after_filter = len(batting_data)
+        print(f"Batters: Filtered {players_before_filter - players_after_filter} players not in {most_recent_season} season (kept {players_after_filter})")
+
         batting_data = batting_data.set_index('Hashcode')
 
         # Apply random data jigger if needed (to both datasets)
@@ -379,7 +587,7 @@ class BaseballStatsPreProcess:
                 historical_data[stats_col] = historical_data[stats_col].apply(self.jigger_data)
 
         # Calculate derived stats for AGGREGATED data
-        batting_data['Season'] = str(load_seasons)  # List of all seasons
+        batting_data['Season'] = str(max(load_seasons) + 1)  # Projected year (e.g., 2026)
         batting_data['OBP'] = self.trunc_col(np.nan_to_num(np.divide(batting_data['H'] + batting_data['BB'] +
                                                                      batting_data['HBP'], batting_data['AB'] +
                                                                      batting_data['BB'] + batting_data['HBP']),
@@ -505,7 +713,7 @@ class BaseballStatsPreProcess:
                 self.pitching_data_historical['Season'] == prior_season
             ].copy()
 
-            # Filter for meaningful playing time
+            # Filter for meaningful playing time (using IP >= 5 for Def_WAR calculation since we need reliable stats)
             prior_p = prior_p[prior_p['IP'] >= 5].copy()
 
             if len(prior_p) > 0:

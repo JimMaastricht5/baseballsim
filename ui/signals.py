@@ -48,6 +48,9 @@ class SeasonSignals:
         self.error_queue = queue.Queue()
         # Message format: (error_message: str)
 
+        self.play_by_play_queue = queue.Queue()
+        # Message format: (play_data: dict)
+
     def emit_day_started(self, day_number: int, schedule_text: str):
         """
         Emit day_started signal.
@@ -107,3 +110,16 @@ class SeasonSignals:
             error_message (str): Human-readable error description
         """
         self.error_queue.put(('error', error_message))
+
+    def emit_play_by_play(self, play_data: Dict):
+        """
+        Emit play_by_play signal.
+
+        Args:
+            play_data (dict): Play-by-play data with keys:
+                - away_team (str): Away team abbreviation
+                - home_team (str): Home team abbreviation
+                - text (str): Play-by-play text fragment
+                - day_num (int): Current day number
+        """
+        self.play_by_play_queue.put(('play_by_play', play_data))

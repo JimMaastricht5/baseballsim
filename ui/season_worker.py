@@ -52,7 +52,7 @@ class SeasonWorker(threading.Thread):
         # Store simulation parameters
         self.load_seasons = load_seasons or [2023, 2024, 2025]
         self.new_season = new_season
-        self.team_to_follow = team_to_follow or []
+        self.team_to_follow = team_to_follow or 'MIL'  # Single string, defaults to 'MIL'
         self.random_data = False
         self.rotation_len = rotation_len
         self.series_length = series_length
@@ -103,7 +103,7 @@ class SeasonWorker(threading.Thread):
                 season_print_lineup_b=self.season_print_lineup_b,  # Suppress console output
                 season_print_box_score_b=self.season_print_box_score_b,  # Suppress console output
                 season_chatty=self.season_chatty,  # Suppress verbose output
-                season_team_to_follow=self.team_to_follow,
+                season_team_to_follow=[self.team_to_follow],  # Convert single string to single-element list
                 load_batter_file='aggr-stats-pp-Batting.csv',
                 load_pitcher_file='aggr-stats-pp-Pitching.csv',
                 schedule=None  # Let it generate schedule

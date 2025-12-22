@@ -11,6 +11,7 @@ game results, and tabs for schedule and injuries.
 import tkinter as tk
 from tkinter import ttk, messagebox, scrolledtext
 import queue
+import pandas as pd
 
 from ui.season_worker import SeasonWorker
 import bbgame
@@ -48,9 +49,9 @@ class SeasonMainWindow:
         self.season_chatty = season_chatty
         self.season_print_lineup_b = season_print_lineup_b
         self.season_print_box_score_b = season_print_box_score_b
-        self.season_team_to_follow = season_team_to_follow
+        self.season_team_to_follow = season_team_to_follow or 'MIL'  # Single string, defaults to 'MIL'
         self.root.title("Baseball Season Simulator")
-        self.root.geometry("1200x800")
+        self.root.geometry("1500x900")
 
         # Season worker (created when simulation starts)
         self.worker = None
@@ -59,6 +60,7 @@ class SeasonMainWindow:
         self.current_day_schedule = []  # List of (away_team, home_tuple) tuples
         self.current_day_results = {}   # Dict: {(away, home): game_data}
         self.followed_game_recaps = []  # List of (away, home, recap_text) for followed games
+        self.previous_day_results = {}  # Dict: {(away, home): game_data} from previous day
         self.current_day_num = 0  # Track current day number for header
 
         # Setup UI components
@@ -222,7 +224,7 @@ class SeasonMainWindow:
 
         self.notebook.add(schedule_frame, text="Schedule")
 
-        # Tab 3: Injuries (Treeview for sortable injury list)
+        # Tab 3: League IL (Treeview for sortable injury list)
         injuries_frame = tk.Frame(self.notebook)
 
         # Header with injury count
@@ -230,10 +232,26 @@ class SeasonMainWindow:
         injuries_header_frame.pack(fill=tk.X, pady=5)
 
         self.injuries_header_label = tk.Label(
-            injuries_header_frame, text="Injury Report",
+            injuries_header_frame, text="League IL Report",
             font=("Arial", 11, "bold")
         )
         self.injuries_header_label.pack()
+
+        # Control frame with team filter dropdown
+        injuries_control_frame = tk.Frame(injuries_frame)
+        injuries_control_frame.pack(fill=tk.X, padx=10, pady=5)
+
+        tk.Label(injuries_control_frame, text="Team:", font=("Arial", 10, "bold")).pack(side=tk.LEFT, padx=5)
+        self.injuries_team_var = tk.StringVar(value="All Teams")
+        self.injuries_team_combo = ttk.Combobox(
+            injuries_control_frame,
+            textvariable=self.injuries_team_var,
+            width=15,
+            state="readonly"
+        )
+        self.injuries_team_combo['values'] = ['All Teams']  # Populated when simulation starts
+        self.injuries_team_combo.bind('<<ComboboxSelected>>', self._on_injuries_team_changed)
+        self.injuries_team_combo.pack(side=tk.LEFT, padx=5)
 
         # Create Treeview for injuries
         injuries_tree_frame = tk.Frame(injuries_frame)
@@ -244,7 +262,7 @@ class SeasonMainWindow:
 
         self.injuries_tree = ttk.Treeview(
             injuries_tree_frame,
-            columns=("player", "team", "pos", "injury", "days", "status"),
+            columns=("player", "team", "pos", "injury", "status"),
             show="headings",
             height=20,
             yscrollcommand=injuries_scrollbar.set
@@ -256,16 +274,14 @@ class SeasonMainWindow:
         self.injuries_tree.heading("team", text="Team", command=lambda: self._sort_injuries("team"))
         self.injuries_tree.heading("pos", text="Pos", command=lambda: self._sort_injuries("pos"))
         self.injuries_tree.heading("injury", text="Injury", command=lambda: self._sort_injuries("injury"))
-        self.injuries_tree.heading("days", text="Days Left", command=lambda: self._sort_injuries("days"))
         self.injuries_tree.heading("status", text="Status", command=lambda: self._sort_injuries("status"))
 
         # Configure column widths
         self.injuries_tree.column("player", width=150, anchor=tk.W)
         self.injuries_tree.column("team", width=60, anchor=tk.CENTER)
         self.injuries_tree.column("pos", width=50, anchor=tk.CENTER)
-        self.injuries_tree.column("injury", width=200, anchor=tk.W)
-        self.injuries_tree.column("days", width=80, anchor=tk.CENTER)
-        self.injuries_tree.column("status", width=100, anchor=tk.CENTER)
+        self.injuries_tree.column("injury", width=250, anchor=tk.W)
+        self.injuries_tree.column("status", width=120, anchor=tk.CENTER)
 
         # Tags for injury status
         self.injuries_tree.tag_configure("IL", background="#ffcccc")  # Red for IL
@@ -275,39 +291,30 @@ class SeasonMainWindow:
 
         # Store injury data for sorting
         self.injuries_data_cache = []
-        self.injuries_sort_column = "days"  # Default sort by days remaining
-        self.injuries_sort_reverse = True  # Descending
+        self.injuries_sort_column = "status"  # Default sort by status
+        self.injuries_sort_reverse = False  # Ascending
 
-        self.notebook.add(injuries_frame, text="Injuries")
+        self.notebook.add(injuries_frame, text="League IL")
 
-        # Tab 4: GM Assessments (ScrolledText for assessment history)
-        gm_assessment_frame = tk.Frame(self.notebook)
+        # Tab 4: Team Tab with nested sub-tabs
+        team_tab_frame = tk.Frame(self.notebook)
+        self.notebook.add(team_tab_frame, text=self.season_team_to_follow)
 
-        # Header
-        gm_header_frame = tk.Frame(gm_assessment_frame)
-        gm_header_frame.pack(fill=tk.X, pady=5)
+        # Create inner notebook for team sub-tabs
+        self.team_notebook = ttk.Notebook(team_tab_frame)
+        self.team_notebook.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
 
-        self.gm_header_label = tk.Label(
-            gm_header_frame, text="No GM Assessment Yet",
-            font=("Arial", 11, "bold")
-        )
-        self.gm_header_label.pack()
+        # Sub-tab 1: Roster (NEW)
+        roster_frame = self._create_roster_subtab(self.team_notebook)
+        self.team_notebook.add(roster_frame, text="Roster")
 
-        # ScrolledText for assessment history
-        self.gm_text = scrolledtext.ScrolledText(
-            gm_assessment_frame, wrap=tk.WORD, font=("Courier", 9), state=tk.DISABLED
-        )
+        # Sub-tab 2: Games Played (MOVED and RENAMED from Play-by-Play)
+        games_played_frame = self._create_games_played_subtab(self.team_notebook)
+        self.team_notebook.add(games_played_frame, text="Games Played")
 
-        # Configure text tags for formatting
-        self.gm_text.tag_configure("header", font=("Courier", 11, "bold"), foreground="#0044cc")
-        self.gm_text.tag_configure("section", font=("Courier", 10, "bold"), underline=True)
-        self.gm_text.tag_configure("value", foreground="#006600")
-        self.gm_text.tag_configure("warning", foreground="#cc6600")
-        self.gm_text.tag_configure("separator", foreground="#888888")
-
-        self.gm_text.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
-
-        self.notebook.add(gm_assessment_frame, text="GM Assessments")
+        # Sub-tab 3: GM Assessment (MOVED from old tab 4)
+        gm_frame = self._create_gm_assessment_subtab(self.team_notebook)
+        self.team_notebook.add(gm_frame, text="GM Assessment")
 
         # Tab 5: Admin (Player Management)
         admin_frame = tk.Frame(self.notebook)
@@ -438,11 +445,284 @@ class SeasonMainWindow:
 
         self.notebook.add(admin_frame, text="Admin")
 
+        # Storage for play-by-play data by day (used by team sub-tab)
+        self.pbp_by_day = {}  # Dict: {day_num: [(away, home, game_recap), ...]}
+
         paned_window.add(notebook_frame, minsize=600)
 
         # Set initial sash position (30% for standings, 70% for content)
         self.root.update_idletasks()
         paned_window.sash_place(0, 360, 1)
+
+    def _create_roster_subtab(self, parent):
+        """Create Roster sub-tab with position players and pitchers."""
+        frame = tk.Frame(parent)
+
+        # Create notebook for Roster sub-sections
+        roster_notebook = ttk.Notebook(frame)
+        roster_notebook.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
+
+        # Sub-section 1: Position Players (combined lineup and bench)
+        pos_players_frame = tk.Frame(roster_notebook)
+        roster_notebook.add(pos_players_frame, text="Pos Players")
+        self.pos_players_tree = self._create_roster_treeview(pos_players_frame, is_batter=True)
+
+        # Sub-section 2: Pitchers
+        pitchers_frame = tk.Frame(roster_notebook)
+        roster_notebook.add(pitchers_frame, text="Pitchers")
+        self.pitchers_tree = self._create_roster_treeview(pitchers_frame, is_batter=False)
+
+        return frame
+
+    def _create_roster_treeview(self, parent, is_batter=True):
+        """Create Treeview for roster data."""
+        if is_batter:
+            columns = ("Player", "Pos", "AB", "R", "H", "2B", "3B", "HR", "RBI", "BB", "K", "AVG", "OBP", "SLG", "Condition", "Status")
+        else:
+            columns = ("Player", "G", "GS", "W", "L", "IP", "H", "R", "ER", "HR", "BB", "SO", "ERA", "WHIP", "SV", "Condition", "Status")
+
+        tree = ttk.Treeview(parent, columns=columns, show="headings", height=15)
+
+        # Configure columns
+        for col in columns:
+            tree.heading(col, text=col)
+            if col == "Player":
+                tree.column(col, width=150, anchor=tk.W)
+            elif col in ["Pos", "Status"]:
+                tree.column(col, width=70, anchor=tk.CENTER)
+            elif col in ["AB", "R", "H", "2B", "3B", "HR", "RBI", "BB", "K", "G", "GS", "W", "L", "ER", "SV", "SO", "Condition"]:
+                tree.column(col, width=45, anchor=tk.CENTER)
+            elif col in ["AVG", "OBP", "SLG", "ERA", "WHIP"]:
+                tree.column(col, width=55, anchor=tk.CENTER)
+            elif col == "IP":
+                tree.column(col, width=50, anchor=tk.CENTER)
+            else:
+                tree.column(col, width=50, anchor=tk.CENTER)
+
+        # Add scrollbar
+        scrollbar = ttk.Scrollbar(parent, orient=tk.VERTICAL, command=tree.yview)
+        tree.configure(yscrollcommand=scrollbar.set)
+        scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+        tree.pack(fill=tk.BOTH, expand=True)
+
+        # Configure tags for injury highlighting
+        tree.tag_configure("day_to_day", background="#fff4cc")  # Yellow for day-to-day (<10 days)
+        tree.tag_configure("injured", background="#ffcccc")  # Red for IL (>=10 days)
+
+        return tree
+
+    def _create_gm_assessment_subtab(self, parent):
+        """Create GM Assessment sub-tab (moved from standalone tab)."""
+        frame = tk.Frame(parent)
+
+        # Header
+        gm_header_frame = tk.Frame(frame)
+        gm_header_frame.pack(fill=tk.X, pady=5)
+
+        self.gm_header_label = tk.Label(
+            gm_header_frame, text="No GM Assessment Yet",
+            font=("Arial", 11, "bold")
+        )
+        self.gm_header_label.pack()
+
+        # ScrolledText for assessment history
+        self.gm_text = scrolledtext.ScrolledText(
+            frame, wrap=tk.WORD, font=("Courier", 9), state=tk.DISABLED
+        )
+
+        # Configure text tags for formatting
+        self.gm_text.tag_configure("header", font=("Courier", 11, "bold"), foreground="#0044cc")
+        self.gm_text.tag_configure("section", font=("Courier", 10, "bold"), underline=True)
+        self.gm_text.tag_configure("value", foreground="#006600")
+        self.gm_text.tag_configure("warning", foreground="#cc6600")
+        self.gm_text.tag_configure("separator", foreground="#888888")
+
+        self.gm_text.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
+
+        return frame
+
+    def _create_games_played_subtab(self, parent):
+        """Create Games Played sub-tab (moved from Play-by-Play tab)."""
+        frame = tk.Frame(parent)
+
+        # Control frame with day dropdown
+        pbp_control_frame = tk.Frame(frame)
+        pbp_control_frame.pack(fill=tk.X, padx=10, pady=5)
+
+        tk.Label(pbp_control_frame, text="Day:", font=("Arial", 10, "bold")).pack(side=tk.LEFT, padx=5)
+        self.pbp_day_var = tk.StringVar(value="Select Day")
+        self.pbp_day_combo = ttk.Combobox(
+            pbp_control_frame,
+            textvariable=self.pbp_day_var,
+            width=15,
+            state="readonly"
+        )
+        self.pbp_day_combo['values'] = ['Select Day']  # Populated as days complete
+        self.pbp_day_combo.bind('<<ComboboxSelected>>', self._on_pbp_day_changed)
+        self.pbp_day_combo.pack(side=tk.LEFT, padx=5)
+
+        # Info label
+        self.pbp_info_label = tk.Label(
+            pbp_control_frame,
+            text="Select a day to view play-by-play for followed games",
+            font=("Arial", 9),
+            fg="#666666"
+        )
+        self.pbp_info_label.pack(side=tk.LEFT, padx=20)
+
+        # ScrolledText for play-by-play
+        self.pbp_text = scrolledtext.ScrolledText(
+            frame, wrap=tk.WORD, font=("Courier", 9), state=tk.DISABLED
+        )
+
+        # Configure text tags for formatting
+        self.pbp_text.tag_configure("game_header", font=("Arial", 11, "bold"),
+                                   foreground="#1a3d6b", spacing1=10, spacing3=5)
+        self.pbp_text.tag_configure("play", font=("Courier", 9))
+        self.pbp_text.tag_configure("score_update", font=("Courier", 9, "bold"),
+                                   foreground="#006600")
+
+        self.pbp_text.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
+
+        return frame
+
+    def on_roster_update(self):
+        """Fetch and display roster data for followed team."""
+        if not self.worker or not self.worker.season:
+            logger.debug("Roster update skipped - no worker or season available")
+            return
+
+        try:
+            team = self.season_team_to_follow
+            baseball_data = self.worker.season.baseball_data
+
+            # Get batting data (current season)
+            batting_df = baseball_data.get_batting_data(team, prior_season=False)
+
+            # Get pitching data (current season)
+            pitching_df = baseball_data.get_pitching_data(team, prior_season=False)
+
+            # Sort batters by PA if column exists, otherwise use AB, then G
+            # Try PA first, fall back to AB, then G (games)
+            if 'PA' in batting_df.columns and batting_df['PA'].sum() > 0:
+                sorted_batters = batting_df.sort_values('PA', ascending=False)
+            elif 'AB' in batting_df.columns and batting_df['AB'].sum() > 0:
+                sorted_batters = batting_df.sort_values('AB', ascending=False)
+            elif 'G' in batting_df.columns and batting_df['G'].sum() > 0:
+                sorted_batters = batting_df.sort_values('G', ascending=False)
+            else:
+                # No stats yet, just use as-is
+                sorted_batters = batting_df
+
+            # Update position players tree (all batters combined)
+            self._update_roster_tree(self.pos_players_tree, sorted_batters, is_batter=True)
+
+            # Sort pitchers by IP (innings pitched)
+            # NOTE: Display ALL pitchers on team roster, including those with 0 IP
+            if 'IP' in pitching_df.columns and pitching_df['IP'].sum() > 0:
+                # Sort by IP descending (pitchers with 0 IP will appear at bottom)
+                sorted_pitchers = pitching_df.sort_values('IP', ascending=False)
+            else:
+                # No IP stats yet, sort by player name for consistency
+                sorted_pitchers = pitching_df.sort_values('Player') if 'Player' in pitching_df.columns else pitching_df
+
+            # Update pitchers tree (includes all team pitchers regardless of IP)
+            self._update_roster_tree(self.pitchers_tree, sorted_pitchers, is_batter=False)
+
+            logger.info(f"Roster updated for {team}: {len(batting_df)} batters, {len(pitching_df)} pitchers")
+
+        except Exception as e:
+            logger.error(f"Error updating roster: {e}")
+            import traceback
+            logger.error(traceback.format_exc())
+
+    @staticmethod
+    def _condition_to_text(condition):
+        """Convert numeric condition (0-100) to descriptive text."""
+        if condition >= 95:
+            return "Excellent"
+        elif condition >= 85:
+            return "Good"
+        elif condition >= 70:
+            return "Fair"
+        elif condition >= 50:
+            return "Tired"
+        else:
+            return "Fatigued"
+
+    def _update_roster_tree(self, tree, data_df, is_batter=True):
+        """Update roster Treeview with data."""
+        # Clear existing
+        for item in tree.get_children():
+            tree.delete(item)
+
+        # Handle empty DataFrame
+        if data_df.empty:
+            logger.debug(f"Empty roster data for {'batter' if is_batter else 'pitcher'}")
+            return
+
+        # Insert rows
+        for idx, row in data_df.iterrows():
+            try:
+                if is_batter:
+                    # Clean up position formatting (remove brackets and quotes)
+                    pos = row.get('Pos', 'Unknown')
+                    if isinstance(pos, list):
+                        pos = pos[0] if pos else 'Unknown'
+                    # Convert to string and remove all brackets, quotes, and spaces
+                    pos = str(pos).replace('[', '').replace(']', '').replace("'", '').replace('"', '').strip()
+
+                    values = (
+                        row.get('Player', 'Unknown'),
+                        pos,
+                        int(row.get('AB', 0)),
+                        int(row.get('R', 0)),
+                        int(row.get('H', 0)),
+                        int(row.get('2B', 0)),
+                        int(row.get('3B', 0)),
+                        int(row.get('HR', 0)),
+                        int(row.get('RBI', 0)),
+                        int(row.get('BB', 0)),
+                        int(row.get('SO', 0)),
+                        f"{float(row.get('AVG', 0)):.3f}",
+                        f"{float(row.get('OBP', 0)):.3f}",
+                        f"{float(row.get('SLG', 0)):.3f}",
+                        self._condition_to_text(int(row.get('Condition', 100))),
+                        row.get('Status', 'Healthy')
+                    )
+                else:
+                    values = (
+                        row.get('Player', 'Unknown'),
+                        int(row.get('G', 0)),
+                        int(row.get('GS', 0)),
+                        int(row.get('W', 0)),
+                        int(row.get('L', 0)),
+                        f"{float(row.get('IP', 0)):.1f}",
+                        int(row.get('H', 0)),
+                        int(row.get('R', 0)),
+                        int(row.get('ER', 0)),
+                        int(row.get('HR', 0)),
+                        int(row.get('BB', 0)),
+                        int(row.get('SO', 0)),
+                        f"{float(row.get('ERA', 0)):.2f}",
+                        f"{float(row.get('WHIP', 0)):.2f}",
+                        int(row.get('SV', 0)),
+                        self._condition_to_text(int(row.get('Condition', 100))),
+                        row.get('Status', 'Healthy')
+                    )
+
+                # Determine injury tag based on Injured Days
+                injured_days = int(row.get('Injured Days', 0))
+                tags = ()
+                if injured_days > 0:
+                    if injured_days < 10:
+                        tags = ("day_to_day",)
+                    else:
+                        tags = ("injured",)
+
+                tree.insert("", tk.END, values=values, tags=tags)
+            except Exception as e:
+                logger.warning(f"Error inserting roster row for {row.get('Player', 'Unknown')}: {e}")
 
     def _create_status_bar(self):
         """Create status bar frame with day counter, progress bar, and status message."""
@@ -514,6 +794,12 @@ class SeasonMainWindow:
 
         # Load admin players after a short delay (wait for season to initialize)
         self.root.after(1000, self._load_admin_players)
+
+        # Populate injury team dropdown
+        self.root.after(1000, self._populate_injuries_teams)
+
+        # Load initial roster data for followed team
+        self.root.after(2000, self.on_roster_update)
 
         # Update UI state
         self._update_button_states(simulation_running=True, paused=False)
@@ -630,6 +916,8 @@ class SeasonMainWindow:
             except Exception as e:
                 logger.error(f"Error handling simulation_complete: {e}")
 
+            # Note: play_by_play queue polling removed - now using game_completed for full recaps
+
             # Check error queue
             try:
                 msg = signals.error_queue.get_nowait()
@@ -672,14 +960,24 @@ class SeasonMainWindow:
         else:
             self.current_day_schedule = []
 
-        # Clear results tracking
+        # Display yesterday's results and today's schedule
+        self.games_text.config(state=tk.NORMAL)
+        self.games_text.delete(1.0, tk.END)
+
+        # Show yesterday's final scores (if not day 1)
+        if day_num > 0 and self.previous_day_results:
+            self.games_text.insert(tk.END, f"═══ Day {day_num} Results ═══\n\n", "day_header")
+            self._display_yesterday_results()
+            self.games_text.insert(tk.END, "\n\n")
+
+        # Show today's schedule header
+        self.games_text.insert(tk.END, f"═══ Day {day_num + 1} Schedule ═══\n\n", "day_header")
+
+        # Clear results tracking for new day
         self.current_day_results = {}
         self.followed_game_recaps = []
 
-        # Display initial grid with blanks
-        self.games_text.config(state=tk.NORMAL)
-        self.games_text.delete(1.0, tk.END)
-        self.games_text.insert(tk.END, f"═══ Day {day_num + 1} ═══\n\n", "day_header")
+        # Display initial grid with blanks for today's games
         self._display_games_grid()
         self.games_text.config(state=tk.DISABLED)
 
@@ -692,12 +990,23 @@ class SeasonMainWindow:
 
         away = game_data['away_team']
         home = game_data['home_team']
+        day_num = game_data.get('day_num', 0)
 
-        # Store result
+        # Store result for Today's Games tab
         self.current_day_results[(away, home)] = game_data
 
-        # Store recap for later display
-        self.followed_game_recaps.append((away, home, game_data['game_recap']))
+        # Store recap for Play-by-Play tab (grouped by day)
+        if day_num not in self.pbp_by_day:
+            self.pbp_by_day[day_num] = []
+        self.pbp_by_day[day_num].append((away, home, game_data['game_recap']))
+
+        # Update dropdown with this day if not already present
+        current_days = [int(val.split()[1]) for val in self.pbp_day_combo['values'] if val.startswith('Day')]
+        if day_num + 1 not in current_days:  # day_num is 0-indexed, display as 1-indexed
+            # Sort days in descending order (most recent first)
+            days_list = ['Select Day'] + [f'Day {d + 1}' for d in sorted(list(self.pbp_by_day.keys()), reverse=True)]
+            self.pbp_day_combo['values'] = days_list
+            logger.debug(f"Added Day {day_num + 1} to play-by-play dropdown")
 
         # Rebuild grid to show updated score
         self._rebuild_games_display()
@@ -715,8 +1024,14 @@ class SeasonMainWindow:
         # Rebuild grid to show all scores
         self._rebuild_games_display()
 
+        # Save current day's results as previous day (for next day's display)
+        self.previous_day_results = self.current_day_results.copy()
+
         # Update standings display
         self._update_standings_display(standings_data)
+
+        # Update roster to reflect latest stats
+        self.on_roster_update()
 
         # Update button states if worker is paused (e.g., after step_one_day)
         if self.worker and self.worker._paused:
@@ -740,8 +1055,8 @@ class SeasonMainWindow:
         pcts = standings_data.get('pct', [])
         gbs = standings_data.get('gb', [])
 
-        # Get followed teams for highlighting
-        followed_teams = self.worker.team_to_follow if self.worker else []
+        # Get followed team for highlighting (single string)
+        followed_team = self.worker.team_to_follow if self.worker else ''
 
         # Insert data into treeview
         for i in range(len(teams)):
@@ -751,7 +1066,7 @@ class SeasonMainWindow:
             gb = gbs[i]
 
             # Determine if this team is followed
-            tags = ("followed",) if team in followed_teams else ()
+            tags = ("followed",) if team == followed_team else ()
 
             self.standings_tree.insert(
                 "",
@@ -852,9 +1167,6 @@ class SeasonMainWindow:
         self._display_gm_assessment(team, games, wins, losses, games_back, assessment)
 
         self.gm_text.config(state=tk.DISABLED)
-
-        # Switch to GM Assessments tab
-        self.notebook.select(3)  # Tab 4 (0-indexed, so index 3)
 
     def _display_gm_assessment(self, team, games, wins, losses, games_back, assessment):
         """
@@ -960,11 +1272,21 @@ class SeasonMainWindow:
         """Handle injury_update message."""
         logger.debug(f"Injury update: {len(injury_list)} injured players")
 
-        # Cache injury data for sorting
+        # Cache injury data for sorting and filtering
         self.injuries_data_cache = injury_list
 
+        # Apply team filter
+        selected_team = self.injuries_team_var.get()
+        if selected_team != "All Teams":
+            filtered_list = [inj for inj in injury_list if inj['team'] == selected_team]
+        else:
+            filtered_list = injury_list
+
         # Update header with count
-        count_text = f"Injury Report ({len(injury_list)} injured)"
+        if selected_team == "All Teams":
+            count_text = f"League IL Report ({len(filtered_list)} injured)"
+        else:
+            count_text = f"League IL Report - {selected_team} ({len(filtered_list)} injured)"
         self.injuries_header_label.config(text=count_text)
 
         # Clear existing items
@@ -972,9 +1294,27 @@ class SeasonMainWindow:
             self.injuries_tree.delete(item)
 
         # Insert injury data
-        for injury in injury_list:
-            status = injury['status']
-            tags = (status,)  # Use status as tag for color coding
+        for injury in filtered_list:
+            days = injury['days_remaining']
+
+            # Clean up position formatting (remove brackets and quotes)
+            pos = injury['position']
+            if isinstance(pos, list):
+                pos = pos[0] if pos else 'Unknown'
+            pos = str(pos).replace('[', '').replace(']', '').replace("'", '').replace('"', '').strip()
+
+            # Create descriptive status based on days remaining
+            if days >= 60:
+                status_text = "60-Day IL"
+                tag_status = "IL"
+            elif days >= 10:
+                status_text = "10-Day IL"
+                tag_status = "IL"
+            else:
+                status_text = "Day-to-Day"
+                tag_status = "Day-to-Day"
+
+            tags = (tag_status,)  # Use tag status for color coding
 
             self.injuries_tree.insert(
                 "",
@@ -982,10 +1322,9 @@ class SeasonMainWindow:
                 values=(
                     injury['player'],
                     injury['team'],
-                    injury['position'],
+                    pos,
                     injury['injury'],
-                    injury['days_remaining'],
-                    status
+                    status_text
                 ),
                 tags=tags
             )
@@ -1005,12 +1344,94 @@ class SeasonMainWindow:
         self._update_button_states(simulation_running=False, paused=False)
         self.status_label.config(text="Error occurred")
 
+    def _on_pbp_day_changed(self, event=None):
+        """Handle day dropdown change in play-by-play tab."""
+        selected = self.pbp_day_var.get()
+
+        if selected == "Select Day":
+            return
+
+        # Extract day number from "Day X" format
+        try:
+            day_num = int(selected.split()[1]) - 1  # Convert back to 0-indexed
+        except (ValueError, IndexError):
+            logger.error(f"Invalid day selection: {selected}")
+            return
+
+        # Get games for this day
+        games = self.pbp_by_day.get(day_num, [])
+
+        if not games:
+            self.pbp_text.config(state=tk.NORMAL)
+            self.pbp_text.delete(1.0, tk.END)
+            self.pbp_text.insert(tk.END, f"No followed games on {selected}\n")
+            self.pbp_text.config(state=tk.DISABLED)
+            return
+
+        # Display all games for this day
+        self.pbp_text.config(state=tk.NORMAL)
+        self.pbp_text.delete(1.0, tk.END)
+
+        for away, home, game_recap in games:
+            # Add game header
+            header = f"▼ {away} @ {home} ▼\n"
+            self.pbp_text.insert(tk.END, "\n" if self.pbp_text.get(1.0, tk.END).strip() else "")
+            self.pbp_text.insert(tk.END, header, "game_header")
+
+            # Add game recap (already formatted with play-by-play)
+            # Apply simple formatting: highlight score lines
+            for line in game_recap.split('\n'):
+                if "Scored" in line or "score is" in line:
+                    self.pbp_text.insert(tk.END, line + '\n', "score_update")
+                else:
+                    self.pbp_text.insert(tk.END, line + '\n', "play")
+
+            # Add separator between games
+            self.pbp_text.insert(tk.END, "\n" + "="*80 + "\n")
+
+        self.pbp_text.see(1.0)  # Scroll to top of day's games
+        self.pbp_text.config(state=tk.DISABLED)
+
+        logger.debug(f"Displayed {len(games)} games for Day {day_num + 1}")
+
+    def _display_yesterday_results(self):
+        """Display yesterday's final scores in a compact format."""
+        if not self.previous_day_results:
+            return
+
+        # Get all games from previous day (recreate schedule from results)
+        games = sorted(self.previous_day_results.keys())
+
+        games_per_row = 5
+        game_separator = '     '
+
+        for row_start in range(0, len(games), games_per_row):
+            row_games = games[row_start:row_start + games_per_row]
+
+            # Header row
+            header_parts = ['     R   H   E'] * len(row_games)
+            self.games_text.insert(tk.END, game_separator.join(header_parts) + "\n")
+
+            # Away team row
+            away_parts = []
+            for away, home in row_games:
+                data = self.previous_day_results[(away, home)]
+                away_parts.append(f"{away:>3} {data['away_r']:>2}  {data['away_h']:>2}   {data['away_e']:>1}")
+            self.games_text.insert(tk.END, game_separator.join(away_parts) + "\n")
+
+            # Home team row
+            home_parts = []
+            for away, home in row_games:
+                data = self.previous_day_results[(away, home)]
+                home_parts.append(f"{home:>3} {data['home_r']:>2}  {data['home_h']:>2}   {data['home_e']:>1}")
+            self.games_text.insert(tk.END, game_separator.join(home_parts) + "\n\n")
+
     def _display_games_grid(self):
         """
         Display all games for the day in columnar format with R H E headers.
 
         Shows actual R H E values for completed games, dashes for pending games.
-        Followed game recaps appear below the grid.
+        All games (followed and non-followed) are displayed the same way.
         """
         if not self.current_day_schedule:
             self.games_text.insert(tk.END, "No games scheduled today\n\n")
@@ -1054,18 +1475,6 @@ class SeasonMainWindow:
                     home_parts.append(f"{home:>3}  -   -    -")
             self.games_text.insert(tk.END, game_separator.join(home_parts) + "\n\n")
 
-        # Add followed game recaps below grid
-        if self.followed_game_recaps:
-            self.games_text.insert(tk.END, "\n" + "=" * 60 + "\n")
-            self.games_text.insert(tk.END, "FOLLOWED GAME DETAILS\n", "header")
-            self.games_text.insert(tk.END, "=" * 60 + "\n\n")
-            for away, home, recap in self.followed_game_recaps:
-                self.games_text.insert(tk.END, f"▼ {away} @ {home} ▼\n", "header")
-                self.games_text.insert(tk.END, "─" * 60 + "\n", "separator")
-                self.games_text.insert(tk.END, recap, "followed_game")
-                self.games_text.insert(tk.END, "\n")
-                self.games_text.insert(tk.END, "─" * 60 + "\n\n", "separator")
-
     def _rebuild_games_display(self):
         """Rebuild the entire games display with current results."""
         self.games_text.config(state=tk.NORMAL)
@@ -1073,8 +1482,14 @@ class SeasonMainWindow:
         # Clear and rebuild
         self.games_text.delete(1.0, tk.END)
 
-        # Restore day header with proper formatting
-        self.games_text.insert(tk.END, f"═══ Day {self.current_day_num + 1} ═══\n\n", "day_header")
+        # Show yesterday's results if available (same as on_day_started)
+        if self.current_day_num > 0 and self.previous_day_results:
+            self.games_text.insert(tk.END, f"═══ Day {self.current_day_num} Results ═══\n\n", "day_header")
+            self._display_yesterday_results()
+            self.games_text.insert(tk.END, "\n\n")
+
+        # Restore today's schedule header with proper formatting
+        self.games_text.insert(tk.END, f"═══ Day {self.current_day_num + 1} Schedule ═══\n\n", "day_header")
 
         # Display updated grid
         self._display_games_grid()
@@ -1154,13 +1569,17 @@ class SeasonMainWindow:
         else:
             self.injuries_sort_column = column
             # Default directions
-            if column == "days":
-                self.injuries_sort_reverse = True  # Longest injuries first
+            if column == "status":
+                self.injuries_sort_reverse = True  # Longest injuries first (by days_remaining)
             else:
                 self.injuries_sort_reverse = False  # Ascending for text
 
-        # Sort data
-        data = self.injuries_data_cache.copy()
+        # Apply team filter first
+        selected_team = self.injuries_team_var.get()
+        if selected_team != "All Teams":
+            data = [inj for inj in self.injuries_data_cache if inj['team'] == selected_team]
+        else:
+            data = self.injuries_data_cache.copy()
 
         if column == "player":
             data.sort(key=lambda x: x['player'], reverse=self.injuries_sort_reverse)
@@ -1170,18 +1589,43 @@ class SeasonMainWindow:
             data.sort(key=lambda x: x['position'], reverse=self.injuries_sort_reverse)
         elif column == "injury":
             data.sort(key=lambda x: x['injury'], reverse=self.injuries_sort_reverse)
-        elif column == "days":
-            data.sort(key=lambda x: x['days_remaining'], reverse=self.injuries_sort_reverse)
         elif column == "status":
-            data.sort(key=lambda x: x['status'], reverse=self.injuries_sort_reverse)
+            # Sort by days_remaining for status column (since status is now "10-Day IL", "60-Day IL", etc.)
+            data.sort(key=lambda x: x['days_remaining'], reverse=self.injuries_sort_reverse)
+
+        # Update header with filtered count
+        selected_team = self.injuries_team_var.get()
+        if selected_team == "All Teams":
+            count_text = f"League IL Report ({len(data)} injured)"
+        else:
+            count_text = f"League IL Report - {selected_team} ({len(data)} injured)"
+        self.injuries_header_label.config(text=count_text)
 
         # Clear and repopulate
         for item in self.injuries_tree.get_children():
             self.injuries_tree.delete(item)
 
         for injury in data:
-            status = injury['status']
-            tags = (status,)
+            days = injury['days_remaining']
+
+            # Clean up position formatting (remove brackets and quotes)
+            pos = injury['position']
+            if isinstance(pos, list):
+                pos = pos[0] if pos else 'Unknown'
+            pos = str(pos).replace('[', '').replace(']', '').replace("'", '').replace('"', '').strip()
+
+            # Create descriptive status based on days remaining
+            if days >= 60:
+                status_text = "60-Day IL"
+                tag_status = "IL"
+            elif days >= 10:
+                status_text = "10-Day IL"
+                tag_status = "IL"
+            else:
+                status_text = "Day-to-Day"
+                tag_status = "Day-to-Day"
+
+            tags = (tag_status,)
 
             self.injuries_tree.insert(
                 "",
@@ -1189,13 +1633,36 @@ class SeasonMainWindow:
                 values=(
                     injury['player'],
                     injury['team'],
-                    injury['position'],
+                    pos,
                     injury['injury'],
-                    injury['days_remaining'],
-                    status
+                    status_text
                 ),
                 tags=tags
             )
+
+    def _on_injuries_team_changed(self, event=None):
+        """Handle team dropdown change in injuries tab."""
+        # Just redisplay with current filter - on_injury_update already handles filtering
+        if self.injuries_data_cache:
+            self._sort_injuries(self.injuries_sort_column)
+
+    def _populate_injuries_teams(self):
+        """Populate injuries team dropdown with all teams."""
+        if not self.worker or not self.worker.season:
+            logger.debug("Cannot populate injury teams - no worker or season available")
+            return
+
+        try:
+            # Get all team names from the season
+            all_teams = self.worker.season.baseball_data.get_all_team_names()
+
+            # Update dropdown values
+            team_values = ['All Teams'] + sorted(all_teams)
+            self.injuries_team_combo['values'] = team_values
+
+            logger.debug(f"Populated injury team dropdown with {len(all_teams)} teams")
+        except Exception as e:
+            logger.error(f"Error populating injury teams: {e}")
 
     def _load_admin_players(self):
         """

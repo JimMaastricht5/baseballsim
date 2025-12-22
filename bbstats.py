@@ -200,7 +200,8 @@ class BaseballStats:
             df_new = self.new_season_pitching_data[self.new_season_pitching_data['Team'] == team_name]
             df_cur = self.pitching_data[self.pitching_data.index.isin(df_new.index)]
             df = df_cur if prior_season else df_new
-        df = team_pitching_stats(df)
+        # Don't filter stats - include pitchers with 0 IP (important for roster display at season start)
+        df = team_pitching_stats(df, filter_stats=False)
         df = self.add_missing_cols(df)
         return df
 

@@ -10,6 +10,8 @@ for UI updates while preserving all simulation logic.
 
 import pandas as pd
 from typing import List, Optional
+import queue
+import threading
 
 import bbseason
 import bbgame
@@ -41,7 +43,30 @@ class UIBaseballSeason(bbseason.BaseballSeason):
         self.signals = signals
         logger.info("UIBaseballSeason initialized with signal emitter")
 
-    def _process_and_print_game_results(self, game_results: List[tuple]) -> None:
+    def _create_play_by_play_callback(self, away_team: str, home_team: str, day_num: int):
+        """
+        Create a callback function for emitting play-by-play during game simulation.
+
+        Args:
+            away_team (str): Away team abbreviation
+            home_team (str): Home team abbreviation
+            day_num (int): Current day number
+
+        Returns:
+            callable: Callback function that accepts text string
+        """
+        def callback(text: str):
+            # Only emit if this involves a followed team
+            if not self.team_to_follow or any(team in self.team_to_follow for team in [away_team, home_team]):
+                self.signals.emit_play_by_play({
+                    'away_team': away_team,
+                    'home_team': home_team,
+                    'text': text,
+                    'day_num': day_num
+                })
+        return callback
+
+    def _process_and_print_game_results(self, game_results: List[tuple], season_day_num: int = 0) -> None:
         """
         Override to emit signals instead of printing.
 
@@ -51,6 +76,7 @@ class UIBaseballSeason(bbseason.BaseballSeason):
 
         Args:
             game_results: List of tuples (match_up, score, game_recap, away_box_score, home_box_score)
+            season_day_num: Day number (0-indexed)
         """
         compact_summaries = []
 
@@ -68,7 +94,8 @@ class UIBaseballSeason(bbseason.BaseballSeason):
                 'home_h': home_box_score.total_hits,
                 'away_e': away_box_score.total_errors,
                 'home_e': home_box_score.total_errors,
-                'game_recap': game_recap
+                'game_recap': game_recap if is_followed else '',  # Full recap for followed games (display in Play-by-Play tab)
+                'day_num': season_day_num if is_followed else None
             }
 
             if is_followed:
@@ -153,7 +180,7 @@ class UIBaseballSeason(bbseason.BaseballSeason):
 
     def sim_day_threaded(self, season_day_num: int) -> None:
         """
-        Override to emit day_started signal before running games.
+        Override to emit day_started signal and inject play-by-play callbacks.
 
         Args:
             season_day_num (int): Day number (0-indexed)
@@ -163,12 +190,57 @@ class UIBaseballSeason(bbseason.BaseballSeason):
         self.signals.emit_day_started(season_day_num, schedule_text)
         logger.debug(f"Emitted day_started for day {season_day_num + 1}")
 
-        # Call parent to run the actual simulation
-        # Note: We need to suppress the print statements in parent
-        # The parent will call _process_and_print_game_results which we've overridden
-        super().sim_day_threaded(season_day_num)
+        # Run game simulation (adapted from parent's sim_day_threaded)
+        threads = []
+        queues = []
+        match_ups = []
+        todays_games = self.schedule[season_day_num]
+        teams_list = self.team_to_follow if len(self.team_to_follow) > 0 else None
+        self.baseball_data.new_game_day(teams_to_follow=teams_list)
 
-        # Extract and emit injury update after new_game_day() has been called
+        for match_up in todays_games:
+            if 'OFF DAY' not in match_up:
+                # Create play-by-play callback for this game
+                pbp_callback = self._create_play_by_play_callback(
+                    match_up[0], match_up[1], season_day_num
+                )
+
+                game = bbgame.Game(
+                    away_team_name=match_up[0],
+                    home_team_name=match_up[1],
+                    baseball_data=self.baseball_data,
+                    game_num=season_day_num,
+                    rotation_len=self.rotation_len,
+                    print_lineup=self.print_lineup_b,
+                    chatty=self.season_chatty,
+                    print_box_score_b=self.print_box_score_b,
+                    team_to_follow=self.team_to_follow,
+                    interactive=self.interactive,
+                    play_by_play_callback=pbp_callback  # NEW: Inject callback
+                )
+                q = queue.Queue()
+                thread = threading.Thread(target=game.sim_game_threaded, args=(q,))
+                threads.append(thread)
+                queues.append(q)
+                match_ups.append(match_up)
+                thread.start()
+
+        # Collect game results
+        game_results = []
+        for ii, thread in enumerate(threads):
+            thread.join()
+            (score, inning, win_loss_list, away_box_score, home_box_score, game_recap) = queues[ii].get()
+            match_up = match_ups[ii]
+            self.update_win_loss(away_team_name=match_up[0], home_team_name=match_up[1],
+                                win_loss=win_loss_list)
+            self.baseball_data.game_results_to_season(box_score_class=away_box_score)
+            self.baseball_data.game_results_to_season(box_score_class=home_box_score)
+            game_results.append((match_up, score, game_recap, away_box_score, home_box_score))
+
+        # Process and emit signals (existing code)
+        self._process_and_print_game_results(game_results, season_day_num)
+
+        # Extract and emit injury update
         injuries = self.extract_injuries()
         self.signals.emit_injury_update(injuries)
         logger.debug(f"Emitted injury_update with {len(injuries)} injuries")

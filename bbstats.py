@@ -17,12 +17,6 @@ Key Features:
 - Syncs condition and injury data between historical and new season stats
 - Calculates all derived baseball statistics (AVG, OBP, SLG, ERA, WHIP, etc.)
 
-Performance Optimizations:
-- Cached RNG (29x speedup) - see at_bat.py for shared instance
-- Pre-calculated league totals (2-3x speedup)
-- Pre-compiled regex patterns (2-5x speedup)
-- Return scalar values instead of size-1 arrays
-
 Data Structure:
 - pitching_data: Aggregated career pitching stats (indexed by Hashcode)
 - batting_data: Aggregated career batting stats (indexed by Hashcode)
@@ -673,18 +667,18 @@ class BaseballStats:
         :return: None
         """
         with self.semaphore:
-            logger.info('Calculating team pitching stats...')
+            logger.debug('Calculating team pitching stats...')
             self.new_season_pitching_data = \
                 team_pitching_stats(self.new_season_pitching_data[self.new_season_pitching_data['IP'] > 0].fillna(0))
-            logger.info('Calculating team batting stats...')
+            logger.debug('Calculating team batting stats...')
             self.new_season_batting_data = \
                 team_batting_stats(self.new_season_batting_data[self.new_season_batting_data['AB'] > 0].fillna(0))
             logger.debug('Updated season pitching stats:\n{}', self.new_season_pitching_data.to_string(justify="right"))
 
             # Calculate Sim WAR after updating stats
-            logger.info('Calculating player WAR values...')
+            logger.debug('Calculating player WAR values...')
             self.calculate_sim_war()
-            logger.info('Season statistics update complete.')
+            logger.debug('Season statistics update complete.')
         return
 
     def calculate_sim_war(self) -> None:
@@ -772,7 +766,7 @@ class BaseballStats:
         active_pitchers = pitching_df['IP'] >= 5
 
         # Debug output for season end
-        logger.info(f'Pitcher WAR calculation: {len(pitching_df)} total pitchers, {active_pitchers.sum()} active (IP >= 5)')
+        logger.debug(f'Pitcher WAR calculation: {len(pitching_df)} total pitchers, {active_pitchers.sum()} active (IP >= 5)')
 
         if active_pitchers.sum() > 0:
             # Calculate FIP (Fielding Independent Pitching)
@@ -812,14 +806,14 @@ class BaseballStats:
             # Set Sim_WAR column (vectorized)
             pitching_df['Sim_WAR'] = np.where(active_pitchers, sim_war, 0.0)
 
-            logger.info(f'League average FIP: {league_fip:.2f}, Replacement level FIP: {replacement_fip:.2f}')
-            logger.info(f'Pitcher WAR range: {pitching_df[active_pitchers]["Sim_WAR"].min():.2f} to {pitching_df[active_pitchers]["Sim_WAR"].max():.2f}, avg={pitching_df[active_pitchers]["Sim_WAR"].mean():.2f}')
+            logger.debug(f'League average FIP: {league_fip:.2f}, Replacement level FIP: {replacement_fip:.2f}')
+            logger.debug(f'Pitcher WAR range: {pitching_df[active_pitchers]["Sim_WAR"].min():.2f} to {pitching_df[active_pitchers]["Sim_WAR"].max():.2f}, avg={pitching_df[active_pitchers]["Sim_WAR"].mean():.2f}')
 
             # Log a sample pitcher for verification (temporarily store FIP in dataframe)
             pitching_df['_temp_fip'] = fip
             sample_pitchers = pitching_df[active_pitchers].nlargest(3, 'IP')
             for idx, p in sample_pitchers.iterrows():
-                logger.info(f'Sample: {p.get("Player", "Unknown")} - IP:{p["IP"]:.1f} FIP:{p["_temp_fip"]:.2f} WAR:{p["Sim_WAR"]:.2f}')
+                logger.debug(f'Sample: {p.get("Player", "Unknown")} - IP:{p["IP"]:.1f} FIP:{p["_temp_fip"]:.2f} WAR:{p["Sim_WAR"]:.2f}')
             pitching_df.drop(columns=['_temp_fip'], inplace=True)
         else:
             pitching_df['Sim_WAR'] = 0.0
@@ -920,8 +914,8 @@ class BaseballStats:
         final_batting_data.to_csv(batting_filename, index=True, index_label='Hashcode')
         final_pitching_data.to_csv(pitching_filename, index=True, index_label='Hashcode')
 
-        logger.info(f'Saved final season batting stats to {batting_filename}')
-        logger.info(f'Saved final season pitching stats to {pitching_filename}')
+        logger.debug(f'Saved final season batting stats to {batting_filename}')
+        logger.debug(f'Saved final season pitching stats to {pitching_filename}')
         print(f'\nFinal season statistics saved to:')
         print(f'  - {batting_filename}')
         print(f'  - {pitching_filename}')
@@ -944,8 +938,8 @@ class BaseballStats:
         self.new_season_batting_data.to_csv(batting_filename, index=True, index_label='Hashcode')
         self.new_season_pitching_data.to_csv(pitching_filename, index=True, index_label='Hashcode')
 
-        logger.info(f'Saved new season batting stats to {batting_filename}')
-        logger.info(f'Saved new season pitching stats to {pitching_filename}')
+        logger.debug(f'Saved new season batting stats to {batting_filename}')
+        logger.debug(f'Saved new season pitching stats to {pitching_filename}')
         print(f'\nNew season statistics saved to:')
         print(f'  - {batting_filename}')
         print(f'  - {pitching_filename}')

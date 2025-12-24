@@ -229,7 +229,7 @@ class SeasonMainWindow:
 
         # Store current standings data for sorting
         self.standings_data_cache = None
-        self.standings_sort_column = "pct"  # Default sort by win percentage
+        self.standings_sort_column = "gb"  # Default sort by win percentage
         self.standings_sort_reverse = True  # Descending by default
         self.standings_sort_league = None  # Track which league is being sorted
 

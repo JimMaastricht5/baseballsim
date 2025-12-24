@@ -279,20 +279,24 @@ class UIBaseballSeason(bbseason.BaseballSeason):
 
     def extract_standings(self) -> dict:
         """
-        Extract standings data from team_win_loss dictionary.
+        Extract standings data from team_win_loss dictionary, separated by league.
 
         Replicates the logic from print_standings() but returns data
-        instead of printing.
+        instead of printing, with separate AL and NL standings.
 
         Returns:
             dict: Standings data with keys:
-                - teams (list[str]): Team abbreviations
-                - wins (list[int]): Win counts
-                - losses (list[int]): Loss counts
-                - pct (list[float]): Win percentages
-                - gb (list[str]): Games back ('-' for leader, '1.0', '2.5', etc.)
+                - al (dict): AL standings with 'teams', 'wins', 'losses', 'pct', 'gb'
+                - nl (dict): NL standings with 'teams', 'wins', 'losses', 'pct', 'gb'
         """
-        teaml, winl, lossl = [], [], []
+        teaml, winl, lossl, leaguel = [], [], [], []
+
+        # Get team-to-league mapping from baseball_data
+        team_league_map = {}
+        if hasattr(self.baseball_data, 'batting_data') and 'League' in self.baseball_data.batting_data.columns:
+            # Create a mapping of team to league
+            team_league_df = self.baseball_data.batting_data[['Team', 'League']].drop_duplicates()
+            team_league_map = dict(zip(team_league_df['Team'], team_league_df['League']))
 
         for team in self.team_win_loss:
             if team != 'OFF DAY':
@@ -300,28 +304,52 @@ class UIBaseballSeason(bbseason.BaseballSeason):
                 teaml.append(team)
                 winl.append(win_loss[0])
                 lossl.append(win_loss[1])
+                # Get league from mapping, default to 'AL' if not found
+                leaguel.append(team_league_map.get(team, 'AL'))
 
         # Create DataFrame and calculate stats
-        df = pd.DataFrame({'Team': teaml, 'W': winl, 'L': lossl})
+        df = pd.DataFrame({'Team': teaml, 'W': winl, 'L': lossl, 'League': leaguel})
         df['Pct'] = df['W'] / (df['W'] + df['L'])
         df['Pct'] = df['Pct'].fillna(0.0)  # Handle 0-0 teams
-        df = df.sort_values('W', ascending=False).reset_index(drop=True)
 
-        # Calculate Games Back from leader
-        if len(df) > 0:
-            max_wins = df['W'].iloc[0]
-            leader_losses = df['L'].iloc[0]
-            df['GB'] = ((max_wins - df['W']) + (df['L'] - leader_losses)) / 2.0
-            df['GB'] = df['GB'].apply(lambda x: '-' if x == 0 else f'{x:.1f}')
-        else:
-            df['GB'] = []
+        # Separate by league and calculate GB separately
+        al_df = df[df['League'] == 'AL'].copy()
+        nl_df = df[df['League'] == 'NL'].copy()
+
+        def calculate_gb(league_df):
+            """Calculate games back for a league."""
+            if len(league_df) == 0:
+                return league_df
+
+            # Sort by wins descending
+            league_df = league_df.sort_values('W', ascending=False).reset_index(drop=True)
+
+            # Calculate Games Back from league leader
+            max_wins = league_df['W'].iloc[0]
+            leader_losses = league_df['L'].iloc[0]
+            league_df['GB'] = ((max_wins - league_df['W']) + (league_df['L'] - leader_losses)) / 2.0
+            league_df['GB'] = league_df['GB'].apply(lambda x: '-' if x == 0 else f'{x:.1f}')
+
+            return league_df
+
+        al_df = calculate_gb(al_df)
+        nl_df = calculate_gb(nl_df)
 
         return {
-            'teams': df['Team'].tolist(),
-            'wins': df['W'].tolist(),
-            'losses': df['L'].tolist(),
-            'pct': df['Pct'].tolist(),
-            'gb': df['GB'].tolist()
+            'al': {
+                'teams': al_df['Team'].tolist(),
+                'wins': al_df['W'].tolist(),
+                'losses': al_df['L'].tolist(),
+                'pct': al_df['Pct'].tolist(),
+                'gb': al_df['GB'].tolist()
+            },
+            'nl': {
+                'teams': nl_df['Team'].tolist(),
+                'wins': nl_df['W'].tolist(),
+                'losses': nl_df['L'].tolist(),
+                'pct': nl_df['Pct'].tolist(),
+                'gb': nl_df['GB'].tolist()
+            }
         }
 
     def extract_injuries(self) -> list:

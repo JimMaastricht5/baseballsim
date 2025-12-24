@@ -71,6 +71,7 @@ class SeasonWorker(threading.Thread):
         # Control flags
         self._paused = False
         self._step_mode = False
+        self._step_count = 1  # Number of days to step (default 1)
         self._stopped = False
 
         # Synchronization primitives for pause/resume
@@ -106,7 +107,8 @@ class SeasonWorker(threading.Thread):
                 season_team_to_follow=[self.team_to_follow],  # Convert single string to single-element list
                 load_batter_file='aggr-stats-pp-Batting.csv',
                 load_pitcher_file='aggr-stats-pp-Pitching.csv',
-                schedule=None  # Let it generate schedule
+                schedule=None,  # Let it generate schedule
+                suppress_console_output=True  # Suppress disabled list and hot/cold list prints for UI
             )
 
             # Call sim_start for initialization
@@ -133,10 +135,13 @@ class SeasonWorker(threading.Thread):
                 self.season.sim_next_day()
                 logger.debug(f"Completed day {self.season.season_day_num}")
 
-                # If in step mode, pause after this day
+                # If in step mode, decrement counter and pause when done
                 if self._step_mode:
-                    self._step_mode = False
-                    self._paused = True
+                    self._step_count -= 1
+                    if self._step_count <= 0:
+                        self._step_mode = False
+                        self._paused = True
+                        self._step_count = 1  # Reset for next time
 
             # Season complete
             if not self._stopped:
@@ -197,10 +202,27 @@ class SeasonWorker(threading.Thread):
         Useful for day-by-day stepping through the season.
         """
         with self._pause_lock:
+            self._step_count = 1
             self._step_mode = True
             self._paused = False
             self._pause_event.set()
         logger.info("Step one day requested")
+
+    def step_n_days(self, n):
+        """
+        Advance exactly n days, then pause.
+
+        Useful for stepping through multiple days (e.g., a series or week).
+
+        Args:
+            n (int): Number of days to advance
+        """
+        with self._pause_lock:
+            self._step_count = n
+            self._step_mode = True
+            self._paused = False
+            self._pause_event.set()
+        logger.info(f"Step {n} days requested")
 
     def stop(self):
         """

@@ -1,0 +1,107 @@
+flowchart TD
+    Start([User runs bbseason_ui.py]) --> Main[main function]
+    Main --> CreateRoot[Create tkinter root window]
+    CreateRoot --> CreateMainWindow[Create SeasonMainWindow instance]
+    CreateMainWindow --> DisplayWindow[Display main window with toolbar, tabs, status bar]
+
+    DisplayWindow --> Toolbar{Toolbar Buttons}
+
+    Toolbar -->|Start Season| StartSeason[start_season method]
+    Toolbar -->|Pause| PauseSeason[pause_season method]
+    Toolbar -->|Resume| ResumeSeason[resume_season method]
+    Toolbar -->|Next Day| NextDay[next_day method]
+    Toolbar -->|Stop| StopSeason[stop_season method]
+
+    StartSeason --> CreateWorker[Create SeasonWorker thread]
+    CreateWorker --> StartThread[Start worker.start]
+
+    StartThread --> WorkerRun[SeasonWorker.run method executes in background thread]
+    WorkerRun --> CreateSeason[Create UIBaseballSeason instance]
+    CreateSeason --> InitSignals[Initialize SeasonSignals with queues]
+    InitSignals --> SimStart[season.sim_start - Initialize season]
+
+    SimStart --> SimLoop{Season Loop: For each day}
+
+    SimLoop -->|Day Start| DayStarted[sim_day_threaded - Emit day_started via queue]
+    DayStarted --> SimGames[Simulate all games for the day in threads]
+    SimGames --> GameComplete{Is followed team?}
+
+    GameComplete -->|Yes| EmitGameCompleted[Emit game_completed via queue immediately]
+    GameComplete -->|No| BatchResults[Batch for day_completed]
+
+    EmitGameCompleted --> DayDone
+    BatchResults --> DayDone[Emit day_completed with all results + standings]
+
+    DayDone --> EmitInjuries[Emit injury_update via queue]
+    EmitInjuries --> CheckGM[check_gm_assessments]
+    CheckGM -->|Assessment due?| EmitGM[Emit gm_assessment_ready via queue]
+    CheckGM -->|Not due| NextDay2
+    EmitGM --> NextDay2[Increment day number]
+
+    NextDay2 --> SimLoop
+    SimLoop -->|Season Complete| SimEnd[season.sim_end - Emit simulation_complete]
+
+    SimEnd --> WorkerDone([Worker Thread Exits])
+
+    subgraph "UI Main Thread - Polling Loop"
+        PollStart[_poll_queues called every 100ms]
+        PollStart --> CheckQueues{Check all queues}
+
+        CheckQueues -->|day_started_queue| HandleDayStart[on_day_started: Update day counter, display schedule]
+        CheckQueues -->|game_completed_queue| HandleGameComplete[on_game_completed: Update Today's Games tab with score]
+        CheckQueues -->|day_completed_queue| HandleDayComplete[on_day_completed: Update standings, roster]
+        CheckQueues -->|gm_assessment_queue| HandleGM[on_gm_assessment: Update GM Assessment tab]
+        CheckQueues -->|injury_update_queue| HandleInjury[on_injury_update: Update League IL tab]
+        CheckQueues -->|simulation_complete_queue| HandleComplete[on_simulation_complete: Show completion message]
+        CheckQueues -->|error_queue| HandleError[on_error: Show error dialog]
+
+        HandleDayStart --> ScheduleNext[Schedule next _poll_queues in 100ms]
+        HandleGameComplete --> ScheduleNext
+        HandleDayComplete --> ScheduleNext
+        HandleGM --> ScheduleNext
+        HandleInjury --> ScheduleNext
+        HandleComplete --> ScheduleNext
+        HandleError --> ScheduleNext
+
+        ScheduleNext --> PollStart
+    end
+
+    subgraph "UI Components - main_window_tk.py"
+        Toolbar2[Toolbar Frame: Start, Pause, Resume, Next Day, Stop buttons]
+        Paned[Paned Window: Left 30% / Right 70%]
+
+        Paned --> LeftPanel[Left Panel: Standings Treeview]
+        Paned --> RightPanel[Right Panel: Notebook with 5 tabs]
+
+        RightPanel --> Tab1["Tab 1: Today's Games - Shows current day schedule and scores"]
+        RightPanel --> Tab2["Tab 2: Schedule - Shows next 14 days"]
+        RightPanel --> Tab3["Tab 3: League IL - Shows all injured players"]
+        RightPanel --> Tab4["Tab 4: Team Tab (Followed Team)"]
+        RightPanel --> Tab5["Tab 5: Admin - Player management"]
+
+        Tab4 --> SubTab1["Sub-tab: Roster - Position players and pitchers with stats"]
+        Tab4 --> SubTab2["Sub-tab: Games Played - Play-by-play for past games"]
+        Tab4 --> SubTab3["Sub-tab: GM Assessment - AI GM recommendations"]
+
+        StatusBar[Status Bar: Day counter, progress bar, status message]
+    end
+
+    subgraph "Signal Flow - signals.py"
+        Queue1[day_started_queue]
+        Queue2[game_completed_queue]
+        Queue3[day_completed_queue]
+        Queue4[gm_assessment_queue]
+        Queue5[injury_update_queue]
+        Queue6[simulation_complete_queue]
+        Queue7[error_queue]
+    end
+
+    PauseSeason --> WorkerPause[worker.pause - Set pause flag]
+    ResumeSeason --> WorkerResume[worker.resume - Clear pause flag]
+    NextDay --> WorkerStep[worker.step_one_day - Advance one day then pause]
+    StopSeason --> WorkerStop[worker.stop - Set stop flag and exit loop]
+
+    style Start fill:#e1f5e1
+    style WorkerDone fill:#ffe1e1
+    style SimLoop fill:#fff4e1
+    style CheckQueues fill:#e1f0ff

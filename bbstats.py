@@ -17,12 +17,6 @@ Key Features:
 - Syncs condition and injury data between historical and new season stats
 - Calculates all derived baseball statistics (AVG, OBP, SLG, ERA, WHIP, etc.)
 
-Performance Optimizations:
-- Cached RNG (29x speedup) - see at_bat.py for shared instance
-- Pre-calculated league totals (2-3x speedup)
-- Pre-compiled regex patterns (2-5x speedup)
-- Return scalar values instead of size-1 arrays
-
 Data Structure:
 - pitching_data: Aggregated career pitching stats (indexed by Hashcode)
 - batting_data: Aggregated career batting stats (indexed by Hashcode)
@@ -54,14 +48,17 @@ DYNAMIC_FIELDS = ['Condition', 'Injured Days', 'Injury Description',
 class BaseballStats:
     def __init__(self, load_seasons: List[int], new_season: int, include_leagues: list = None,
                  load_batter_file: str = 'aggr-stats-pp-Batting.csv',
-                 load_pitcher_file: str = 'aggr-stats-pp-Pitching.csv') -> None:
+                 load_pitcher_file: str = 'aggr-stats-pp-Pitching.csv',
+                 suppress_console_output: bool = False) -> None:
         """
         :param load_seasons: list of seasons to load, each season is an integer year
         :param new_season: integer value of year for new season
         :param include_leagues: list of leagues to include in season
         :param load_batter_file: file name of the batting stats, year will be added as a prefix
         :param load_pitcher_file: file name of the pitching stats, year will be added as a prefix
+        :param suppress_console_output: if True, suppress disabled list and hot/cold list console output
         """
+        self.suppress_console_output = suppress_console_output
         self.semaphore = threading.Semaphore(1)  # one thread can update games stats at a time
         # PERFORMANCE: Create RNG instance once, reuse for ~29x speedup
         self._rng_instance = np.random.default_rng()
@@ -110,22 +107,16 @@ class BaseballStats:
         # 27.5% of pitchers w > 5 in will spend time on IL per season (188 out of 684)
         # 26.3% of pitching injuries affect the throwing elbow results in avg of 74 days lost
         # position player (non-pitcher) longevitiy: https://www.nytimes.com/2007/07/15/sports/baseball/15careers.html
-        self.condition_change_per_day = 20  # improve with rest, mid-point of normal dist for recovery
+        self.condition_change_per_day = 15  # improve with rest, mid-point of normal dist for recovery
         self.fatigue_start_perc = 70  # 85% of way to avg max is where fatigue starts, adjust factor to inc outing lgth
         self.fatigue_rate = .001  # at 85% of avg max pitchers have a .014 increase in OBP.  using .001 as proxy
         self.fatigue_pitching_change_limit = 5  # change pitcher at # or below out of 100
         self.fatigue_unavailable = 33  # condition must be 33 or higher for a pitcher or pos player to be available
         self.pitching_injury_rate = .275  # 27.5 out of 100 players injured per season-> per game
-        # self.pitching_injury_odds_for_season = 1 - (1 - self.pitching_injury_rate) ** (1/162)
         self.pitching_injury_avg_len = 32  # according to mlb avg len is 74 but that cant be a normal dist
         self.batting_injury_rate = .137  # 2022 87 out of 634 injured per season .137 avg age 27
-        # self.batting_injury_odds_for_season = 1 - (1 - self.batting_injury_rate) ** (1/162)
         self.injury_odds_adjustment_for_age = .000328  # 3.28% inc injury per season above 20 w/ .90 survival
         self.batting_injury_avg_len = 15  # made this up
-        # self.pitcher_injury_odds_for_season = lambda age: 1 - (1 - (self.pitching_injury_rate + ((age - 20)
-        #                                                             * self.injury_odds_adjustment_for_age))) ** (1/162)
-        # self.batter_injury_odds_for_season = lambda age: 1 - (1 - (self.batting_injury_rate + ((age - 20)
-        #                                                            * self.injury_odds_adjustment_for_age))) ** (1 / 162)
         # adjust performance is this is a substantial injury, perf decreases by 0 to 20%; studies indicated -10 to -20%
         self.injury_perf_f = lambda injury_days, injury_perf_adj: (
                 injury_perf_adj - self._rng_instance.uniform(0, 0.2)) if injury_days >= 30 else injury_perf_adj
@@ -471,37 +462,38 @@ class BaseballStats:
         self.new_season_pitching_data['Status'] = get_status_vectorized(self.new_season_pitching_data, True)
         self.new_season_batting_data['Status'] = get_status_vectorized(self.new_season_batting_data, False)
 
-        # Print the disabled lists in compact format
-        print(f'Season Disabled Lists:')
+        # Print the disabled lists in compact format (only if not suppressed)
+        if not self.suppress_console_output:
+            print(f'Season Disabled Lists:')
 
-        # Helper function to print injuries by IL type
-        def print_injuries_by_il_type(df, player_type='Pitchers'):
-            if df[df["Injured Days"] > 0].shape[0] == 0:
-                return
+            # Helper function to print injuries by IL type
+            def print_injuries_by_il_type(df, player_type='Pitchers'):
+                if df[df["Injured Days"] > 0].shape[0] == 0:
+                    return
 
-            injured_df = df[df["Injured Days"] > 0].copy()
-            print(f'\n{player_type}:')
+                injured_df = df[df["Injured Days"] > 0].copy()
+                print(f'\n{player_type}:')
 
-            # Group by Status (IL type)
-            for il_type in ['60-Day IL', '15-Day IL', '10-Day IL', '7-Day IL']:
-                il_group = injured_df[injured_df['Status'] == il_type]
-                if il_group.shape[0] > 0:
-                    count = il_group.shape[0]
-                    # Build compact list: Player(TEAM) - Injury
-                    injury_list = []
-                    for idx, row in il_group.iterrows():
-                        player = row['Player']
-                        team = row['Team']
-                        injury = row['Injury Description']
-                        injury_list.append(f"{player}({team}) - {injury}")
+                # Group by Status (IL type)
+                for il_type in ['60-Day IL', '15-Day IL', '10-Day IL', '7-Day IL']:
+                    il_group = injured_df[injured_df['Status'] == il_type]
+                    if il_group.shape[0] > 0:
+                        count = il_group.shape[0]
+                        # Build compact list: Player(TEAM) - Injury
+                        injury_list = []
+                        for idx, row in il_group.iterrows():
+                            player = row['Player']
+                            team = row['Team']
+                            injury = row['Injury Description']
+                            injury_list.append(f"{player}({team}) - {injury}")
 
-                    # Print in compact format
-                    print(f"  {il_type} ({count}): {', '.join(injury_list)}")
+                        # Print in compact format
+                        print(f"  {il_type} ({count}): {', '.join(injury_list)}")
 
-        # Print pitchers and batters
-        print_injuries_by_il_type(self.new_season_pitching_data, 'Pitchers')
-        print_injuries_by_il_type(self.new_season_batting_data, 'Batters')
-        print()  # Add blank line after injury lists
+            # Print pitchers and batters
+            print_injuries_by_il_type(self.new_season_pitching_data, 'Pitchers')
+            print_injuries_by_il_type(self.new_season_batting_data, 'Batters')
+            print()  # Add blank line after injury lists
 
         return
 
@@ -512,8 +504,8 @@ class BaseballStats:
         :param teams_to_follow: List of team names to show, None means don't print anything
         :return: None
         """
-        # Only print if following specific teams
-        if not teams_to_follow:
+        # Only print if following specific teams and console output is not suppressed
+        if not teams_to_follow or self.suppress_console_output:
             return
 
         # Filter for hot/cold players only (not Normal)
@@ -675,18 +667,18 @@ class BaseballStats:
         :return: None
         """
         with self.semaphore:
-            logger.info('Calculating team pitching stats...')
+            logger.debug('Calculating team pitching stats...')
             self.new_season_pitching_data = \
                 team_pitching_stats(self.new_season_pitching_data[self.new_season_pitching_data['IP'] > 0].fillna(0))
-            logger.info('Calculating team batting stats...')
+            logger.debug('Calculating team batting stats...')
             self.new_season_batting_data = \
                 team_batting_stats(self.new_season_batting_data[self.new_season_batting_data['AB'] > 0].fillna(0))
             logger.debug('Updated season pitching stats:\n{}', self.new_season_pitching_data.to_string(justify="right"))
 
             # Calculate Sim WAR after updating stats
-            logger.info('Calculating player WAR values...')
+            logger.debug('Calculating player WAR values...')
             self.calculate_sim_war()
-            logger.info('Season statistics update complete.')
+            logger.debug('Season statistics update complete.')
         return
 
     def calculate_sim_war(self) -> None:
@@ -774,7 +766,7 @@ class BaseballStats:
         active_pitchers = pitching_df['IP'] >= 5
 
         # Debug output for season end
-        logger.info(f'Pitcher WAR calculation: {len(pitching_df)} total pitchers, {active_pitchers.sum()} active (IP >= 5)')
+        logger.debug(f'Pitcher WAR calculation: {len(pitching_df)} total pitchers, {active_pitchers.sum()} active (IP >= 5)')
 
         if active_pitchers.sum() > 0:
             # Calculate FIP (Fielding Independent Pitching)
@@ -814,14 +806,14 @@ class BaseballStats:
             # Set Sim_WAR column (vectorized)
             pitching_df['Sim_WAR'] = np.where(active_pitchers, sim_war, 0.0)
 
-            logger.info(f'League average FIP: {league_fip:.2f}, Replacement level FIP: {replacement_fip:.2f}')
-            logger.info(f'Pitcher WAR range: {pitching_df[active_pitchers]["Sim_WAR"].min():.2f} to {pitching_df[active_pitchers]["Sim_WAR"].max():.2f}, avg={pitching_df[active_pitchers]["Sim_WAR"].mean():.2f}')
+            logger.debug(f'League average FIP: {league_fip:.2f}, Replacement level FIP: {replacement_fip:.2f}')
+            logger.debug(f'Pitcher WAR range: {pitching_df[active_pitchers]["Sim_WAR"].min():.2f} to {pitching_df[active_pitchers]["Sim_WAR"].max():.2f}, avg={pitching_df[active_pitchers]["Sim_WAR"].mean():.2f}')
 
             # Log a sample pitcher for verification (temporarily store FIP in dataframe)
             pitching_df['_temp_fip'] = fip
             sample_pitchers = pitching_df[active_pitchers].nlargest(3, 'IP')
             for idx, p in sample_pitchers.iterrows():
-                logger.info(f'Sample: {p.get("Player", "Unknown")} - IP:{p["IP"]:.1f} FIP:{p["_temp_fip"]:.2f} WAR:{p["Sim_WAR"]:.2f}')
+                logger.debug(f'Sample: {p.get("Player", "Unknown")} - IP:{p["IP"]:.1f} FIP:{p["_temp_fip"]:.2f} WAR:{p["Sim_WAR"]:.2f}')
             pitching_df.drop(columns=['_temp_fip'], inplace=True)
         else:
             pitching_df['Sim_WAR'] = 0.0
@@ -922,8 +914,8 @@ class BaseballStats:
         final_batting_data.to_csv(batting_filename, index=True, index_label='Hashcode')
         final_pitching_data.to_csv(pitching_filename, index=True, index_label='Hashcode')
 
-        logger.info(f'Saved final season batting stats to {batting_filename}')
-        logger.info(f'Saved final season pitching stats to {pitching_filename}')
+        logger.debug(f'Saved final season batting stats to {batting_filename}')
+        logger.debug(f'Saved final season pitching stats to {pitching_filename}')
         print(f'\nFinal season statistics saved to:')
         print(f'  - {batting_filename}')
         print(f'  - {pitching_filename}')
@@ -946,8 +938,8 @@ class BaseballStats:
         self.new_season_batting_data.to_csv(batting_filename, index=True, index_label='Hashcode')
         self.new_season_pitching_data.to_csv(pitching_filename, index=True, index_label='Hashcode')
 
-        logger.info(f'Saved new season batting stats to {batting_filename}')
-        logger.info(f'Saved new season pitching stats to {pitching_filename}')
+        logger.debug(f'Saved new season batting stats to {batting_filename}')
+        logger.debug(f'Saved new season pitching stats to {pitching_filename}')
         print(f'\nNew season statistics saved to:')
         print(f'  - {batting_filename}')
         print(f'  - {pitching_filename}')

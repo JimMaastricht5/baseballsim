@@ -51,7 +51,7 @@ class BaseballSeason:
                  season_chatty: bool = False, season_team_to_follow: Optional[List[str]] = None,
                  load_batter_file: str = 'aggr-stats-pp-Batting.csv',
                  load_pitcher_file: str = 'aggr-stats-pp-Pitching.csv',
-                 schedule: list = None) -> None:
+                 schedule: list = None, suppress_console_output: bool = False) -> None:
         """
         :param load_seasons: list of seasons to load for stats, can blend multiple seasons
         :param new_season: int value representing the year of the new season can be the same as one of the loads
@@ -67,6 +67,8 @@ class BaseballSeason:
         :param season_team_to_follow: list of team abbreviations to follow in detail (e.g., ['NYM', 'BOS'])
         :param load_batter_file: name of the file with batter data, year will be added to the front of the text
         :param load_pitcher_file: name of the file for the pitcher data, year will be added to the front of the text
+        :param schedule: optional pre-built schedule
+        :param suppress_console_output: if True, suppress disabled list and hot/cold list console output
         :return: None
         """
         self.season_day_num = 0  # set to first day of the season
@@ -86,7 +88,8 @@ class BaseballSeason:
         logger.debug("Initializing BaseballSeason with seasons: {}, new season: {}", load_seasons, new_season)
         self.baseball_data = bbstats.BaseballStats(load_seasons=self.load_seasons, new_season=new_season,
                                                    include_leagues=include_leagues, load_batter_file=load_batter_file,
-                                                   load_pitcher_file=load_pitcher_file)
+                                                   load_pitcher_file=load_pitcher_file,
+                                                   suppress_console_output=suppress_console_output)
         self.teams = list(self.baseball_data.batting_data.Team.unique()) if team_list == [] or team_list is None \
             else team_list
         if len(self.teams) % 2 == 1:  # odd number of teams

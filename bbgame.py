@@ -358,29 +358,37 @@ class Game:
             runner_stats = self.teams[self.team_hitting()].pos_player_prior_year_stats(runner_key)
             # scale steal attempts with frequency of stealing when on base
             # runner_stats.SB + runner_stats.CS >= self.min_steal_attempts and \
-            if self.rng() <= (runner_stats.SB + runner_stats.CS) / (runner_stats.H + runner_stats.BB) \
-                    * self.steal_multiplier:
-                if self.rng() <= (runner_stats.SB / (runner_stats.SB + runner_stats.CS)):  # successful steal
-                    self.bases.push_a_runner(1, 2)  # move runner from 1st to second
-                    self.teams[self.team_hitting()].box_score.steal_result(runner_key, True)  # stole the base
-                    if self.chatty:
-                        play_text = f'\t{runner_stats.Player} stole 2nd base!\n'
-                        self.game_recap += play_text
-                        if self.play_by_play_callback:
-                            self.play_by_play_callback(play_text)
-                        play_text = f'\t{self.bases.describe_runners()}\n'
-                        self.game_recap += play_text
-                        if self.play_by_play_callback:
-                            self.play_by_play_callback(play_text)
-                else:
-                    self.teams[self.team_hitting()].box_score.steal_result(runner_key, False)  # caught stealing
-                    self.bases.remove_runner(1)  # runner was on first and never made it to second on the out
-                    if self.chatty:
-                        self.outs += 1  # this could result in the third out
-                        play_text = f'\t{runner_stats.Player} was caught stealing for out number {self.outs}\n'
-                        self.game_recap += play_text
-                        if self.play_by_play_callback:
-                            self.play_by_play_callback(play_text)
+
+            # Calculate steal attempt probability, handling division by zero
+            times_on_base = runner_stats.H + runner_stats.BB
+            steal_attempts = runner_stats.SB + runner_stats.CS
+
+            if times_on_base > 0 and steal_attempts > 0:
+                steal_attempt_rate = steal_attempts / times_on_base
+                if self.rng() <= steal_attempt_rate * self.steal_multiplier:
+                    # Calculate steal success rate, handling division by zero
+                    steal_success_rate = runner_stats.SB / steal_attempts if steal_attempts > 0 else 0.0
+                    if self.rng() <= steal_success_rate:  # successful steal
+                        self.bases.push_a_runner(1, 2)  # move runner from 1st to second
+                        self.teams[self.team_hitting()].box_score.steal_result(runner_key, True)  # stole the base
+                        if self.chatty:
+                            play_text = f'\t{runner_stats.Player} stole 2nd base!\n'
+                            self.game_recap += play_text
+                            if self.play_by_play_callback:
+                                self.play_by_play_callback(play_text)
+                            play_text = f'\t{self.bases.describe_runners()}\n'
+                            self.game_recap += play_text
+                            if self.play_by_play_callback:
+                                self.play_by_play_callback(play_text)
+                    else:
+                        self.teams[self.team_hitting()].box_score.steal_result(runner_key, False)  # caught stealing
+                        self.bases.remove_runner(1)  # runner was on first and never made it to second on the out
+                        if self.chatty:
+                            self.outs += 1  # this could result in the third out
+                            play_text = f'\t{runner_stats.Player} was caught stealing for out number {self.outs}\n'
+                            self.game_recap += play_text
+                            if self.play_by_play_callback:
+                                self.play_by_play_callback(play_text)
         return
 
     def is_extra_innings(self) -> bool:

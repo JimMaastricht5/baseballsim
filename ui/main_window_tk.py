@@ -81,6 +81,26 @@ class SeasonMainWindow:
         toolbar = tk.Frame(self.root, relief=tk.RAISED, bd=2)
         toolbar.pack(side=tk.TOP, fill=tk.X, padx=5, pady=5)
 
+        # Team selection label and dropdown
+        tk.Label(toolbar, text="Team to Follow:", font=("Arial", 10, "bold")).pack(side=tk.LEFT, padx=5)
+        self.team_var = tk.StringVar(value=self.season_team_to_follow)
+        self.team_combo = ttk.Combobox(
+            toolbar,
+            textvariable=self.team_var,
+            width=6,
+            state="readonly",
+            font=("Arial", 10)
+        )
+        # Will be populated with all teams when simulation is ready
+        self.team_combo['values'] = ['ARI', 'ATL', 'BAL', 'BOS', 'CHC', 'CHW', 'CIN', 'CLE',
+                                      'COL', 'DET', 'HOU', 'KCR', 'LAA', 'LAD', 'MIA', 'MIL',
+                                      'MIN', 'NYM', 'NYY', 'OAK', 'PHI', 'PIT', 'SDP', 'SEA',
+                                      'SFG', 'STL', 'TBR', 'TEX', 'TOR', 'WSN']
+        self.team_combo.pack(side=tk.LEFT, padx=5)
+
+        # Separator
+        ttk.Separator(toolbar, orient=tk.VERTICAL).pack(side=tk.LEFT, fill=tk.Y, padx=10)
+
         # Start button
         self.start_btn = tk.Button(
             toolbar, text="Start Season", command=self.start_season,
@@ -89,7 +109,7 @@ class SeasonMainWindow:
         self.start_btn.pack(side=tk.LEFT, padx=5)
 
         # Separator
-        ttk.Separator(toolbar, orient=tk.VERTICAL).pack(side=tk.LEFT, fill=tk.Y, padx=5)
+        ttk.Separator(toolbar, orient=tk.VERTICAL).pack(side=tk.LEFT, fill=tk.Y, padx=10)
 
         # Pause button
         self.pause_btn = tk.Button(
@@ -112,15 +132,19 @@ class SeasonMainWindow:
         )
         self.next_day_btn.pack(side=tk.LEFT, padx=5)
 
-        # Separator
-        ttk.Separator(toolbar, orient=tk.VERTICAL).pack(side=tk.LEFT, fill=tk.Y, padx=5)
-
-        # Stop button
-        self.stop_btn = tk.Button(
-            toolbar, text="Stop", command=self.stop_season,
-            width=10, bg="red", fg="white", font=("Arial", 10, "bold")
+        # Next Series button (3 days)
+        self.next_series_btn = tk.Button(
+            toolbar, text="Next Series", command=self.next_series,
+            width=10, font=("Arial", 10)
         )
-        self.stop_btn.pack(side=tk.LEFT, padx=5)
+        self.next_series_btn.pack(side=tk.LEFT, padx=5)
+
+        # Next Week button (7 days)
+        self.next_week_btn = tk.Button(
+            toolbar, text="Next Week", command=self.next_week,
+            width=10, font=("Arial", 10)
+        )
+        self.next_week_btn.pack(side=tk.LEFT, padx=5)
 
     def _create_main_content(self):
         """Create the main layout with paned window, standings, and tabs."""
@@ -128,50 +152,86 @@ class SeasonMainWindow:
         paned_window = tk.PanedWindow(self.root, orient=tk.HORIZONTAL, sashrelief=tk.RAISED)
         paned_window.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
 
-        # Left panel: Standings with Treeview
+        # Left panel: Standings with separate AL and NL Treeviews
         standings_frame = tk.Frame(paned_window, relief=tk.SUNKEN, bd=1)
         standings_label = tk.Label(standings_frame, text="STANDINGS", font=("Arial", 12, "bold"))
         standings_label.pack(pady=5)
 
-        # Create Treeview for standings with scrollbar
-        tree_frame = tk.Frame(standings_frame)
-        tree_frame.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
+        # AL Standings
+        al_label = tk.Label(standings_frame, text="AMERICAN LEAGUE", font=("Arial", 10, "bold"))
+        al_label.pack(pady=(5, 2))
 
-        # Scrollbar
-        scrollbar = ttk.Scrollbar(tree_frame, orient=tk.VERTICAL)
-        scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+        al_tree_frame = tk.Frame(standings_frame)
+        al_tree_frame.pack(fill=tk.BOTH, expand=True, padx=5, pady=2)
 
-        # Treeview with columns
-        self.standings_tree = ttk.Treeview(
-            tree_frame,
+        al_scrollbar = ttk.Scrollbar(al_tree_frame, orient=tk.VERTICAL)
+        al_scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+
+        self.al_standings_tree = ttk.Treeview(
+            al_tree_frame,
             columns=("team", "wl", "pct", "gb"),
-            show="headings",  # Don't show the default first column
-            height=25,
-            yscrollcommand=scrollbar.set
+            show="headings",
+            height=15,
+            yscrollcommand=al_scrollbar.set
         )
-        scrollbar.config(command=self.standings_tree.yview)
+        al_scrollbar.config(command=self.al_standings_tree.yview)
 
-        # Define column headings and properties
-        self.standings_tree.heading("team", text="Team", command=lambda: self._sort_standings("team"))
-        self.standings_tree.heading("wl", text="W-L", command=lambda: self._sort_standings("wl"))
-        self.standings_tree.heading("pct", text="Pct", command=lambda: self._sort_standings("pct"))
-        self.standings_tree.heading("gb", text="GB", command=lambda: self._sort_standings("gb"))
+        # Define column headings
+        self.al_standings_tree.heading("team", text="Team", command=lambda: self._sort_standings("team", "al"))
+        self.al_standings_tree.heading("wl", text="W-L", command=lambda: self._sort_standings("wl", "al"))
+        self.al_standings_tree.heading("pct", text="Pct", command=lambda: self._sort_standings("pct", "al"))
+        self.al_standings_tree.heading("gb", text="GB", command=lambda: self._sort_standings("gb", "al"))
 
-        # Configure column widths and alignment
-        self.standings_tree.column("team", width=60, anchor=tk.CENTER)
-        self.standings_tree.column("wl", width=80, anchor=tk.CENTER)
-        self.standings_tree.column("pct", width=60, anchor=tk.CENTER)
-        self.standings_tree.column("gb", width=50, anchor=tk.CENTER)
+        # Configure column widths
+        self.al_standings_tree.column("team", width=60, anchor=tk.CENTER)
+        self.al_standings_tree.column("wl", width=80, anchor=tk.CENTER)
+        self.al_standings_tree.column("pct", width=60, anchor=tk.CENTER)
+        self.al_standings_tree.column("gb", width=50, anchor=tk.CENTER)
 
-        # Add tag for followed teams (highlight)
-        self.standings_tree.tag_configure("followed", background="#e6f3ff", font=("Arial", 10, "bold"))
+        # Add tag for followed teams
+        self.al_standings_tree.tag_configure("followed", background="#e6f3ff", font=("Arial", 10, "bold"))
+        self.al_standings_tree.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
 
-        self.standings_tree.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        # NL Standings
+        nl_label = tk.Label(standings_frame, text="NATIONAL LEAGUE", font=("Arial", 10, "bold"))
+        nl_label.pack(pady=(10, 2))
+
+        nl_tree_frame = tk.Frame(standings_frame)
+        nl_tree_frame.pack(fill=tk.BOTH, expand=True, padx=5, pady=2)
+
+        nl_scrollbar = ttk.Scrollbar(nl_tree_frame, orient=tk.VERTICAL)
+        nl_scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+
+        self.nl_standings_tree = ttk.Treeview(
+            nl_tree_frame,
+            columns=("team", "wl", "pct", "gb"),
+            show="headings",
+            height=15,
+            yscrollcommand=nl_scrollbar.set
+        )
+        nl_scrollbar.config(command=self.nl_standings_tree.yview)
+
+        # Define column headings
+        self.nl_standings_tree.heading("team", text="Team", command=lambda: self._sort_standings("team", "nl"))
+        self.nl_standings_tree.heading("wl", text="W-L", command=lambda: self._sort_standings("wl", "nl"))
+        self.nl_standings_tree.heading("pct", text="Pct", command=lambda: self._sort_standings("pct", "nl"))
+        self.nl_standings_tree.heading("gb", text="GB", command=lambda: self._sort_standings("gb", "nl"))
+
+        # Configure column widths
+        self.nl_standings_tree.column("team", width=60, anchor=tk.CENTER)
+        self.nl_standings_tree.column("wl", width=80, anchor=tk.CENTER)
+        self.nl_standings_tree.column("pct", width=60, anchor=tk.CENTER)
+        self.nl_standings_tree.column("gb", width=50, anchor=tk.CENTER)
+
+        # Add tag for followed teams
+        self.nl_standings_tree.tag_configure("followed", background="#e6f3ff", font=("Arial", 10, "bold"))
+        self.nl_standings_tree.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
 
         # Store current standings data for sorting
         self.standings_data_cache = None
-        self.standings_sort_column = "pct"  # Default sort by win percentage
+        self.standings_sort_column = "gb"  # Default sort by win percentage
         self.standings_sort_reverse = True  # Descending by default
+        self.standings_sort_league = None  # Track which league is being sorted
 
         paned_window.add(standings_frame, minsize=300)
 
@@ -477,7 +537,7 @@ class SeasonMainWindow:
     def _create_roster_treeview(self, parent, is_batter=True):
         """Create Treeview for roster data."""
         if is_batter:
-            columns = ("Player", "Pos", "AB", "R", "H", "2B", "3B", "HR", "RBI", "BB", "K", "AVG", "OBP", "SLG", "Condition", "Status")
+            columns = ("Player", "Pos", "AB", "R", "H", "2B", "3B", "HR", "RBI", "BB", "K", "AVG", "OBP", "SLG", "OPS", "Condition", "Status")
         else:
             columns = ("Player", "G", "GS", "W", "L", "IP", "H", "R", "ER", "HR", "BB", "SO", "ERA", "WHIP", "SV", "Condition", "Status")
 
@@ -492,7 +552,7 @@ class SeasonMainWindow:
                 tree.column(col, width=70, anchor=tk.CENTER)
             elif col in ["AB", "R", "H", "2B", "3B", "HR", "RBI", "BB", "K", "G", "GS", "W", "L", "ER", "SV", "SO", "Condition"]:
                 tree.column(col, width=45, anchor=tk.CENTER)
-            elif col in ["AVG", "OBP", "SLG", "ERA", "WHIP"]:
+            elif col in ["AVG", "OBP", "SLG", "OPS", "ERA", "WHIP"]:
                 tree.column(col, width=55, anchor=tk.CENTER)
             elif col == "IP":
                 tree.column(col, width=50, anchor=tk.CENTER)
@@ -664,6 +724,13 @@ class SeasonMainWindow:
         # Insert rows
         for idx, row in data_df.iterrows():
             try:
+                # Determine injury days and condition display
+                injured_days = int(row.get('Injured Days', 0))
+                if injured_days > 0:
+                    condition_display = "Injured"
+                else:
+                    condition_display = self._condition_to_text(int(row.get('Condition', 100)))
+
                 if is_batter:
                     # Clean up position formatting (remove brackets and quotes)
                     pos = row.get('Pos', 'Unknown')
@@ -687,7 +754,8 @@ class SeasonMainWindow:
                         f"{float(row.get('AVG', 0)):.3f}",
                         f"{float(row.get('OBP', 0)):.3f}",
                         f"{float(row.get('SLG', 0)):.3f}",
-                        self._condition_to_text(int(row.get('Condition', 100))),
+                        f"{float(row.get('OPS', 0)):.3f}",
+                        condition_display,
                         row.get('Status', 'Healthy')
                     )
                 else:
@@ -707,12 +775,11 @@ class SeasonMainWindow:
                         f"{float(row.get('ERA', 0)):.2f}",
                         f"{float(row.get('WHIP', 0)):.2f}",
                         int(row.get('SV', 0)),
-                        self._condition_to_text(int(row.get('Condition', 100))),
+                        condition_display,
                         row.get('Status', 'Healthy')
                     )
 
                 # Determine injury tag based on Injured Days
-                injured_days = int(row.get('Injured Days', 0))
                 tags = ()
                 if injured_days > 0:
                     if injured_days < 10:
@@ -768,7 +835,17 @@ class SeasonMainWindow:
                                    "A season simulation is already running.")
             return
 
-        logger.info("Starting season simulation")
+        # Get the selected team from dropdown
+        selected_team = self.team_var.get()
+        if not selected_team:
+            messagebox.showwarning("No Team Selected",
+                                   "Please select a team to follow before starting.")
+            return
+
+        logger.info(f"Starting season simulation, following team: {selected_team}")
+
+        # Update the season_team_to_follow to the selected team
+        self.season_team_to_follow = selected_team
 
         # Create worker with simulation parameters
         self.worker = SeasonWorker(
@@ -780,7 +857,7 @@ class SeasonMainWindow:
             self.season_chatty,
             self.season_print_lineup_b,
             self.season_print_box_score_b,
-            self.season_team_to_follow
+            selected_team  # Use selected team from dropdown
         )
 
         # Reset progress indicators
@@ -791,6 +868,16 @@ class SeasonMainWindow:
         # Start worker thread
         self.worker.daemon = True  # Thread will exit when main program exits
         self.worker.start()
+
+        # Update the team tab label to the selected team
+        for i in range(self.notebook.index("end")):
+            if self.notebook.tab(i, "text") in ['ARI', 'ATL', 'BAL', 'BOS', 'CHC', 'CHW', 'CIN', 'CLE',
+                                                 'COL', 'DET', 'HOU', 'KCR', 'LAA', 'LAD', 'MIA', 'MIL',
+                                                 'MIN', 'NYM', 'NYY', 'OAK', 'PHI', 'PIT', 'SDP', 'SEA',
+                                                 'SFG', 'STL', 'TBR', 'TEX', 'TOR', 'WSN']:
+                # Found the team tab - update its label
+                self.notebook.tab(i, text=selected_team)
+                break
 
         # Load admin players after a short delay (wait for season to initialize)
         self.root.after(1000, self._load_admin_players)
@@ -829,14 +916,21 @@ class SeasonMainWindow:
             self._update_button_states(simulation_running=True, paused=False)
             self.status_label.config(text="Advancing one day...")
 
-    def stop_season(self):
-        """Stop the simulation entirely."""
+    def next_series(self):
+        """Advance exactly three days (one series), then pause."""
         if self.worker and self.worker.is_alive():
-            logger.info("Stopping simulation")
-            self.worker.stop()
-            self.worker.join(timeout=5.0)  # Wait up to 5 seconds for thread to finish
-            self._update_button_states(simulation_running=False, paused=False)
-            self.status_label.config(text="Simulation stopped")
+            logger.info("Advancing three days (series)")
+            self.worker.step_n_days(3)
+            self._update_button_states(simulation_running=True, paused=False)
+            self.status_label.config(text="Advancing 3 days (series)...")
+
+    def next_week(self):
+        """Advance exactly seven days (one week), then pause."""
+        if self.worker and self.worker.is_alive():
+            logger.info("Advancing seven days (week)")
+            self.worker.step_n_days(7)
+            self._update_button_states(simulation_running=True, paused=False)
+            self.status_label.config(text="Advancing 7 days (week)...")
 
     def _update_button_states(self, simulation_running, paused):
         """
@@ -846,11 +940,15 @@ class SeasonMainWindow:
             simulation_running (bool): Whether a simulation is currently running
             paused (bool): Whether the simulation is paused
         """
+        # Disable team selection once simulation starts
+        self.team_combo.config(state="disabled" if simulation_running else "readonly")
+
         self.start_btn.config(state=tk.DISABLED if simulation_running else tk.NORMAL)
         self.pause_btn.config(state=tk.NORMAL if simulation_running and not paused else tk.DISABLED)
         self.resume_btn.config(state=tk.NORMAL if simulation_running and paused else tk.DISABLED)
         self.next_day_btn.config(state=tk.NORMAL if simulation_running else tk.DISABLED)
-        self.stop_btn.config(state=tk.NORMAL if simulation_running else tk.DISABLED)
+        self.next_series_btn.config(state=tk.NORMAL if simulation_running else tk.DISABLED)
+        self.next_week_btn.config(state=tk.NORMAL if simulation_running else tk.DISABLED)
 
     def _poll_queues(self):
         """
@@ -1036,27 +1134,52 @@ class SeasonMainWindow:
         # Update button states if worker is paused (e.g., after step_one_day)
         if self.worker and self.worker._paused:
             self._update_button_states(simulation_running=True, paused=True)
-            self.status_label.config(text="Day complete - Paused")
+            self.status_label.config(text=f"Day complete - Paused")
+            # When paused, update display to show completed day results + next day schedule
+            self._display_paused_state()
         else:
-            self.status_label.config(text="Day complete")
+            self.status_label.config(text=f"Day complete")
 
     def _update_standings_display(self, standings_data):
-        """Update standings Treeview widget."""
+        """Update standings Treeview widgets (AL and NL separately)."""
         # Cache the data for sorting
         self.standings_data_cache = standings_data
 
-        # Clear existing items
-        for item in self.standings_tree.get_children():
-            self.standings_tree.delete(item)
-
-        teams = standings_data.get('teams', [])
-        wins = standings_data.get('wins', [])
-        losses = standings_data.get('losses', [])
-        pcts = standings_data.get('pct', [])
-        gbs = standings_data.get('gb', [])
-
         # Get followed team for highlighting (single string)
         followed_team = self.worker.team_to_follow if self.worker else ''
+
+        # Update AL standings
+        self._populate_league_standings(
+            self.al_standings_tree,
+            standings_data.get('al', {}),
+            followed_team
+        )
+
+        # Update NL standings
+        self._populate_league_standings(
+            self.nl_standings_tree,
+            standings_data.get('nl', {}),
+            followed_team
+        )
+
+    def _populate_league_standings(self, tree, league_data, followed_team):
+        """
+        Populate a standings treeview with league data.
+
+        Args:
+            tree: The treeview widget to populate
+            league_data: Dict with 'teams', 'wins', 'losses', 'pct', 'gb'
+            followed_team: Team abbreviation to highlight
+        """
+        # Clear existing items
+        for item in tree.get_children():
+            tree.delete(item)
+
+        teams = league_data.get('teams', [])
+        wins = league_data.get('wins', [])
+        losses = league_data.get('losses', [])
+        pcts = league_data.get('pct', [])
+        gbs = league_data.get('gb', [])
 
         # Insert data into treeview
         for i in range(len(teams)):
@@ -1068,29 +1191,31 @@ class SeasonMainWindow:
             # Determine if this team is followed
             tags = ("followed",) if team == followed_team else ()
 
-            self.standings_tree.insert(
+            tree.insert(
                 "",
                 tk.END,
                 values=(team, wl, pct, gb),
                 tags=tags
             )
 
-    def _sort_standings(self, column):
+    def _sort_standings(self, column, league):
         """
-        Sort standings by the specified column.
+        Sort standings by the specified column for a specific league.
 
         Args:
             column (str): Column to sort by ('team', 'wl', 'pct', 'gb')
+            league (str): League to sort ('al' or 'nl')
         """
         if not self.standings_data_cache:
             return
 
-        # Toggle sort direction if clicking same column
-        if self.standings_sort_column == column:
+        # Toggle sort direction if clicking same column in same league
+        if self.standings_sort_column == column and self.standings_sort_league == league:
             self.standings_sort_reverse = not self.standings_sort_reverse
         else:
-            # New column - use appropriate default direction
+            # New column or league - use appropriate default direction
             self.standings_sort_column = column
+            self.standings_sort_league = league
             if column in ("pct", "wl"):
                 self.standings_sort_reverse = True  # Descending for pct and wins
             elif column == "gb":
@@ -1098,12 +1223,13 @@ class SeasonMainWindow:
             else:
                 self.standings_sort_reverse = False  # Ascending for team names
 
-        # Get data
-        teams = self.standings_data_cache.get('teams', [])
-        wins = self.standings_data_cache.get('wins', [])
-        losses = self.standings_data_cache.get('losses', [])
-        pcts = self.standings_data_cache.get('pct', [])
-        gbs = self.standings_data_cache.get('gb', [])
+        # Get data for the specific league
+        league_data = self.standings_data_cache.get(league, {})
+        teams = league_data.get('teams', [])
+        wins = league_data.get('wins', [])
+        losses = league_data.get('losses', [])
+        pcts = league_data.get('pct', [])
+        gbs = league_data.get('gb', [])
 
         # Create list of tuples for sorting
         data = list(zip(teams, wins, losses, pcts, gbs))
@@ -1127,18 +1253,21 @@ class SeasonMainWindow:
                     return 999.0  # Put invalid values at end
             data.sort(key=gb_key, reverse=self.standings_sort_reverse)
 
-        # Clear and repopulate treeview
-        for item in self.standings_tree.get_children():
-            self.standings_tree.delete(item)
+        # Select the appropriate tree
+        tree = self.al_standings_tree if league == 'al' else self.nl_standings_tree
 
-        followed_teams = self.worker.team_to_follow if self.worker else []
+        # Clear and repopulate treeview
+        for item in tree.get_children():
+            tree.delete(item)
+
+        followed_team = self.worker.team_to_follow if self.worker else ''
 
         for team, w, l, pct, gb in data:
             wl = f"{w}-{l}"
             pct_str = f"{pct:.3f}"
-            tags = ("followed",) if team in followed_teams else ()
+            tags = ("followed",) if team == followed_team else ()
 
-            self.standings_tree.insert(
+            tree.insert(
                 "",
                 tk.END,
                 values=(team, wl, pct_str, gb),
@@ -1496,6 +1625,103 @@ class SeasonMainWindow:
 
         self.games_text.see(tk.END)  # Auto-scroll
         self.games_text.config(state=tk.DISABLED)
+
+    def _display_paused_state(self):
+        """
+        Display completed day results and next day schedule when paused.
+
+        Shows:
+        - The just-completed day's final results
+        - The next day's schedule
+        """
+        if not self.worker or not self.worker.season:
+            return
+
+        self.games_text.config(state=tk.NORMAL)
+        self.games_text.delete(1.0, tk.END)
+
+        # Show completed day's results (the day that just finished)
+        completed_day = self.current_day_num + 1  # current_day_num is 0-indexed
+        self.games_text.insert(tk.END, f"═══ Day {completed_day} Results ═══\n\n", "day_header")
+
+        # Display all games from the completed day (stored in current_day_results)
+        if self.current_day_results:
+            self._display_completed_day_results()
+        else:
+            self.games_text.insert(tk.END, "No games played today\n\n")
+
+        self.games_text.insert(tk.END, "\n\n")
+
+        # Show next day's schedule if available
+        next_day_num = self.current_day_num + 1  # This is the next day to be simulated
+        if next_day_num < len(self.worker.season.schedule):
+            self.games_text.insert(tk.END, f"═══ Day {next_day_num + 1} Schedule ═══\n\n", "day_header")
+            self._display_next_day_schedule(next_day_num)
+        else:
+            self.games_text.insert(tk.END, "═══ Season Complete ═══\n", "day_header")
+
+        self.games_text.see(1.0)  # Scroll to top
+        self.games_text.config(state=tk.DISABLED)
+
+    def _display_completed_day_results(self):
+        """Display the completed day's results in compact grid format."""
+        games = sorted(self.current_day_results.keys())
+        games_per_row = 5
+        game_separator = '     '
+
+        for row_start in range(0, len(games), games_per_row):
+            row_games = games[row_start:row_start + games_per_row]
+
+            # Header row
+            header_parts = ['     R   H   E'] * len(row_games)
+            self.games_text.insert(tk.END, game_separator.join(header_parts) + "\n")
+
+            # Away team row
+            away_parts = []
+            for away, home in row_games:
+                data = self.current_day_results[(away, home)]
+                away_parts.append(f"{away:>3} {data['away_r']:>2}  {data['away_h']:>2}   {data['away_e']:>1}")
+            self.games_text.insert(tk.END, game_separator.join(away_parts) + "\n")
+
+            # Home team row
+            home_parts = []
+            for away, home in row_games:
+                data = self.current_day_results[(away, home)]
+                home_parts.append(f"{home:>3} {data['home_r']:>2}  {data['home_h']:>2}   {data['home_e']:>1}")
+            self.games_text.insert(tk.END, game_separator.join(home_parts) + "\n\n")
+
+    def _display_next_day_schedule(self, day_num):
+        """Display the next day's schedule."""
+        next_day_games = self.worker.season.schedule[day_num]
+
+        # Filter out OFF DAY entries
+        matchups = [(m[0], m[1]) for m in next_day_games if 'OFF DAY' not in m]
+
+        if not matchups:
+            self.games_text.insert(tk.END, "No games scheduled\n\n")
+            return
+
+        games_per_row = 5
+        game_separator = '     '
+
+        for row_start in range(0, len(matchups), games_per_row):
+            row_games = matchups[row_start:row_start + games_per_row]
+
+            # Header row
+            header_parts = ['     R   H   E'] * len(row_games)
+            self.games_text.insert(tk.END, game_separator.join(header_parts) + "\n")
+
+            # Away team row (with dashes for unplayed games)
+            away_parts = []
+            for away, home in row_games:
+                away_parts.append(f"{away:>3}  -   -    -")
+            self.games_text.insert(tk.END, game_separator.join(away_parts) + "\n")
+
+            # Home team row (with dashes for unplayed games)
+            home_parts = []
+            for away, home in row_games:
+                home_parts.append(f"{home:>3}  -   -    -")
+            self.games_text.insert(tk.END, game_separator.join(home_parts) + "\n\n")
 
     def _update_schedule_display(self, current_day):
         """

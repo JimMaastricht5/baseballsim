@@ -344,10 +344,13 @@ class BaseballSeason:
         else:
             return [self.team_to_follow]  # Convert string to list
 
-    def check_gm_assessments(self) -> None:
+    def check_gm_assessments(self, force: bool = False) -> None:
         """
         Check if any teams have reached GM assessment milestones (30, 60, 90, 120, 150 games).
         Run assessments for teams that are due.
+
+        Args:
+            force: If True, force assessments for all teams regardless of schedule
         """
         # Skip GM assessments after game 150 milestone (last assessment)
         # This avoids expensive calculations late in the season
@@ -368,8 +371,8 @@ class BaseballSeason:
         for team_name, gm in self.gm_managers.items():
             games_played = self.team_games_played[team_name]
 
-            # Check if assessment is due
-            if gm.should_assess(games_played):
+            # Check if assessment is due (or force if requested)
+            if force or gm.should_assess(games_played):
                 # Get team record
                 record = self.team_win_loss[team_name]
                 wins, losses = record[0], record[1]
@@ -595,6 +598,10 @@ class BaseballSeason:
         :return: None
         """
         self.sim_start()
+
+        # Perform initial GM assessments at start of season
+        self.check_gm_assessments()
+
         while self.season_day_num <= len(self.schedule) - 1:  # loop over every day and every game scheduled that day
             self.sim_next_day()
 

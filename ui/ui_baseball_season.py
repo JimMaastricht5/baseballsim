@@ -120,12 +120,15 @@ class UIBaseballSeason(bbseason.BaseballSeason):
         self.signals.emit_day_completed(compact_summaries, standings_data)
         logger.debug(f"Emitted day_completed with {len(compact_summaries)} games and standings")
 
-    def check_gm_assessments(self) -> None:
+    def check_gm_assessments(self, force: bool = False) -> None:
         """
         Override to emit signals for GM assessments of followed teams.
 
         Runs the standard GM assessment logic but emits gm_assessment_ready
         signal instead of printing to console.
+
+        Args:
+            force: If True, force assessments for all teams regardless of schedule
         """
         # Skip GM assessments after game 150 milestone (last assessment)
         if self.team_games_played:
@@ -143,8 +146,8 @@ class UIBaseballSeason(bbseason.BaseballSeason):
         for team_name, gm in self.gm_managers.items():
             games_played = self.team_games_played[team_name]
 
-            # Check if assessment is due
-            if gm.should_assess(games_played):
+            # Check if assessment is due (or force if requested)
+            if force or gm.should_assess(games_played):
                 # Get team record
                 record = self.team_win_loss[team_name]
                 wins, losses = record[0], record[1]

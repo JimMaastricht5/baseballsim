@@ -575,7 +575,7 @@ class SeasonMainWindow:
         """Create GM Assessment sub-tab (moved from standalone tab)."""
         frame = tk.Frame(parent)
 
-        # Header
+        # Header with button
         gm_header_frame = tk.Frame(frame)
         gm_header_frame.pack(fill=tk.X, pady=5)
 
@@ -583,7 +583,15 @@ class SeasonMainWindow:
             gm_header_frame, text="No GM Assessment Yet",
             font=("Arial", 11, "bold")
         )
-        self.gm_header_label.pack()
+        self.gm_header_label.pack(side=tk.LEFT, padx=10)
+
+        # Update Assessment button
+        self.update_assessment_btn = tk.Button(
+            gm_header_frame, text="Update Assessment", command=self.run_gm_assessments,
+            width=16, bg="blue", fg="white", font=("Arial", 10, "bold")
+        )
+        self.update_assessment_btn.pack(side=tk.RIGHT, padx=10)
+        self.update_assessment_btn.config(state=tk.DISABLED)  # Initially disabled
 
         # ScrolledText for assessment history
         self.gm_text = scrolledtext.ScrolledText(
@@ -932,6 +940,22 @@ class SeasonMainWindow:
             self._update_button_states(simulation_running=True, paused=False)
             self.status_label.config(text="Advancing 7 days (week)...")
 
+    def run_gm_assessments(self):
+        """Force all teams to run GM assessments immediately."""
+        if self.worker and self.worker.season:
+            logger.info("Running forced GM assessments for all teams")
+            try:
+                # Call check_gm_assessments with force=True to run regardless of schedule
+                # This will run assessments for all teams and emit signals for the followed team
+                self.worker.season.check_gm_assessments(force=True)
+                self.status_label.config(text="GM assessments completed")
+                # Don't show message box - assessment will appear in the tab automatically
+            except Exception as e:
+                logger.error(f"Error running GM assessments: {e}")
+                messagebox.showerror("Error", f"Failed to run GM assessments: {e}")
+        else:
+            messagebox.showwarning("Warning", "Simulation must be started before running GM assessments.")
+
     def _update_button_states(self, simulation_running, paused):
         """
         Update button enabled/disabled states based on simulation state.
@@ -949,6 +973,7 @@ class SeasonMainWindow:
         self.next_day_btn.config(state=tk.NORMAL if simulation_running else tk.DISABLED)
         self.next_series_btn.config(state=tk.NORMAL if simulation_running else tk.DISABLED)
         self.next_week_btn.config(state=tk.NORMAL if simulation_running else tk.DISABLED)
+        self.update_assessment_btn.config(state=tk.NORMAL if simulation_running else tk.DISABLED)
 
     def _poll_queues(self):
         """

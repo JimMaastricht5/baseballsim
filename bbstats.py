@@ -675,9 +675,7 @@ class BaseballStats:
                 team_batting_stats(self.new_season_batting_data[self.new_season_batting_data['AB'] > 0].fillna(0))
             logger.debug('Updated season pitching stats:\n{}', self.new_season_pitching_data.to_string(justify="right"))
 
-            # Calculate Sim WAR after updating stats
-            logger.debug('Calculating player WAR values...')
-            self.calculate_sim_war()
+            # Note: Sim WAR is calculated only during AI GM assessments (not after every game)
             logger.debug('Season statistics update complete.')
         return
 
@@ -710,7 +708,7 @@ class BaseballStats:
         batting_df = self.new_season_batting_data
 
         # Filter batters with playing time
-        active_batters = batting_df['AB'] >= 10
+        active_batters = batting_df['AB'] >= 0
 
         if active_batters.sum() > 0:
             # Calculate wOBA (weighted On-Base Average)

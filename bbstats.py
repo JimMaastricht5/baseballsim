@@ -708,7 +708,7 @@ class BaseballStats:
         batting_df = self.new_season_batting_data
 
         # Filter batters with playing time
-        active_batters = batting_df['AB'] >= 0
+        active_batters = batting_df['AB'] >= 10
 
         if active_batters.sum() > 0:
             # Calculate wOBA (weighted On-Base Average)
@@ -756,6 +756,8 @@ class BaseballStats:
                        batting_df['Sim_WAR'].mean())
         else:
             batting_df['Sim_WAR'] = 0.0
+
+        batting_df['Sim_WAR'] = batting_df['Sim_WAR'] + batting_df['WAR'] / 2 # weight the prior experience
 
         # ===== PITCHER SIM WAR =====
         pitching_df = self.new_season_pitching_data
@@ -816,6 +818,7 @@ class BaseballStats:
         else:
             pitching_df['Sim_WAR'] = 0.0
 
+        pitching_df['Sim_WAR'] = pitching_df['Sim_WAR'] + pitching_df['WAR'] / 2  # weight the prior experience
         return
 
     def move_a_player_between_teams(self, player_index, new_team):

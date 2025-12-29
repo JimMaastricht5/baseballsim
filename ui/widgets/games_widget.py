@@ -53,6 +53,16 @@ class GamesWidget:
         self.current_day_results = {}   # Dict: {(away, home): game_data}
         self.previous_day_results = {}  # Dict: {(away, home): game_data} from previous day
         self.current_day_num = 0  # Track current day number for header
+        self.season_schedule = []  # Full season schedule for looking ahead
+
+    def set_season_schedule(self, schedule: List[List[Tuple[str, str]]]):
+        """
+        Set the full season schedule for looking ahead.
+
+        Args:
+            schedule: Full season schedule (list of daily schedules)
+        """
+        self.season_schedule = schedule
 
     def on_day_started(self, day_num: int, schedule: List[Tuple[str, str]]):
         """
@@ -200,17 +210,33 @@ class GamesWidget:
         self.games_text.config(state=tk.NORMAL)
         self.games_text.delete(1.0, tk.END)
 
-        # Show yesterday's results if available
-        if self.current_day_num > 0 and self.previous_day_results:
-            self.games_text.insert(tk.END, f"═══ Day {self.current_day_num} Results ═══\n\n", "day_header")
-            self._display_yesterday_results()
+        # Determine if all games are complete
+        all_games_complete = (len(self.current_day_schedule) > 0 and
+                             len(self.current_day_results) == len(self.current_day_schedule))
+
+        if all_games_complete:
+            # Show current day's results
+            self.games_text.insert(tk.END, f"═══ Day {self.current_day_num + 1} Results ═══\n\n", "day_header")
+            self._display_games_grid()
             self.games_text.insert(tk.END, "\n\n")
 
-        # Show today's schedule header
-        self.games_text.insert(tk.END, f"═══ Day {self.current_day_num + 1} Schedule ═══\n\n", "day_header")
+            # Show next day's schedule if available
+            next_day_num = self.current_day_num + 1
+            if next_day_num < len(self.season_schedule):
+                self.games_text.insert(tk.END, f"═══ Day {next_day_num + 1} Schedule ═══\n\n", "day_header")
+                self._display_next_day_schedule(self.season_schedule[next_day_num])
+            else:
+                self.games_text.insert(tk.END, "═══ Season Complete ═══\n", "day_header")
+        else:
+            # Games in progress - show yesterday's results and today's schedule
+            if self.current_day_num > 0 and self.previous_day_results:
+                self.games_text.insert(tk.END, f"═══ Day {self.current_day_num} Results ═══\n\n", "day_header")
+                self._display_yesterday_results()
+                self.games_text.insert(tk.END, "\n\n")
 
-        # Display updated grid
-        self._display_games_grid()
+            # Show today's schedule (with partial results)
+            self.games_text.insert(tk.END, f"═══ Day {self.current_day_num + 1} Schedule ═══\n\n", "day_header")
+            self._display_games_grid()
 
         self.games_text.see(tk.END)  # Auto-scroll
         self.games_text.config(state=tk.DISABLED)

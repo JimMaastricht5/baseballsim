@@ -356,6 +356,10 @@ class SeasonMainWindow:
         # Extract today's schedule from worker
         worker = self.controller.get_worker()
         if worker and worker.season:
+            # Set the full season schedule on first day
+            if day_num == 0:
+                self.games_widget.set_season_schedule(worker.season.schedule)
+
             todays_games = worker.season.schedule[day_num]
             schedule = [(m[0], m[1]) for m in todays_games if 'OFF DAY' not in m]
 

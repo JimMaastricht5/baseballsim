@@ -107,7 +107,7 @@ class BaseballStats:
         # 27.5% of pitchers w > 5 in will spend time on IL per season (188 out of 684)
         # 26.3% of pitching injuries affect the throwing elbow results in avg of 74 days lost
         # position player (non-pitcher) longevitiy: https://www.nytimes.com/2007/07/15/sports/baseball/15careers.html
-        self.condition_change_per_day = 15  # improve with rest, mid-point of normal dist for recovery
+        self.condition_change_per_day = 20  # improve with rest, mid-point of normal dist for recovery
         self.fatigue_start_perc = 70  # 85% of way to avg max is where fatigue starts, adjust factor to inc outing lgth
         self.fatigue_rate = .001  # at 85% of avg max pitchers have a .014 increase in OBP.  using .001 as proxy
         self.fatigue_pitching_change_limit = 5  # change pitcher at # or below out of 100
@@ -195,6 +195,46 @@ class BaseballStats:
         df = team_pitching_stats(df, filter_stats=False)
         df = self.add_missing_cols(df)
         return df
+
+    def get_player_historical_data(self, player_name: str, is_batter: bool = True) -> DataFrame:
+        """
+        Get historical year-by-year data for a specific player.
+
+        :param player_name: Name of the player
+        :param is_batter: True for batting data, False for pitching data
+        :return: DataFrame with year-by-year historical stats, sorted by season (most recent first)
+        """
+        try:
+            # Build file name for historical data
+            seasons_str = " ".join(str(season) for season in self.load_seasons)
+            data_type = "Batting" if is_batter else "Pitching"
+            historical_file = f"{seasons_str} historical-{data_type}.csv"
+
+            # Load historical data
+            historical_df = pd.read_csv(historical_file, index_col='Player_Season_Key')
+
+            # Filter by player name
+            player_history = historical_df[historical_df['Player'] == player_name].copy()
+
+            # Sort by season (most recent first)
+            if 'Season' in player_history.columns:
+                player_history = player_history.sort_values('Season', ascending=False)
+
+            # Calculate derived stats if needed
+            if is_batter:
+                player_history = team_batting_stats(player_history, filter_stats=False)
+            else:
+                player_history = team_pitching_stats(player_history, filter_stats=False)
+
+            logger.debug(f"Retrieved {len(player_history)} historical seasons for {player_name}")
+            return player_history
+
+        except FileNotFoundError as e:
+            logger.error(f"Historical data file not found: {e}")
+            return pd.DataFrame()  # Return empty DataFrame if file not found
+        except Exception as e:
+            logger.error(f"Error retrieving historical data for {player_name}: {e}")
+            return pd.DataFrame()  # Return empty DataFrame on error
 
     def get_seasons(self, batter_file: str, pitcher_file: str) -> None:
         """

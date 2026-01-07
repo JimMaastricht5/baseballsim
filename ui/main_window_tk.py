@@ -107,11 +107,11 @@ class SeasonMainWindow:
         self.notebook.pack(fill=tk.BOTH, expand=True)
 
         # Tab 1: Today's Games
-        self.games_widget = GamesWidget(self.notebook)
+        self.games_widget = GamesWidget(self.notebook, self.season_team_to_follow)
         self.notebook.add(self.games_widget.get_frame(), text="Today's Games")
 
         # Tab 2: Schedule
-        self.schedule_widget = ScheduleWidget(self.notebook)
+        self.schedule_widget = ScheduleWidget(self.notebook, self.season_team_to_follow)
         self.notebook.add(self.schedule_widget.get_frame(), text="Schedule")
 
         # Tab 3: League IL

@@ -20,14 +20,16 @@ class ScheduleWidget:
     current day highlighting and formatted matchups.
     """
 
-    def __init__(self, parent: tk.Widget):
+    def __init__(self, parent: tk.Widget, followed_team: str = None):
         """
         Initialize schedule widget.
 
         Args:
             parent: Parent tkinter widget (notebook or frame)
+            followed_team: Team abbreviation to highlight (e.g., 'MIL', 'NYM')
         """
         self.frame = tk.Frame(parent)
+        self.followed_team = followed_team
 
         # Header
         schedule_header = tk.Label(
@@ -54,6 +56,8 @@ class ScheduleWidget:
                                         spacing1=5, spacing3=3)
         self.schedule_text.tag_configure("matchup", font=("Courier", 9),
                                         lmargin1=20, lmargin2=20)
+        self.schedule_text.tag_configure("bold_team", font=("Courier", 10, "bold"),
+                                        lmargin1=20, lmargin2=20, foreground="#000000")
 
         self.schedule_text.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
 
@@ -90,19 +94,50 @@ class ScheduleWidget:
                 self.schedule_text.insert(tk.END, day_label + "\n", "day_header")
 
             # Format matchups - show 4 per line for better readability
-            matchup_strings = []
+            # Insert matchups with bold for followed team names
+            matchups_per_line = 4
+            matchup_count = 0
+
             for matchup in day_games:
+                # Add line break and indent after every 4 matchups
+                if matchup_count % matchups_per_line == 0:
+                    self.schedule_text.insert(tk.END, "  ", "matchup")  # Indent
+                else:
+                    self.schedule_text.insert(tk.END, "   ", "matchup")  # Separator between matchups
+
                 if 'OFF DAY' in matchup:
                     off_team = matchup[0] if matchup[0] != 'OFF DAY' else matchup[1]
-                    matchup_strings.append(f"{off_team:4s} OFF")
+                    # Insert team name with bold if it's the followed team
+                    if self.followed_team and off_team == self.followed_team:
+                        self.schedule_text.insert(tk.END, f"{off_team:4s}", "bold_team")
+                    else:
+                        self.schedule_text.insert(tk.END, f"{off_team:4s}", "matchup")
+                    self.schedule_text.insert(tk.END, " OFF", "matchup")
                 else:
-                    matchup_strings.append(f"{matchup[0]:3s} @ {matchup[1]:3s}")
+                    away, home = matchup[0], matchup[1]
+                    # Insert away team with bold if it's the followed team
+                    if self.followed_team and away == self.followed_team:
+                        self.schedule_text.insert(tk.END, f"{away:3s}", "bold_team")
+                    else:
+                        self.schedule_text.insert(tk.END, f"{away:3s}", "matchup")
 
-            # Display matchups in rows of 4
-            for j in range(0, len(matchup_strings), 4):
-                row_matchups = matchup_strings[j:j+4]
-                matchups_line = "   ".join(row_matchups)
-                self.schedule_text.insert(tk.END, "  " + matchups_line + "\n", "matchup")
+                    self.schedule_text.insert(tk.END, " @ ", "matchup")
+
+                    # Insert home team with bold if it's the followed team
+                    if self.followed_team and home == self.followed_team:
+                        self.schedule_text.insert(tk.END, f"{home:3s}", "bold_team")
+                    else:
+                        self.schedule_text.insert(tk.END, f"{home:3s}", "matchup")
+
+                matchup_count += 1
+
+                # Add line break after every 4 matchups
+                if matchup_count % matchups_per_line == 0:
+                    self.schedule_text.insert(tk.END, "\n", "matchup")
+
+            # Add final line break if we didn't just add one
+            if matchup_count % matchups_per_line != 0:
+                self.schedule_text.insert(tk.END, "\n", "matchup")
 
             # Add spacing between days
             self.schedule_text.insert(tk.END, "\n")

@@ -58,6 +58,7 @@ import numpy as np
 from numpy import ndarray
 from pandas.core.frame import DataFrame
 from typing import List, Optional
+from bblogger import logger
 
 
 class BaseballStatsPreProcess:
@@ -245,29 +246,54 @@ class BaseballStatsPreProcess:
         # Check data availability
         num_years = len(player_data)
 
-        if num_years == 1:
-            # Use most recent year unchanged
+        if num_years < 3:
+            # Need at least 3 years for reliable trend projection
+            # Use most recent year unchanged for 1-2 years of data
             recent_value = player_data.iloc[-1][stat_col]
             # Handle NaN
             if pd.isna(recent_value):
                 recent_value = 0.0
-            return max(0.0, float(recent_value)), "Recent_Year", 1
+            return max(0.0, float(recent_value)), "Recent_Year", num_years
 
-        # Perform linear regression (need at least 2 points)
+        # Perform linear regression (need at least 3 points for reliable trends)
         years = player_data['Season'].values.astype(float)
         values = player_data[stat_col].fillna(0).values.astype(float)
+
+        # Check for high variance - if stats are too inconsistent, use recent year
+        variance = np.var(values)
+        mean = np.mean(values)
+        # If coefficient of variation > 0.1 (variability), don't extrapolate
+        if mean > 0 and (np.sqrt(variance) / mean) > 0.1:
+            recent_value = float(values[-1])
+            return max(0.0, recent_value), "Recent_Year", num_years
+
+        # Convert to relative years (so 0, 1, 2, ...) to avoid huge intercepts
+        # This fixes the bug where absolute years (2023, 2024, 2025) caused unstable projections
+        relative_years = years - years[0]
+        target_relative_year = target_year - years[0]
 
         # Use polyfit to calculate linear trend
         import warnings
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")  # Ignore all warnings from polyfit
-            slope, intercept = np.polyfit(years, values, deg=1)
+            slope, intercept = np.polyfit(relative_years, values, deg=1)
 
-        # Project to target year
-        projected = slope * target_year + intercept
+        # Project to target year using relative year
+        projected = slope * target_relative_year + intercept
 
         # Clamp to 0 (can't have negative stats)
         projected = max(0.0, projected)
+
+        # Add upper bounds check for unrealistic growth
+        recent_value = float(values[-1])  # Most recent year's value
+        if recent_value > 0:
+            # Don't allow projections to exceed 110% of recent value
+            # (prevents unrealistic jumps from small trends)
+            max_reasonable = recent_value * 1.10
+            if projected > max_reasonable:
+                logger.debug(f"Projection {projected:.1f} exceeds 110% of recent ({recent_value:.1f}), "
+                           f"capping at {max_reasonable:.1f} for {stat_col}")
+                projected = min(projected, max_reasonable)
 
         return projected, "Trend", num_years
 

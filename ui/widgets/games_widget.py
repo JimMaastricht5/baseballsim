@@ -24,14 +24,16 @@ class GamesWidget:
     - Handles paused state display
     """
 
-    def __init__(self, parent: tk.Widget):
+    def __init__(self, parent: tk.Widget, followed_team: str = None):
         """
         Initialize games widget.
 
         Args:
             parent: Parent tkinter widget (notebook or frame)
+            followed_team: Team abbreviation to highlight (e.g., 'MIL', 'NYM')
         """
         self.frame = tk.Frame(parent)
+        self.followed_team = followed_team
 
         # Create ScrolledText widget for games display
         self.games_text = scrolledtext.ScrolledText(
@@ -42,8 +44,8 @@ class GamesWidget:
         self.games_text.tag_configure("header", font=("Arial", 12, "bold"), foreground="#2e5090")
         self.games_text.tag_configure("day_header", font=("Arial", 12, "bold"),
                                      foreground="#1a3d6b", spacing3=10)
-        self.games_text.tag_configure("followed_game", background="#ffffcc",
-                                     spacing1=5, spacing3=5)
+        self.games_text.tag_configure("normal_text", font=("Courier", 9, "normal"))
+        self.games_text.tag_configure("bold_team", font=("Courier", 10, "bold"), foreground="#000000")
         self.games_text.tag_configure("separator", foreground="#888888")
 
         self.games_text.pack(fill=tk.BOTH, expand=True)
@@ -177,33 +179,60 @@ class GamesWidget:
 
             # Header row: "     R   H   E"
             header_parts = ['     R   H   E'] * len(row_games)
-            self.games_text.insert(tk.END, game_separator.join(header_parts) + "\n")
+            header_line = game_separator.join(header_parts) + "\n"
+            self.games_text.insert(tk.END, header_line)
 
-            # Away team row
-            away_parts = []
-            for away, home in row_games:
+            # Away team row - insert each game separately to apply bold to team names
+            for idx, (away, home) in enumerate(row_games):
+                if idx > 0:
+                    self.games_text.insert(tk.END, game_separator, "normal_text")
+
                 game_key = (away, home)
                 if game_key in self.current_day_results:
                     data = self.current_day_results[game_key]
-                    # Format: Team(3) Space R(2) 2spaces H(2) 3spaces E(1)
-                    away_parts.append(f"{away:>3} {data['away_r']:>2}  {data['away_h']:>2}   {data['away_e']:>1}")
+                    # Insert team name with bold if it's the followed team
+                    if self.followed_team and away == self.followed_team:
+                        self.games_text.insert(tk.END, f"{away:>3}", "bold_team")
+                    else:
+                        self.games_text.insert(tk.END, f"{away:>3}", "normal_text")
+                    # Insert stats
+                    self.games_text.insert(tk.END, f" {data['away_r']:>2}  {data['away_h']:>2}   {data['away_e']:>1}", "normal_text")
                 else:
-                    # Use same spacing but with dashes
-                    away_parts.append(f"{away:>3}  -   -    -")
-            self.games_text.insert(tk.END, game_separator.join(away_parts) + "\n")
+                    # Insert team name with bold if it's the followed team
+                    if self.followed_team and away == self.followed_team:
+                        self.games_text.insert(tk.END, f"{away:>3}", "bold_team")
+                    else:
+                        self.games_text.insert(tk.END, f"{away:>3}", "normal_text")
+                    # Insert dashes
+                    self.games_text.insert(tk.END, "  -   -    -", "normal_text")
 
-            # Home team row
-            home_parts = []
-            for away, home in row_games:
+            self.games_text.insert(tk.END, "\n")
+
+            # Home team row - insert each game separately to apply bold to team names
+            for idx, (away, home) in enumerate(row_games):
+                if idx > 0:
+                    self.games_text.insert(tk.END, game_separator, "normal_text")
+
                 game_key = (away, home)
                 if game_key in self.current_day_results:
                     data = self.current_day_results[game_key]
-                    # Format: Team(3) Space R(2) 2spaces H(2) 3spaces E(1)
-                    home_parts.append(f"{home:>3} {data['home_r']:>2}  {data['home_h']:>2}   {data['home_e']:>1}")
+                    # Insert team name with bold if it's the followed team
+                    if self.followed_team and home == self.followed_team:
+                        self.games_text.insert(tk.END, f"{home:>3}", "bold_team")
+                    else:
+                        self.games_text.insert(tk.END, f"{home:>3}", "normal_text")
+                    # Insert stats
+                    self.games_text.insert(tk.END, f" {data['home_r']:>2}  {data['home_h']:>2}   {data['home_e']:>1}", "normal_text")
                 else:
-                    # Use same spacing but with dashes
-                    home_parts.append(f"{home:>3}  -   -    -")
-            self.games_text.insert(tk.END, game_separator.join(home_parts) + "\n\n")
+                    # Insert team name with bold if it's the followed team
+                    if self.followed_team and home == self.followed_team:
+                        self.games_text.insert(tk.END, f"{home:>3}", "bold_team")
+                    else:
+                        self.games_text.insert(tk.END, f"{home:>3}", "normal_text")
+                    # Insert dashes
+                    self.games_text.insert(tk.END, "  -   -    -", "normal_text")
+
+            self.games_text.insert(tk.END, "\n\n")
 
     def _rebuild_games_display(self):
         """Rebuild the entire games display with current results."""
@@ -255,21 +284,40 @@ class GamesWidget:
 
             # Header row
             header_parts = ['     R   H   E'] * len(row_games)
-            self.games_text.insert(tk.END, game_separator.join(header_parts) + "\n")
+            header_line = game_separator.join(header_parts) + "\n"
+            self.games_text.insert(tk.END, header_line)
 
-            # Away team row
-            away_parts = []
-            for game_key in row_games:
-                data = self.previous_day_results[game_key]
-                away_parts.append(f"{data['away_team']:>3} {data['away_r']:>2}  {data['away_h']:>2}   {data['away_e']:>1}")
-            self.games_text.insert(tk.END, game_separator.join(away_parts) + "\n")
+            # Away team row - insert each game separately
+            for idx, game_key in enumerate(row_games):
+                if idx > 0:
+                    self.games_text.insert(tk.END, game_separator, "normal_text")
 
-            # Home team row
-            home_parts = []
-            for game_key in row_games:
                 data = self.previous_day_results[game_key]
-                home_parts.append(f"{data['home_team']:>3} {data['home_r']:>2}  {data['home_h']:>2}   {data['home_e']:>1}")
-            self.games_text.insert(tk.END, game_separator.join(home_parts) + "\n\n")
+                # Insert team name with bold if it's the followed team
+                if self.followed_team and data['away_team'] == self.followed_team:
+                    self.games_text.insert(tk.END, f"{data['away_team']:>3}", "bold_team")
+                else:
+                    self.games_text.insert(tk.END, f"{data['away_team']:>3}", "normal_text")
+                # Insert stats
+                self.games_text.insert(tk.END, f" {data['away_r']:>2}  {data['away_h']:>2}   {data['away_e']:>1}", "normal_text")
+
+            self.games_text.insert(tk.END, "\n")
+
+            # Home team row - insert each game separately
+            for idx, game_key in enumerate(row_games):
+                if idx > 0:
+                    self.games_text.insert(tk.END, game_separator, "normal_text")
+
+                data = self.previous_day_results[game_key]
+                # Insert team name with bold if it's the followed team
+                if self.followed_team and data['home_team'] == self.followed_team:
+                    self.games_text.insert(tk.END, f"{data['home_team']:>3}", "bold_team")
+                else:
+                    self.games_text.insert(tk.END, f"{data['home_team']:>3}", "normal_text")
+                # Insert stats
+                self.games_text.insert(tk.END, f" {data['home_r']:>2}  {data['home_h']:>2}   {data['home_e']:>1}", "normal_text")
+
+            self.games_text.insert(tk.END, "\n\n")
 
     def _display_completed_day_results(self):
         """Display the completed day's results in compact grid format."""
@@ -282,21 +330,40 @@ class GamesWidget:
 
             # Header row
             header_parts = ['     R   H   E'] * len(row_games)
-            self.games_text.insert(tk.END, game_separator.join(header_parts) + "\n")
+            header_line = game_separator.join(header_parts) + "\n"
+            self.games_text.insert(tk.END, header_line)
 
-            # Away team row
-            away_parts = []
-            for game_key in row_games:
-                data = self.current_day_results[game_key]
-                away_parts.append(f"{data['away_team']:>3} {data['away_r']:>2}  {data['away_h']:>2}   {data['away_e']:>1}")
-            self.games_text.insert(tk.END, game_separator.join(away_parts) + "\n")
+            # Away team row - insert each game separately
+            for idx, game_key in enumerate(row_games):
+                if idx > 0:
+                    self.games_text.insert(tk.END, game_separator, "normal_text")
 
-            # Home team row
-            home_parts = []
-            for game_key in row_games:
                 data = self.current_day_results[game_key]
-                home_parts.append(f"{data['home_team']:>3} {data['home_r']:>2}  {data['home_h']:>2}   {data['home_e']:>1}")
-            self.games_text.insert(tk.END, game_separator.join(home_parts) + "\n\n")
+                # Insert team name with bold if it's the followed team
+                if self.followed_team and data['away_team'] == self.followed_team:
+                    self.games_text.insert(tk.END, f"{data['away_team']:>3}", "bold_team")
+                else:
+                    self.games_text.insert(tk.END, f"{data['away_team']:>3}", "normal_text")
+                # Insert stats
+                self.games_text.insert(tk.END, f" {data['away_r']:>2}  {data['away_h']:>2}   {data['away_e']:>1}", "normal_text")
+
+            self.games_text.insert(tk.END, "\n")
+
+            # Home team row - insert each game separately
+            for idx, game_key in enumerate(row_games):
+                if idx > 0:
+                    self.games_text.insert(tk.END, game_separator, "normal_text")
+
+                data = self.current_day_results[game_key]
+                # Insert team name with bold if it's the followed team
+                if self.followed_team and data['home_team'] == self.followed_team:
+                    self.games_text.insert(tk.END, f"{data['home_team']:>3}", "bold_team")
+                else:
+                    self.games_text.insert(tk.END, f"{data['home_team']:>3}", "normal_text")
+                # Insert stats
+                self.games_text.insert(tk.END, f" {data['home_r']:>2}  {data['home_h']:>2}   {data['home_e']:>1}", "normal_text")
+
+            self.games_text.insert(tk.END, "\n\n")
 
     def _display_next_day_schedule(self, next_day_games: List[Tuple[str, str]]):
         """
@@ -320,19 +387,38 @@ class GamesWidget:
 
             # Header row
             header_parts = ['     R   H   E'] * len(row_games)
-            self.games_text.insert(tk.END, game_separator.join(header_parts) + "\n")
+            header_line = game_separator.join(header_parts) + "\n"
+            self.games_text.insert(tk.END, header_line)
 
-            # Away team row (with dashes for unplayed games)
-            away_parts = []
-            for away, home in row_games:
-                away_parts.append(f"{away:>3}  -   -    -")
-            self.games_text.insert(tk.END, game_separator.join(away_parts) + "\n")
+            # Away team row (with dashes for unplayed games) - insert each game separately
+            for idx, (away, home) in enumerate(row_games):
+                if idx > 0:
+                    self.games_text.insert(tk.END, game_separator, "normal_text")
 
-            # Home team row (with dashes for unplayed games)
-            home_parts = []
-            for away, home in row_games:
-                home_parts.append(f"{home:>3}  -   -    -")
-            self.games_text.insert(tk.END, game_separator.join(home_parts) + "\n\n")
+                # Insert team name with bold if it's the followed team
+                if self.followed_team and away == self.followed_team:
+                    self.games_text.insert(tk.END, f"{away:>3}", "bold_team")
+                else:
+                    self.games_text.insert(tk.END, f"{away:>3}", "normal_text")
+                # Insert dashes
+                self.games_text.insert(tk.END, "  -   -    -", "normal_text")
+
+            self.games_text.insert(tk.END, "\n")
+
+            # Home team row (with dashes for unplayed games) - insert each game separately
+            for idx, (away, home) in enumerate(row_games):
+                if idx > 0:
+                    self.games_text.insert(tk.END, game_separator, "normal_text")
+
+                # Insert team name with bold if it's the followed team
+                if self.followed_team and home == self.followed_team:
+                    self.games_text.insert(tk.END, f"{home:>3}", "bold_team")
+                else:
+                    self.games_text.insert(tk.END, f"{home:>3}", "normal_text")
+                # Insert dashes
+                self.games_text.insert(tk.END, "  -   -    -", "normal_text")
+
+            self.games_text.insert(tk.END, "\n\n")
 
     def get_frame(self) -> tk.Frame:
         """Get the main frame for adding to parent container."""

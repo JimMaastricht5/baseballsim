@@ -60,8 +60,8 @@ if __name__ == "__main__":
          series_length = 3,
          rotation_len = 5,
          season_chatty = True,
-         season_print_lineup_b = False,
-         season_print_box_score_b = False,
+         season_print_lineup_b = True,
+         season_print_box_score_b = True,
          season_team_to_follow = 'MIL'  # Single team string (defaults to 'MIL' if None)
          )
 

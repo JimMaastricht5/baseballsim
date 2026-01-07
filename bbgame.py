@@ -592,13 +592,13 @@ if __name__ == '__main__':
     startdt = datetime.datetime.now()
 
     away_team = 'LAD'
-    home_team = 'TOR'
+    home_team = 'MIL'
 
     # MIL_lineup = {647549: 'LF', 239398: 'C', 224423: '1B', 138309: 'DH', 868055: 'CF', 520723: 'SS',
     #               299454: '3B', 46074: '2B', 752787: 'RF'}
     # NYM_starter = 626858
     # MIL_starter = 288650
-    sims = 5
+    sims = 1
     season_win_loss = [[0, 0], [0, 0]]  # away record pos 0, home pos 1
     score_total = [0, 0]
     # team0_season_df = None
@@ -617,7 +617,7 @@ if __name__ == '__main__':
                     # , starting_pitchers=[MIL_starter, BOS_starter]
                     # , starting_lineups=[MIL_lineup, None]
                     )
-        score, inning, win_loss, game_recap_str = game.sim_game(team_to_follow=home_team)
+        score, inning, win_loss, game_recap_str = game.sim_game()
         print(game_recap_str)
         season_win_loss[0] = list(np.add(np.array(season_win_loss[0]), np.array(win_loss[0])))
         season_win_loss[1] = list(np.add(np.array(season_win_loss[1]), np.array(win_loss[1])))

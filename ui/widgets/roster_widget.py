@@ -195,8 +195,24 @@ class RosterWidget:
             # Store DataFrames for sorting
             self.batters_df = sorted_batters.copy()
 
+            # Check if user had a custom sort applied, and reapply it
+            tree_id = str(id(self.pos_players_tree))
+            if tree_id in self.sort_state and self.sort_state[tree_id]['column'] is not None:
+                # Reapply user's sort
+                sort_state = self.sort_state[tree_id]
+                sorted_batters = self._apply_sort(sorted_batters, sort_state['column'],
+                                                   sort_state['ascending'], is_batter=True)
+                self.batters_df = sorted_batters.copy()
+
             # Update position players tree
             self._update_roster_tree(self.pos_players_tree, sorted_batters, is_batter=True)
+
+            # Update sort indicators if there was a custom sort
+            if tree_id in self.sort_state and self.sort_state[tree_id]['column'] is not None:
+                self._update_sort_indicators(self.pos_players_tree,
+                                             self.sort_state[tree_id]['column'],
+                                             self.sort_state[tree_id]['ascending'],
+                                             is_batter=True)
 
             # Sort pitchers by IP (innings pitched)
             if 'IP' in pitching_df.columns and pitching_df['IP'].sum() > 0:
@@ -207,8 +223,24 @@ class RosterWidget:
             # Store DataFrames for sorting
             self.pitchers_df = sorted_pitchers.copy()
 
+            # Check if user had a custom sort applied, and reapply it
+            tree_id = str(id(self.pitchers_tree))
+            if tree_id in self.sort_state and self.sort_state[tree_id]['column'] is not None:
+                # Reapply user's sort
+                sort_state = self.sort_state[tree_id]
+                sorted_pitchers = self._apply_sort(sorted_pitchers, sort_state['column'],
+                                                   sort_state['ascending'], is_batter=False)
+                self.pitchers_df = sorted_pitchers.copy()
+
             # Update pitchers tree
             self._update_roster_tree(self.pitchers_tree, sorted_pitchers, is_batter=False)
+
+            # Update sort indicators if there was a custom sort
+            if tree_id in self.sort_state and self.sort_state[tree_id]['column'] is not None:
+                self._update_sort_indicators(self.pitchers_tree,
+                                             self.sort_state[tree_id]['column'],
+                                             self.sort_state[tree_id]['ascending'],
+                                             is_batter=False)
 
             logger.info(f"Roster updated for {team}: {len(batting_df)} batters, {len(pitching_df)} pitchers")
 
@@ -326,6 +358,56 @@ class RosterWidget:
             except Exception as e:
                 logger.warning(f"Error inserting roster row for {row.get('Player', 'Unknown')}: {e}")
 
+    def _apply_sort(self, df: pd.DataFrame, column: str, ascending: bool, is_batter: bool) -> pd.DataFrame:
+        """
+        Apply sort to a DataFrame.
+
+        Args:
+            df: DataFrame to sort
+            column: Column name to sort by
+            ascending: Sort direction
+            is_batter: True if batter data, False if pitcher data
+
+        Returns:
+            Sorted DataFrame
+        """
+        if df is None or df.empty:
+            return df
+
+        # Map display column names to DataFrame column names
+        column_mapping = {
+            'K': 'SO'  # Display column "K" maps to DataFrame column "SO"
+        }
+
+        # Get the actual DataFrame column name
+        df_column = column_mapping.get(column, column)
+
+        # Determine if column is numeric or text
+        numeric_cols = ['G', 'AB', 'R', 'H', '2B', '3B', 'HR', 'RBI', 'BB', 'SO', 'K',
+                       'AVG', 'OBP', 'SLG', 'OPS', 'GS', 'W', 'L', 'IP', 'ER', 'ERA',
+                       'WHIP', 'SV', 'Condition', 'Age']
+
+        try:
+            if df_column in df.columns:
+                # Handle numeric vs text sorting
+                if column in numeric_cols or df_column in numeric_cols:
+                    # Convert to numeric, handling any non-numeric values
+                    sorted_df = df.copy()
+                    sorted_df[df_column] = pd.to_numeric(sorted_df[df_column], errors='coerce')
+                    sorted_df = sorted_df.sort_values(df_column, ascending=ascending, na_position='last')
+                else:
+                    # Text sorting
+                    sorted_df = df.sort_values(df_column, ascending=ascending, na_position='last')
+
+                return sorted_df
+            else:
+                logger.warning(f"Column {column} (mapped to {df_column}) not found in DataFrame")
+                return df
+
+        except Exception as e:
+            logger.error(f"Error applying sort by column {column}: {e}")
+            return df
+
     def _sort_by_column(self, tree: ttk.Treeview, column: str, is_batter: bool):
         """
         Sort roster tree by the specified column.
@@ -356,58 +438,28 @@ class RosterWidget:
             logger.warning("No data available to sort")
             return
 
-        # Map display column names to DataFrame column names
-        # The treeview shows "K" but DataFrame has "SO" for strikeouts
-        column_mapping = {
-            'K': 'SO'  # Display column "K" maps to DataFrame column "SO"
-        }
+        # Apply the sort using helper method
+        sorted_df = self._apply_sort(df, column, ascending, is_batter)
 
-        # Get the actual DataFrame column name
+        # Update the stored DataFrame
+        if is_batter:
+            self.batters_df = sorted_df
+        else:
+            self.pitchers_df = sorted_df
+
+        # Update the tree display
+        self._update_roster_tree(tree, sorted_df, is_batter)
+
+        # Update sort state
+        self.sort_state[tree_id] = {'column': column, 'ascending': ascending}
+
+        # Update column headings to show sort indicator
+        self._update_sort_indicators(tree, column, ascending, is_batter)
+
+        # Map display column names to DataFrame column names for logging
+        column_mapping = {'K': 'SO'}
         df_column = column_mapping.get(column, column)
-
-        # Determine if column is numeric or text
-        # Numeric columns should be sorted numerically, text alphabetically
-        numeric_cols = ['G', 'AB', 'R', 'H', '2B', '3B', 'HR', 'RBI', 'BB', 'SO', 'K',
-                       'AVG', 'OBP', 'SLG', 'OPS', 'GS', 'W', 'L', 'IP', 'ER', 'ERA',
-                       'WHIP', 'SV', 'Condition', 'Age']
-
-        try:
-            # Sort the DataFrame using the mapped column name
-            if df_column in df.columns:
-                # Handle numeric vs text sorting
-                if column in numeric_cols or df_column in numeric_cols:
-                    # Convert to numeric, handling any non-numeric values
-                    sorted_df = df.copy()
-                    sorted_df[df_column] = pd.to_numeric(sorted_df[df_column], errors='coerce')
-                    sorted_df = sorted_df.sort_values(df_column, ascending=ascending, na_position='last')
-                else:
-                    # Text sorting
-                    sorted_df = df.sort_values(df_column, ascending=ascending, na_position='last')
-
-                # Update the stored DataFrame
-                if is_batter:
-                    self.batters_df = sorted_df
-                else:
-                    self.pitchers_df = sorted_df
-
-                # Update the tree display
-                self._update_roster_tree(tree, sorted_df, is_batter)
-
-                # Update sort state
-                self.sort_state[tree_id] = {'column': column, 'ascending': ascending}
-
-                # Update column headings to show sort indicator
-                self._update_sort_indicators(tree, column, ascending, is_batter)
-
-                logger.debug(f"Sorted by {column} (DataFrame column: {df_column}), ascending={ascending}")
-
-            else:
-                logger.warning(f"Column {column} (mapped to {df_column}) not found in DataFrame")
-
-        except Exception as e:
-            logger.error(f"Error sorting by column {column}: {e}")
-            import traceback
-            logger.error(traceback.format_exc())
+        logger.debug(f"Sorted by {column} (DataFrame column: {df_column}), ascending={ascending}")
 
     def _update_sort_indicators(self, tree: ttk.Treeview, sorted_column: str, ascending: bool, is_batter: bool):
         """

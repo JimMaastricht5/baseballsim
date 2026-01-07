@@ -131,8 +131,8 @@ class GMStrategy:
         Calculate team's strategy coefficient based on current performance.
 
         Formula combines:
-        1. Win percentage (40% weight) - overall team quality
-        2. Games back (40% weight) - playoff positioning
+        1. Win percentage (60% weight) - overall team quality
+        2. Games back (20% weight) - playoff positioning
         3. Season timing (20% weight) - urgency increases late season
 
         Args:
@@ -175,8 +175,8 @@ class GMStrategy:
         urgency = season_progress ** 2  # Quadratic urgency curve
 
         # Combine signals with weights
-        base_signal = (0.40 * win_pct_signal +
-                      0.40 * games_back_signal +
+        base_signal = (0.60 * win_pct_signal +
+                      0.20 * games_back_signal +
                       0.20 * urgency)
 
         # If not in realistic playoff race, push toward rebuild regardless of record

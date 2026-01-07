@@ -304,10 +304,22 @@ class BaseballSeason:
         Returns:
             Games back (negative if team is leading, 0.0 if tied for lead)
         """
+        team_data = []
         if team_name == 'OFF DAY':
             return 0.0
 
-        # Get team's record
+        # Get team's league
+        team_league = None
+        if (hasattr(self.baseball_data, 'batting_data') and  'League' in self.baseball_data.batting_data.columns):
+            team_data = (self.baseball_data.batting_data)[self.baseball_data.batting_data['Team'] == team_name]
+        if not team_data.empty:
+            team_league = team_data['League'].iloc[0]
+
+        # If league not found, fall back to old behavior (all teams)
+        if team_league is None:
+            logger.warning(f"Could not determine league for {team_name}, calculating GB across all teams")
+
+    # Get team's record
         team_record = self.team_win_loss[team_name]
         team_wins = team_record[0]
         team_losses = team_record[1]

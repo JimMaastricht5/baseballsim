@@ -121,27 +121,96 @@ class BaseballSeason:
     def get_team_names(self) -> list:
         return self.teams
 
+    #  def create_schedule(self) -> None:
+    #     """
+    #     set the schedule for the seasons using the teams, series length, min games in season, and limit of games
+    #     conflicts sometimes occur between the params, so it is possible for a team to play an extra game
+    #     day schedule in format  ([['MIL', 'COL'], ['PIT', 'CIN'], ['CHC', 'STL']])  # test schedule
+    #     if there are an odd number of teams there may be an "OFF" day in the schedule
+    #     :return: None
+    #     """
+    #     for game_day in range(0, len(self.teams)-1):  # setup each team play all other teams one time
+    #         random.shuffle(self.teams)  # randomize team match ups. may repeat, deal with it
+    #         day_schedule = []
+    #         for ii in range(0, len(self.teams), 2):  # select home and away without repeating a team, inc by 2 away/home
+    #             day_schedule.append([self.teams[ii], self.teams[ii+1]])  # build schedule for one day
+    #
+    #         for series_game in range(0, self.series_length):  # repeat day schedule to build series
+    #             self.schedule.append(day_schedule)  # add day schedule to full schedule
+    #     # schedule is built, check against minimums and repeat if needed, recursive call to build out further
+    #     if len(self.schedule) < self.season_length:
+    #         self.create_schedule()  # recursive call to add more games to get over minimum
+    #     elif len(self.schedule) > self.season_length:
+    #         self.schedule = self.schedule[0:self.season_length]
+    #     return
+
     def create_schedule(self) -> None:
         """
         set the schedule for the seasons using the teams, series length, min games in season, and limit of games
-        conflicts sometimes occur between the params, so it is possible for a team to play an extra game
-        day schedule in format  ([['MIL', 'COL'], ['PIT', 'CIN'], ['CHC', 'STL']])  # test schedule
+        ([['MIL', 'COL'], ['PIT', 'CIN'], ['CHC', 'STL']])  # test schedule
         if there are an odd number of teams there may be an "OFF" day in the schedule
         :return: None
         """
-        for game_day in range(0, len(self.teams)-1):  # setup each team play all other teams one time
-            random.shuffle(self.teams)  # randomize team match ups. may repeat, deal with it
-            day_schedule = []
-            for ii in range(0, len(self.teams), 2):  # select home and away without repeating a team, inc by 2 away/home
-                day_schedule.append([self.teams[ii], self.teams[ii+1]])  # build schedule for one day
 
-            for series_game in range(0, self.series_length):  # repeat day schedule to build series
-                self.schedule.append(day_schedule)  # add day schedule to full schedule
-        # schedule is built, check against minimums and repeat if needed, recursive call to build out further
-        if len(self.schedule) < self.season_length:
-            self.create_schedule()  # recursive call to add more games to get over minimum
-        elif len(self.schedule) > self.season_length:
-            self.schedule = self.schedule[0:self.season_length]
+        # 1. Setup
+        teams_list = list(self.teams)
+        target_games = self.season_length  # e.g., 162
+
+        # Handle odd number of teams
+        if len(teams_list) % 2 != 0:
+            teams_list.append("OFF")
+
+        num_teams = len(teams_list)
+        num_rounds = num_teams - 1
+
+        # Track games played by a specific "real" team to know when to stop
+        # We'll use the first team in the original list
+        tracking_team = self.teams[0]
+        games_scheduled_for_tracker = 0
+
+        self.schedule = []  # Reset schedule
+        random.shuffle(teams_list)
+
+        # 2. Main Loop: Continue until the tracking team has played the target games
+        while games_scheduled_for_tracker < target_games:
+
+            # Perform one full Round-Robin rotation
+            for _ in range(num_rounds):
+                day_matchups = []
+
+                # Generate pairs for this round
+                round_pairs = []
+                tracker_plays_this_round = True
+
+                for i in range(num_teams // 2):
+                    home = teams_list[i]
+                    away = teams_list[num_teams - 1 - i]
+
+                    # Check if our tracking team is playing someone or has an OFF day
+                    if tracking_team in (home, away):
+                        if "OFF" in (home, away):
+                            tracker_plays_this_round = False
+
+                    if home != "OFF" and away != "OFF":
+                        round_pairs.append([home, away])
+
+                # 3. Add the series to the schedule
+                for _ in range(self.series_length):
+                    # Only add games if we haven't hit the target yet
+                    if games_scheduled_for_tracker < target_games:
+                        self.schedule.append(round_pairs)
+
+                        # Only increment count if the tracker actually played a game
+                        if tracker_plays_this_round:
+                            games_scheduled_for_tracker += 1
+                    else:
+                        break
+
+                # 4. Rotate teams
+                teams_list = [teams_list[0]] + [teams_list[-1]] + teams_list[1:-1]
+
+                if games_scheduled_for_tracker >= target_games:
+                    break
         return
 
     def print_day_schedule(self, day: int) -> str:

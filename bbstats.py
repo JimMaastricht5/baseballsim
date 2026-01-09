@@ -107,7 +107,7 @@ class BaseballStats:
         # 27.5% of pitchers w > 5 in will spend time on IL per season (188 out of 684)
         # 26.3% of pitching injuries affect the throwing elbow results in avg of 74 days lost
         # position player (non-pitcher) longevitiy: https://www.nytimes.com/2007/07/15/sports/baseball/15careers.html
-        self.condition_change_per_day = 20  # improve with rest, mid-point of normal dist for recovery
+        self.condition_change_per_day = 17  # improve with rest, mid-point of normal dist for recovery
         self.fatigue_start_perc = 70  # 85% of way to avg max is where fatigue starts, adjust factor to inc outing lgth
         self.fatigue_rate = .001  # at 85% of avg max pitchers have a .014 increase in OBP.  using .001 as proxy
         self.fatigue_pitching_change_limit = 5  # change pitcher at # or below out of 100

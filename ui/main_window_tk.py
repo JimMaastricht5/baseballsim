@@ -155,7 +155,7 @@ class SeasonMainWindow:
 
         # Day counter label
         self.day_label = tk.Label(
-            status_frame, text="Day: 0 / 162", font=("Arial", 10), anchor=tk.W
+            status_frame, text=f"Day: 0 / {self.season_length}", font=("Arial", 10), anchor=tk.W
         )
         self.day_label.pack(side=tk.LEFT, padx=10)
 
@@ -164,7 +164,7 @@ class SeasonMainWindow:
             status_frame,
             length=200,
             mode='determinate',
-            maximum=162
+            maximum=self.season_length
         )
         self.progress_bar.pack(side=tk.LEFT, padx=10)
 
@@ -194,7 +194,7 @@ class SeasonMainWindow:
             # Reset progress indicators
             self.progress_bar['value'] = 0
             self.progress_label.config(text="0%")
-            self.day_label.config(text="Day: 0 / 162")
+            self.day_label.config(text=f"Day: 0 / {self.season_length}")
 
             # Update season_team_to_follow
             self.season_team_to_follow = selected_team

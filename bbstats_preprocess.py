@@ -243,6 +243,27 @@ class BaseballStatsPreProcess:
         # Sort by Season chronologically
         player_data = player_data.sort_values('Season')
 
+        # Check minimum playing time requirements before applying trend
+        # Batters need at least 130 AB total, pitchers need at least 50 IP total
+        if 'AB' in player_data.columns:
+            total_ab = player_data['AB'].sum()
+            if total_ab < 130:
+                # Insufficient at-bats for reliable trend - use recent year
+                recent_value = player_data.iloc[-1][stat_col]
+                if pd.isna(recent_value):
+                    recent_value = 0.0
+                logger.debug(f"Player has only {total_ab} AB (< 130), using recent year for {stat_col}")
+                return max(0.0, float(recent_value)), "Recent_Year", len(player_data)
+        elif 'IP' in player_data.columns:
+            total_ip = player_data['IP'].sum()
+            if total_ip < 50:
+                # Insufficient innings for reliable trend - use recent year
+                recent_value = player_data.iloc[-1][stat_col]
+                if pd.isna(recent_value):
+                    recent_value = 0.0
+                logger.debug(f"Player has only {total_ip:.1f} IP (< 50), using recent year for {stat_col}")
+                return max(0.0, float(recent_value)), "Recent_Year", len(player_data)
+
         # Check data availability
         num_years = len(player_data)
 

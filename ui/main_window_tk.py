@@ -14,7 +14,7 @@ import queue
 from ui.widgets import (
     ToolbarWidget, StandingsWidget, GamesWidget, ScheduleWidget,
     InjuriesWidget, RosterWidget, AdminWidget, GamesPlayedWidget,
-    GMAssessmentWidget
+    GMAssessmentWidget, LeagueStatsWidget, LeagueLeadersWidget
 )
 from ui.controllers import SimulationController
 from bblogger import logger
@@ -55,6 +55,7 @@ class SeasonMainWindow:
         self.season_print_lineup_b = season_print_lineup_b
         self.season_print_box_score_b = season_print_box_score_b
         self.season_team_to_follow = season_team_to_follow or 'MIL'
+        self.current_day = 0  # Track current simulation day for status messages
 
         self.root.title("Baseball Season Simulator")
         self.root.geometry("1500x900")
@@ -114,9 +115,29 @@ class SeasonMainWindow:
         self.schedule_widget = ScheduleWidget(self.notebook, self.season_team_to_follow)
         self.notebook.add(self.schedule_widget.get_frame(), text="Schedule")
 
-        # Tab 3: League IL
-        self.injuries_widget = InjuriesWidget(self.notebook)
-        self.notebook.add(self.injuries_widget.get_frame(), text="League IL")
+        # Tab 3: League Tab with nested sub-tabs
+        league_tab_frame = tk.Frame(self.notebook)
+        self.notebook.add(league_tab_frame, text="League")
+
+        # Create inner notebook for league sub-tabs
+        league_notebook = ttk.Notebook(league_tab_frame)
+        league_notebook.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
+
+        # League Sub-tab 1: Leaders
+        self.league_leaders_widget = LeagueLeadersWidget(league_notebook)
+        league_notebook.add(self.league_leaders_widget.get_frame(), text="Leaders")
+
+        # League Sub-tab 2: Stats
+        self.league_stats_widget = LeagueStatsWidget(league_notebook)
+        league_notebook.add(self.league_stats_widget.get_frame(), text="Stats")
+
+        # League Sub-tab 3: IL (Injured List)
+        self.injuries_widget = InjuriesWidget(league_notebook)
+        league_notebook.add(self.injuries_widget.get_frame(), text="IL")
+
+        # League Sub-tab 4: Admin (Player Management)
+        self.admin_widget = AdminWidget(league_notebook, self.controller.get_worker)
+        league_notebook.add(self.admin_widget.get_frame(), text="Admin")
 
         # Tab 4: Team Tab with nested sub-tabs
         team_tab_frame = tk.Frame(self.notebook)
@@ -126,21 +147,17 @@ class SeasonMainWindow:
         team_notebook = ttk.Notebook(team_tab_frame)
         team_notebook.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
 
-        # Sub-tab 1: Roster
+        # Team Sub-tab 1: Roster
         self.roster_widget = RosterWidget(team_notebook)
         team_notebook.add(self.roster_widget.get_frame(), text="Roster")
 
-        # Sub-tab 2: Games Played
+        # Team Sub-tab 2: Games Played
         self.games_played_widget = GamesPlayedWidget(team_notebook)
         team_notebook.add(self.games_played_widget.get_frame(), text="Games Played")
 
-        # Sub-tab 3: GM Assessment
+        # Team Sub-tab 3: GM Assessment
         self.gm_assessment_widget = GMAssessmentWidget(team_notebook, self.run_gm_assessments)
         team_notebook.add(self.gm_assessment_widget.get_frame(), text="GM Assessment")
-
-        # Tab 5: Admin (Player Management)
-        self.admin_widget = AdminWidget(self.notebook, self.controller.get_worker)
-        self.notebook.add(self.admin_widget.get_frame(), text="Admin")
 
         paned_window.add(notebook_frame, minsize=600)
 
@@ -192,6 +209,7 @@ class SeasonMainWindow:
         def on_started():
             """Callback after worker starts."""
             # Reset progress indicators
+            self.current_day = 0
             self.progress_bar['value'] = 0
             self.progress_label.config(text="0%")
             self.day_label.config(text=f"Day: 0 / {self.season_length}")
@@ -213,11 +231,13 @@ class SeasonMainWindow:
             self.root.after(1000, self.admin_widget.load_players)
             self.root.after(1000, self._populate_injuries_teams)
             self.root.after(2000, self._update_roster)
+            self.root.after(2000, self._update_league_stats)
+            self.root.after(2000, self._update_league_leaders)
             self.root.after(2000, self.gm_assessment_widget.enable_button)
 
             # Update UI state
             self.toolbar.update_button_states(simulation_running=True, paused=False)
-            self.status_label.config(text="Simulation started...")
+            self.status_label.config(text=self._format_status_with_day("Starting simulation..."))
 
         if self.controller.start_season(selected_team, on_started):
             logger.info(f"Season started for team: {selected_team}")
@@ -226,38 +246,40 @@ class SeasonMainWindow:
         """Pause the simulation."""
         if self.controller.pause_season():
             self.toolbar.update_button_states(simulation_running=True, paused=True)
-            self.status_label.config(text="Simulation paused")
+            self.status_label.config(text=self._format_status_with_day("Simulation paused"))
 
     def resume_season(self):
         """Resume the simulation from paused state."""
         if self.controller.resume_season():
             self.toolbar.update_button_states(simulation_running=True, paused=False)
-            self.status_label.config(text="Simulation resumed")
+            self.status_label.config(text=self._format_status_with_day("Simulation resumed"))
 
     def next_day(self):
         """Advance exactly one day, then pause."""
         if self.controller.next_day():
             # Keep paused state - simulation will auto-pause after stepping
             self.toolbar.update_button_states(simulation_running=True, paused=True)
-            self.status_label.config(text="Advancing one day...")
+            self.status_label.config(text=self._format_status_with_day("Advancing one day..."))
 
     def next_series(self):
         """Advance exactly three days (one series), then pause."""
         if self.controller.next_series():
-            # Keep paused state - simulation will auto-pause after stepping
+            # Simulation will auto-pause after stepping through all 3 days
             self.toolbar.update_button_states(simulation_running=True, paused=True)
-            self.status_label.config(text="Advancing 3 days (series)...")
+            self.status_label.config(text=self._format_status_with_day("Advancing 3 days (series)..."))
 
     def next_week(self):
         """Advance exactly seven days (one week), then pause."""
         if self.controller.next_week():
-            # Keep paused state - simulation will auto-pause after stepping
+            # Simulation will auto-pause after stepping through all 7 days
             self.toolbar.update_button_states(simulation_running=True, paused=True)
-            self.status_label.config(text="Advancing 7 days (week)...")
+            self.status_label.config(text=self._format_status_with_day("Advancing 7 days (week)..."))
 
     def run_gm_assessments(self):
         """Force all teams to run GM assessments immediately."""
-        self.controller.run_gm_assessments(lambda msg: self.status_label.config(text=msg))
+        self.controller.run_gm_assessments(
+            lambda msg: self.status_label.config(text=self._format_status_with_day(msg))
+        )
 
     # =================================================================
     # QUEUE POLLING AND EVENT HANDLING
@@ -353,6 +375,9 @@ class SeasonMainWindow:
         """Handle day_started message."""
         logger.debug(f"Day {day_num + 1} started")
 
+        # Track current day for status messages (1-indexed for display)
+        self.current_day = day_num + 1
+
         # Extract today's schedule from worker
         worker = self.controller.get_worker()
         if worker and worker.season:
@@ -407,6 +432,14 @@ class SeasonMainWindow:
         # Update roster for followed team
         self._update_roster()
 
+        # Update league stats and leaders
+        self._update_league_stats()
+        self._update_league_leaders()
+
+        # Update status message based on actual controller pause state
+        # This is called after the day completes, so the worker has updated its pause flag
+        self._update_status_from_controller()
+
     def _on_gm_assessment(self, assessment_data: dict):
         """Handle gm_assessment_ready message."""
         team = assessment_data.get('team', 'Unknown')
@@ -434,7 +467,7 @@ class SeasonMainWindow:
         """Handle simulation_complete message."""
         logger.info("Season simulation completed")
         self.toolbar.update_button_states(simulation_running=False, paused=False)
-        self.status_label.config(text="Season complete!")
+        self.status_label.config(text=self._format_status_with_day("Season complete!"))
         messagebox.showinfo("Season Complete",
                           "The season simulation has completed successfully.")
 
@@ -443,11 +476,37 @@ class SeasonMainWindow:
         logger.error(f"Simulation error: {error_message}")
         messagebox.showerror("Simulation Error", error_message)
         self.toolbar.update_button_states(simulation_running=False, paused=False)
-        self.status_label.config(text="Error occurred")
+        self.status_label.config(text=self._format_status_with_day("Error occurred"))
 
     # =================================================================
     # HELPER METHODS
     # =================================================================
+
+    def _format_status_with_day(self, message: str) -> str:
+        """
+        Format a status message to include current day information.
+
+        Args:
+            message: Base status message
+
+        Returns:
+            Formatted message with day info (e.g., "Simulating day 11 - Simulation paused")
+        """
+        if self.current_day > 0:
+            return f"Simulating day {self.current_day} - {message}"
+        return message
+
+    def _update_status_from_controller(self):
+        """
+        Update status message based on actual controller pause state.
+
+        This is called after each day starts to reflect whether the simulation
+        is actively running or has paused (e.g., after completing a step operation).
+        """
+        if self.controller.is_paused():
+            self.status_label.config(text=self._format_status_with_day("Simulation paused"))
+        else:
+            self.status_label.config(text=self._format_status_with_day("Simulating..."))
 
     def _update_roster(self):
         """Update roster widget for followed team."""
@@ -456,6 +515,22 @@ class SeasonMainWindow:
             self.roster_widget.update_roster(
                 self.season_team_to_follow,
                 worker.season.baseball_data
+            )
+
+    def _update_league_stats(self):
+        """Update league stats widget with current season data."""
+        worker = self.controller.get_worker()
+        if worker and worker.season:
+            self.league_stats_widget.update_stats(worker.season.baseball_data)
+
+    def _update_league_leaders(self):
+        """Update league leaders widget with current season data."""
+        worker = self.controller.get_worker()
+        if worker and worker.season:
+            # Pass current_day as games_played for PA/IP minimum calculations
+            self.league_leaders_widget.update_leaders(
+                worker.season.baseball_data,
+                games_played=self.current_day
             )
 
     def _populate_injuries_teams(self):

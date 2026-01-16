@@ -11,6 +11,8 @@ from .roster_widget import RosterWidget
 from .admin_widget import AdminWidget
 from .games_played_widget import GamesPlayedWidget
 from .gm_assessment_widget import GMAssessmentWidget
+from .league_stats_widget import LeagueStatsWidget
+from .league_leaders_widget import LeagueLeadersWidget
 
 __all__ = [
     'ToolbarWidget',
@@ -22,4 +24,6 @@ __all__ = [
     'AdminWidget',
     'GamesPlayedWidget',
     'GMAssessmentWidget',
+    'LeagueStatsWidget',
+    'LeagueLeadersWidget',
 ]

@@ -287,11 +287,11 @@ class BaseballStatsPreProcess:
         # Add upper bounds check for unrealistic growth
         recent_value = float(values[-1])  # Most recent year's value
         if recent_value > 0:
-            # Don't allow projections to exceed 110% of recent value
+            # Don't allow projections to exceed 105% of recent value
             # (prevents unrealistic jumps from small trends)
-            max_reasonable = recent_value * 1.10
+            max_reasonable = recent_value * 1.05
             if projected > max_reasonable:
-                logger.debug(f"Projection {projected:.1f} exceeds 110% of recent ({recent_value:.1f}), "
+                logger.debug(f"Projection {projected:.1f} exceeds 105% of recent ({recent_value:.1f}), "
                            f"capping at {max_reasonable:.1f} for {stat_col}")
                 projected = min(projected, max_reasonable)
 

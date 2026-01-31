@@ -441,3 +441,93 @@ class UIBaseballSeason(bbseason.BaseballSeason):
                 schedule_lines.append(f"{match_up[0]} @ {match_up[1]}")
 
         return f"Day {day + 1}: " + ", ".join(schedule_lines)
+
+    def run_world_series(self) -> None:
+        """
+        Override to run World Series with UI signal emission.
+
+        Creates UIBaseballSeason instance for World Series and emits
+        world_series_started and world_series_completed signals.
+        """
+        import os
+        from bblogger import logger
+
+        # Check eligibility
+        if not self.should_run_world_series():
+            return
+
+        # Get league winners (reuse extract_standings logic)
+        standings = self.extract_standings()
+        al_teams = standings['al']['teams']
+        nl_teams = standings['nl']['teams']
+
+        al_winner = al_teams[0] if len(al_teams) > 0 else None
+        nl_winner = nl_teams[0] if len(nl_teams) > 0 else None
+
+        if al_winner is None or nl_winner is None:
+            logger.warning("Cannot determine league winners for World Series")
+            return
+
+        # Verify stats files
+        batter_file_full = f'{self.new_season} Final-Season-stats-pp-Batting.csv'
+        pitcher_file_full = f'{self.new_season} Final-Season-stats-pp-Pitching.csv'
+        if not os.path.exists(batter_file_full) or not os.path.exists(pitcher_file_full):
+            logger.error(f"Stats files not found, cannot run World Series")
+            return
+
+        # Emit world_series_started signal
+        if hasattr(self, 'signals') and self.signals is not None:
+            self.signals.emit_world_series_started({
+                'al_winner': al_winner,
+                'nl_winner': nl_winner,
+                'season': self.new_season,
+                'al_record': self.team_win_loss[al_winner],
+                'nl_record': self.team_win_loss[nl_winner]
+            })
+
+        # Create World Series schedule
+        ws_schedule = self.create_world_series_schedule(al_winner, nl_winner)
+
+        # Create UIBaseballSeason for World Series
+        # Note: load_batter_file and load_pitcher_file should NOT include year prefix
+        # as BaseballSeason will prepend the load_seasons years automatically
+        ws_season = UIBaseballSeason(
+            signals=self.signals if hasattr(self, 'signals') else None,
+            load_seasons=[self.new_season],
+            new_season=self.new_season,
+            team_list=[al_winner, nl_winner],
+            season_length=7,
+            series_length=1,
+            rotation_len=self.rotation_len,
+            include_leagues=None,
+            season_interactive=self.interactive,
+            season_print_lineup_b=self.print_lineup_b,
+            season_print_box_score_b=self.print_box_score_b,
+            season_chatty=self.season_chatty,
+            season_team_to_follow=self.team_to_follow,
+            load_batter_file='Final-Season-stats-pp-Batting.csv',
+            load_pitcher_file='Final-Season-stats-pp-Pitching.csv',
+            schedule=ws_schedule,
+            suppress_console_output=True
+        )
+
+        # Run World Series
+        ws_season.sim_start()
+        while ws_season.season_day_num < len(ws_season.schedule):
+            ws_season.sim_next_day()
+        ws_season.sim_end()
+
+        # Determine and emit champion
+        ws_al_wins = ws_season.team_win_loss[al_winner][0]
+        ws_nl_wins = ws_season.team_win_loss[nl_winner][0]
+        ws_winner = al_winner if ws_al_wins > ws_nl_wins else nl_winner
+
+        if hasattr(self, 'signals') and self.signals is not None:
+            self.signals.emit_world_series_completed({
+                'champion': ws_winner,
+                'season': self.new_season,
+                'series_result': {
+                    al_winner: ws_al_wins,
+                    nl_winner: ws_nl_wins
+                }
+            })

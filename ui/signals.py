@@ -42,6 +42,9 @@ class SeasonSignals:
         # Message format: (injury_list: list)
 
         # Simulation lifecycle queues
+        self.season_complete_queue = queue.Queue()
+        # Message format: (None,) - signals regular season ended, asking about playoffs
+
         self.simulation_complete_queue = queue.Queue()
         # Message format: (None,) - just a signal flag
 
@@ -50,6 +53,13 @@ class SeasonSignals:
 
         self.play_by_play_queue = queue.Queue()
         # Message format: (play_data: dict)
+
+        # World Series queues
+        self.world_series_started_queue = queue.Queue()
+        # Message format: (ws_data: dict) with keys: al_winner, nl_winner, season, al_record, nl_record
+
+        self.world_series_completed_queue = queue.Queue()
+        # Message format: (ws_data: dict) with keys: champion, season, series_result
 
     def emit_day_started(self, day_number: int, schedule_text: str):
         """
@@ -98,6 +108,10 @@ class SeasonSignals:
         """
         self.injury_update_queue.put(('injury_update', injury_list))
 
+    def emit_season_complete(self):
+        """Emit season_complete signal (regular season ended, before playoffs)."""
+        self.season_complete_queue.put(('season_complete',))
+
     def emit_simulation_complete(self):
         """Emit simulation_complete signal."""
         self.simulation_complete_queue.put(('simulation_complete',))
@@ -123,3 +137,29 @@ class SeasonSignals:
                 - day_num (int): Current day number
         """
         self.play_by_play_queue.put(('play_by_play', play_data))
+
+    def emit_world_series_started(self, ws_data: Dict):
+        """
+        Emit world_series_started signal.
+
+        Args:
+            ws_data (dict): World Series start data with keys:
+                - al_winner (str): AL champion abbreviation
+                - nl_winner (str): NL champion abbreviation
+                - season (int): Season year
+                - al_record (list): [wins, losses] for AL champion
+                - nl_record (list): [wins, losses] for NL champion
+        """
+        self.world_series_started_queue.put(('world_series_started', ws_data))
+
+    def emit_world_series_completed(self, ws_data: Dict):
+        """
+        Emit world_series_completed signal.
+
+        Args:
+            ws_data (dict): World Series completion data with keys:
+                - champion (str): Winner abbreviation
+                - season (int): Season year
+                - series_result (dict): {team: wins, ...}
+        """
+        self.world_series_completed_queue.put(('world_series_completed', ws_data))

@@ -67,10 +67,10 @@ class SeasonMainWindow:
             season_print_box_score_b
         )
 
-        # Create widgets
-        self._create_toolbar()
-        self._create_main_content()
-        self._create_status_bar()
+        # Create widgets (order matters for packing!)
+        self._create_toolbar()      # Packs at TOP
+        self._create_status_bar()   # Packs at BOTTOM
+        self._create_main_content() # Fills remaining space (BOTH + expand)
 
         # Initial button states
         self.toolbar.update_button_states(simulation_running=False, paused=False)
@@ -350,6 +350,15 @@ class SeasonMainWindow:
             except Exception as e:
                 logger.error(f"Error handling play_by_play: {e}")
 
+            # Check season complete queue (regular season ended, prompt for playoffs)
+            try:
+                msg = signals.season_complete_queue.get_nowait()
+                self._on_season_complete()
+            except queue.Empty:
+                pass
+            except Exception as e:
+                logger.error(f"Error handling season_complete: {e}")
+
             # Check simulation complete queue
             try:
                 msg = signals.simulation_complete_queue.get_nowait()
@@ -462,6 +471,25 @@ class SeasonMainWindow:
 
         # Update injuries widget
         self.injuries_widget.update_injuries(injury_list)
+
+    def _on_season_complete(self):
+        """Handle season_complete message (regular season ended, prompt for playoffs)."""
+        logger.info("Regular season completed, prompting for playoffs")
+
+        # Ask user if they want to run playoffs
+        response = messagebox.askyesno(
+            "Regular Season Complete",
+            "The 162-game regular season is complete!\n\n"
+            "Would you like to run the World Series playoffs?",
+            icon='question'
+        )
+
+        if response:  # Yes
+            logger.info("User chose to run World Series")
+            self.controller.worker.run_playoffs()
+        else:  # No
+            logger.info("User chose to skip World Series")
+            self.controller.worker.skip_playoffs()
 
     def _on_simulation_complete(self):
         """Handle simulation_complete message."""

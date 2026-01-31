@@ -413,6 +413,112 @@ class BaseballSeason:
 
         return games_back
 
+    def should_run_world_series(self) -> bool:
+        """
+        Check if World Series should run after this season.
+
+        Returns True if:
+        - This is a full season (140+ games indicates regular season, not playoff series)
+        - Both AL and NL teams are present
+        - League column exists in batting data
+
+        Returns:
+            bool: True if World Series should be run
+        """
+        # Check season length (140+ games = full season)
+        if self.season_length < 140:
+            return False
+
+        # Check if batting data exists
+        if not hasattr(self.baseball_data, 'batting_data'):
+            return False
+
+        # Check if League column exists
+        if 'League' not in self.baseball_data.batting_data.columns:
+            return False
+
+        # Verify both AL and NL exist
+        team_leagues = self.baseball_data.batting_data[['Team', 'League']].drop_duplicates()
+        leagues = set(team_leagues['League'].values)
+        return 'AL' in leagues and 'NL' in leagues
+
+    def get_league_winners(self) -> tuple:
+        """
+        Get AL and NL champions from current standings.
+
+        Determines the team with the best record in each league.
+        Tiebreaker: most wins, then fewest losses.
+
+        Returns:
+            tuple: (al_winner, nl_winner) or (None, None) if cannot determine
+        """
+        # Create team->league mapping from batting_data
+        team_league_df = self.baseball_data.batting_data[['Team', 'League']].drop_duplicates()
+        team_league_map = dict(zip(team_league_df['Team'], team_league_df['League']))
+
+        # Separate teams by league
+        al_teams, nl_teams = [], []
+        for team in self.team_win_loss:
+            if team != 'OFF DAY':
+                league = team_league_map.get(team)
+                if league == 'AL':
+                    al_teams.append(team)
+                elif league == 'NL':
+                    nl_teams.append(team)
+
+        # Sort by wins (descending), then losses (ascending) for tiebreaker
+        def sort_by_record(teams):
+            return sorted(teams,
+                         key=lambda t: (self.team_win_loss[t][0], -self.team_win_loss[t][1]),
+                         reverse=True)
+
+        al_teams = sort_by_record(al_teams)
+        nl_teams = sort_by_record(nl_teams)
+
+        # Get top team from each league
+        al_winner = al_teams[0] if len(al_teams) > 0 else None
+        nl_winner = nl_teams[0] if len(nl_teams) > 0 else None
+
+        return (al_winner, nl_winner)
+
+    def create_world_series_schedule(self, al_winner: str, nl_winner: str) -> list:
+        """
+        Create 2-3-2 format World Series schedule.
+
+        Better regular season record hosts games 1, 2, 6, 7.
+        Opponent hosts games 3, 4, 5.
+
+        Args:
+            al_winner: AL champion abbreviation
+            nl_winner: NL champion abbreviation
+
+        Returns:
+            list: Schedule in format List[List[List[str]]]
+                  [[['away', 'home']], ...] for 7 games
+        """
+        # Determine better record
+        al_wins, al_losses = self.team_win_loss[al_winner]
+        nl_wins, nl_losses = self.team_win_loss[nl_winner]
+        al_pct = al_wins / (al_wins + al_losses) if (al_wins + al_losses) > 0 else 0
+        nl_pct = nl_wins / (nl_wins + nl_losses) if (nl_wins + nl_losses) > 0 else 0
+
+        # Better record hosts games 1,2,6,7
+        if al_pct >= nl_pct:
+            home_team, away_team = al_winner, nl_winner
+        else:
+            home_team, away_team = nl_winner, al_winner
+
+        # Build 2-3-2 schedule: [away, home] format
+        return [
+            [[away_team, home_team]],  # Game 1: Home hosts
+            [[away_team, home_team]],  # Game 2: Home hosts
+            [[home_team, away_team]],  # Game 3: Away hosts
+            [[home_team, away_team]],  # Game 4: Away hosts
+            [[home_team, away_team]],  # Game 5: Away hosts
+            [[away_team, home_team]],  # Game 6: Home hosts
+            [[away_team, home_team]]   # Game 7: Home hosts
+        ]
+
     def _get_teams_to_print(self) -> Optional[List[str]]:
         """
         Get list of teams to print AI GM output for.
@@ -673,6 +779,85 @@ class BaseballSeason:
         self.season_day_num = self.season_day_num + 1
         return
 
+    def run_world_series(self) -> None:
+        """
+        Run World Series playoff between league champions.
+
+        Called after regular season ends. Creates a new BaseballSeason instance
+        with 2 teams and 7-game schedule, then runs full simulation.
+        Updates same season stats and declares champion.
+        """
+        import os
+        from bblogger import logger
+
+        # Check eligibility
+        if not self.should_run_world_series():
+            return
+
+        # Get league winners
+        al_winner, nl_winner = self.get_league_winners()
+        if al_winner is None or nl_winner is None:
+            logger.warning("Cannot determine league winners for World Series")
+            return
+
+        # Verify stats files exist
+        batter_file_full = f'{self.new_season} Final-Season-stats-pp-Batting.csv'
+        pitcher_file_full = f'{self.new_season} Final-Season-stats-pp-Pitching.csv'
+        if not os.path.exists(batter_file_full) or not os.path.exists(pitcher_file_full):
+            logger.error(f"Stats files not found, cannot run World Series")
+            return
+
+        # Print header
+        print(f"\n\n{'='*80}")
+        print(f"{self.new_season} WORLD SERIES")
+        print(f"American League Champion: {self.team_city_dict[al_winner]} ({al_winner})")
+        print(f"National League Champion: {self.team_city_dict[nl_winner]} ({nl_winner})")
+        al_record = self.team_win_loss[al_winner]
+        nl_record = self.team_win_loss[nl_winner]
+        print(f"{al_winner}: {al_record[0]}-{al_record[1]} vs {nl_winner}: {nl_record[0]}-{nl_record[1]}")
+        print(f"{'='*80}\n")
+
+        # Create World Series schedule
+        ws_schedule = self.create_world_series_schedule(al_winner, nl_winner)
+
+        # Create new BaseballSeason for World Series
+        # Note: load_batter_file and load_pitcher_file should NOT include year prefix
+        # as BaseballSeason will prepend the load_seasons years automatically
+        ws_season = BaseballSeason(
+            load_seasons=[self.new_season],
+            new_season=self.new_season,
+            team_list=[al_winner, nl_winner],
+            season_length=7,
+            series_length=1,
+            rotation_len=self.rotation_len,
+            include_leagues=None,
+            season_interactive=self.interactive,
+            season_print_lineup_b=self.print_lineup_b,
+            season_print_box_score_b=self.print_box_score_b,
+            season_chatty=self.season_chatty,
+            season_team_to_follow=self.team_to_follow,
+            load_batter_file='Final-Season-stats-pp-Batting.csv',
+            load_pitcher_file='Final-Season-stats-pp-Pitching.csv',
+            schedule=ws_schedule,
+            suppress_console_output=False
+        )
+
+        # Run World Series simulation
+        ws_season.sim_start()
+        while ws_season.season_day_num < len(ws_season.schedule):
+            ws_season.sim_next_day()
+        ws_season.sim_end()
+
+        # Declare champion
+        ws_al_wins = ws_season.team_win_loss[al_winner][0]
+        ws_nl_wins = ws_season.team_win_loss[nl_winner][0]
+        ws_winner = al_winner if ws_al_wins > ws_nl_wins else nl_winner
+
+        print(f"\n\n{'='*80}")
+        print(f"{self.new_season} WORLD SERIES CHAMPION: {self.team_city_dict[ws_winner]} ({ws_winner})")
+        print(f"Series Result: {al_winner} {ws_al_wins}-{ws_nl_wins} {nl_winner}")
+        print(f"{'='*80}\n")
+
     def sim_full_season(self) -> None:
         """
         function drives overall sim for entire season
@@ -687,6 +872,10 @@ class BaseballSeason:
             self.sim_next_day()
 
         self.sim_end()
+
+        # Run World Series if this was a full regular season
+        self.run_world_series()
+
         return
 
 

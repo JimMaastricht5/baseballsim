@@ -82,7 +82,8 @@ class UIBaseballSeason(bbseason.BaseballSeason):
 
         for match_up, score, game_recap, away_box_score, home_box_score in game_results:
             # Check if this was a followed game
-            is_followed = any(team in self.team_to_follow for team in match_up) if self.team_to_follow else False
+            # Empty team_to_follow means follow ALL games (used for World Series)
+            is_followed = (not self.team_to_follow) or any(team in self.team_to_follow for team in match_up)
 
             # Build game data dict
             game_data = {
@@ -331,8 +332,8 @@ class UIBaseballSeason(bbseason.BaseballSeason):
             if len(league_df) == 0:
                 return league_df
 
-            # Sort by wins descending
-            league_df = league_df.sort_values('W', ascending=False).reset_index(drop=True)
+            # Sort by wins descending, then losses ascending (tiebreaker)
+            league_df = league_df.sort_values(['W', 'L'], ascending=[False, True]).reset_index(drop=True)
 
             # Calculate Games Back from league leader
             max_wins = league_df['W'].iloc[0]
@@ -526,7 +527,7 @@ class UIBaseballSeason(bbseason.BaseballSeason):
             season_print_lineup_b=self.print_lineup_b,
             season_print_box_score_b=self.print_box_score_b,
             season_chatty=self.season_chatty,
-            season_team_to_follow=self.team_to_follow,
+            season_team_to_follow=[al_winner, nl_winner],  # Follow both World Series teams
             load_batter_file='stats-pp-Batting.csv',
             load_pitcher_file='stats-pp-Pitching.csv',
             schedule=ws_schedule,

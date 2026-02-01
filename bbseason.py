@@ -418,15 +418,15 @@ class BaseballSeason:
         Check if World Series should run after this season.
 
         Returns True if:
-        - This is a full season (140+ games indicates regular season, not playoff series)
+        - This is a full season (10+ games minimum for testing)
         - Both AL and NL teams are present
         - League column exists in batting data
 
         Returns:
             bool: True if World Series should be run
         """
-        # Check season length (140+ games = full season)
-        if self.season_length < 140:
+        # Check season length (10+ games minimum for testing)
+        if self.season_length < 10:
             return False
 
         # Check if batting data exists

@@ -58,6 +58,7 @@ class SeasonMainWindow:
         self.current_day = 0  # Track current simulation day for status messages
         self.world_series_active = False  # Track if World Series is running
         self.saved_standings = None  # Save regular season standings during playoffs
+        self.world_series_teams = set()  # Track which teams are in World Series
 
         self.root.title("Baseball Season Simulator")
         self.root.geometry("1500x900")
@@ -431,6 +432,10 @@ class SeasonMainWindow:
         # Track current day for status messages (1-indexed for display)
         self.current_day = day_num + 1
 
+        # Skip regular season widget updates during World Series
+        if self.world_series_active:
+            return
+
         # Extract today's schedule from worker
         worker = self.controller.get_worker()
         if worker and worker.season:
@@ -457,12 +462,14 @@ class SeasonMainWindow:
         """Handle game_completed message."""
         logger.debug(f"Game completed: {game_data['away_team']} @ {game_data['home_team']}")
 
-        # Update games widget (progressive update)
-        self.games_widget.on_game_completed(game_data)
+        # If World Series is active, only send to playoff widget
+        if self.world_series_active:
+            if hasattr(self, 'playoff_widget') and self.playoff_widget.ws_active:
+                self.playoff_widget.add_game_result(game_data)
+            return
 
-        # If World Series is active, also send to playoff widget
-        if hasattr(self, 'playoff_widget') and self.playoff_widget.ws_active:
-            self.playoff_widget.add_game_result(game_data)
+        # Update games widget (progressive update) - regular season only
+        self.games_widget.on_game_completed(game_data)
 
         # If there's a game_recap, add to games_played widget
         if game_data.get('game_recap') and game_data.get('day_num') is not None:
@@ -477,15 +484,18 @@ class SeasonMainWindow:
         """Handle day_completed message."""
         logger.debug(f"Day completed with {len(game_results)} non-followed games")
 
+        # Skip regular season widget updates during World Series
+        if self.world_series_active:
+            return
+
         # Update games widget (batch update for non-followed games)
         self.games_widget.on_day_completed(game_results, standings_data)
 
-        # Update standings widget (but not during World Series to preserve regular season standings)
-        if not self.world_series_active:
-            worker = self.controller.get_worker()
-            followed_team = worker.team_to_follow if worker else ''
-            self.standings.set_followed_team(followed_team)
-            self.standings.update_standings(standings_data, followed_team)
+        # Update standings widget
+        worker = self.controller.get_worker()
+        followed_team = worker.team_to_follow if worker else ''
+        self.standings.set_followed_team(followed_team)
+        self.standings.update_standings(standings_data, followed_team)
 
         # Update roster for followed team
         self._update_roster()
@@ -557,17 +567,29 @@ class SeasonMainWindow:
 
     def _on_play_by_play(self, play_data: dict):
         """Handle play_by_play message."""
-        # Forward play-by-play to playoff widget if World Series is active
-        if hasattr(self, 'playoff_widget'):
-            self.playoff_widget.add_play_by_play(play_data)
+        # During World Series, only show play-by-play from World Series teams
+        if self.world_series_active:
+            away_team = play_data.get('away_team', '')
+            home_team = play_data.get('home_team', '')
+
+            # Only forward if both teams are World Series participants
+            if away_team in self.world_series_teams and home_team in self.world_series_teams:
+                if hasattr(self, 'playoff_widget'):
+                    self.playoff_widget.add_play_by_play(play_data)
+        # During regular season, could forward to a different widget if needed
+        # For now, only handle playoff play-by-play
 
     def _on_world_series_started(self, ws_data: dict):
         """Handle world_series_started message."""
         logger.info(f"World Series started: {ws_data.get('al_winner')} vs {ws_data.get('nl_winner')}")
 
-        # Set World Series flag and save current standings
+        # Set World Series flag and track teams
         self.world_series_active = True
-        # Standings are already displayed, no need to save/restore
+        self.world_series_teams = {ws_data.get('al_winner'), ws_data.get('nl_winner')}
+
+        # Clear regular season game displays (they're finished)
+        # The games widget will not be updated during World Series
+        # Standings remain displayed with final regular season results
 
         # Switch to Playoffs tab
         for i in range(self.notebook.index('end')):
@@ -583,8 +605,9 @@ class SeasonMainWindow:
         """Handle world_series_completed message."""
         logger.info(f"World Series completed: {ws_data.get('champion')} wins!")
 
-        # Clear World Series flag (regular season standings remain displayed)
+        # Clear World Series flag and teams
         self.world_series_active = False
+        self.world_series_teams = set()
 
         # Update playoff widget
         if hasattr(self, 'playoff_widget'):

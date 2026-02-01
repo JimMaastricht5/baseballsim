@@ -277,6 +277,13 @@ class UIBaseballSeason(bbseason.BaseballSeason):
         logger.info(f"Ending {self.new_season} season")
         # Update season stats
         self.baseball_data.update_season_stats()
+
+        # Save final season statistics to CSV files (required for World Series)
+        self.baseball_data.save_season_stats()
+
+        # Perform AI GM end-of-season evaluations
+        self._perform_gm_evaluations()
+
         # Suppress the print statements from parent
         pass
 
@@ -468,12 +475,26 @@ class UIBaseballSeason(bbseason.BaseballSeason):
             logger.warning("Cannot determine league winners for World Series")
             return
 
-        # Verify stats files
-        batter_file_full = f'{self.new_season} Final-Season-stats-pp-Batting.csv'
-        pitcher_file_full = f'{self.new_season} Final-Season-stats-pp-Pitching.csv'
-        if not os.path.exists(batter_file_full) or not os.path.exists(pitcher_file_full):
+        # Verify stats files exist and prepare them for World Series
+        import shutil
+        batter_file_final = f'{self.new_season} Final-Season-stats-pp-Batting.csv'
+        pitcher_file_final = f'{self.new_season} Final-Season-stats-pp-Pitching.csv'
+        batter_file_hist = f'{self.new_season} stats-pp-Batting.csv'
+        pitcher_file_hist = f'{self.new_season} stats-pp-Pitching.csv'
+        batter_file_new = f'{self.new_season} New-Season-stats-pp-Batting.csv'
+        pitcher_file_new = f'{self.new_season} New-Season-stats-pp-Pitching.csv'
+
+        if not os.path.exists(batter_file_final) or not os.path.exists(pitcher_file_final):
             logger.error(f"Stats files not found, cannot run World Series")
             return
+
+        # Copy Final-Season files to both historical and New-Season formats for World Series
+        # The loader expects both: '{year} {file}' and '{year} New-Season-{file}'
+        shutil.copy2(batter_file_final, batter_file_hist)
+        shutil.copy2(pitcher_file_final, pitcher_file_hist)
+        shutil.copy2(batter_file_final, batter_file_new)
+        shutil.copy2(pitcher_file_final, pitcher_file_new)
+        logger.info(f"Prepared stats files for World Series")
 
         # Emit world_series_started signal
         if hasattr(self, 'signals') and self.signals is not None:
@@ -491,6 +512,7 @@ class UIBaseballSeason(bbseason.BaseballSeason):
         # Create UIBaseballSeason for World Series
         # Note: load_batter_file and load_pitcher_file should NOT include year prefix
         # as BaseballSeason will prepend the load_seasons years automatically
+        # Using 'stats-pp-' format which we copied from Final-Season files above
         ws_season = UIBaseballSeason(
             signals=self.signals if hasattr(self, 'signals') else None,
             load_seasons=[self.new_season],
@@ -505,22 +527,38 @@ class UIBaseballSeason(bbseason.BaseballSeason):
             season_print_box_score_b=self.print_box_score_b,
             season_chatty=self.season_chatty,
             season_team_to_follow=self.team_to_follow,
-            load_batter_file='Final-Season-stats-pp-Batting.csv',
-            load_pitcher_file='Final-Season-stats-pp-Pitching.csv',
+            load_batter_file='stats-pp-Batting.csv',
+            load_pitcher_file='stats-pp-Pitching.csv',
             schedule=ws_schedule,
             suppress_console_output=True
         )
 
-        # Run World Series
+        # Run World Series (best of 7 - first to 4 wins)
         ws_season.sim_start()
+        ws_winner = None
         while ws_season.season_day_num < len(ws_season.schedule):
             ws_season.sim_next_day()
+
+            # Check if a team has won 4 games (series victory)
+            ws_al_wins = ws_season.team_win_loss[al_winner][0]
+            ws_nl_wins = ws_season.team_win_loss[nl_winner][0]
+
+            if ws_al_wins >= 4:
+                ws_winner = al_winner
+                logger.info(f"{al_winner} wins World Series 4-{ws_nl_wins}")
+                break
+            elif ws_nl_wins >= 4:
+                ws_winner = nl_winner
+                logger.info(f"{nl_winner} wins World Series 4-{ws_al_wins}")
+                break
+
         ws_season.sim_end()
 
-        # Determine and emit champion
-        ws_al_wins = ws_season.team_win_loss[al_winner][0]
-        ws_nl_wins = ws_season.team_win_loss[nl_winner][0]
-        ws_winner = al_winner if ws_al_wins > ws_nl_wins else nl_winner
+        # Determine champion (if not already set by early series end)
+        if ws_winner is None:
+            ws_al_wins = ws_season.team_win_loss[al_winner][0]
+            ws_nl_wins = ws_season.team_win_loss[nl_winner][0]
+            ws_winner = al_winner if ws_al_wins > ws_nl_wins else nl_winner
 
         if hasattr(self, 'signals') and self.signals is not None:
             self.signals.emit_world_series_completed({

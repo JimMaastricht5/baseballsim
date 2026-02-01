@@ -800,12 +800,26 @@ class BaseballSeason:
             logger.warning("Cannot determine league winners for World Series")
             return
 
-        # Verify stats files exist
-        batter_file_full = f'{self.new_season} Final-Season-stats-pp-Batting.csv'
-        pitcher_file_full = f'{self.new_season} Final-Season-stats-pp-Pitching.csv'
-        if not os.path.exists(batter_file_full) or not os.path.exists(pitcher_file_full):
+        # Verify stats files exist and prepare them for World Series
+        import shutil
+        batter_file_final = f'{self.new_season} Final-Season-stats-pp-Batting.csv'
+        pitcher_file_final = f'{self.new_season} Final-Season-stats-pp-Pitching.csv'
+        batter_file_hist = f'{self.new_season} stats-pp-Batting.csv'
+        pitcher_file_hist = f'{self.new_season} stats-pp-Pitching.csv'
+        batter_file_new = f'{self.new_season} New-Season-stats-pp-Batting.csv'
+        pitcher_file_new = f'{self.new_season} New-Season-stats-pp-Pitching.csv'
+
+        if not os.path.exists(batter_file_final) or not os.path.exists(pitcher_file_final):
             logger.error(f"Stats files not found, cannot run World Series")
             return
+
+        # Copy Final-Season files to both historical and New-Season formats for World Series
+        # The loader expects both: '{year} {file}' and '{year} New-Season-{file}'
+        shutil.copy2(batter_file_final, batter_file_hist)
+        shutil.copy2(pitcher_file_final, pitcher_file_hist)
+        shutil.copy2(batter_file_final, batter_file_new)
+        shutil.copy2(pitcher_file_final, pitcher_file_new)
+        logger.info(f"Prepared stats files for World Series")
 
         # Print header
         print(f"\n\n{'='*80}")
@@ -823,6 +837,7 @@ class BaseballSeason:
         # Create new BaseballSeason for World Series
         # Note: load_batter_file and load_pitcher_file should NOT include year prefix
         # as BaseballSeason will prepend the load_seasons years automatically
+        # Using 'stats-pp-' format which we copied from Final-Season files above
         ws_season = BaseballSeason(
             load_seasons=[self.new_season],
             new_season=self.new_season,
@@ -836,8 +851,8 @@ class BaseballSeason:
             season_print_box_score_b=self.print_box_score_b,
             season_chatty=self.season_chatty,
             season_team_to_follow=self.team_to_follow,
-            load_batter_file='Final-Season-stats-pp-Batting.csv',
-            load_pitcher_file='Final-Season-stats-pp-Pitching.csv',
+            load_batter_file='stats-pp-Batting.csv',
+            load_pitcher_file='stats-pp-Pitching.csv',
             schedule=ws_schedule,
             suppress_console_output=False
         )

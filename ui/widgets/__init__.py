@@ -13,6 +13,7 @@ from .games_played_widget import GamesPlayedWidget
 from .gm_assessment_widget import GMAssessmentWidget
 from .league_stats_widget import LeagueStatsWidget
 from .league_leaders_widget import LeagueLeadersWidget
+from .playoff_widget import PlayoffWidget
 
 __all__ = [
     'ToolbarWidget',
@@ -26,4 +27,5 @@ __all__ = [
     'GMAssessmentWidget',
     'LeagueStatsWidget',
     'LeagueLeadersWidget',
+    'PlayoffWidget',
 ]

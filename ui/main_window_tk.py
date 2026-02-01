@@ -14,7 +14,7 @@ import queue
 from ui.widgets import (
     ToolbarWidget, StandingsWidget, GamesWidget, ScheduleWidget,
     InjuriesWidget, RosterWidget, AdminWidget, GamesPlayedWidget,
-    GMAssessmentWidget, LeagueStatsWidget, LeagueLeadersWidget
+    GMAssessmentWidget, LeagueStatsWidget, LeagueLeadersWidget, PlayoffWidget
 )
 from ui.controllers import SimulationController
 from bblogger import logger
@@ -56,9 +56,31 @@ class SeasonMainWindow:
         self.season_print_box_score_b = season_print_box_score_b
         self.season_team_to_follow = season_team_to_follow or 'MIL'
         self.current_day = 0  # Track current simulation day for status messages
+        self.world_series_active = False  # Track if World Series is running
+        self.saved_standings = None  # Save regular season standings during playoffs
 
         self.root.title("Baseball Season Simulator")
         self.root.geometry("1500x900")
+
+        # Configure tab styling (Baseball Theme)
+        style = ttk.Style()
+        style.theme_use('default')  # Use default theme as base
+
+        # Configure the Notebook frame background
+        style.configure('TNotebook', background='#f0f0f0', borderwidth=0)
+        style.configure('TNotebook.Tab',
+            background='#2d5016',      # Baseball field green (inactive tabs)
+            foreground='#ffffff',      # White text on inactive tabs
+            padding=[12, 6],           # Tab padding (horizontal, vertical)
+            font=('TkDefaultFont', 10, 'bold'),
+            borderwidth=1
+        )
+        # Configure selected/active tab appearance
+        style.map('TNotebook.Tab',
+            background=[('selected', '#1e90ff'), ('active', '#1e90ff')],  # Dodger blue (active/hovered tab)
+            foreground=[('selected', '#ffffff'), ('active', '#ffffff')],   # White text on active tab
+            expand=[('selected', [1, 1, 1, 0])]    # Slight expansion effect
+        )
 
         # Create simulation controller
         self.controller = SimulationController(
@@ -115,7 +137,11 @@ class SeasonMainWindow:
         self.schedule_widget = ScheduleWidget(self.notebook, self.season_team_to_follow)
         self.notebook.add(self.schedule_widget.get_frame(), text="Schedule")
 
-        # Tab 3: League Tab with nested sub-tabs
+        # Tab 3: Playoffs
+        self.playoff_widget = PlayoffWidget(self.notebook)
+        self.notebook.add(self.playoff_widget.get_frame(), text="Playoffs")
+
+        # Tab 4: League Tab with nested sub-tabs
         league_tab_frame = tk.Frame(self.notebook)
         self.notebook.add(league_tab_frame, text="League")
 
@@ -139,7 +165,7 @@ class SeasonMainWindow:
         self.admin_widget = AdminWidget(league_notebook, self.controller.get_worker)
         league_notebook.add(self.admin_widget.get_frame(), text="Admin")
 
-        # Tab 4: Team Tab with nested sub-tabs
+        # Tab 5: Team Tab with nested sub-tabs
         team_tab_frame = tk.Frame(self.notebook)
         self.notebook.add(team_tab_frame, text=self.season_team_to_follow)
 
@@ -344,11 +370,29 @@ class SeasonMainWindow:
             # Check play-by-play queue
             try:
                 msg = signals.play_by_play_queue.get_nowait()
-                # Not used in current implementation (game_recap in game_completed)
+                self._on_play_by_play(msg[1])
             except queue.Empty:
                 pass
             except Exception as e:
                 logger.error(f"Error handling play_by_play: {e}")
+
+            # Check world_series_started queue
+            try:
+                msg = signals.world_series_started_queue.get_nowait()
+                self._on_world_series_started(msg[1])
+            except queue.Empty:
+                pass
+            except Exception as e:
+                logger.error(f"Error handling world_series_started: {e}")
+
+            # Check world_series_completed queue
+            try:
+                msg = signals.world_series_completed_queue.get_nowait()
+                self._on_world_series_completed(msg[1])
+            except queue.Empty:
+                pass
+            except Exception as e:
+                logger.error(f"Error handling world_series_completed: {e}")
 
             # Check season complete queue (regular season ended, prompt for playoffs)
             try:
@@ -416,6 +460,10 @@ class SeasonMainWindow:
         # Update games widget (progressive update)
         self.games_widget.on_game_completed(game_data)
 
+        # If World Series is active, also send to playoff widget
+        if hasattr(self, 'playoff_widget') and self.playoff_widget.ws_active:
+            self.playoff_widget.add_game_result(game_data)
+
         # If there's a game_recap, add to games_played widget
         if game_data.get('game_recap') and game_data.get('day_num') is not None:
             self.games_played_widget.add_game_recap(
@@ -432,11 +480,12 @@ class SeasonMainWindow:
         # Update games widget (batch update for non-followed games)
         self.games_widget.on_day_completed(game_results, standings_data)
 
-        # Update standings widget
-        worker = self.controller.get_worker()
-        followed_team = worker.team_to_follow if worker else ''
-        self.standings.set_followed_team(followed_team)
-        self.standings.update_standings(standings_data, followed_team)
+        # Update standings widget (but not during World Series to preserve regular season standings)
+        if not self.world_series_active:
+            worker = self.controller.get_worker()
+            followed_team = worker.team_to_follow if worker else ''
+            self.standings.set_followed_team(followed_team)
+            self.standings.update_standings(standings_data, followed_team)
 
         # Update roster for followed team
         self._update_roster()
@@ -505,6 +554,47 @@ class SeasonMainWindow:
         messagebox.showerror("Simulation Error", error_message)
         self.toolbar.update_button_states(simulation_running=False, paused=False)
         self.status_label.config(text=self._format_status_with_day("Error occurred"))
+
+    def _on_play_by_play(self, play_data: dict):
+        """Handle play_by_play message."""
+        # Forward play-by-play to playoff widget if World Series is active
+        if hasattr(self, 'playoff_widget'):
+            self.playoff_widget.add_play_by_play(play_data)
+
+    def _on_world_series_started(self, ws_data: dict):
+        """Handle world_series_started message."""
+        logger.info(f"World Series started: {ws_data.get('al_winner')} vs {ws_data.get('nl_winner')}")
+
+        # Set World Series flag and save current standings
+        self.world_series_active = True
+        # Standings are already displayed, no need to save/restore
+
+        # Switch to Playoffs tab
+        for i in range(self.notebook.index('end')):
+            if self.notebook.tab(i, 'text') == 'Playoffs':
+                self.notebook.select(i)
+                break
+
+        # Update playoff widget
+        if hasattr(self, 'playoff_widget'):
+            self.playoff_widget.world_series_started(ws_data)
+
+    def _on_world_series_completed(self, ws_data: dict):
+        """Handle world_series_completed message."""
+        logger.info(f"World Series completed: {ws_data.get('champion')} wins!")
+
+        # Clear World Series flag (regular season standings remain displayed)
+        self.world_series_active = False
+
+        # Update playoff widget
+        if hasattr(self, 'playoff_widget'):
+            self.playoff_widget.world_series_completed(ws_data)
+
+        # Show championship message
+        messagebox.showinfo(
+            "World Series Complete",
+            f"🏆 {ws_data.get('champion')} wins the World Series! 🏆"
+        )
 
     # =================================================================
     # HELPER METHODS

@@ -410,6 +410,12 @@ class Team:
         in_game_fatigue = 0
         cur_game_faced = self.box_score.batters_faced(cur_pitching_index)
         avg_faced = self.gameplay_pitching_df.AVG_faced  # avg adjusted for starting condition
+
+        # Guard against division by zero (can happen when Condition=0 or no games played)
+        if avg_faced == 0 or pd.isna(avg_faced):
+            logger.warning(f'AVG_faced is {avg_faced} for pitcher {cur_pitching_index}, using default value of 20')
+            avg_faced = 20.0  # Default: average batters faced per game
+
         cur_ratio = cur_game_faced / avg_faced * 100
         logger.debug('Updating pitcher fatigue. New condition: {}', 100 - (cur_ratio * 100))
         if cur_ratio >= self.fatigue_start_perc:

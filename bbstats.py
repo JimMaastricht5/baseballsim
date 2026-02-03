@@ -293,6 +293,12 @@ class BaseballStats:
         self._ensure_column_exists([self.pitching_data, self.new_season_pitching_data], 'Sim_WAR', 0.0)
         self._ensure_column_exists([self.batting_data, self.new_season_batting_data], 'Sim_WAR', 0.0)
 
+        # Explicitly ensure 'Injury Description' has dtype 'object' (string type) not float
+        self.pitching_data['Injury Description'] = self.pitching_data['Injury Description'].astype('object')
+        self.new_season_pitching_data['Injury Description'] = self.new_season_pitching_data['Injury Description'].astype('object')
+        self.batting_data['Injury Description'] = self.batting_data['Injury Description'].astype('object')
+        self.new_season_batting_data['Injury Description'] = self.new_season_batting_data['Injury Description'].astype('object')
+
         return
 
     def _ensure_column_exists(self, df_list: List[DataFrame], column_name: str, default_value) -> None:
@@ -322,12 +328,15 @@ class BaseballStats:
                 # 1. Get the current dtype of the target
                 target_dtype = target_df[field].dtype
 
-                # 2. If target is an integer but source has NaNs,
+                # 2. If target is object type (strings), just assign directly without casting
+                if target_dtype == 'object':
+                    target_df[field] = source_df[field]
+                # 3. If target is an integer but source has NaNs,
                 #    force the cast to 'Int64' (Nullable Integer)
-                if "int" in str(target_dtype).lower() and source_df[field].isnull().any():
+                elif "int" in str(target_dtype).lower() and source_df[field].isnull().any():
                     target_df[field] = source_df[field].astype("Int64")
                 else:
-                    # 3. Otherwise, proceed with the existing target dtype
+                    # 4. Otherwise, proceed with the existing target dtype
                     target_df[field] = source_df[field].astype(target_dtype)
 
 

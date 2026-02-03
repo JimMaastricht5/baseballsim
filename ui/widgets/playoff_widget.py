@@ -37,6 +37,7 @@ class PlayoffWidget:
         self.game_number = 0
         self.current_game_pbp = 1  # Currently selected game for play-by-play
         self.game_pbp_data = {}  # Store play-by-play for each game: {game_num: [text_lines]}
+        self.completed_games = set()  # Track which games have ended (no more play-by-play)
 
         # Create header section
         self.header_frame = tk.Frame(self.frame, bg="#1a3d6b", height=60)
@@ -188,36 +189,40 @@ class PlayoffWidget:
         """
         Add play-by-play text to the display.
 
+        For World Series games, we now display everything at once when the game completes,
+        so this method just tracks which game is active.
+
         Args:
-            play_data: Dict with 'text', 'away_team', 'home_team', etc.
+            play_data: Dict with 'text', 'away_team', 'home_team', 'ws_game_num', etc.
         """
+        from bblogger import logger
+        logger.debug(f"Playoff widget add_play_by_play called: ws_active={self.ws_active}")
+
         if not self.ws_active:
+            logger.debug("World Series not active, returning")
             return
 
-        text = play_data.get('text', '')
-        if not text:
+        # Get the game number from play_data
+        ws_game_num = play_data.get('ws_game_num')
+        if ws_game_num is None:
             return
 
-        # Determine tag based on content
-        if 'Inning' in text or 'Top' in text or 'Bottom' in text:
-            tag = "inning"
-        elif 'Score:' in text or 'Final:' in text:
-            tag = "score"
-        else:
-            tag = "normal"
-
-        # Store play-by-play for current game (game_number is 0-indexed during play, will increment when game completes)
-        current_game = self.game_number + 1  # Convert to 1-indexed
-        if current_game not in self.game_pbp_data:
-            self.game_pbp_data[current_game] = []
-        self.game_pbp_data[current_game].append((text, tag))
-
-        # Only display if this is the currently selected game
-        if current_game == self.current_game_pbp:
+        # Auto-select new games when they start
+        if ws_game_num not in self.game_pbp_data:
+            self.game_pbp_data[ws_game_num] = []
+            # New game detected - update dropdown and auto-select it
+            game_list = [f"Game {i}" for i in range(1, ws_game_num + 1)]
+            self.game_selector['values'] = game_list
+            self.game_selector.current(ws_game_num - 1)  # Select the new game (0-indexed)
+            self.current_game_pbp = ws_game_num
+            # Clear the play-by-play display for the new game
             self.pbp_text.configure(state=tk.NORMAL)
-            self.pbp_text.insert(tk.END, text + "\n", tag)
-            self.pbp_text.see(tk.END)  # Auto-scroll to bottom
+            self.pbp_text.delete(1.0, tk.END)
+            self.pbp_text.insert(tk.END, "Game in progress...\n", "normal")
             self.pbp_text.configure(state=tk.DISABLED)
+            logger.info(f"Auto-selected Game {ws_game_num} in dropdown")
+
+        # Don't display play-by-play incrementally - we'll show everything at once when game completes
 
     def add_game_result(self, game_data: Dict[str, Any]):
         """
@@ -238,6 +243,7 @@ class PlayoffWidget:
         home_h = game_data.get('home_h', 0)
         away_e = game_data.get('away_e', 0)
         home_e = game_data.get('home_e', 0)
+        game_recap = game_data.get('game_recap', '')
 
         # Update series score
         if away_r > home_r:
@@ -249,7 +255,11 @@ class PlayoffWidget:
         game_list = [f"Game {i+1}" for i in range(self.game_number)]
         self.game_selector['values'] = game_list
 
-        # Add to box scores
+        # Add final box score to play-by-play for this game
+        self._add_final_box_score_to_pbp(self.game_number, away, home, away_r, home_r,
+                                          away_h, home_h, away_e, home_e, game_recap)
+
+        # Add to box scores panel
         self.box_text.configure(state=tk.NORMAL)
         self.box_text.insert(tk.END, f"\nGame {self.game_number}\n", "game_header")
         self.box_text.insert(tk.END, f"{'Team':<6} {'R':>3} {'H':>3} {'E':>3}\n", "normal")
@@ -266,6 +276,98 @@ class PlayoffWidget:
         self.box_text.insert(tk.END, "-" * 30 + "\n", "normal")
         self.box_text.configure(state=tk.DISABLED)
 
+    def _add_final_box_score_to_pbp(self, game_num: int, away: str, home: str,
+                                      away_r: int, home_r: int, away_h: int, home_h: int,
+                                      away_e: int, home_e: int, game_recap: str):
+        """
+        Display complete game recap (lineups + play-by-play + box scores) all at once.
+
+        Args:
+            game_num: Game number (1-7)
+            away/home: Team abbreviations
+            away_r/home_r: Runs scored
+            away_h/home_h: Hits
+            away_e/home_e: Errors
+            game_recap: Full game text (contains everything)
+        """
+        from bblogger import logger
+
+        # Mark this game as completed
+        self.completed_games.add(game_num)
+
+        # Ensure game_pbp_data entry exists for this game
+        if game_num not in self.game_pbp_data:
+            self.game_pbp_data[game_num] = []
+
+        # Parse game_recap into sections: lineups, play-by-play, box scores
+        sections = self._parse_game_recap(game_recap)
+
+        # Clear any existing data for this game
+        self.game_pbp_data[game_num] = []
+
+        # Add all sections to game_pbp_data
+        for text, tag in sections:
+            self.game_pbp_data[game_num].append((text, tag))
+
+        logger.info(f"Game {game_num} complete: added {len(sections)} sections to display")
+
+        # If this is the currently displayed game, update the display
+        if game_num == self.current_game_pbp:
+            self._display_game_pbp(game_num)
+
+    def _parse_game_recap(self, game_recap: str) -> list:
+        """
+        Parse game recap into sections for display.
+
+        Args:
+            game_recap: Full game text with lineups, play-by-play, and box scores
+
+        Returns:
+            List of (text, tag) tuples for display
+        """
+        if not game_recap:
+            return [("No game data available.\n", "normal")]
+
+        sections = []
+        lines = game_recap.split('\n')
+
+        # Find key section boundaries
+        lineup_start = -1
+        lineup_end = -1
+        box_score_start = -1
+
+        for i, line in enumerate(lines):
+            if lineup_start == -1 and ('Starting lineup' in line or 'Lineup Card' in line):
+                lineup_start = i
+            elif lineup_start != -1 and lineup_end == -1 and ('Inning 1' in line or 'Top of the 1st' in line):
+                lineup_end = i
+            elif 'Player' in line and 'Team' in line and ('Pos' in line or 'Age' in line):
+                box_score_start = i
+                break
+
+        # Extract lineups
+        if lineup_start != -1 and lineup_end != -1:
+            lineup_text = '\n'.join(lines[lineup_start:lineup_end])
+            if lineup_text.strip():
+                sections.append(("=" * 80 + "\n" + lineup_text + "\n" + "=" * 80 + "\n\n", "normal"))
+
+        # Extract play-by-play (everything between lineups and box scores)
+        pbp_start = lineup_end if lineup_end != -1 else 0
+        pbp_end = box_score_start if box_score_start != -1 else len(lines)
+
+        if pbp_start < pbp_end:
+            pbp_text = '\n'.join(lines[pbp_start:pbp_end])
+            if pbp_text.strip():
+                sections.append((pbp_text + "\n", "normal"))
+
+        # Extract box scores
+        if box_score_start != -1:
+            box_text = '\n'.join(lines[box_score_start:])
+            if box_text.strip():
+                sections.append(("\n" + "=" * 80 + "\n" + "FINAL BOX SCORE\n" + "=" * 80 + "\n" + box_text + "\n" + "=" * 80 + "\n", "normal"))
+
+        return sections if sections else [("No game data available.\n", "normal")]
+
     def world_series_completed(self, ws_data: Dict[str, Any]):
         """
         Handle World Series completion signal.
@@ -275,12 +377,7 @@ class PlayoffWidget:
         """
         champion = ws_data.get('champion', '')
 
-        # Add championship message to play-by-play
-        self.pbp_text.configure(state=tk.NORMAL)
-        self.pbp_text.insert(tk.END, "\n" + "=" * 40 + "\n", "header")
-        self.pbp_text.insert(tk.END, f"{champion} WINS THE WORLD SERIES!\n", "header")
-        self.pbp_text.insert(tk.END, "=" * 40 + "\n", "header")
-        self.pbp_text.configure(state=tk.DISABLED)
+        # Championship message removed from play-by-play per user request
 
         # Add to box scores
         self.box_text.configure(state=tk.NORMAL)

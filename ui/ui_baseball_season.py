@@ -12,8 +12,10 @@ import pandas as pd
 from typing import List, Optional
 import queue
 import threading
+import time
 
 import bbseason
+from bbseason import WIN, LOSS  # Import constants for playoff logic
 import bbgame
 from ui.signals import SeasonSignals
 from bblogger import logger
@@ -41,6 +43,12 @@ class UIBaseballSeason(bbseason.BaseballSeason):
         """
         super().__init__(*args, **kwargs)
         self.signals = signals
+        # Track World Series state for play-by-play game numbering
+        self.ws_active = False
+        self.ws_al_winner = None
+        self.ws_nl_winner = None
+        self.ws_al_start_wins = 0
+        self.ws_nl_start_wins = 0
         logger.info("UIBaseballSeason initialized with signal emitter")
 
     def _create_play_by_play_callback(self, away_team: str, home_team: str, day_num: int):
@@ -56,14 +64,29 @@ class UIBaseballSeason(bbseason.BaseballSeason):
             callable: Callback function that accepts text string
         """
         def callback(text: str):
+            logger.info(f"Callback invoked for {away_team} @ {home_team}, team_to_follow={self.team_to_follow}")
             # Only emit if this involves a followed team
             if not self.team_to_follow or any(team in self.team_to_follow for team in [away_team, home_team]):
+                logger.info(f"Emitting play-by-play for {away_team} @ {home_team}")
+
+                # Calculate World Series game number if WS is active
+                ws_game_num = None
+                if self.ws_active and self.ws_al_winner and self.ws_nl_winner:
+                    # Total games completed = total new wins by both teams
+                    al_wins = self.team_win_loss[self.ws_al_winner][WIN] - self.ws_al_start_wins
+                    nl_wins = self.team_win_loss[self.ws_nl_winner][WIN] - self.ws_nl_start_wins
+                    ws_game_num = al_wins + nl_wins + 1  # +1 for current game in progress
+                    logger.info(f"World Series game {ws_game_num}: {self.ws_al_winner} {al_wins}, {self.ws_nl_winner} {nl_wins}")
+
                 self.signals.emit_play_by_play({
                     'away_team': away_team,
                     'home_team': home_team,
                     'text': text,
-                    'day_num': day_num
+                    'day_num': day_num,
+                    'ws_game_num': ws_game_num  # None for regular season, 1-7 for World Series
                 })
+            else:
+                logger.info(f"Skipping play-by-play - teams not in follow list")
         return callback
 
     def _process_and_print_game_results(self, game_results: List[tuple], season_day_num: int = 0) -> None:
@@ -209,6 +232,8 @@ class UIBaseballSeason(bbseason.BaseballSeason):
                     match_up[0], match_up[1], season_day_num
                 )
 
+                logger.info(f"Creating game {match_up[0]} @ {match_up[1]} with chatty={self.season_chatty}, team_to_follow={self.team_to_follow}")
+
                 game = bbgame.Game(
                     away_team_name=match_up[0],
                     home_team_name=match_up[1],
@@ -240,6 +265,10 @@ class UIBaseballSeason(bbseason.BaseballSeason):
             self.baseball_data.game_results_to_season(box_score_class=away_box_score)
             self.baseball_data.game_results_to_season(box_score_class=home_box_score)
             game_results.append((match_up, score, game_recap, away_box_score, home_box_score))
+
+        # During World Series, wait for play-by-play to finish before showing box scores
+        if self.ws_active and hasattr(self, 'signals') and self.signals is not None:
+            self._wait_for_play_by_play_to_finish()
 
         # Process and emit signals (existing code)
         self._process_and_print_game_results(game_results, season_day_num)
@@ -454,51 +483,42 @@ class UIBaseballSeason(bbseason.BaseballSeason):
         """
         Override to run World Series with UI signal emission.
 
-        Creates UIBaseballSeason instance for World Series and emits
-        world_series_started and world_series_completed signals.
+        Follows base bbseason.py implementation but adds UI signal emissions.
+        Appends playoff games to existing schedule and continues with same season instance.
+        Enables chatty mode and adds both teams to follow for play-by-play output.
         """
-        import os
         from bblogger import logger
 
         # Check eligibility
         if not self.should_run_world_series():
             return
 
-        # Get league winners (reuse extract_standings logic)
-        standings = self.extract_standings()
-        al_teams = standings['al']['teams']
-        nl_teams = standings['nl']['teams']
-
-        al_winner = al_teams[0] if len(al_teams) > 0 else None
-        nl_winner = nl_teams[0] if len(nl_teams) > 0 else None
-
+        # Get league winners (use base class method for consistency)
+        al_winner, nl_winner = self.get_league_winners()
         if al_winner is None or nl_winner is None:
             logger.warning("Cannot determine league winners for World Series")
             return
 
-        # Verify stats files exist and prepare them for World Series
-        import shutil
-        batter_file_final = f'{self.new_season} Final-Season-stats-pp-Batting.csv'
-        pitcher_file_final = f'{self.new_season} Final-Season-stats-pp-Pitching.csv'
-        batter_file_hist = f'{self.new_season} stats-pp-Batting.csv'
-        pitcher_file_hist = f'{self.new_season} stats-pp-Pitching.csv'
-        batter_file_new = f'{self.new_season} New-Season-stats-pp-Batting.csv'
-        pitcher_file_new = f'{self.new_season} New-Season-stats-pp-Pitching.csv'
-
-        if not os.path.exists(batter_file_final) or not os.path.exists(pitcher_file_final):
-            logger.error(f"Stats files not found, cannot run World Series")
-            return
-
-        # Copy Final-Season files to both historical and New-Season formats for World Series
-        # The loader expects both: '{year} {file}' and '{year} New-Season-{file}'
-        shutil.copy2(batter_file_final, batter_file_hist)
-        shutil.copy2(pitcher_file_final, pitcher_file_hist)
-        shutil.copy2(batter_file_final, batter_file_new)
-        shutil.copy2(pitcher_file_final, pitcher_file_new)
-        logger.info(f"Prepared stats files for World Series")
+        # Print header (matches base bbseason.py:778-785)
+        print(f"\n\n{'='*80}")
+        print(f"{self.new_season} WORLD SERIES")
+        print(f"American League Champion: {self.team_city_dict[al_winner]} ({al_winner})")
+        print(f"National League Champion: {self.team_city_dict[nl_winner]} ({nl_winner})")
+        al_record = self.team_win_loss[al_winner]
+        nl_record = self.team_win_loss[nl_winner]
+        print(f"{al_winner}: {al_record[WIN]}-{al_record[LOSS]} vs {nl_winner}: {nl_record[WIN]}-{nl_record[LOSS]}")
+        print(f"{'='*80}\n")
 
         # Emit world_series_started signal
+        # IMPORTANT: Also set world_series_active flag IMMEDIATELY to avoid timing issues
+        # with queued signals being processed after games complete
         if hasattr(self, 'signals') and self.signals is not None:
+            # Set world_series_active synchronously BEFORE emitting signal
+            if self.signals.main_window is not None:
+                self.signals.main_window.world_series_active = True
+                self.signals.main_window.world_series_teams = {al_winner, nl_winner}
+                logger.info(f"Set world_series_active=True synchronously for {al_winner} vs {nl_winner}")
+
             self.signals.emit_world_series_started({
                 'al_winner': al_winner,
                 'nl_winner': nl_winner,
@@ -507,60 +527,50 @@ class UIBaseballSeason(bbseason.BaseballSeason):
                 'nl_record': self.team_win_loss[nl_winner]
             })
 
-        # Create World Series schedule
+        # Create World Series schedule and append to existing schedule (matches base bbseason.py:788-790)
         ws_schedule = self.create_world_series_schedule(al_winner, nl_winner)
+        for ws_game in ws_schedule:
+            self.schedule.append(ws_game)
 
-        # Create UIBaseballSeason for World Series
-        # Note: load_batter_file and load_pitcher_file should NOT include year prefix
-        # as BaseballSeason will prepend the load_seasons years automatically
-        # Using 'stats-pp-' format which we copied from Final-Season files above
-        ws_season = UIBaseballSeason(
-            signals=self.signals if hasattr(self, 'signals') else None,
-            load_seasons=[self.new_season],
-            new_season=self.new_season,
-            team_list=[al_winner, nl_winner],
-            season_length=7,
-            series_length=1,
-            rotation_len=self.rotation_len,
-            include_leagues=None,
-            season_interactive=self.interactive,
-            season_print_lineup_b=self.print_lineup_b,
-            season_print_box_score_b=self.print_box_score_b,
-            season_chatty=self.season_chatty,
-            season_team_to_follow=[al_winner, nl_winner],  # Follow both World Series teams
-            load_batter_file='stats-pp-Batting.csv',
-            load_pitcher_file='stats-pp-Pitching.csv',
-            schedule=ws_schedule,
-            suppress_console_output=True
-        )
+        # Add both teams to follow and enable detailed output (matches base bbseason.py:793-796)
+        self.team_to_follow.append(al_winner)
+        self.team_to_follow.append(nl_winner)
+        self.print_box_score_b = True
+        self.print_lineup_b = True  # Enable lineup printing for World Series
+        self.season_chatty = True
 
-        # Run World Series (best of 7 - first to 4 wins)
-        ws_season.sim_start()
-        ws_winner = None
-        while ws_season.season_day_num < len(ws_season.schedule):
-            ws_season.sim_next_day()
+        # Track World Series state for game numbering in play-by-play
+        self.ws_active = True
+        self.ws_al_winner = al_winner
+        self.ws_nl_winner = nl_winner
+        self.ws_al_start_wins = al_record[WIN]
+        self.ws_nl_start_wins = nl_record[WIN]
+        logger.info(f"World Series settings: season_chatty={self.season_chatty}, team_to_follow={self.team_to_follow}")
+        logger.info(f"World Series tracking: AL {al_winner} starts at {al_record[WIN]} wins, NL {nl_winner} starts at {nl_record[WIN]} wins")
 
-            # Check if a team has won 4 games (series victory)
-            ws_al_wins = ws_season.team_win_loss[al_winner][0]
-            ws_nl_wins = ws_season.team_win_loss[nl_winner][0]
+        # Run World Series simulation (matches base bbseason.py:797-800)
+        while (self.season_day_num < len(self.schedule) and
+               self.team_win_loss[al_winner][WIN] - al_record[WIN] < 4 and
+               self.team_win_loss[nl_winner][WIN] - nl_record[WIN] < 4):
+            logger.info(f"Simulating World Series day {self.season_day_num + 1}")
+            self.sim_next_day()
+            # Note: play-by-play queue draining now happens inside sim_day_threaded()
 
-            if ws_al_wins >= 4:
-                ws_winner = al_winner
-                logger.info(f"{al_winner} wins World Series 4-{ws_nl_wins}")
-                break
-            elif ws_nl_wins >= 4:
-                ws_winner = nl_winner
-                logger.info(f"{nl_winner} wins World Series 4-{ws_al_wins}")
-                break
+        print('\nCalculating final season statistics...')
+        self.baseball_data.update_season_stats()
+        print(f'\n\n****** End of {self.new_season} playoffs ******')
 
-        ws_season.sim_end()
+        # Declare champion (matches base bbseason.py:807-814)
+        ws_al_wins = self.team_win_loss[al_winner][WIN] - al_record[WIN]
+        ws_nl_wins = self.team_win_loss[nl_winner][WIN] - nl_record[WIN]
+        ws_winner = al_winner if ws_al_wins > ws_nl_wins else nl_winner
 
-        # Determine champion (if not already set by early series end)
-        if ws_winner is None:
-            ws_al_wins = ws_season.team_win_loss[al_winner][0]
-            ws_nl_wins = ws_season.team_win_loss[nl_winner][0]
-            ws_winner = al_winner if ws_al_wins > ws_nl_wins else nl_winner
+        print(f"\n\n{'='*80}")
+        print(f"{self.new_season} WORLD SERIES CHAMPION: {self.team_city_dict[ws_winner]} ({ws_winner})")
+        print(f"Series Result: {al_winner} {ws_al_wins}-{ws_nl_wins} {nl_winner}")
+        print(f"{'='*80}\n")
 
+        # Emit world_series_completed signal (UI-specific addition)
         if hasattr(self, 'signals') and self.signals is not None:
             self.signals.emit_world_series_completed({
                 'champion': ws_winner,
@@ -570,3 +580,31 @@ class UIBaseballSeason(bbseason.BaseballSeason):
                     nl_winner: ws_nl_wins
                 }
             })
+
+        # Save season stats (matches base bbseason.py:816)
+        self.baseball_data.save_season_stats()
+        return
+
+    def _wait_for_play_by_play_to_finish(self, timeout: float = 10.0) -> None:
+        """
+        Wait for the play-by-play queue to drain before continuing.
+
+        This ensures the UI has time to process and display all play-by-play
+        events from the current game before the next game starts.
+
+        Args:
+            timeout: Maximum time to wait in seconds (default: 10.0)
+        """
+        start_time = time.time()
+        queue_obj = self.signals.play_by_play_queue
+
+        while time.time() - start_time < timeout:
+            queue_size = queue_obj.qsize()
+            if queue_size == 0:
+                logger.info("Play-by-play queue is empty, continuing to next game")
+                return
+            logger.debug(f"Waiting for play-by-play queue to drain ({queue_size} items remaining)")
+            time.sleep(0.1)  # Sleep 100ms between checks
+
+        logger.warning(f"Timeout waiting for play-by-play queue to drain (still {queue_obj.qsize()} items)")
+        return

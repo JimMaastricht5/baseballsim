@@ -138,11 +138,7 @@ class SeasonMainWindow:
         self.schedule_widget = ScheduleWidget(self.notebook, self.season_team_to_follow)
         self.notebook.add(self.schedule_widget.get_frame(), text="Schedule")
 
-        # Tab 3: Playoffs
-        self.playoff_widget = PlayoffWidget(self.notebook)
-        self.notebook.add(self.playoff_widget.get_frame(), text="Playoffs")
-
-        # Tab 4: League Tab with nested sub-tabs
+        # Tab 3: League Tab with nested sub-tabs
         league_tab_frame = tk.Frame(self.notebook)
         self.notebook.add(league_tab_frame, text="League")
 
@@ -166,7 +162,7 @@ class SeasonMainWindow:
         self.admin_widget = AdminWidget(league_notebook, self.controller.get_worker)
         league_notebook.add(self.admin_widget.get_frame(), text="Admin")
 
-        # Tab 5: Team Tab with nested sub-tabs
+        # Tab 4: Team Tab with nested sub-tabs
         team_tab_frame = tk.Frame(self.notebook)
         self.notebook.add(team_tab_frame, text=self.season_team_to_follow)
 
@@ -185,6 +181,10 @@ class SeasonMainWindow:
         # Team Sub-tab 3: GM Assessment
         self.gm_assessment_widget = GMAssessmentWidget(team_notebook, self.run_gm_assessments)
         team_notebook.add(self.gm_assessment_widget.get_frame(), text="GM Assessment")
+
+        # Tab 5: Playoffs (after Team tab)
+        self.playoff_widget = PlayoffWidget(self.notebook)
+        self.notebook.add(self.playoff_widget.get_frame(), text="Playoffs")
 
         paned_window.add(notebook_frame, minsize=600)
 
@@ -235,6 +235,12 @@ class SeasonMainWindow:
 
         def on_started():
             """Callback after worker starts."""
+            # Set signals reference for synchronous World Series flag updates
+            worker = self.controller.get_worker()
+            if worker and worker.signals:
+                worker.signals.main_window = self
+                logger.debug("Set signals.main_window reference for synchronous updates")
+
             # Reset progress indicators
             self.current_day = 0
             self.progress_bar['value'] = 0
@@ -517,7 +523,7 @@ class SeasonMainWindow:
         games_back = assessment_data.get('games_back', 0.0)
         assessment = assessment_data.get('assessment', {})
 
-        logger.info(f"GM assessment ready for {team} at {games} games")
+        logger.debug(f"GM assessment ready for {team} at {games} games")
 
         # Display in GM assessment widget
         self.gm_assessment_widget.display_assessment(
@@ -532,23 +538,10 @@ class SeasonMainWindow:
         self.injuries_widget.update_injuries(injury_list)
 
     def _on_season_complete(self):
-        """Handle season_complete message (regular season ended, prompt for playoffs)."""
-        logger.info("Regular season completed, prompting for playoffs")
-
-        # Ask user if they want to run playoffs
-        response = messagebox.askyesno(
-            "Regular Season Complete",
-            "The 162-game regular season is complete!\n\n"
-            "Would you like to run the World Series playoffs?",
-            icon='question'
-        )
-
-        if response:  # Yes
-            logger.info("User chose to run World Series")
-            self.controller.worker.run_playoffs()
-        else:  # No
-            logger.info("User chose to skip World Series")
-            self.controller.worker.skip_playoffs()
+        """Handle season_complete message (regular season ended, playoffs will run automatically)."""
+        logger.debug("Regular season completed, playoffs will run automatically")
+        # No user prompt - playoffs run automatically now
+        # This handler just logs that the regular season is complete
 
     def _on_simulation_complete(self):
         """Handle simulation_complete message."""
@@ -568,14 +561,20 @@ class SeasonMainWindow:
     def _on_play_by_play(self, play_data: dict):
         """Handle play_by_play message."""
         # During World Series, only show play-by-play from World Series teams
-        if self.world_series_active:
-            away_team = play_data.get('away_team', '')
-            home_team = play_data.get('home_team', '')
+        # Check if both teams are World Series participants (not just the flag)
+        # This handles queued events that arrive after world_series_active is cleared
+        away_team = play_data.get('away_team', '')
+        home_team = play_data.get('home_team', '')
 
-            # Only forward if both teams are World Series participants
-            if away_team in self.world_series_teams and home_team in self.world_series_teams:
-                if hasattr(self, 'playoff_widget'):
-                    self.playoff_widget.add_play_by_play(play_data)
+        if self.world_series_teams and away_team in self.world_series_teams and home_team in self.world_series_teams:
+            logger.debug(f"Play-by-play received: {away_team} @ {home_team}, WS teams: {self.world_series_teams}")
+
+            # Forward to playoff widget
+            if hasattr(self, 'playoff_widget'):
+                logger.debug(f"Forwarding play-by-play to playoff widget")
+                self.playoff_widget.add_play_by_play(play_data)
+        else:
+            logger.debug(f"Skipping play-by-play: {away_team} @ {home_team} (not WS teams)")
         # During regular season, could forward to a different widget if needed
         # For now, only handle playoff play-by-play
 
@@ -586,6 +585,19 @@ class SeasonMainWindow:
         # Set World Series flag and track teams
         self.world_series_active = True
         self.world_series_teams = {ws_data.get('al_winner'), ws_data.get('nl_winner')}
+
+        # CRITICAL: Clear the play-by-play queue to flush old regular season signals
+        # This prevents the backlog of regular season play-by-play from delaying World Series updates
+        worker = self.controller.get_worker()
+        if worker and worker.signals:
+            cleared_count = 0
+            try:
+                while True:
+                    worker.signals.play_by_play_queue.get_nowait()
+                    cleared_count += 1
+            except queue.Empty:
+                pass
+            logger.debug(f"Cleared {cleared_count} old play-by-play signals from queue before World Series")
 
         # Clear regular season game displays (they're finished)
         # The games widget will not be updated during World Series
@@ -605,9 +617,10 @@ class SeasonMainWindow:
         """Handle world_series_completed message."""
         logger.info(f"World Series completed: {ws_data.get('champion')} wins!")
 
-        # Clear World Series flag and teams
+        # Clear World Series flag but keep teams for processing queued play-by-play events
         self.world_series_active = False
-        self.world_series_teams = set()
+        # Note: world_series_teams is intentionally NOT cleared here to allow
+        # queued play-by-play events to be processed after the series completes
 
         # Update playoff widget
         if hasattr(self, 'playoff_widget'):

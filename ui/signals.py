@@ -23,6 +23,8 @@ class SeasonSignals:
 
     def __init__(self):
         """Initialize all event queues."""
+        self.main_window = None  # Will be set by main window for direct synchronous access
+
         # Day lifecycle queues
         self.day_started_queue = queue.Queue()
         # Message format: (day_number: int, schedule_text: str)
@@ -135,6 +137,7 @@ class SeasonSignals:
                 - home_team (str): Home team abbreviation
                 - text (str): Play-by-play text fragment
                 - day_num (int): Current day number
+                - ws_game_num (int|None): World Series game number (1-7) or None for regular season
         """
         self.play_by_play_queue.put(('play_by_play', play_data))
 

@@ -38,6 +38,125 @@ import numpy as np
 from typing import List, Optional
 import threading
 from bblogger import logger
+from typing import Callable, Optional, Dict, Any
+
+OutputHandlerType = Callable[[str, str, Optional[Dict[str, Any]]], None]
+
+# Output Categories - used by output_handler to categorize different types of output
+class OutputCategory:
+    """
+    Constants for output handler categories.
+
+    Custom output handlers can use these categories to selectively handle different
+    types of output (e.g., route to different UI elements, log at different levels, etc.)
+
+    Season Lifecycle:
+        SEASON_START: Season initialization info (teams, schedule length, etc.)
+        SEASON_END: Final statistics, end-of-season summaries
+
+    Day Simulation:
+        DAY_SCHEDULE: Daily game schedule display
+        DAY_PROGRESS: Progress indicators during simulation (dots, status messages)
+        DAY_STANDINGS: League standings display
+
+    Game Results:
+        GAME_RESULT_FULL: Full game recap for followed teams
+        GAME_RESULT_COMPACT: Compact summaries for batch of games
+
+    AI General Manager:
+        GM_ASSESSMENT: GM roster assessments at milestone games
+
+    World Series:
+        WORLD_SERIES_START: World Series matchup announcement
+        WORLD_SERIES_END: Championship result
+
+    Progress:
+        SIM_PROGRESS: Threading/simulation progress messages
+    """
+    # Season lifecycle
+    SEASON_START = 'season_start'
+    SEASON_END = 'season_end'
+
+    # Day simulation
+    DAY_SCHEDULE = 'day_schedule'
+    DAY_PROGRESS = 'day_progress'
+    DAY_STANDINGS = 'day_standings'
+
+    # Game results
+    GAME_RESULT_FULL = 'game_result_full'
+    GAME_RESULT_COMPACT = 'game_result_compact'
+
+    # AI GM
+    GM_ASSESSMENT = 'gm_assessment'
+
+    # World Series
+    WORLD_SERIES_START = 'world_series_start'
+    WORLD_SERIES_END = 'world_series_end'
+
+    # Progress
+    SIM_PROGRESS = 'sim_progress'
+
+
+def console_output_handler(category: str, text: str, metadata: Optional[Dict] = None) -> None:
+    """
+    Default console output handler - prints all output to stdout.
+
+    Args:
+        category: Output category (see OutputCategory constants)
+        text: Human-readable text to output
+        metadata: Optional structured data associated with the output
+    """
+    print(text, end='')
+
+def null_output_handler(category: str, text: str, metadata: Optional[Dict] = None) -> None:
+    """
+    Null handler that discards all output.
+
+    Useful for running simulations without any console output.
+
+    Args:
+        category: Output category (ignored)
+        text: Output text (ignored)
+        metadata: Metadata (ignored)
+    """
+    pass
+
+
+def create_custom_output_handler_example():
+    """
+    Example of how to create a custom output handler.
+
+    This is a template function showing how to implement selective handling
+    of different output categories. Users can copy and modify this pattern.
+
+    Returns:
+        A custom output handler function
+
+    Example usage:
+        handler = create_custom_output_handler()
+        season = BaseballSeason(..., output_handler=handler)
+        season.sim_full_season()
+    """
+    def custom_handler(category: str, text: str, metadata: Optional[Dict] = None):
+        """Custom output handler with selective category handling."""
+        if category == OutputCategory.GAME_RESULT_FULL:
+            # Log detailed game results to a file
+            with open('game_results.log', 'a') as f:
+                f.write(text)
+        elif category == OutputCategory.DAY_STANDINGS:
+            # Update a database with standings data
+            # standings_data = metadata.get('standings', [])
+            # update_database(standings_data)
+            pass
+        elif category in (OutputCategory.SIM_PROGRESS, OutputCategory.DAY_PROGRESS):
+            # Suppress progress indicators
+            pass
+        else:
+            # Print everything else to console
+            print(text, end='')
+
+    return custom_handler
+
 
 AWAY = 0
 HOME = 1
@@ -53,7 +172,8 @@ class BaseballSeason:
                  season_chatty: bool = False, season_team_to_follow: Optional[List[str]] = None,
                  load_batter_file: str = 'aggr-stats-pp-Batting.csv',
                  load_pitcher_file: str = 'aggr-stats-pp-Pitching.csv',
-                 schedule: list = None, suppress_console_output: bool = False) -> None:
+                 schedule: list = None, suppress_console_output: bool = False,
+                 output_handler: Optional[OutputHandlerType] = None) -> None:
         """
         :param load_seasons: list of seasons to load for stats, can blend multiple seasons
         :param new_season: int value representing the year of the new season can be the same as one of the loads
@@ -71,8 +191,10 @@ class BaseballSeason:
         :param load_pitcher_file: name of the file for the pitcher data, year will be added to the front of the text
         :param schedule: optional pre-built schedule
         :param suppress_console_output: if True, suppress disabled list and hot/cold list console output
+        :param output_handler: optional output handler function
         :return: None
         """
+        self.output_handler = output_handler if output_handler is not None else console_output_handler
         self.season_day_num = 0  # set to first day of the season
         self.season_length = season_length
         self.series_length = series_length
@@ -264,11 +386,11 @@ class BaseballSeason:
         col2 = display_df.iloc[teams_per_col:teams_per_col*2].reset_index(drop=True)
         col3 = display_df.iloc[teams_per_col*2:].reset_index(drop=True)
 
-        # Print header
-        print(f"{'Team':<5} {'W-L':<8} {'Pct':<6} {'GB':<5}   {'Team':<5} {'W-L':<8} {'Pct':<6} {'GB':<5}   {'Team':<5} {'W-L':<8} {'Pct':<6} {'GB':<5}")
-        print('-' * 90)
+        # Build standings text
+        standings_text = f"{'Team':<5} {'W-L':<8} {'Pct':<6} {'GB':<5}   {'Team':<5} {'W-L':<8} {'Pct':<6} {'GB':<5}   {'Team':<5} {'W-L':<8} {'Pct':<6} {'GB':<5}\n"
+        standings_text += '-' * 90 + '\n'
 
-        # Print rows side by side
+        # Build rows side by side
         for i in range(teams_per_col):
             line_parts = []
 
@@ -284,9 +406,19 @@ class BaseballSeason:
                 row = col3.iloc[i]
                 line_parts.append(f"{row['Team']:<5} {row['W-L']:<8} {row['Pct']:<6} {row['GB']:<5}")
 
-            print("   ".join(line_parts))
+            standings_text += "   ".join(line_parts) + '\n'
 
-        print('')
+        standings_text += '\n'
+
+        # Extract structured standings data for metadata
+        standings_data = df[['Team', 'W', 'L']].to_dict('records')
+
+        # Send to output handler
+        self.output_handler(
+            OutputCategory.DAY_STANDINGS,
+            standings_text,
+            metadata={'standings': standings_data}
+        )
         return
 
     def _process_and_print_game_results(self, game_results: List[tuple]) -> None:
@@ -319,11 +451,19 @@ class BaseballSeason:
 
         # Print followed games first (full format)
         for game_recap in followed_games:
-            print(game_recap)
+            self.output_handler(
+                OutputCategory.GAME_RESULT_FULL,
+                game_recap,
+                metadata={'game_recap': game_recap}
+            )
 
         # Print non-followed games in compact format (5 per line)
         if compact_summaries:
-            print(bbgame.Game.format_compact_games(compact_summaries))
+            self.output_handler(
+                OutputCategory.GAME_RESULT_COMPACT,
+                bbgame.Game.format_compact_games(compact_summaries),
+                metadata={'compact_games': compact_summaries}
+            )
 
     def update_win_loss(self, away_team_name: str, home_team_name: str, win_loss: List[List[int]]) -> None:
         """
@@ -569,13 +709,25 @@ class BaseballSeason:
         :return: None
         """
         teams_paragraph = ''
-        print(f'{self.new_season} will have {len(self.schedule)} games per team with {len(self.teams)} teams.')
+        self.output_handler(
+            OutputCategory.SEASON_START,
+            f'{self.new_season} will have {len(self.schedule)} games per team with {len(self.teams)} teams.\n',
+            metadata={'season': self.new_season, 'games': len(self.schedule), 'teams': len(self.teams)}
+        )
         for team in self.team_city_dict.keys():
             teams_paragraph = teams_paragraph + ', ' if len(teams_paragraph) > 0 else ''
             teams_paragraph = teams_paragraph + f'{self.team_city_dict[team]} ({team})'
-        print(f'{teams_paragraph} \n')
+        self.output_handler(
+            OutputCategory.SEASON_START,
+            f'{teams_paragraph} \n\n',
+            metadata={'team_names': self.team_city_dict}
+        )
         if self.season_chatty:
-            print(f'Full schedule of games: {self.schedule}')
+            self.output_handler(
+                'season_start',
+                f'Full schedule of games: {self.schedule}\n',
+                metadata={'schedule': self.schedule}
+            )
         return
 
     def sim_end(self) -> None:
@@ -583,17 +735,17 @@ class BaseballSeason:
         print end of season info and update end of season stats
         :return: None
         """
-        print('\nCalculating final season statistics...')
+        self.output_handler(OutputCategory.SEASON_END, '\nCalculating final season statistics...\n', metadata=None)
         self.baseball_data.update_season_stats()
-        print(f'\n\n****** End of {self.new_season} season ******')
-        print(f'{self.new_season} Season Standings:')
+        self.output_handler(OutputCategory.SEASON_END, f'\n\n****** End of {self.new_season} season ******\n', metadata={'season': self.new_season})
+        self.output_handler(OutputCategory.SEASON_END, f'{self.new_season} Season Standings:\n', metadata={'season': self.new_season})
         self.print_standings()
-        print(f'\n{self.new_season} Season Stats')
+        self.output_handler(OutputCategory.SEASON_END, f'\n{self.new_season} Season Stats\n', metadata={'season': self.new_season})
         self.baseball_data.print_current_season(teams=self.team_to_follow, summary_only_b=False)
         self.baseball_data.print_current_season(teams=self.teams, summary_only_b=not self.season_chatty)
 
         # Perform AI GM end-of-season evaluations
-        print(f'\n\n****** AI GM End-of-Season Evaluations ******\n')
+        self.output_handler(OutputCategory.SEASON_END, f'\n\n****** AI GM End-of-Season Evaluations ******\n', metadata=None)
         self._perform_gm_evaluations()
 
         return
@@ -647,7 +799,7 @@ class BaseballSeason:
                 )
 
         # Print all player stats after GM evaluations
-        print(f'\n\n****** Complete Player Statistics ******\n')
+        self.output_handler(OutputCategory.SEASON_END, f'\n\n****** Complete Player Statistics ******\n', metadata=None)
         self.baseball_data.print_current_season(teams=None, summary_only_b=False)
 
         return
@@ -657,7 +809,11 @@ class BaseballSeason:
         sim one day of games across the league
         :return: None
         """
-        print(self.print_day_schedule(season_day_num))
+        self.output_handler(
+            OutputCategory.DAY_SCHEDULE,
+            self.print_day_schedule(season_day_num),
+            metadata={'day': season_day_num + 1, 'schedule': self.schedule[season_day_num]}
+        )
         todays_games = self.schedule[season_day_num]
         # Pass team_to_follow list (if not empty) to show hot/cold players
         teams_list = self.team_to_follow if len(self.team_to_follow) > 0 else None
@@ -694,12 +850,20 @@ class BaseballSeason:
         threads = []
         queues = []
         match_ups = []
-        print(self.print_day_schedule(season_day_num) + '\n')
+        self.output_handler(
+            OutputCategory.DAY_SCHEDULE,
+            self.print_day_schedule(season_day_num) + '\n',
+            metadata={'day': season_day_num + 1, 'schedule': self.schedule[season_day_num]}
+        )
         todays_games = self.schedule[season_day_num]
         # Pass team_to_follow list (if not empty) to show hot/cold players
         teams_list = self.team_to_follow if len(self.team_to_follow) > 0 else None
         self.baseball_data.new_game_day(teams_to_follow=teams_list)  # update rest, injury, and print lists
-        print(f'Simulating day #{season_day_num + 1} for league(s): {self.leagues_str}', end='')  # start sim wait line
+        self.output_handler(
+            OutputCategory.SIM_PROGRESS,
+            f'Simulating day #{season_day_num + 1} for league(s): {self.leagues_str}',
+            metadata={'day': season_day_num + 1, 'leagues': self.leagues_str}
+        )
         for match_up in todays_games:  # run all games for a day, day starts at zero
             if 'OFF DAY' not in match_up:  # not an off day
                 # print(f'in sim day threaded: Playing day #{season_day_num + 1}: {match_up[0]} away against {match_up[1]}')
@@ -714,8 +878,8 @@ class BaseballSeason:
                 queues.append(q)
                 match_ups.append(match_up)
                 thread.start()
-                print('.', end='')
-        print('')
+                self.output_handler(OutputCategory.SIM_PROGRESS, '.', metadata=None)
+        self.output_handler(OutputCategory.SIM_PROGRESS, '\n', metadata=None)
 
         # Collect game results
         game_results = []
@@ -744,7 +908,11 @@ class BaseballSeason:
         """
         # self.sim_day(season_day_num=self.season_day_num)
         self.sim_day_threaded(season_day_num=self.season_day_num)
-        print(f'Standings for Day {self.season_day_num + 1}:')
+        self.output_handler(
+            OutputCategory.DAY_STANDINGS,
+            f'Standings for Day {self.season_day_num + 1}:\n',
+            metadata={'day': self.season_day_num + 1}
+        )
         self.print_standings()
 
         # Check if any teams are due for GM assessment (every 30 games)
@@ -775,14 +943,25 @@ class BaseballSeason:
             return
 
         # Print header
-        print(f"\n\n{'='*80}")
-        print(f"{self.new_season} WORLD SERIES")
-        print(f"American League Champion: {self.team_city_dict[al_winner]} ({al_winner})")
-        print(f"National League Champion: {self.team_city_dict[nl_winner]} ({nl_winner})")
         al_record = self.team_win_loss[al_winner]
         nl_record = self.team_win_loss[nl_winner]
-        print(f"{al_winner}: {al_record[WIN]}-{al_record[LOSS]} vs {nl_winner}: {nl_record[WIN]}-{nl_record[LOSS]}")
-        print(f"{'='*80}\n")
+        ws_header = f"\n\n{'='*80}\n"
+        ws_header += f"{self.new_season} WORLD SERIES\n"
+        ws_header += f"American League Champion: {self.team_city_dict[al_winner]} ({al_winner})\n"
+        ws_header += f"National League Champion: {self.team_city_dict[nl_winner]} ({nl_winner})\n"
+        ws_header += f"{al_winner}: {al_record[WIN]}-{al_record[LOSS]} vs {nl_winner}: {nl_record[WIN]}-{nl_record[LOSS]}\n"
+        ws_header += f"{'='*80}\n\n"
+        self.output_handler(
+            OutputCategory.WORLD_SERIES_START,
+            ws_header,
+            metadata={
+                'season': self.new_season,
+                'al_winner': al_winner,
+                'nl_winner': nl_winner,
+                'al_record': al_record,
+                'nl_record': nl_record
+            }
+        )
 
         # Create World Series schedule and append onto exist schedule
         ws_schedule = self.create_world_series_schedule(al_winner, nl_winner)
@@ -799,19 +978,31 @@ class BaseballSeason:
                self.team_win_loss[nl_winner][WIN] - nl_record[WIN] < 4):
             self.sim_next_day()
 
-        print('\nCalculating final season statistics...')
+        self.output_handler(OutputCategory.WORLD_SERIES_END, '\nCalculating final season statistics...\n', metadata=None)
         self.baseball_data.update_season_stats()
-        print(f'\n\n****** End of {self.new_season} playoffs ******')
+        self.output_handler(OutputCategory.WORLD_SERIES_END, f'\n\n****** End of {self.new_season} playoffs ******\n', metadata={'season': self.new_season})
 
         # Declare champion
         ws_al_wins = self.team_win_loss[al_winner][WIN] - al_record[WIN]
         ws_nl_wins = self.team_win_loss[nl_winner][WIN] - nl_record[WIN]
         ws_winner = al_winner if ws_al_wins > ws_nl_wins else nl_winner
 
-        print(f"\n\n{'='*80}")
-        print(f"{self.new_season} WORLD SERIES CHAMPION: {self.team_city_dict[ws_winner]} ({ws_winner})")
-        print(f"Series Result: {al_winner} {ws_al_wins}-{ws_nl_wins} {nl_winner}")
-        print(f"{'='*80}\n")
+        ws_champion = f"\n\n{'='*80}\n"
+        ws_champion += f"{self.new_season} WORLD SERIES CHAMPION: {self.team_city_dict[ws_winner]} ({ws_winner})\n"
+        ws_champion += f"Series Result: {al_winner} {ws_al_wins}-{ws_nl_wins} {nl_winner}\n"
+        ws_champion += f"{'='*80}\n\n"
+        self.output_handler(
+            'world_series_end',
+            ws_champion,
+            metadata={
+                'season': self.new_season,
+                'winner': ws_winner,
+                'al_winner': al_winner,
+                'nl_winner': nl_winner,
+                'al_wins': ws_al_wins,
+                'nl_wins': ws_nl_wins
+            }
+        )
 
         self.baseball_data.save_season_stats()
         return
@@ -844,7 +1035,8 @@ class MultiBaseballSeason:
                  season_print_lineup_b: bool = False, season_print_box_score_b: bool = False,
                  season_chatty: bool = False, season_team_to_follow: Optional[List[str]] = None,
                  load_batter_file: str = 'stats-pp-Batting.csv',
-                 load_pitcher_file: str = 'stats-pp-Pitching.csv') -> None:
+                 load_pitcher_file: str = 'stats-pp-Pitching.csv',
+                 output_handler: Optional[OutputHandlerType] = None) -> None:
         """
                 :param load_seasons: list of seasons to load for stats, can blend multiple seasons
                 :param new_season: int value representing the year of the new season can be the same as one of the loads
@@ -860,8 +1052,10 @@ class MultiBaseballSeason:
                 :param season_team_to_follow: list of team abbreviations to follow in detail (e.g., ['NYM', 'BOS'])
                 :param load_batter_file: name of the file with batter data, year will be added to the front of the text
                 :param load_pitcher_file: name of the file for the pitcher data, year will be added to the front of name
+                :param output_handler: optional output handler function
                 :return: None
                 """
+        self.output_handler = output_handler if output_handler is not None else console_output_handler
         self.season_day_num = 0  # set to first day of the season
         self.load_seasons = load_seasons  # pull base data across for what seasons
         self.new_season = new_season
@@ -895,7 +1089,8 @@ class MultiBaseballSeason:
                                          season_print_box_score_b=self.print_box_score_b,
                                          season_team_to_follow=self.team_to_follow,
                                          load_batter_file=self.load_batter_file,
-                                         load_pitcher_file=self.load_pitcher_file)
+                                         load_pitcher_file=self.load_pitcher_file,
+                                         output_handler=self.output_handler)
 
         if self.minors is not None:
             self.bbseason_b = BaseballSeason(load_seasons=self.load_seasons, new_season=self.new_season,
@@ -909,9 +1104,10 @@ class MultiBaseballSeason:
                                              season_print_box_score_b=self.print_box_score_b,
                                              season_team_to_follow=self.team_to_follow,
                                              load_batter_file=self.load_batter_file,
-                                             load_pitcher_file=self.load_pitcher_file)
+                                             load_pitcher_file=self.load_pitcher_file,
+                                             output_handler=self.output_handler)
             self.affliations = dict(zip(self.bbseason_a.get_team_names(), self.bbseason_b.get_team_names()))
-            print(self.affliations)
+            self.output_handler(OutputCategory.SEASON_START, f'{self.affliations}\n', metadata={'affiliations': self.affliations})
         else:
             self.bbseason_b = None
             self.affliations = None

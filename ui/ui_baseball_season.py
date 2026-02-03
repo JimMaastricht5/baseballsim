@@ -15,7 +15,7 @@ import threading
 import time
 
 import bbseason
-from bbseason import WIN, LOSS  # Import constants for playoff logic
+from bbseason import WIN, LOSS, OutputCategory  # Import constants for playoff logic
 import bbgame
 from ui.signals import SeasonSignals
 from bblogger import logger
@@ -23,14 +23,26 @@ from bblogger import logger
 
 class UIBaseballSeason(bbseason.BaseballSeason):
     """
-    BaseballSeason subclass that emits queue-based signals instead of printing to console.
+    BaseballSeason subclass that emits queue-based signals for UI updates.
 
-    Overrides:
-    - _process_and_print_game_results(): Emits game_completed and day_completed signals via queues
-    - check_gm_assessments(): Emits gm_assessment_ready signal for followed teams via queues
-    - print_standings(): Suppressed (standings emitted with day_completed)
+    Uses a custom output_handler that suppresses console output and relies on
+    signal emissions for UI updates. This eliminates the need to override methods
+    solely for output suppression.
 
-    All other simulation logic remains unchanged from BaseballSeason.
+    Key Features:
+    - Custom output_handler suppresses console output
+    - Emits signals for game_completed, day_completed, gm_assessment_ready
+    - Injects play-by-play callbacks for real-time game updates
+    - Handles World Series with proper UI state tracking
+
+    Overrides (minimal):
+    - __init__(): Sets up signal handler and passes custom output_handler to parent
+    - sim_day_threaded(): Injects play-by-play callbacks for followed games
+    - _process_and_print_game_results(): Emits game/day completion signals
+    - check_gm_assessments(): Emits GM assessment signals for followed teams
+    - run_world_series(): Tracks World Series state for UI
+
+    All simulation logic inherited from BaseballSeason.
     """
 
     def __init__(self, signals: SeasonSignals, *args, **kwargs):
@@ -41,7 +53,9 @@ class UIBaseballSeason(bbseason.BaseballSeason):
             signals (SeasonSignals): Signal emitter for UI updates
             *args, **kwargs: Passed to BaseballSeason.__init__()
         """
-        super().__init__(*args, **kwargs)
+        # Create output handler that emits signals instead of printing
+        output_handler = self._create_signal_output_handler(signals)
+        super().__init__(*args, output_handler=output_handler, **kwargs)
         self.signals = signals
         # Track World Series state for play-by-play game numbering
         self.ws_active = False
@@ -50,6 +64,43 @@ class UIBaseballSeason(bbseason.BaseballSeason):
         self.ws_al_start_wins = 0
         self.ws_nl_start_wins = 0
         logger.info("UIBaseballSeason initialized with signal emitter")
+
+    def _create_signal_output_handler(self, signals: SeasonSignals):
+        """
+        Create output handler that emits signals instead of printing.
+
+        This handler maps output categories to appropriate signal emissions,
+        allowing the UI to handle different types of output without needing
+        to override multiple methods.
+
+        Args:
+            signals: SeasonSignals instance for emitting UI updates
+
+        Returns:
+            callable: Output handler function
+        """
+        def handler(category: str, text: str, metadata: Optional[dict] = None):
+            """Handle output by emitting appropriate signals."""
+            # Most categories are suppressed for UI (no console output needed)
+            # Specific categories are handled via signals in overridden methods
+
+            # Suppress console output for most categories
+            # The UI gets updates through:
+            # - game_completed/day_completed signals (from _process_and_print_game_results)
+            # - gm_assessment_ready signals (from check_gm_assessments)
+            # - world_series_started/completed signals (from run_world_series)
+            # - day_started signals (from sim_day_threaded)
+
+            # Only log important events
+            if category in (OutputCategory.SEASON_START, OutputCategory.SEASON_END):
+                logger.info(f"Season event: {text.strip()}")
+            elif category in (OutputCategory.WORLD_SERIES_START, OutputCategory.WORLD_SERIES_END):
+                logger.info(f"World Series event: {text.strip()}")
+
+            # Suppress all console output - UI handles display
+            pass
+
+        return handler
 
     def _create_play_by_play_callback(self, away_team: str, home_team: str, day_num: int):
         """
@@ -278,45 +329,6 @@ class UIBaseballSeason(bbseason.BaseballSeason):
         self.signals.emit_injury_update(injuries)
         logger.debug(f"Emitted injury_update with {len(injuries)} injuries")
 
-    def print_standings(self) -> None:
-        """
-        Override to suppress printing.
-
-        Standings are emitted as part of day_completed signal,
-        so we don't need to print them separately.
-        """
-        # Standings already emitted via day_completed signal
-        pass
-
-    def sim_start(self) -> None:
-        """
-        Override to suppress printing start info.
-
-        The UI doesn't need this console output.
-        """
-        logger.info(f"Starting {self.new_season} season with {len(self.schedule)} games per team")
-        # Suppress the print statements from parent
-        pass
-
-    def sim_end(self) -> None:
-        """
-        Override to suppress printing end info.
-
-        The UI will show its own completion message.
-        """
-        logger.info(f"Ending {self.new_season} season")
-        # Update season stats
-        self.baseball_data.update_season_stats()
-
-        # Save final season statistics to CSV files (required for World Series)
-        self.baseball_data.save_season_stats()
-
-        # Perform AI GM end-of-season evaluations
-        self._perform_gm_evaluations()
-
-        # Suppress the print statements from parent
-        pass
-
     def extract_standings(self) -> dict:
         """
         Extract standings data from team_win_loss dictionary, separated by league.
@@ -499,15 +511,9 @@ class UIBaseballSeason(bbseason.BaseballSeason):
             logger.warning("Cannot determine league winners for World Series")
             return
 
-        # Print header (matches base bbseason.py:778-785)
-        print(f"\n\n{'='*80}")
-        print(f"{self.new_season} WORLD SERIES")
-        print(f"American League Champion: {self.team_city_dict[al_winner]} ({al_winner})")
-        print(f"National League Champion: {self.team_city_dict[nl_winner]} ({nl_winner})")
+        # Get records (output_handler in base class handles printing)
         al_record = self.team_win_loss[al_winner]
         nl_record = self.team_win_loss[nl_winner]
-        print(f"{al_winner}: {al_record[WIN]}-{al_record[LOSS]} vs {nl_winner}: {nl_record[WIN]}-{nl_record[LOSS]}")
-        print(f"{'='*80}\n")
 
         # Emit world_series_started signal
         # IMPORTANT: Also set world_series_active flag IMMEDIATELY to avoid timing issues
@@ -556,19 +562,13 @@ class UIBaseballSeason(bbseason.BaseballSeason):
             self.sim_next_day()
             # Note: play-by-play queue draining now happens inside sim_day_threaded()
 
-        print('\nCalculating final season statistics...')
+        # Calculate final stats (output_handler in base class handles printing)
         self.baseball_data.update_season_stats()
-        print(f'\n\n****** End of {self.new_season} playoffs ******')
 
         # Declare champion (matches base bbseason.py:807-814)
         ws_al_wins = self.team_win_loss[al_winner][WIN] - al_record[WIN]
         ws_nl_wins = self.team_win_loss[nl_winner][WIN] - nl_record[WIN]
         ws_winner = al_winner if ws_al_wins > ws_nl_wins else nl_winner
-
-        print(f"\n\n{'='*80}")
-        print(f"{self.new_season} WORLD SERIES CHAMPION: {self.team_city_dict[ws_winner]} ({ws_winner})")
-        print(f"Series Result: {al_winner} {ws_al_wins}-{ws_nl_wins} {nl_winner}")
-        print(f"{'='*80}\n")
 
         # Emit world_series_completed signal (UI-specific addition)
         if hasattr(self, 'signals') and self.signals is not None:

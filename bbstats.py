@@ -316,8 +316,20 @@ class BaseballStats:
         :return: None (modifies target_df in place)
         """
         for field in field_list:
+        #     if field in source_df.columns and field in target_df.columns:
+        #         target_df.loc[:, field] = source_df.loc[:, field].astype(target_df[field].dtype)
             if field in source_df.columns and field in target_df.columns:
-                target_df.loc[:, field] = source_df.loc[:, field].astype(target_df[field].dtype)
+                # 1. Get the current dtype of the target
+                target_dtype = target_df[field].dtype
+
+                # 2. If target is an integer but source has NaNs,
+                #    force the cast to 'Int64' (Nullable Integer)
+                if "int" in str(target_dtype).lower() and source_df[field].isnull().any():
+                    target_df[field] = source_df[field].astype("Int64")
+                else:
+                    # 3. Otherwise, proceed with the existing target dtype
+                    target_df[field] = source_df[field].astype(target_dtype)
+
 
     def sync_dynamic_fields(self, target_pitching_df: DataFrame, target_batting_df: DataFrame) -> None:
         """

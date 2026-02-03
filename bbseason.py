@@ -41,6 +41,8 @@ from bblogger import logger
 
 AWAY = 0
 HOME = 1
+WIN = 0
+LOSS = 1
 
 
 class BaseballSeason:
@@ -120,29 +122,6 @@ class BaseballSeason:
 
     def get_team_names(self) -> list:
         return self.teams
-
-    #  def create_schedule(self) -> None:
-    #     """
-    #     set the schedule for the seasons using the teams, series length, min games in season, and limit of games
-    #     conflicts sometimes occur between the params, so it is possible for a team to play an extra game
-    #     day schedule in format  ([['MIL', 'COL'], ['PIT', 'CIN'], ['CHC', 'STL']])  # test schedule
-    #     if there are an odd number of teams there may be an "OFF" day in the schedule
-    #     :return: None
-    #     """
-    #     for game_day in range(0, len(self.teams)-1):  # setup each team play all other teams one time
-    #         random.shuffle(self.teams)  # randomize team match ups. may repeat, deal with it
-    #         day_schedule = []
-    #         for ii in range(0, len(self.teams), 2):  # select home and away without repeating a team, inc by 2 away/home
-    #             day_schedule.append([self.teams[ii], self.teams[ii+1]])  # build schedule for one day
-    #
-    #         for series_game in range(0, self.series_length):  # repeat day schedule to build series
-    #             self.schedule.append(day_schedule)  # add day schedule to full schedule
-    #     # schedule is built, check against minimums and repeat if needed, recursive call to build out further
-    #     if len(self.schedule) < self.season_length:
-    #         self.create_schedule()  # recursive call to add more games to get over minimum
-    #     elif len(self.schedule) > self.season_length:
-    #         self.schedule = self.schedule[0:self.season_length]
-    #     return
 
     def create_schedule(self) -> None:
         """
@@ -579,7 +558,6 @@ class BaseballSeason:
                     games_played=games_played,
                     should_print=should_print
                 )
-
                 # Could store assessment for later analysis
                 # self.gm_assessments[team_name].append(assessment)
 
@@ -611,12 +589,8 @@ class BaseballSeason:
         print(f'{self.new_season} Season Standings:')
         self.print_standings()
         print(f'\n{self.new_season} Season Stats')
-        if self.team_to_follow != '' and self.team_to_follow in self.baseball_data.get_all_team_names():
-            self.baseball_data.print_current_season(teams=[self.team_to_follow], summary_only_b=False)
+        self.baseball_data.print_current_season(teams=self.team_to_follow, summary_only_b=False)
         self.baseball_data.print_current_season(teams=self.teams, summary_only_b=not self.season_chatty)
-
-        # Save final season statistics to CSV files
-        self.baseball_data.save_season_stats()
 
         # Perform AI GM end-of-season evaluations
         print(f'\n\n****** AI GM End-of-Season Evaluations ******\n')
@@ -800,27 +774,6 @@ class BaseballSeason:
             logger.warning("Cannot determine league winners for World Series")
             return
 
-        # Verify stats files exist and prepare them for World Series
-        import shutil
-        batter_file_final = f'{self.new_season} Final-Season-stats-pp-Batting.csv'
-        pitcher_file_final = f'{self.new_season} Final-Season-stats-pp-Pitching.csv'
-        batter_file_hist = f'{self.new_season} stats-pp-Batting.csv'
-        pitcher_file_hist = f'{self.new_season} stats-pp-Pitching.csv'
-        batter_file_new = f'{self.new_season} New-Season-stats-pp-Batting.csv'
-        pitcher_file_new = f'{self.new_season} New-Season-stats-pp-Pitching.csv'
-
-        if not os.path.exists(batter_file_final) or not os.path.exists(pitcher_file_final):
-            logger.error(f"Stats files not found, cannot run World Series")
-            return
-
-        # Copy Final-Season files to both historical and New-Season formats for World Series
-        # The loader expects both: '{year} {file}' and '{year} New-Season-{file}'
-        shutil.copy2(batter_file_final, batter_file_hist)
-        shutil.copy2(pitcher_file_final, pitcher_file_hist)
-        shutil.copy2(batter_file_final, batter_file_new)
-        shutil.copy2(pitcher_file_final, pitcher_file_new)
-        logger.info(f"Prepared stats files for World Series")
-
         # Print header
         print(f"\n\n{'='*80}")
         print(f"{self.new_season} WORLD SERIES")
@@ -828,50 +781,40 @@ class BaseballSeason:
         print(f"National League Champion: {self.team_city_dict[nl_winner]} ({nl_winner})")
         al_record = self.team_win_loss[al_winner]
         nl_record = self.team_win_loss[nl_winner]
-        print(f"{al_winner}: {al_record[0]}-{al_record[1]} vs {nl_winner}: {nl_record[0]}-{nl_record[1]}")
+        print(f"{al_winner}: {al_record[WIN]}-{al_record[LOSS]} vs {nl_winner}: {nl_record[WIN]}-{nl_record[LOSS]}")
         print(f"{'='*80}\n")
 
-        # Create World Series schedule
+        # Create World Series schedule and append onto exist schedule
         ws_schedule = self.create_world_series_schedule(al_winner, nl_winner)
-
-        # Create new BaseballSeason for World Series
-        # Note: load_batter_file and load_pitcher_file should NOT include year prefix
-        # as BaseballSeason will prepend the load_seasons years automatically
-        # Using 'stats-pp-' format which we copied from Final-Season files above
-        ws_season = BaseballSeason(
-            load_seasons=[self.new_season],
-            new_season=self.new_season,
-            team_list=[al_winner, nl_winner],
-            season_length=7,
-            series_length=1,
-            rotation_len=self.rotation_len,
-            include_leagues=None,
-            season_interactive=self.interactive,
-            season_print_lineup_b=self.print_lineup_b,
-            season_print_box_score_b=self.print_box_score_b,
-            season_chatty=self.season_chatty,
-            season_team_to_follow=self.team_to_follow,
-            load_batter_file='stats-pp-Batting.csv',
-            load_pitcher_file='stats-pp-Pitching.csv',
-            schedule=ws_schedule,
-            suppress_console_output=False
-        )
+        for ws_game in ws_schedule:
+            self.schedule.append(ws_game)
 
         # Run World Series simulation
-        ws_season.sim_start()
-        while ws_season.season_day_num < len(ws_season.schedule):
-            ws_season.sim_next_day()
-        ws_season.sim_end()
+        self.team_to_follow.append(al_winner)
+        self.team_to_follow.append(nl_winner)
+        self.print_box_score_b = True
+        self.season_chatty = True
+        while (self.season_day_num < len(self.schedule) and
+               self.team_win_loss[al_winner][WIN] - al_record[WIN] < 4 and
+               self.team_win_loss[nl_winner][WIN] - nl_record[WIN] < 4):
+            self.sim_next_day()
+
+        print('\nCalculating final season statistics...')
+        self.baseball_data.update_season_stats()
+        print(f'\n\n****** End of {self.new_season} playoffs ******')
 
         # Declare champion
-        ws_al_wins = ws_season.team_win_loss[al_winner][0]
-        ws_nl_wins = ws_season.team_win_loss[nl_winner][0]
+        ws_al_wins = self.team_win_loss[al_winner][WIN] - al_record[WIN]
+        ws_nl_wins = self.team_win_loss[nl_winner][WIN] - nl_record[WIN]
         ws_winner = al_winner if ws_al_wins > ws_nl_wins else nl_winner
 
         print(f"\n\n{'='*80}")
         print(f"{self.new_season} WORLD SERIES CHAMPION: {self.team_city_dict[ws_winner]} ({ws_winner})")
         print(f"Series Result: {al_winner} {ws_al_wins}-{ws_nl_wins} {nl_winner}")
         print(f"{'='*80}\n")
+
+        self.baseball_data.save_season_stats()
+        return
 
     def sim_full_season(self) -> None:
         """
@@ -936,7 +879,8 @@ class MultiBaseballSeason:
         self.print_lineup_b = season_print_lineup_b
         self.print_box_score_b = season_print_box_score_b
         self.season_chatty = season_chatty
-        self.team_to_follow = season_team_to_follow if season_team_to_follow is not None else []
+        self.team_to_follow = [season_team_to_follow] if isinstance(season_team_to_follow, str) else (
+                    season_team_to_follow or [])
         self.load_batter_file = load_batter_file
         self.load_pitcher_file = load_pitcher_file
         logger.debug("Initializing MultiBaseballSeason with seasons: {}, new season: {}", load_seasons, new_season)
@@ -1043,7 +987,7 @@ if __name__ == '__main__':
 
     # handle a single full season of MLB
     if not fantasy:
-        my_team_to_follow = ['MIL']  # List of teams to follow, e.g., ['MIL', 'NYM'] for multiple
+        my_team_to_follow = ['MIL','MIA']  # List of teams to follow, e.g., ['MIL', 'NYM'] for multiple
         # my_team_to_follow = None  # or set to None for no followed teams
 
         # set a series schedule if you just want to simulate a playoff series or use the team_list param

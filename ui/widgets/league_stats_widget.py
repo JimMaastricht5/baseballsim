@@ -100,6 +100,17 @@ class LeagueStatsWidget:
         # Create treeview
         self.pos_players_tree = self._create_stats_treeview(parent, is_batter=True)
 
+        # Add historical stats section at the bottom
+        history_label = tk.Label(parent, text="Player Historical Performance (Click player to view)",
+                                font=("Arial", 10, "bold"))
+        history_label.pack(padx=5, pady=(10, 5))
+
+        # Create frame for historical stats treeview
+        history_frame = tk.Frame(parent)
+        history_frame.pack(fill=tk.BOTH, expand=False, padx=5, pady=5)
+
+        self.batters_history_tree = self._create_history_treeview(history_frame)
+
     def _create_pitchers_tab(self, parent: tk.Frame):
         """
         Create pitchers tab with filters.
@@ -137,6 +148,17 @@ class LeagueStatsWidget:
 
         # Create treeview
         self.pitchers_tree = self._create_stats_treeview(parent, is_batter=False)
+
+        # Add historical stats section at the bottom
+        history_label = tk.Label(parent, text="Player Historical Performance (Click player to view)",
+                                font=("Arial", 10, "bold"))
+        history_label.pack(padx=5, pady=(10, 5))
+
+        # Create frame for historical stats treeview
+        history_frame = tk.Frame(parent)
+        history_frame.pack(fill=tk.BOTH, expand=False, padx=5, pady=5)
+
+        self.pitchers_history_tree = self._create_history_treeview(history_frame)
 
     def _create_stats_treeview(self, parent: tk.Widget, is_batter: bool = True) -> ttk.Treeview:
         """
@@ -186,6 +208,9 @@ class LeagueStatsWidget:
         tree.configure(yscrollcommand=scrollbar.set)
         scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
         tree.pack(fill=tk.BOTH, expand=True)
+
+        # Bind click event to show historical stats
+        tree.bind('<ButtonRelease-1>', lambda e, t=tree, b=is_batter: self._on_player_click(t, b))
 
         return tree
 
@@ -500,6 +525,167 @@ class LeagueStatsWidget:
                 # Remove indicator from other columns
                 tree.heading(col, text=col,
                            command=lambda c=col: self._sort_by_column(tree, c, is_batter))
+
+    def _create_history_treeview(self, parent: tk.Widget) -> ttk.Treeview:
+        """
+        Create Treeview for historical player stats.
+
+        Args:
+            parent: Parent widget
+
+        Returns:
+            ttk.Treeview: Configured treeview for historical data
+        """
+        # Common columns for both batters and pitchers
+        columns = ("Season", "Team", "Age", "G")
+
+        tree = ttk.Treeview(parent, columns=columns, show="headings", height=5)
+
+        # Configure columns
+        for col in columns:
+            tree.heading(col, text=col)
+            if col == "Season":
+                tree.column(col, width=70, anchor=tk.CENTER)
+            elif col == "Team":
+                tree.column(col, width=60, anchor=tk.CENTER)
+            elif col in ["Age", "G"]:
+                tree.column(col, width=50, anchor=tk.CENTER)
+            else:
+                tree.column(col, width=70, anchor=tk.CENTER)
+
+        # Add scrollbar
+        scrollbar = ttk.Scrollbar(parent, orient=tk.VERTICAL, command=tree.yview)
+        tree.configure(yscrollcommand=scrollbar.set)
+        scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+        tree.pack(fill=tk.BOTH, expand=True)
+
+        return tree
+
+    def _on_player_click(self, tree: ttk.Treeview, is_batter: bool):
+        """
+        Handle player row click - fetch and display historical stats.
+
+        Args:
+            tree: The treeview that was clicked
+            is_batter: True if batter tree, False if pitcher tree
+        """
+        # Get selected item
+        selection = tree.selection()
+        if not selection:
+            return
+
+        # Get player name from selected row (first column)
+        item = selection[0]
+        values = tree.item(item, 'values')
+        if not values:
+            return
+
+        player_name = values[0]  # Player name is first column
+        logger.info(f"Player clicked: {player_name} (is_batter={is_batter})")
+
+        # Check if baseball_data is available
+        if not self.baseball_data:
+            logger.warning("baseball_data not available for historical lookup")
+            return
+
+        # Determine which history tree to update
+        history_tree = self.batters_history_tree if is_batter else self.pitchers_history_tree
+
+        # Fetch historical data
+        try:
+            historical_df = self.baseball_data.get_player_historical_data(player_name, is_batter)
+
+            if historical_df.empty:
+                logger.info(f"No historical data found for {player_name}")
+                # Clear the history tree
+                for item in history_tree.get_children():
+                    history_tree.delete(item)
+                return
+
+            # Update history tree with new data
+            self._update_history_tree(history_tree, historical_df, is_batter)
+
+        except Exception as e:
+            logger.error(f"Error fetching historical data for {player_name}: {e}")
+            import traceback
+            logger.error(traceback.format_exc())
+
+    def _update_history_tree(self, history_tree: ttk.Treeview, historical_df: pd.DataFrame, is_batter: bool):
+        """
+        Update the history tree with player's historical stats.
+
+        Args:
+            history_tree: The treeview to update
+            historical_df: DataFrame with historical stats
+            is_batter: True if batter, False if pitcher
+        """
+        # Clear existing data
+        for item in history_tree.get_children():
+            history_tree.delete(item)
+
+        # Define columns based on player type
+        if is_batter:
+            columns = ("Season", "Team", "Age", "G", "AB", "R", "H", "HR", "RBI", "AVG", "OBP", "SLG", "OPS")
+        else:
+            columns = ("Season", "Team", "Age", "G", "GS", "IP", "W", "L", "ERA", "WHIP", "SO")
+
+        # Reconfigure tree columns
+        history_tree['columns'] = columns
+        history_tree['show'] = 'headings'
+
+        # Configure column headings and widths
+        for col in columns:
+            history_tree.heading(col, text=col)
+            if col in ["Season", "Team"]:
+                history_tree.column(col, width=60, anchor=tk.CENTER)
+            elif col in ["Age", "G", "GS", "W", "L"]:
+                history_tree.column(col, width=40, anchor=tk.CENTER)
+            elif col in ["AB", "R", "H", "HR", "RBI", "SO"]:
+                history_tree.column(col, width=45, anchor=tk.CENTER)
+            elif col in ["AVG", "OBP", "SLG", "OPS", "ERA", "WHIP"]:
+                history_tree.column(col, width=55, anchor=tk.CENTER)
+            elif col == "IP":
+                history_tree.column(col, width=50, anchor=tk.CENTER)
+            else:
+                history_tree.column(col, width=50, anchor=tk.CENTER)
+
+        # Insert rows from historical data
+        for idx, row in historical_df.iterrows():
+            try:
+                if is_batter:
+                    values = (
+                        int(row.get('Season', 0)),
+                        row.get('Team', ''),
+                        int(row.get('Age', 0)),
+                        int(row.get('G', 0)),
+                        int(row.get('AB', 0)),
+                        int(row.get('R', 0)),
+                        int(row.get('H', 0)),
+                        int(row.get('HR', 0)),
+                        int(row.get('RBI', 0)),
+                        f"{float(row.get('AVG', 0)):.3f}",
+                        f"{float(row.get('OBP', 0)):.3f}",
+                        f"{float(row.get('SLG', 0)):.3f}",
+                        f"{float(row.get('OPS', 0)):.3f}"
+                    )
+                else:
+                    values = (
+                        int(row.get('Season', 0)),
+                        row.get('Team', ''),
+                        int(row.get('Age', 0)),
+                        int(row.get('G', 0)),
+                        int(row.get('GS', 0)),
+                        f"{float(row.get('IP', 0)):.1f}",
+                        int(row.get('W', 0)),
+                        int(row.get('L', 0)),
+                        f"{float(row.get('ERA', 0)):.2f}",
+                        f"{float(row.get('WHIP', 0)):.2f}",
+                        int(row.get('SO', 0))
+                    )
+
+                history_tree.insert("", tk.END, values=values)
+            except Exception as e:
+                logger.warning(f"Error inserting historical row: {e}")
 
     def get_frame(self) -> tk.Frame:
         """Get the main frame for adding to parent container."""

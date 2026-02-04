@@ -41,6 +41,7 @@ from bblogger import logger
 from typing import Callable, Optional, Dict, Any
 
 OutputHandlerType = Callable[[str, str, Optional[Dict[str, Any]]], None]
+PlayByPlayCallbackFactory = Callable[[str, str, int], Optional[Callable[[str], None]]]
 
 # Output Categories - used by output_handler to categorize different types of output
 class OutputCategory:
@@ -173,7 +174,8 @@ class BaseballSeason:
                  load_batter_file: str = 'aggr-stats-pp-Batting.csv',
                  load_pitcher_file: str = 'aggr-stats-pp-Pitching.csv',
                  schedule: list = None, suppress_console_output: bool = False,
-                 output_handler: Optional[OutputHandlerType] = None) -> None:
+                 output_handler: Optional[OutputHandlerType] = None,
+                 play_by_play_callback_factory: Optional[PlayByPlayCallbackFactory] = None) -> None:
         """
         :param load_seasons: list of seasons to load for stats, can blend multiple seasons
         :param new_season: int value representing the year of the new season can be the same as one of the loads
@@ -192,9 +194,13 @@ class BaseballSeason:
         :param schedule: optional pre-built schedule
         :param suppress_console_output: if True, suppress disabled list and hot/cold list console output
         :param output_handler: optional output handler function
+        :param play_by_play_callback_factory: optional factory function that creates play-by-play callbacks
+                                               for each game. Takes (away_team, home_team, day_num) and
+                                               returns a callback function or None.
         :return: None
         """
         self.output_handler = output_handler if output_handler is not None else console_output_handler
+        self.play_by_play_callback_factory = play_by_play_callback_factory
         self.season_day_num = 0  # set to first day of the season
         self.season_length = season_length
         self.series_length = series_length
@@ -824,11 +830,17 @@ class BaseballSeason:
 
         for match_up in todays_games:  # run all games for a day, day starts at zero
             if 'OFF DAY' not in match_up:  # not an off day
+                # Create play-by-play callback if factory is provided
+                pbp_callback = None
+                if self.play_by_play_callback_factory:
+                    pbp_callback = self.play_by_play_callback_factory(match_up[0], match_up[1], season_day_num)
+
                 game = bbgame.Game(away_team_name=match_up[0], home_team_name=match_up[1],
                                    baseball_data=self.baseball_data, game_num=season_day_num,
                                    rotation_len=self.rotation_len, print_lineup=self.print_lineup_b,
                                    chatty=self.season_chatty, print_box_score_b=self.print_box_score_b,
-                                   team_to_follow=self.team_to_follow, interactive=self.interactive)
+                                   team_to_follow=self.team_to_follow, interactive=self.interactive,
+                                   play_by_play_callback=pbp_callback)
                 score, inning, win_loss_list, game_recap = game.sim_game()
                 self.update_win_loss(away_team_name=match_up[0], home_team_name=match_up[1], win_loss=win_loss_list)
                 self.baseball_data.game_results_to_season(box_score_class=game.teams[AWAY].box_score)
@@ -866,12 +878,18 @@ class BaseballSeason:
         )
         for match_up in todays_games:  # run all games for a day, day starts at zero
             if 'OFF DAY' not in match_up:  # not an off day
+                # Create play-by-play callback if factory is provided
+                pbp_callback = None
+                if self.play_by_play_callback_factory:
+                    pbp_callback = self.play_by_play_callback_factory(match_up[0], match_up[1], season_day_num)
+
                 # print(f'in sim day threaded: Playing day #{season_day_num + 1}: {match_up[0]} away against {match_up[1]}')
                 game = bbgame.Game(away_team_name=match_up[0], home_team_name=match_up[1],
                                    baseball_data=self.baseball_data, game_num=season_day_num,
                                    rotation_len=self.rotation_len, print_lineup=self.print_lineup_b,
                                    chatty=self.season_chatty, print_box_score_b=self.print_box_score_b,
-                                   team_to_follow=self.team_to_follow, interactive=self.interactive)
+                                   team_to_follow=self.team_to_follow, interactive=self.interactive,
+                                   play_by_play_callback=pbp_callback)
                 q = queue.Queue()
                 thread = threading.Thread(target=game.sim_game_threaded, args=(q,))
                 threads.append(thread)
@@ -1036,7 +1054,8 @@ class MultiBaseballSeason:
                  season_chatty: bool = False, season_team_to_follow: Optional[List[str]] = None,
                  load_batter_file: str = 'stats-pp-Batting.csv',
                  load_pitcher_file: str = 'stats-pp-Pitching.csv',
-                 output_handler: Optional[OutputHandlerType] = None) -> None:
+                 output_handler: Optional[OutputHandlerType] = None,
+                 play_by_play_callback_factory: Optional[PlayByPlayCallbackFactory] = None) -> None:
         """
                 :param load_seasons: list of seasons to load for stats, can blend multiple seasons
                 :param new_season: int value representing the year of the new season can be the same as one of the loads
@@ -1053,9 +1072,11 @@ class MultiBaseballSeason:
                 :param load_batter_file: name of the file with batter data, year will be added to the front of the text
                 :param load_pitcher_file: name of the file for the pitcher data, year will be added to the front of name
                 :param output_handler: optional output handler function
+                :param play_by_play_callback_factory: optional factory function for play-by-play callbacks
                 :return: None
                 """
         self.output_handler = output_handler if output_handler is not None else console_output_handler
+        self.play_by_play_callback_factory = play_by_play_callback_factory
         self.season_day_num = 0  # set to first day of the season
         self.load_seasons = load_seasons  # pull base data across for what seasons
         self.new_season = new_season
@@ -1090,7 +1111,8 @@ class MultiBaseballSeason:
                                          season_team_to_follow=self.team_to_follow,
                                          load_batter_file=self.load_batter_file,
                                          load_pitcher_file=self.load_pitcher_file,
-                                         output_handler=self.output_handler)
+                                         output_handler=self.output_handler,
+                                         play_by_play_callback_factory=self.play_by_play_callback_factory)
 
         if self.minors is not None:
             self.bbseason_b = BaseballSeason(load_seasons=self.load_seasons, new_season=self.new_season,
@@ -1105,7 +1127,8 @@ class MultiBaseballSeason:
                                              season_team_to_follow=self.team_to_follow,
                                              load_batter_file=self.load_batter_file,
                                              load_pitcher_file=self.load_pitcher_file,
-                                             output_handler=self.output_handler)
+                                             output_handler=self.output_handler,
+                                             play_by_play_callback_factory=self.play_by_play_callback_factory)
             self.affliations = dict(zip(self.bbseason_a.get_team_names(), self.bbseason_b.get_team_names()))
             self.output_handler(OutputCategory.SEASON_START, f'{self.affliations}\n', metadata={'affiliations': self.affliations})
         else:

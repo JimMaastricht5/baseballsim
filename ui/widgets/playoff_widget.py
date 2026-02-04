@@ -57,9 +57,9 @@ class PlayoffWidget:
         paned = tk.PanedWindow(self.frame, orient=tk.HORIZONTAL, sashrelief=tk.RAISED)
         paned.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
 
-        # Left panel: Box scores
-        box_frame = tk.Frame(paned)
-        paned.add(box_frame, minsize=400)
+        # Left panel: Box scores (1/3 of space)
+        box_frame = tk.Frame(paned, width=350)
+        paned.add(box_frame, minsize=250, width=350)
 
         box_label = tk.Label(box_frame, text="BOX SCORES", font=("Arial", 11, "bold"),
                             bg="#f8f4e8", anchor=tk.W, padx=5)
@@ -75,9 +75,9 @@ class PlayoffWidget:
         self.box_text.tag_configure("game_header", font=("Courier", 10, "bold"), foreground="#2e5090")
         self.box_text.tag_configure("normal", font=("Courier", 9))
 
-        # Right panel: Play-by-play
-        pbp_frame = tk.Frame(paned)
-        paned.add(pbp_frame, minsize=400)
+        # Right panel: Play-by-play (2/3 of space)
+        pbp_frame = tk.Frame(paned, width=700)
+        paned.add(pbp_frame, minsize=400, width=700)
 
         # Header with label and game selector
         pbp_header_frame = tk.Frame(pbp_frame, bg="#e8f4f8")

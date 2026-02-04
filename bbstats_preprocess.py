@@ -207,30 +207,108 @@ class BaseballStatsPreProcess:
     def translate_pos(self, digit_string):
         return ''.join(self.digit_pos_map.get(digit, digit) + ',' for digit in digit_string).rstrip(',')
 
+    def calculate_league_averages(self, historical_df: DataFrame, is_pitching: bool = False) -> dict:
+        """
+        Calculate league average rates for regression to mean.
+
+        Args:
+            historical_df: Historical data for all players
+            is_pitching: True for pitchers, False for batters
+
+        Returns:
+            dict: League average rates (per PA for batters, per IP for pitchers)
+        """
+        if is_pitching:
+            # Calculate league averages per IP
+            total_ip = historical_df['IP'].sum()
+            if total_ip == 0:
+                return {}
+
+            return {
+                'H_per_IP': historical_df['H'].sum() / total_ip,
+                'BB_per_IP': historical_df['BB'].sum() / total_ip,
+                'SO_per_IP': historical_df['SO'].sum() / total_ip,
+                'HR_per_IP': historical_df['HR'].sum() / total_ip,
+                'ER_per_IP': historical_df['ER'].sum() / total_ip,
+                'W_rate': historical_df['W'].sum() / historical_df['G'].sum() if historical_df['G'].sum() > 0 else 0,
+                'L_rate': historical_df['L'].sum() / historical_df['G'].sum() if historical_df['G'].sum() > 0 else 0,
+                'SV_rate': historical_df['SV'].sum() / historical_df['G'].sum() if historical_df['G'].sum() > 0 else 0,
+            }
+        else:
+            # Calculate league averages per PA (use AB + BB as rough estimate of PA)
+            total_ab = historical_df['AB'].sum()
+            total_bb = historical_df['BB'].sum()
+            total_pa = total_ab + total_bb
+            if total_pa == 0:
+                return {}
+
+            return {
+                'H_per_PA': historical_df['H'].sum() / total_pa,
+                'HR_per_PA': historical_df['HR'].sum() / total_pa,
+                'BB_per_PA': total_bb / total_pa,
+                'SO_per_PA': historical_df['SO'].sum() / total_pa,
+                'R_per_PA': historical_df['R'].sum() / total_pa,
+                'RBI_per_PA': historical_df['RBI'].sum() / total_pa,
+                '2B_per_PA': historical_df['2B'].sum() / total_pa if '2B' in historical_df.columns else 0,
+                '3B_per_PA': historical_df['3B'].sum() / total_pa if '3B' in historical_df.columns else 0,
+            }
+
+    def regress_to_mean(self, actual_stat: float, league_avg_rate: float,
+                       sample_size: float, reliability_constant: float,
+                       sample_multiplier: float = 1.0) -> float:
+        """
+        Apply regression to the mean formula for small sample sizes.
+
+        Formula: (Actual + (Reliability_Constant * League_Avg)) / (Sample + Reliability_Constant)
+
+        Args:
+            actual_stat: Player's actual stat value
+            league_avg_rate: League average rate (e.g., H per PA)
+            sample_size: Player's sample size (PA, AB, or IP)
+            reliability_constant: How much to regress (higher = more regression)
+            sample_multiplier: Multiply sample_size by this to get actual stat expectation
+
+        Returns:
+            float: Regressed projection
+        """
+        # Calculate league average expectation for this sample size
+        league_expectation = league_avg_rate * sample_size * sample_multiplier
+
+        # Apply regression to mean formula
+        projected = (actual_stat + (reliability_constant * league_avg_rate * sample_multiplier)) / \
+                    (sample_size + reliability_constant)
+
+        # Scale back up to the original sample size
+        projected *= sample_size
+
+        return max(0.0, projected)
+
     def calculate_trend_projection(self, historical_df: DataFrame, hashcode: int,
-                                    stat_col: str, target_year: int) -> tuple:
+                                    stat_col: str, target_year: int,
+                                    league_averages: dict = None) -> tuple:
         """
         Calculate linear regression trend and project to target year.
 
         Uses numpy.polyfit to compute a linear trend line from a player's year-by-year
-        historical stats, then extrapolates to the target year. This allows projecting
-        future performance based on whether a player is improving or declining.
+        historical stats, then extrapolates to the target year. For players with insufficient
+        data, applies regression to the mean using league averages.
 
         Args:
             historical_df: Year-by-year data with 'Season' and 'Hashcode' columns
             hashcode: Player's unique identifier
             stat_col: Column name to project (e.g., 'H', 'BB', 'AB')
             target_year: Year to project to (e.g., 2026)
+            league_averages: Dict of league average rates (per PA or per IP)
 
         Returns:
             tuple: (projected_value, method, years_used)
                 - projected_value: float, clamped to >= 0
-                - method: str, one of ["Trend", "Recent_Year", "Insufficient_Data"]
-                - years_used: int, number of data points used (0, 1, 2, or 3)
+                - method: str, one of ["Trend", "Regressed", "Insufficient_Data"]
+                - years_used: int, number of data points used (0, 1, 2, or 3+)
 
         Edge Cases:
             - No data (0 years): Returns (0.0, "Insufficient_Data", 0)
-            - Single year (1 year): Returns (recent_value, "Recent_Year", 1)
+            - Small sample: Uses regression to mean with league averages
             - Negative projection: Clamped to 0.0 (can't have negative stats)
             - NaN values: Filled with 0.0
         """
@@ -243,37 +321,138 @@ class BaseballStatsPreProcess:
         # Sort by Season chronologically
         player_data = player_data.sort_values('Season')
 
+        # Determine if this is batting or pitching data
+        is_pitching = 'IP' in player_data.columns
+        is_batting = 'AB' in player_data.columns
+
         # Check minimum playing time requirements before applying trend
-        # Batters need at least 130 AB total, pitchers need at least 50 IP total
-        if 'AB' in player_data.columns:
+        # For small samples, use regression to mean instead of just recent year
+        if is_batting:
             total_ab = player_data['AB'].sum()
-            if total_ab < 130:
-                # Insufficient at-bats for reliable trend - use recent year
+            total_bb = player_data['BB'].sum() if 'BB' in player_data.columns else 0
+            total_pa = total_ab + total_bb
+
+            if total_ab < 130 and league_averages:
+                # Apply regression to mean for counting stats
                 recent_value = player_data.iloc[-1][stat_col]
                 if pd.isna(recent_value):
                     recent_value = 0.0
-                logger.debug(f"Player has only {total_ab} AB (< 130), using recent year for {stat_col}")
-                return max(0.0, float(recent_value)), "Recent_Year", len(player_data)
-        elif 'IP' in player_data.columns:
+
+                # Map stat column to league average rate
+                stat_map = {
+                    'H': 'H_per_PA', 'HR': 'HR_per_PA', 'BB': 'BB_per_PA',
+                    'SO': 'SO_per_PA', 'R': 'R_per_PA', 'RBI': 'RBI_per_PA',
+                    '2B': '2B_per_PA', '3B': '3B_per_PA'
+                }
+
+                if stat_col in stat_map and stat_map[stat_col] in league_averages:
+                    # Reliability constant: 200 PA for batting
+                    reliability_constant = 200
+                    league_rate = league_averages[stat_map[stat_col]]
+                    projected = self.regress_to_mean(
+                        recent_value, league_rate, total_pa, reliability_constant
+                    )
+                    logger.debug(f"Player has {total_ab} AB, regressed {stat_col} from {recent_value:.1f} to {projected:.1f}")
+                    return max(0.0, projected), "Regressed", len(player_data)
+                else:
+                    # For non-rate stats (like AB, G), just use recent value
+                    return max(0.0, float(recent_value)), "Recent_Year", len(player_data)
+
+        elif is_pitching:
             total_ip = player_data['IP'].sum()
-            if total_ip < 50:
-                # Insufficient innings for reliable trend - use recent year
+
+            if total_ip < 50 and league_averages:
+                # Apply regression to mean for counting stats
                 recent_value = player_data.iloc[-1][stat_col]
                 if pd.isna(recent_value):
                     recent_value = 0.0
-                logger.debug(f"Player has only {total_ip:.1f} IP (< 50), using recent year for {stat_col}")
-                return max(0.0, float(recent_value)), "Recent_Year", len(player_data)
+
+                # Map stat column to league average rate
+                stat_map = {
+                    'H': 'H_per_IP', 'BB': 'BB_per_IP', 'SO': 'SO_per_IP',
+                    'HR': 'HR_per_IP', 'ER': 'ER_per_IP', 'W': 'W_rate',
+                    'L': 'L_rate', 'SV': 'SV_rate'
+                }
+
+                if stat_col in stat_map and stat_map[stat_col] in league_averages:
+                    # Reliability constant: 50 IP for pitching
+                    reliability_constant = 50
+                    league_rate = league_averages[stat_map[stat_col]]
+
+                    # For W/L/SV, we use games as sample size
+                    if stat_col in ['W', 'L', 'SV']:
+                        total_games = player_data['G'].sum() if 'G' in player_data.columns else 0
+                        projected = self.regress_to_mean(
+                            recent_value, league_rate, total_games, reliability_constant / 5
+                        )
+                    else:
+                        projected = self.regress_to_mean(
+                            recent_value, league_rate, total_ip, reliability_constant
+                        )
+
+                    logger.debug(f"Player has {total_ip:.1f} IP, regressed {stat_col} from {recent_value:.1f} to {projected:.1f}")
+                    return max(0.0, projected), "Regressed", len(player_data)
+                else:
+                    # For non-rate stats (like IP, G), just use recent value
+                    return max(0.0, float(recent_value)), "Recent_Year", len(player_data)
 
         # Check data availability
         num_years = len(player_data)
 
         if num_years < 3:
             # Need at least 3 years for reliable trend projection
-            # Use most recent year unchanged for 1-2 years of data
+            # For 1-2 years with reasonable sample, use regression to mean
             recent_value = player_data.iloc[-1][stat_col]
-            # Handle NaN
             if pd.isna(recent_value):
                 recent_value = 0.0
+
+            # Try to apply regression to mean if we have league averages
+            if league_averages:
+                if is_batting:
+                    total_ab = player_data['AB'].sum()
+                    total_bb = player_data['BB'].sum() if 'BB' in player_data.columns else 0
+                    total_pa = total_ab + total_bb
+
+                    stat_map = {
+                        'H': 'H_per_PA', 'HR': 'HR_per_PA', 'BB': 'BB_per_PA',
+                        'SO': 'SO_per_PA', 'R': 'R_per_PA', 'RBI': 'RBI_per_PA',
+                        '2B': '2B_per_PA', '3B': '3B_per_PA'
+                    }
+
+                    if stat_col in stat_map and stat_map[stat_col] in league_averages:
+                        reliability_constant = 200
+                        league_rate = league_averages[stat_map[stat_col]]
+                        projected = self.regress_to_mean(
+                            recent_value, league_rate, total_pa, reliability_constant
+                        )
+                        return max(0.0, projected), "Regressed", num_years
+
+                elif is_pitching:
+                    total_ip = player_data['IP'].sum()
+
+                    stat_map = {
+                        'H': 'H_per_IP', 'BB': 'BB_per_IP', 'SO': 'SO_per_IP',
+                        'HR': 'HR_per_IP', 'ER': 'ER_per_IP', 'W': 'W_rate',
+                        'L': 'L_rate', 'SV': 'SV_rate'
+                    }
+
+                    if stat_col in stat_map and stat_map[stat_col] in league_averages:
+                        reliability_constant = 50
+                        league_rate = league_averages[stat_map[stat_col]]
+
+                        if stat_col in ['W', 'L', 'SV']:
+                            total_games = player_data['G'].sum() if 'G' in player_data.columns else 0
+                            projected = self.regress_to_mean(
+                                recent_value, league_rate, total_games, reliability_constant / 5
+                            )
+                        else:
+                            projected = self.regress_to_mean(
+                                recent_value, league_rate, total_ip, reliability_constant
+                            )
+
+                        return max(0.0, projected), "Regressed", num_years
+
+            # If no league averages or stat not in map, use recent year
             return max(0.0, float(recent_value)), "Recent_Year", num_years
 
         # Perform linear regression (need at least 3 points for reliable trends)
@@ -363,6 +542,11 @@ class BaseballStatsPreProcess:
         # Target projection year (one year beyond the most recent in data)
         target_year = historical_df['Season'].max() + 1
 
+        # Calculate league averages for regression to mean
+        logger.info(f"Calculating league averages for regression to mean...")
+        league_averages = self.calculate_league_averages(historical_df, is_pitching=is_pitching)
+        logger.info(f"League averages calculated: {list(league_averages.keys())}")
+
         # Initialize result list
         results = []
 
@@ -383,7 +567,7 @@ class BaseballStatsPreProcess:
             # Apply trends to each stat
             for stat_col in stats_to_project:
                 projected_value, method, years_used = self.calculate_trend_projection(
-                    historical_df, hashcode, stat_col, target_year
+                    historical_df, hashcode, stat_col, target_year, league_averages
                 )
                 most_recent[stat_col] = projected_value
                 player_methods.append(method)
@@ -426,12 +610,14 @@ class BaseballStatsPreProcess:
 
         # Add logging
         trend_count = sum(1 for m in projection_methods if m == 'Trend')
+        regressed_count = sum(1 for m in projection_methods if m == 'Regressed')
         recent_count = sum(1 for m in projection_methods if m == 'Recent_Year')
         insufficient_count = sum(1 for m in projection_methods if m == 'Insufficient_Data')
 
         player_type = "Pitchers" if is_pitching else "Batters"
         print(f"{player_type} projection summary:")
-        print(f"  - Trend-based: {trend_count} players")
+        print(f"  - Trend-based (3+ years): {trend_count} players")
+        print(f"  - Regressed to mean (small sample): {regressed_count} players")
         print(f"  - Recent year: {recent_count} players")
         print(f"  - Insufficient data: {insufficient_count} players")
 

@@ -121,7 +121,7 @@ class Team:
 
         # check data type of new season pitching data, after first pass it is converted to a string
         if (self.baseball_data.new_season_pitching_data['Condition'].dtype == float or
-                self.baseball_data.new_season_pitching_data['Condition'].dtype == int):  # action has already been performed
+                self.baseball_data.new_season_pitching_data['Condition'].dtype == int):  # action already been performed
             # Sync all dynamic fields (condition, injuries, streaks) from new season to gameplay dataframes
             self.baseball_data.sync_dynamic_fields(self.gameplay_pitchers_df, self.gameplay_pos_players_df)
 
@@ -545,21 +545,6 @@ class Team:
                     # If even the DH search finds no one, grab anyone based on Condition
                     df_players = self.gameplay_pos_players_df[not_in_lineup].sort_values('Condition', ascending=False)
 
-            # not_exhausted = ~(self.gameplay_pos_players_df['Condition'] <= self.fatigue_unavailable)
-            # not_injured = (self.gameplay_pos_players_df['Injured Days'] == 0)
-            # df_criteria_pos = (~self.gameplay_pos_players_df.index.isin(lineup_index_list) &
-            #                    (self.gameplay_pos_players_df['Pos'] == position)) if (
-            #                    # (self.gameplay_pos_players_df['Pos'].apply(lambda df_positions: position in df_positions))) if (
-            #                    position != 'DH' and position != '1B') else \
-            #     ~self.gameplay_pos_players_df.index.isin(lineup_index_list)
-            # df_criteria = df_criteria_pos & not_exhausted & not_injured
-            # df_players = self.gameplay_pos_players_df[df_criteria].sort_values(stat_criteria, ascending=False)
-            # if len(df_players) == 0:  # missing player at pos, pick the best available stat, or best condition
-            #     if position != 'DH':  # if we are not looking for a DH use the DH criteria to just grab one
-            #         df_player_num = self.search_for_pos('DH', lineup_index_list, stat_criteria)
-            #     else:  # try if the DH criteria fails try grabbing tired players
-            #         df_players = self.gameplay_pos_players_df[df_criteria_pos].sort_values('Condition',
-            #                                                                                    ascending=False)
             logger.debug('Top player at position {}: {}', 
                        position, df_players.head(1).index[0] if df_player_num is None else df_player_num)
         except IndexError:

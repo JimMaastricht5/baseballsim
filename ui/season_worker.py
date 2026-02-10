@@ -79,6 +79,10 @@ class SeasonWorker(threading.Thread):
         self._pause_event = threading.Event()
         self._pause_event.set()  # Initially not paused
 
+        # Playoff decision synchronization
+        self._playoff_decision_event = threading.Event()
+        self._run_playoffs = False
+
     def run(self):
         """
         Main thread execution method.
@@ -146,7 +150,22 @@ class SeasonWorker(threading.Thread):
             # Season complete
             if not self._stopped:
                 self.season.sim_end()
-                logger.info("Season simulation complete")
+                logger.info("Regular season simulation complete")
+
+                # Check if World Series is eligible and run automatically
+                if self.season.should_run_world_series():
+                    logger.info("World Series eligible, running playoffs automatically")
+                    # Emit season_complete signal (for UI updates, but don't wait for response)
+                    self.signals.emit_season_complete()
+
+                    # Run World Series automatically (no user prompt)
+                    if not self._stopped:
+                        logger.info("Running World Series")
+                        self.season.run_world_series()
+                else:
+                    logger.info("World Series not eligible (single league or short season)")
+
+                # Emit final simulation complete
                 self.signals.emit_simulation_complete()
 
         except Exception as e:
@@ -235,4 +254,27 @@ class SeasonWorker(threading.Thread):
             self._stopped = True
             self._paused = False
             self._pause_event.set()
+            # Also unblock playoff decision if waiting
+            self._run_playoffs = False
+            self._playoff_decision_event.set()
+
+    def run_playoffs(self):
+        """
+        Signal to run the World Series playoffs.
+
+        Called by UI when user chooses to run playoffs after regular season.
+        """
+        logger.info("User chose to run playoffs")
+        self._run_playoffs = True
+        self._playoff_decision_event.set()
+
+    def skip_playoffs(self):
+        """
+        Signal to skip the World Series playoffs.
+
+        Called by UI when user chooses not to run playoffs after regular season.
+        """
+        logger.info("User chose to skip playoffs")
+        self._run_playoffs = False
+        self._playoff_decision_event.set()
         logger.info("Stop requested")

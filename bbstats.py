@@ -107,7 +107,7 @@ class BaseballStats:
         # 27.5% of pitchers w > 5 in will spend time on IL per season (188 out of 684)
         # 26.3% of pitching injuries affect the throwing elbow results in avg of 74 days lost
         # position player (non-pitcher) longevitiy: https://www.nytimes.com/2007/07/15/sports/baseball/15careers.html
-        self.condition_change_per_day = 15  # improve with rest, mid-point of normal dist for recovery
+        self.condition_change_per_day = 17  # improve with rest, mid-point of normal dist for recovery
         self.fatigue_start_perc = 70  # 85% of way to avg max is where fatigue starts, adjust factor to inc outing lgth
         self.fatigue_rate = .001  # at 85% of avg max pitchers have a .014 increase in OBP.  using .001 as proxy
         self.fatigue_pitching_change_limit = 5  # change pitcher at # or below out of 100
@@ -196,6 +196,46 @@ class BaseballStats:
         df = self.add_missing_cols(df)
         return df
 
+    def get_player_historical_data(self, player_name: str, is_batter: bool = True) -> DataFrame:
+        """
+        Get historical year-by-year data for a specific player.
+
+        :param player_name: Name of the player
+        :param is_batter: True for batting data, False for pitching data
+        :return: DataFrame with year-by-year historical stats, sorted by season (most recent first)
+        """
+        try:
+            # Build file name for historical data
+            seasons_str = " ".join(str(season) for season in self.load_seasons)
+            data_type = "Batting" if is_batter else "Pitching"
+            historical_file = f"{seasons_str} historical-{data_type}.csv"
+
+            # Load historical data
+            historical_df = pd.read_csv(historical_file, index_col='Player_Season_Key')
+
+            # Filter by player name
+            player_history = historical_df[historical_df['Player'] == player_name].copy()
+
+            # Sort by season (most recent first)
+            if 'Season' in player_history.columns:
+                player_history = player_history.sort_values('Season', ascending=False)
+
+            # Calculate derived stats if needed
+            if is_batter:
+                player_history = team_batting_stats(player_history, filter_stats=False)
+            else:
+                player_history = team_pitching_stats(player_history, filter_stats=False)
+
+            logger.debug(f"Retrieved {len(player_history)} historical seasons for {player_name}")
+            return player_history
+
+        except FileNotFoundError as e:
+            logger.error(f"Historical data file not found: {e}")
+            return pd.DataFrame()  # Return empty DataFrame if file not found
+        except Exception as e:
+            logger.error(f"Error retrieving historical data for {player_name}: {e}")
+            return pd.DataFrame()  # Return empty DataFrame on error
+
     def get_seasons(self, batter_file: str, pitcher_file: str) -> None:
         """
         loads a full season of data for pitching and hitting and casts cols to proper values, loads values into
@@ -253,6 +293,12 @@ class BaseballStats:
         self._ensure_column_exists([self.pitching_data, self.new_season_pitching_data], 'Sim_WAR', 0.0)
         self._ensure_column_exists([self.batting_data, self.new_season_batting_data], 'Sim_WAR', 0.0)
 
+        # Explicitly ensure 'Injury Description' has dtype 'object' (string type) not float
+        self.pitching_data['Injury Description'] = self.pitching_data['Injury Description'].astype('object')
+        self.new_season_pitching_data['Injury Description'] = self.new_season_pitching_data['Injury Description'].astype('object')
+        self.batting_data['Injury Description'] = self.batting_data['Injury Description'].astype('object')
+        self.new_season_batting_data['Injury Description'] = self.new_season_batting_data['Injury Description'].astype('object')
+
         return
 
     def _ensure_column_exists(self, df_list: List[DataFrame], column_name: str, default_value) -> None:
@@ -276,8 +322,23 @@ class BaseballStats:
         :return: None (modifies target_df in place)
         """
         for field in field_list:
+        #     if field in source_df.columns and field in target_df.columns:
+        #         target_df.loc[:, field] = source_df.loc[:, field].astype(target_df[field].dtype)
             if field in source_df.columns and field in target_df.columns:
-                target_df.loc[:, field] = source_df.loc[:, field].astype(target_df[field].dtype)
+                # 1. Get the current dtype of the target
+                target_dtype = target_df[field].dtype
+
+                # 2. If target is object type (strings), just assign directly without casting
+                if target_dtype == 'object':
+                    target_df[field] = source_df[field]
+                # 3. If target is an integer but source has NaNs,
+                #    force the cast to 'Int64' (Nullable Integer)
+                elif "int" in str(target_dtype).lower() and source_df[field].isnull().any():
+                    target_df[field] = source_df[field].astype("Int64")
+                else:
+                    # 4. Otherwise, proceed with the existing target dtype
+                    target_df[field] = source_df[field].astype(target_dtype)
+
 
     def sync_dynamic_fields(self, target_pitching_df: DataFrame, target_batting_df: DataFrame) -> None:
         """
@@ -675,9 +736,7 @@ class BaseballStats:
                 team_batting_stats(self.new_season_batting_data[self.new_season_batting_data['AB'] > 0].fillna(0))
             logger.debug('Updated season pitching stats:\n{}', self.new_season_pitching_data.to_string(justify="right"))
 
-            # Calculate Sim WAR after updating stats
-            logger.debug('Calculating player WAR values...')
-            self.calculate_sim_war()
+            # Note: Sim WAR is calculated only during AI GM assessments (not after every game)
             logger.debug('Season statistics update complete.')
         return
 
@@ -759,6 +818,8 @@ class BaseballStats:
         else:
             batting_df['Sim_WAR'] = 0.0
 
+        batting_df['Sim_WAR'] = batting_df['Sim_WAR'] + batting_df['WAR'] / 2 # weight the prior experience
+
         # ===== PITCHER SIM WAR =====
         pitching_df = self.new_season_pitching_data
 
@@ -818,6 +879,7 @@ class BaseballStats:
         else:
             pitching_df['Sim_WAR'] = 0.0
 
+        pitching_df['Sim_WAR'] = pitching_df['Sim_WAR'] + pitching_df['WAR'] / 2  # weight the prior experience
         return
 
     def move_a_player_between_teams(self, player_index, new_team):

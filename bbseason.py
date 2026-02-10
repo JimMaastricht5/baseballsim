@@ -38,9 +38,131 @@ import numpy as np
 from typing import List, Optional
 import threading
 from bblogger import logger
+from typing import Callable, Optional, Dict, Any
+
+OutputHandlerType = Callable[[str, str, Optional[Dict[str, Any]]], None]
+PlayByPlayCallbackFactory = Callable[[str, str, int], Optional[Callable[[str], None]]]
+
+# Output Categories - used by output_handler to categorize different types of output
+class OutputCategory:
+    """
+    Constants for output handler categories.
+
+    Custom output handlers can use these categories to selectively handle different
+    types of output (e.g., route to different UI elements, log at different levels, etc.)
+
+    Season Lifecycle:
+        SEASON_START: Season initialization info (teams, schedule length, etc.)
+        SEASON_END: Final statistics, end-of-season summaries
+
+    Day Simulation:
+        DAY_SCHEDULE: Daily game schedule display
+        DAY_PROGRESS: Progress indicators during simulation (dots, status messages)
+        DAY_STANDINGS: League standings display
+
+    Game Results:
+        GAME_RESULT_FULL: Full game recap for followed teams
+        GAME_RESULT_COMPACT: Compact summaries for batch of games
+
+    AI General Manager:
+        GM_ASSESSMENT: GM roster assessments at milestone games
+
+    World Series:
+        WORLD_SERIES_START: World Series matchup announcement
+        WORLD_SERIES_END: Championship result
+
+    Progress:
+        SIM_PROGRESS: Threading/simulation progress messages
+    """
+    # Season lifecycle
+    SEASON_START = 'season_start'
+    SEASON_END = 'season_end'
+
+    # Day simulation
+    DAY_SCHEDULE = 'day_schedule'
+    DAY_PROGRESS = 'day_progress'
+    DAY_STANDINGS = 'day_standings'
+
+    # Game results
+    GAME_RESULT_FULL = 'game_result_full'
+    GAME_RESULT_COMPACT = 'game_result_compact'
+
+    # AI GM
+    GM_ASSESSMENT = 'gm_assessment'
+
+    # World Series
+    WORLD_SERIES_START = 'world_series_start'
+    WORLD_SERIES_END = 'world_series_end'
+
+    # Progress
+    SIM_PROGRESS = 'sim_progress'
+
+
+def console_output_handler(category: str, text: str, metadata: Optional[Dict] = None) -> None:
+    """
+    Default console output handler - prints all output to stdout.
+
+    Args:
+        category: Output category (see OutputCategory constants)
+        text: Human-readable text to output
+        metadata: Optional structured data associated with the output
+    """
+    print(text, end='')
+
+def null_output_handler(category: str, text: str, metadata: Optional[Dict] = None) -> None:
+    """
+    Null handler that discards all output.
+
+    Useful for running simulations without any console output.
+
+    Args:
+        category: Output category (ignored)
+        text: Output text (ignored)
+        metadata: Metadata (ignored)
+    """
+    pass
+
+
+def create_custom_output_handler_example():
+    """
+    Example of how to create a custom output handler.
+
+    This is a template function showing how to implement selective handling
+    of different output categories. Users can copy and modify this pattern.
+
+    Returns:
+        A custom output handler function
+
+    Example usage:
+        handler = create_custom_output_handler()
+        season = BaseballSeason(..., output_handler=handler)
+        season.sim_full_season()
+    """
+    def custom_handler(category: str, text: str, metadata: Optional[Dict] = None):
+        """Custom output handler with selective category handling."""
+        if category == OutputCategory.GAME_RESULT_FULL:
+            # Log detailed game results to a file
+            with open('game_results.log', 'a') as f:
+                f.write(text)
+        elif category == OutputCategory.DAY_STANDINGS:
+            # Update a database with standings data
+            # standings_data = metadata.get('standings', [])
+            # update_database(standings_data)
+            pass
+        elif category in (OutputCategory.SIM_PROGRESS, OutputCategory.DAY_PROGRESS):
+            # Suppress progress indicators
+            pass
+        else:
+            # Print everything else to console
+            print(text, end='')
+
+    return custom_handler
+
 
 AWAY = 0
 HOME = 1
+WIN = 0
+LOSS = 1
 
 
 class BaseballSeason:
@@ -51,7 +173,9 @@ class BaseballSeason:
                  season_chatty: bool = False, season_team_to_follow: Optional[List[str]] = None,
                  load_batter_file: str = 'aggr-stats-pp-Batting.csv',
                  load_pitcher_file: str = 'aggr-stats-pp-Pitching.csv',
-                 schedule: list = None, suppress_console_output: bool = False) -> None:
+                 schedule: list = None, suppress_console_output: bool = False,
+                 output_handler: Optional[OutputHandlerType] = None,
+                 play_by_play_callback_factory: Optional[PlayByPlayCallbackFactory] = None) -> None:
         """
         :param load_seasons: list of seasons to load for stats, can blend multiple seasons
         :param new_season: int value representing the year of the new season can be the same as one of the loads
@@ -69,8 +193,14 @@ class BaseballSeason:
         :param load_pitcher_file: name of the file for the pitcher data, year will be added to the front of the text
         :param schedule: optional pre-built schedule
         :param suppress_console_output: if True, suppress disabled list and hot/cold list console output
+        :param output_handler: optional output handler function
+        :param play_by_play_callback_factory: optional factory function that creates play-by-play callbacks
+                                               for each game. Takes (away_team, home_team, day_num) and
+                                               returns a callback function or None.
         :return: None
         """
+        self.output_handler = output_handler if output_handler is not None else console_output_handler
+        self.play_by_play_callback_factory = play_by_play_callback_factory
         self.season_day_num = 0  # set to first day of the season
         self.season_length = season_length
         self.series_length = series_length
@@ -124,24 +254,70 @@ class BaseballSeason:
     def create_schedule(self) -> None:
         """
         set the schedule for the seasons using the teams, series length, min games in season, and limit of games
-        conflicts sometimes occur between the params, so it is possible for a team to play an extra game
-        day schedule in format  ([['MIL', 'COL'], ['PIT', 'CIN'], ['CHC', 'STL']])  # test schedule
+        ([['MIL', 'COL'], ['PIT', 'CIN'], ['CHC', 'STL']])  # test schedule
         if there are an odd number of teams there may be an "OFF" day in the schedule
         :return: None
         """
-        for game_day in range(0, len(self.teams)-1):  # setup each team play all other teams one time
-            random.shuffle(self.teams)  # randomize team match ups. may repeat, deal with it
-            day_schedule = []
-            for ii in range(0, len(self.teams), 2):  # select home and away without repeating a team, inc by 2 away/home
-                day_schedule.append([self.teams[ii], self.teams[ii+1]])  # build schedule for one day
 
-            for series_game in range(0, self.series_length):  # repeat day schedule to build series
-                self.schedule.append(day_schedule)  # add day schedule to full schedule
-        # schedule is built, check against minimums and repeat if needed, recursive call to build out further
-        if len(self.schedule) < self.season_length:
-            self.create_schedule()  # recursive call to add more games to get over minimum
-        elif len(self.schedule) > self.season_length:
-            self.schedule = self.schedule[0:self.season_length]
+        # 1. Setup
+        teams_list = list(self.teams)
+        target_games = self.season_length  # e.g., 162
+
+        # Handle odd number of teams
+        if len(teams_list) % 2 != 0:
+            teams_list.append("OFF")
+
+        num_teams = len(teams_list)
+        num_rounds = num_teams - 1
+
+        # Track games played by a specific "real" team to know when to stop
+        # We'll use the first team in the original list
+        tracking_team = self.teams[0]
+        games_scheduled_for_tracker = 0
+
+        self.schedule = []  # Reset schedule
+        random.shuffle(teams_list)
+
+        # 2. Main Loop: Continue until the tracking team has played the target games
+        while games_scheduled_for_tracker < target_games:
+
+            # Perform one full Round-Robin rotation
+            for _ in range(num_rounds):
+                day_matchups = []
+
+                # Generate pairs for this round
+                round_pairs = []
+                tracker_plays_this_round = True
+
+                for i in range(num_teams // 2):
+                    home = teams_list[i]
+                    away = teams_list[num_teams - 1 - i]
+
+                    # Check if our tracking team is playing someone or has an OFF day
+                    if tracking_team in (home, away):
+                        if "OFF" in (home, away):
+                            tracker_plays_this_round = False
+
+                    if home != "OFF" and away != "OFF":
+                        round_pairs.append([home, away])
+
+                # 3. Add the series to the schedule
+                for _ in range(self.series_length):
+                    # Only add games if we haven't hit the target yet
+                    if games_scheduled_for_tracker < target_games:
+                        self.schedule.append(round_pairs)
+
+                        # Only increment count if the tracker actually played a game
+                        if tracker_plays_this_round:
+                            games_scheduled_for_tracker += 1
+                    else:
+                        break
+
+                # 4. Rotate teams
+                teams_list = [teams_list[0]] + [teams_list[-1]] + teams_list[1:-1]
+
+                if games_scheduled_for_tracker >= target_games:
+                    break
         return
 
     def print_day_schedule(self, day: int) -> str:
@@ -216,11 +392,11 @@ class BaseballSeason:
         col2 = display_df.iloc[teams_per_col:teams_per_col*2].reset_index(drop=True)
         col3 = display_df.iloc[teams_per_col*2:].reset_index(drop=True)
 
-        # Print header
-        print(f"{'Team':<5} {'W-L':<8} {'Pct':<6} {'GB':<5}   {'Team':<5} {'W-L':<8} {'Pct':<6} {'GB':<5}   {'Team':<5} {'W-L':<8} {'Pct':<6} {'GB':<5}")
-        print('-' * 90)
+        # Build standings text
+        standings_text = f"{'Team':<5} {'W-L':<8} {'Pct':<6} {'GB':<5}   {'Team':<5} {'W-L':<8} {'Pct':<6} {'GB':<5}   {'Team':<5} {'W-L':<8} {'Pct':<6} {'GB':<5}\n"
+        standings_text += '-' * 90 + '\n'
 
-        # Print rows side by side
+        # Build rows side by side
         for i in range(teams_per_col):
             line_parts = []
 
@@ -236,9 +412,19 @@ class BaseballSeason:
                 row = col3.iloc[i]
                 line_parts.append(f"{row['Team']:<5} {row['W-L']:<8} {row['Pct']:<6} {row['GB']:<5}")
 
-            print("   ".join(line_parts))
+            standings_text += "   ".join(line_parts) + '\n'
 
-        print('')
+        standings_text += '\n'
+
+        # Extract structured standings data for metadata
+        standings_data = df[['Team', 'W', 'L']].to_dict('records')
+
+        # Send to output handler
+        self.output_handler(
+            OutputCategory.DAY_STANDINGS,
+            standings_text,
+            metadata={'standings': standings_data}
+        )
         return
 
     def _process_and_print_game_results(self, game_results: List[tuple]) -> None:
@@ -271,11 +457,19 @@ class BaseballSeason:
 
         # Print followed games first (full format)
         for game_recap in followed_games:
-            print(game_recap)
+            self.output_handler(
+                OutputCategory.GAME_RESULT_FULL,
+                game_recap,
+                metadata={'game_recap': game_recap}
+            )
 
         # Print non-followed games in compact format (5 per line)
         if compact_summaries:
-            print(bbgame.Game.format_compact_games(compact_summaries))
+            self.output_handler(
+                OutputCategory.GAME_RESULT_COMPACT,
+                bbgame.Game.format_compact_games(compact_summaries),
+                metadata={'compact_games': compact_summaries}
+            )
 
     def update_win_loss(self, away_team_name: str, home_team_name: str, win_loss: List[List[int]]) -> None:
         """
@@ -304,10 +498,22 @@ class BaseballSeason:
         Returns:
             Games back (negative if team is leading, 0.0 if tied for lead)
         """
+        team_data = []
         if team_name == 'OFF DAY':
             return 0.0
 
-        # Get team's record
+        # Get team's league
+        team_league = None
+        if (hasattr(self.baseball_data, 'batting_data') and  'League' in self.baseball_data.batting_data.columns):
+            team_data = (self.baseball_data.batting_data)[self.baseball_data.batting_data['Team'] == team_name]
+        if not team_data.empty:
+            team_league = team_data['League'].iloc[0]
+
+        # If league not found, fall back to old behavior (all teams)
+        if team_league is None:
+            logger.warning(f"Could not determine league for {team_name}, calculating GB across all teams")
+
+    # Get team's record
         team_record = self.team_win_loss[team_name]
         team_wins = team_record[0]
         team_losses = team_record[1]
@@ -332,6 +538,112 @@ class BaseballSeason:
 
         return games_back
 
+    def should_run_world_series(self) -> bool:
+        """
+        Check if World Series should run after this season.
+
+        Returns True if:
+        - This is a full season (10+ games minimum for testing)
+        - Both AL and NL teams are present
+        - League column exists in batting data
+
+        Returns:
+            bool: True if World Series should be run
+        """
+        # Check season length (10+ games minimum for testing)
+        if self.season_length < 10:
+            return False
+
+        # Check if batting data exists
+        if not hasattr(self.baseball_data, 'batting_data'):
+            return False
+
+        # Check if League column exists
+        if 'League' not in self.baseball_data.batting_data.columns:
+            return False
+
+        # Verify both AL and NL exist
+        team_leagues = self.baseball_data.batting_data[['Team', 'League']].drop_duplicates()
+        leagues = set(team_leagues['League'].values)
+        return 'AL' in leagues and 'NL' in leagues
+
+    def get_league_winners(self) -> tuple:
+        """
+        Get AL and NL champions from current standings.
+
+        Determines the team with the best record in each league.
+        Tiebreaker: most wins, then fewest losses.
+
+        Returns:
+            tuple: (al_winner, nl_winner) or (None, None) if cannot determine
+        """
+        # Create team->league mapping from batting_data
+        team_league_df = self.baseball_data.batting_data[['Team', 'League']].drop_duplicates()
+        team_league_map = dict(zip(team_league_df['Team'], team_league_df['League']))
+
+        # Separate teams by league
+        al_teams, nl_teams = [], []
+        for team in self.team_win_loss:
+            if team != 'OFF DAY':
+                league = team_league_map.get(team)
+                if league == 'AL':
+                    al_teams.append(team)
+                elif league == 'NL':
+                    nl_teams.append(team)
+
+        # Sort by wins (descending), then losses (ascending) for tiebreaker
+        def sort_by_record(teams):
+            return sorted(teams,
+                         key=lambda t: (self.team_win_loss[t][0], -self.team_win_loss[t][1]),
+                         reverse=True)
+
+        al_teams = sort_by_record(al_teams)
+        nl_teams = sort_by_record(nl_teams)
+
+        # Get top team from each league
+        al_winner = al_teams[0] if len(al_teams) > 0 else None
+        nl_winner = nl_teams[0] if len(nl_teams) > 0 else None
+
+        return (al_winner, nl_winner)
+
+    def create_world_series_schedule(self, al_winner: str, nl_winner: str) -> list:
+        """
+        Create 2-3-2 format World Series schedule.
+
+        Better regular season record hosts games 1, 2, 6, 7.
+        Opponent hosts games 3, 4, 5.
+
+        Args:
+            al_winner: AL champion abbreviation
+            nl_winner: NL champion abbreviation
+
+        Returns:
+            list: Schedule in format List[List[List[str]]]
+                  [[['away', 'home']], ...] for 7 games
+        """
+        # Determine better record
+        al_wins, al_losses = self.team_win_loss[al_winner]
+        nl_wins, nl_losses = self.team_win_loss[nl_winner]
+        al_pct = al_wins / (al_wins + al_losses) if (al_wins + al_losses) > 0 else 0
+        nl_pct = nl_wins / (nl_wins + nl_losses) if (nl_wins + nl_losses) > 0 else 0
+
+        # Better record hosts games 1,2,6,7
+        if al_pct >= nl_pct:
+            home_team, away_team = al_winner, nl_winner
+        else:
+            home_team, away_team = nl_winner, al_winner
+
+        # Build 2-3-2 schedule: [away, home] format
+        return [
+            [[away_team, home_team]],  # Game 1: Home hosts
+            [[away_team, home_team]],  # Game 2: Home hosts
+            [[home_team, away_team]],  # Game 3: Away hosts
+            [[home_team, away_team]],  # Game 4: Away hosts
+            [[home_team, away_team]],  # Game 5: Away hosts
+            [[away_team, home_team]],  # Game 6: Home hosts
+            [[away_team, home_team]]   # Game 7: Home hosts
+        ]
+
     def _get_teams_to_print(self) -> Optional[List[str]]:
         """
         Get list of teams to print AI GM output for.
@@ -344,10 +656,13 @@ class BaseballSeason:
         else:
             return [self.team_to_follow]  # Convert string to list
 
-    def check_gm_assessments(self) -> None:
+    def check_gm_assessments(self, force: bool = False) -> None:
         """
         Check if any teams have reached GM assessment milestones (30, 60, 90, 120, 150 games).
         Run assessments for teams that are due.
+
+        Args:
+            force: If True, force assessments for all teams regardless of schedule
         """
         # Skip GM assessments after game 150 milestone (last assessment)
         # This avoids expensive calculations late in the season
@@ -368,8 +683,8 @@ class BaseballSeason:
         for team_name, gm in self.gm_managers.items():
             games_played = self.team_games_played[team_name]
 
-            # Check if assessment is due
-            if gm.should_assess(games_played):
+            # Check if assessment is due (or force if requested)
+            if force or gm.should_assess(games_played):
                 # Get team record
                 record = self.team_win_loss[team_name]
                 wins, losses = record[0], record[1]
@@ -389,7 +704,6 @@ class BaseballSeason:
                     games_played=games_played,
                     should_print=should_print
                 )
-
                 # Could store assessment for later analysis
                 # self.gm_assessments[team_name].append(assessment)
 
@@ -401,13 +715,25 @@ class BaseballSeason:
         :return: None
         """
         teams_paragraph = ''
-        print(f'{self.new_season} will have {len(self.schedule)} games per team with {len(self.teams)} teams.')
+        self.output_handler(
+            OutputCategory.SEASON_START,
+            f'{self.new_season} will have {len(self.schedule)} games per team with {len(self.teams)} teams.\n',
+            metadata={'season': self.new_season, 'games': len(self.schedule), 'teams': len(self.teams)}
+        )
         for team in self.team_city_dict.keys():
             teams_paragraph = teams_paragraph + ', ' if len(teams_paragraph) > 0 else ''
             teams_paragraph = teams_paragraph + f'{self.team_city_dict[team]} ({team})'
-        print(f'{teams_paragraph} \n')
+        self.output_handler(
+            OutputCategory.SEASON_START,
+            f'{teams_paragraph} \n\n',
+            metadata={'team_names': self.team_city_dict}
+        )
         if self.season_chatty:
-            print(f'Full schedule of games: {self.schedule}')
+            self.output_handler(
+                'season_start',
+                f'Full schedule of games: {self.schedule}\n',
+                metadata={'schedule': self.schedule}
+            )
         return
 
     def sim_end(self) -> None:
@@ -415,21 +741,17 @@ class BaseballSeason:
         print end of season info and update end of season stats
         :return: None
         """
-        print('\nCalculating final season statistics...')
+        self.output_handler(OutputCategory.SEASON_END, '\nCalculating final season statistics...\n', metadata=None)
         self.baseball_data.update_season_stats()
-        print(f'\n\n****** End of {self.new_season} season ******')
-        print(f'{self.new_season} Season Standings:')
+        self.output_handler(OutputCategory.SEASON_END, f'\n\n****** End of {self.new_season} season ******\n', metadata={'season': self.new_season})
+        self.output_handler(OutputCategory.SEASON_END, f'{self.new_season} Season Standings:\n', metadata={'season': self.new_season})
         self.print_standings()
-        print(f'\n{self.new_season} Season Stats')
-        if self.team_to_follow != '' and self.team_to_follow in self.baseball_data.get_all_team_names():
-            self.baseball_data.print_current_season(teams=[self.team_to_follow], summary_only_b=False)
+        self.output_handler(OutputCategory.SEASON_END, f'\n{self.new_season} Season Stats\n', metadata={'season': self.new_season})
+        self.baseball_data.print_current_season(teams=self.team_to_follow, summary_only_b=False)
         self.baseball_data.print_current_season(teams=self.teams, summary_only_b=not self.season_chatty)
 
-        # Save final season statistics to CSV files
-        self.baseball_data.save_season_stats()
-
         # Perform AI GM end-of-season evaluations
-        print(f'\n\n****** AI GM End-of-Season Evaluations ******\n')
+        self.output_handler(OutputCategory.SEASON_END, f'\n\n****** AI GM End-of-Season Evaluations ******\n', metadata=None)
         self._perform_gm_evaluations()
 
         return
@@ -483,7 +805,7 @@ class BaseballSeason:
                 )
 
         # Print all player stats after GM evaluations
-        print(f'\n\n****** Complete Player Statistics ******\n')
+        self.output_handler(OutputCategory.SEASON_END, f'\n\n****** Complete Player Statistics ******\n', metadata=None)
         self.baseball_data.print_current_season(teams=None, summary_only_b=False)
 
         return
@@ -493,7 +815,11 @@ class BaseballSeason:
         sim one day of games across the league
         :return: None
         """
-        print(self.print_day_schedule(season_day_num))
+        self.output_handler(
+            OutputCategory.DAY_SCHEDULE,
+            self.print_day_schedule(season_day_num),
+            metadata={'day': season_day_num + 1, 'schedule': self.schedule[season_day_num]}
+        )
         todays_games = self.schedule[season_day_num]
         # Pass team_to_follow list (if not empty) to show hot/cold players
         teams_list = self.team_to_follow if len(self.team_to_follow) > 0 else None
@@ -504,11 +830,17 @@ class BaseballSeason:
 
         for match_up in todays_games:  # run all games for a day, day starts at zero
             if 'OFF DAY' not in match_up:  # not an off day
+                # Create play-by-play callback if factory is provided
+                pbp_callback = None
+                if self.play_by_play_callback_factory:
+                    pbp_callback = self.play_by_play_callback_factory(match_up[0], match_up[1], season_day_num)
+
                 game = bbgame.Game(away_team_name=match_up[0], home_team_name=match_up[1],
                                    baseball_data=self.baseball_data, game_num=season_day_num,
                                    rotation_len=self.rotation_len, print_lineup=self.print_lineup_b,
                                    chatty=self.season_chatty, print_box_score_b=self.print_box_score_b,
-                                   team_to_follow=self.team_to_follow, interactive=self.interactive)
+                                   team_to_follow=self.team_to_follow, interactive=self.interactive,
+                                   play_by_play_callback=pbp_callback)
                 score, inning, win_loss_list, game_recap = game.sim_game()
                 self.update_win_loss(away_team_name=match_up[0], home_team_name=match_up[1], win_loss=win_loss_list)
                 self.baseball_data.game_results_to_season(box_score_class=game.teams[AWAY].box_score)
@@ -530,28 +862,42 @@ class BaseballSeason:
         threads = []
         queues = []
         match_ups = []
-        print(self.print_day_schedule(season_day_num) + '\n')
+        self.output_handler(
+            OutputCategory.DAY_SCHEDULE,
+            self.print_day_schedule(season_day_num) + '\n',
+            metadata={'day': season_day_num + 1, 'schedule': self.schedule[season_day_num]}
+        )
         todays_games = self.schedule[season_day_num]
         # Pass team_to_follow list (if not empty) to show hot/cold players
         teams_list = self.team_to_follow if len(self.team_to_follow) > 0 else None
         self.baseball_data.new_game_day(teams_to_follow=teams_list)  # update rest, injury, and print lists
-        print(f'Simulating day #{season_day_num + 1} for league(s): {self.leagues_str}', end='')  # start sim wait line
+        self.output_handler(
+            OutputCategory.SIM_PROGRESS,
+            f'Simulating day #{season_day_num + 1} for league(s): {self.leagues_str}',
+            metadata={'day': season_day_num + 1, 'leagues': self.leagues_str}
+        )
         for match_up in todays_games:  # run all games for a day, day starts at zero
             if 'OFF DAY' not in match_up:  # not an off day
+                # Create play-by-play callback if factory is provided
+                pbp_callback = None
+                if self.play_by_play_callback_factory:
+                    pbp_callback = self.play_by_play_callback_factory(match_up[0], match_up[1], season_day_num)
+
                 # print(f'in sim day threaded: Playing day #{season_day_num + 1}: {match_up[0]} away against {match_up[1]}')
                 game = bbgame.Game(away_team_name=match_up[0], home_team_name=match_up[1],
                                    baseball_data=self.baseball_data, game_num=season_day_num,
                                    rotation_len=self.rotation_len, print_lineup=self.print_lineup_b,
                                    chatty=self.season_chatty, print_box_score_b=self.print_box_score_b,
-                                   team_to_follow=self.team_to_follow, interactive=self.interactive)
+                                   team_to_follow=self.team_to_follow, interactive=self.interactive,
+                                   play_by_play_callback=pbp_callback)
                 q = queue.Queue()
                 thread = threading.Thread(target=game.sim_game_threaded, args=(q,))
                 threads.append(thread)
                 queues.append(q)
                 match_ups.append(match_up)
                 thread.start()
-                print('.', end='')
-        print('')
+                self.output_handler(OutputCategory.SIM_PROGRESS, '.', metadata=None)
+        self.output_handler(OutputCategory.SIM_PROGRESS, '\n', metadata=None)
 
         # Collect game results
         game_results = []
@@ -580,7 +926,11 @@ class BaseballSeason:
         """
         # self.sim_day(season_day_num=self.season_day_num)
         self.sim_day_threaded(season_day_num=self.season_day_num)
-        print(f'Standings for Day {self.season_day_num + 1}:')
+        self.output_handler(
+            OutputCategory.DAY_STANDINGS,
+            f'Standings for Day {self.season_day_num + 1}:\n',
+            metadata={'day': self.season_day_num + 1}
+        )
         self.print_standings()
 
         # Check if any teams are due for GM assessment (every 30 games)
@@ -589,16 +939,110 @@ class BaseballSeason:
         self.season_day_num = self.season_day_num + 1
         return
 
+    def run_world_series(self) -> None:
+        """
+        Run World Series playoff between league champions.
+
+        Called after regular season ends. Creates a new BaseballSeason instance
+        with 2 teams and 7-game schedule, then runs full simulation.
+        Updates same season stats and declares champion.
+        """
+        import os
+        from bblogger import logger
+
+        # Check eligibility
+        if not self.should_run_world_series():
+            return
+
+        # Get league winners
+        al_winner, nl_winner = self.get_league_winners()
+        if al_winner is None or nl_winner is None:
+            logger.warning("Cannot determine league winners for World Series")
+            return
+
+        # Print header
+        al_record = self.team_win_loss[al_winner]
+        nl_record = self.team_win_loss[nl_winner]
+        ws_header = f"\n\n{'='*80}\n"
+        ws_header += f"{self.new_season} WORLD SERIES\n"
+        ws_header += f"American League Champion: {self.team_city_dict[al_winner]} ({al_winner})\n"
+        ws_header += f"National League Champion: {self.team_city_dict[nl_winner]} ({nl_winner})\n"
+        ws_header += f"{al_winner}: {al_record[WIN]}-{al_record[LOSS]} vs {nl_winner}: {nl_record[WIN]}-{nl_record[LOSS]}\n"
+        ws_header += f"{'='*80}\n\n"
+        self.output_handler(
+            OutputCategory.WORLD_SERIES_START,
+            ws_header,
+            metadata={
+                'season': self.new_season,
+                'al_winner': al_winner,
+                'nl_winner': nl_winner,
+                'al_record': al_record,
+                'nl_record': nl_record
+            }
+        )
+
+        # Create World Series schedule and append onto exist schedule
+        ws_schedule = self.create_world_series_schedule(al_winner, nl_winner)
+        for ws_game in ws_schedule:
+            self.schedule.append(ws_game)
+
+        # Run World Series simulation
+        self.team_to_follow.append(al_winner)
+        self.team_to_follow.append(nl_winner)
+        self.print_box_score_b = True
+        self.season_chatty = True
+        while (self.season_day_num < len(self.schedule) and
+               self.team_win_loss[al_winner][WIN] - al_record[WIN] < 4 and
+               self.team_win_loss[nl_winner][WIN] - nl_record[WIN] < 4):
+            self.sim_next_day()
+
+        self.output_handler(OutputCategory.WORLD_SERIES_END, '\nCalculating final season statistics...\n', metadata=None)
+        self.baseball_data.update_season_stats()
+        self.output_handler(OutputCategory.WORLD_SERIES_END, f'\n\n****** End of {self.new_season} playoffs ******\n', metadata={'season': self.new_season})
+
+        # Declare champion
+        ws_al_wins = self.team_win_loss[al_winner][WIN] - al_record[WIN]
+        ws_nl_wins = self.team_win_loss[nl_winner][WIN] - nl_record[WIN]
+        ws_winner = al_winner if ws_al_wins > ws_nl_wins else nl_winner
+
+        ws_champion = f"\n\n{'='*80}\n"
+        ws_champion += f"{self.new_season} WORLD SERIES CHAMPION: {self.team_city_dict[ws_winner]} ({ws_winner})\n"
+        ws_champion += f"Series Result: {al_winner} {ws_al_wins}-{ws_nl_wins} {nl_winner}\n"
+        ws_champion += f"{'='*80}\n\n"
+        self.output_handler(
+            'world_series_end',
+            ws_champion,
+            metadata={
+                'season': self.new_season,
+                'winner': ws_winner,
+                'al_winner': al_winner,
+                'nl_winner': nl_winner,
+                'al_wins': ws_al_wins,
+                'nl_wins': ws_nl_wins
+            }
+        )
+
+        self.baseball_data.save_season_stats()
+        return
+
     def sim_full_season(self) -> None:
         """
         function drives overall sim for entire season
         :return: None
         """
         self.sim_start()
+
+        # Perform initial GM assessments at start of season
+        self.check_gm_assessments()
+
         while self.season_day_num <= len(self.schedule) - 1:  # loop over every day and every game scheduled that day
             self.sim_next_day()
 
         self.sim_end()
+
+        # Run World Series if this was a full regular season
+        self.run_world_series()
+
         return
 
 
@@ -609,7 +1053,9 @@ class MultiBaseballSeason:
                  season_print_lineup_b: bool = False, season_print_box_score_b: bool = False,
                  season_chatty: bool = False, season_team_to_follow: Optional[List[str]] = None,
                  load_batter_file: str = 'stats-pp-Batting.csv',
-                 load_pitcher_file: str = 'stats-pp-Pitching.csv') -> None:
+                 load_pitcher_file: str = 'stats-pp-Pitching.csv',
+                 output_handler: Optional[OutputHandlerType] = None,
+                 play_by_play_callback_factory: Optional[PlayByPlayCallbackFactory] = None) -> None:
         """
                 :param load_seasons: list of seasons to load for stats, can blend multiple seasons
                 :param new_season: int value representing the year of the new season can be the same as one of the loads
@@ -625,8 +1071,12 @@ class MultiBaseballSeason:
                 :param season_team_to_follow: list of team abbreviations to follow in detail (e.g., ['NYM', 'BOS'])
                 :param load_batter_file: name of the file with batter data, year will be added to the front of the text
                 :param load_pitcher_file: name of the file for the pitcher data, year will be added to the front of name
+                :param output_handler: optional output handler function
+                :param play_by_play_callback_factory: optional factory function for play-by-play callbacks
                 :return: None
                 """
+        self.output_handler = output_handler if output_handler is not None else console_output_handler
+        self.play_by_play_callback_factory = play_by_play_callback_factory
         self.season_day_num = 0  # set to first day of the season
         self.load_seasons = load_seasons  # pull base data across for what seasons
         self.new_season = new_season
@@ -644,7 +1094,8 @@ class MultiBaseballSeason:
         self.print_lineup_b = season_print_lineup_b
         self.print_box_score_b = season_print_box_score_b
         self.season_chatty = season_chatty
-        self.team_to_follow = season_team_to_follow if season_team_to_follow is not None else []
+        self.team_to_follow = [season_team_to_follow] if isinstance(season_team_to_follow, str) else (
+                    season_team_to_follow or [])
         self.load_batter_file = load_batter_file
         self.load_pitcher_file = load_pitcher_file
         logger.debug("Initializing MultiBaseballSeason with seasons: {}, new season: {}", load_seasons, new_season)
@@ -659,7 +1110,9 @@ class MultiBaseballSeason:
                                          season_print_box_score_b=self.print_box_score_b,
                                          season_team_to_follow=self.team_to_follow,
                                          load_batter_file=self.load_batter_file,
-                                         load_pitcher_file=self.load_pitcher_file)
+                                         load_pitcher_file=self.load_pitcher_file,
+                                         output_handler=self.output_handler,
+                                         play_by_play_callback_factory=self.play_by_play_callback_factory)
 
         if self.minors is not None:
             self.bbseason_b = BaseballSeason(load_seasons=self.load_seasons, new_season=self.new_season,
@@ -673,9 +1126,11 @@ class MultiBaseballSeason:
                                              season_print_box_score_b=self.print_box_score_b,
                                              season_team_to_follow=self.team_to_follow,
                                              load_batter_file=self.load_batter_file,
-                                             load_pitcher_file=self.load_pitcher_file)
+                                             load_pitcher_file=self.load_pitcher_file,
+                                             output_handler=self.output_handler,
+                                             play_by_play_callback_factory=self.play_by_play_callback_factory)
             self.affliations = dict(zip(self.bbseason_a.get_team_names(), self.bbseason_b.get_team_names()))
-            print(self.affliations)
+            self.output_handler(OutputCategory.SEASON_START, f'{self.affliations}\n', metadata={'affiliations': self.affliations})
         else:
             self.bbseason_b = None
             self.affliations = None
@@ -751,7 +1206,7 @@ if __name__ == '__main__':
 
     # handle a single full season of MLB
     if not fantasy:
-        my_team_to_follow = ['MIL']  # List of teams to follow, e.g., ['MIL', 'NYM'] for multiple
+        my_team_to_follow = ['MIL','MIA']  # List of teams to follow, e.g., ['MIL', 'NYM'] for multiple
         # my_team_to_follow = None  # or set to None for no followed teams
 
         # set a series schedule if you just want to simulate a playoff series or use the team_list param

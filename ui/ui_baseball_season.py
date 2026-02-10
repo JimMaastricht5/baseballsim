@@ -12,8 +12,10 @@ import pandas as pd
 from typing import List, Optional
 import queue
 import threading
+import time
 
 import bbseason
+from bbseason import WIN, LOSS, OutputCategory  # Import constants for playoff logic
 import bbgame
 from ui.signals import SeasonSignals
 from bblogger import logger
@@ -21,14 +23,26 @@ from bblogger import logger
 
 class UIBaseballSeason(bbseason.BaseballSeason):
     """
-    BaseballSeason subclass that emits queue-based signals instead of printing to console.
+    BaseballSeason subclass that emits queue-based signals for UI updates.
 
-    Overrides:
-    - _process_and_print_game_results(): Emits game_completed and day_completed signals via queues
-    - check_gm_assessments(): Emits gm_assessment_ready signal for followed teams via queues
-    - print_standings(): Suppressed (standings emitted with day_completed)
+    Uses a custom output_handler that suppresses console output and a
+    play_by_play_callback_factory for real-time game updates. This eliminates
+    the need to duplicate game simulation logic.
 
-    All other simulation logic remains unchanged from BaseballSeason.
+    Key Features:
+    - Custom output_handler suppresses console output
+    - Play-by-play callback factory injects real-time callbacks into games
+    - Emits signals for game_completed, day_completed, gm_assessment_ready
+    - Handles World Series with proper UI state tracking
+
+    Overrides (minimal):
+    - __init__(): Sets up signal handlers and passes factories to parent
+    - sim_day_threaded(): Adds UI-specific signals (day_started, injury_update)
+    - _process_and_print_game_results(): Emits game/day completion signals
+    - check_gm_assessments(): Emits GM assessment signals for followed teams
+    - run_world_series(): Tracks World Series state for UI
+
+    All simulation logic and callback injection inherited from BaseballSeason.
     """
 
     def __init__(self, signals: SeasonSignals, *args, **kwargs):
@@ -39,9 +53,59 @@ class UIBaseballSeason(bbseason.BaseballSeason):
             signals (SeasonSignals): Signal emitter for UI updates
             *args, **kwargs: Passed to BaseballSeason.__init__()
         """
-        super().__init__(*args, **kwargs)
+        # Create output handler that emits signals instead of printing
+        output_handler = self._create_signal_output_handler(signals)
+        # Create play-by-play callback factory for game-level real-time updates
+        play_by_play_factory = self._create_play_by_play_callback
+        super().__init__(*args,
+                         output_handler=output_handler,
+                         play_by_play_callback_factory=play_by_play_factory,
+                         **kwargs)
         self.signals = signals
+        # Track World Series state for play-by-play game numbering
+        self.ws_active = False
+        self.ws_al_winner = None
+        self.ws_nl_winner = None
+        self.ws_al_start_wins = 0
+        self.ws_nl_start_wins = 0
         logger.info("UIBaseballSeason initialized with signal emitter")
+
+    def _create_signal_output_handler(self, signals: SeasonSignals):
+        """
+        Create output handler that emits signals instead of printing.
+
+        This handler maps output categories to appropriate signal emissions,
+        allowing the UI to handle different types of output without needing
+        to override multiple methods.
+
+        Args:
+            signals: SeasonSignals instance for emitting UI updates
+
+        Returns:
+            callable: Output handler function
+        """
+        def handler(category: str, text: str, metadata: Optional[dict] = None):
+            """Handle output by emitting appropriate signals."""
+            # Most categories are suppressed for UI (no console output needed)
+            # Specific categories are handled via signals in overridden methods
+
+            # Suppress console output for most categories
+            # The UI gets updates through:
+            # - game_completed/day_completed signals (from _process_and_print_game_results)
+            # - gm_assessment_ready signals (from check_gm_assessments)
+            # - world_series_started/completed signals (from run_world_series)
+            # - day_started signals (from sim_day_threaded)
+
+            # Only log important events
+            if category in (OutputCategory.SEASON_START, OutputCategory.SEASON_END):
+                logger.info(f"Season event: {text.strip()}")
+            elif category in (OutputCategory.WORLD_SERIES_START, OutputCategory.WORLD_SERIES_END):
+                logger.info(f"World Series event: {text.strip()}")
+
+            # Suppress all console output - UI handles display
+            pass
+
+        return handler
 
     def _create_play_by_play_callback(self, away_team: str, home_team: str, day_num: int):
         """
@@ -56,17 +120,32 @@ class UIBaseballSeason(bbseason.BaseballSeason):
             callable: Callback function that accepts text string
         """
         def callback(text: str):
+            logger.debug(f"Callback invoked for {away_team} @ {home_team}, team_to_follow={self.team_to_follow}")
             # Only emit if this involves a followed team
             if not self.team_to_follow or any(team in self.team_to_follow for team in [away_team, home_team]):
+                logger.debug(f"Emitting play-by-play for {away_team} @ {home_team}")
+
+                # Calculate World Series game number if WS is active
+                ws_game_num = None
+                if self.ws_active and self.ws_al_winner and self.ws_nl_winner:
+                    # Total games completed = total new wins by both teams
+                    al_wins = self.team_win_loss[self.ws_al_winner][WIN] - self.ws_al_start_wins
+                    nl_wins = self.team_win_loss[self.ws_nl_winner][WIN] - self.ws_nl_start_wins
+                    ws_game_num = al_wins + nl_wins + 1  # +1 for current game in progress
+                    logger.info(f"World Series game {ws_game_num}: {self.ws_al_winner} {al_wins}, {self.ws_nl_winner} {nl_wins}")
+
                 self.signals.emit_play_by_play({
                     'away_team': away_team,
                     'home_team': home_team,
                     'text': text,
-                    'day_num': day_num
+                    'day_num': day_num,
+                    'ws_game_num': ws_game_num  # None for regular season, 1-7 for World Series
                 })
+            else:
+                logger.info(f"Skipping play-by-play - teams not in follow list")
         return callback
 
-    def _process_and_print_game_results(self, game_results: List[tuple], season_day_num: int = 0) -> None:
+    def _process_and_print_game_results(self, game_results: List[tuple]) -> None:
         """
         Override to emit signals instead of printing.
 
@@ -76,13 +155,13 @@ class UIBaseballSeason(bbseason.BaseballSeason):
 
         Args:
             game_results: List of tuples (match_up, score, game_recap, away_box_score, home_box_score)
-            season_day_num: Day number (0-indexed)
         """
         compact_summaries = []
 
         for match_up, score, game_recap, away_box_score, home_box_score in game_results:
             # Check if this was a followed game
-            is_followed = any(team in self.team_to_follow for team in match_up) if self.team_to_follow else False
+            # Empty team_to_follow means follow ALL games (used for World Series)
+            is_followed = (not self.team_to_follow) or any(team in self.team_to_follow for team in match_up)
 
             # Build game data dict
             game_data = {
@@ -95,7 +174,7 @@ class UIBaseballSeason(bbseason.BaseballSeason):
                 'away_e': away_box_score.total_errors,
                 'home_e': home_box_score.total_errors,
                 'game_recap': game_recap if is_followed else '',  # Full recap for followed games (display in Play-by-Play tab)
-                'day_num': season_day_num if is_followed else None
+                'day_num': self.season_day_num if is_followed else None  # Use instance variable
             }
 
             if is_followed:
@@ -120,12 +199,15 @@ class UIBaseballSeason(bbseason.BaseballSeason):
         self.signals.emit_day_completed(compact_summaries, standings_data)
         logger.debug(f"Emitted day_completed with {len(compact_summaries)} games and standings")
 
-    def check_gm_assessments(self) -> None:
+    def check_gm_assessments(self, force: bool = False) -> None:
         """
         Override to emit signals for GM assessments of followed teams.
 
         Runs the standard GM assessment logic but emits gm_assessment_ready
         signal instead of printing to console.
+
+        Args:
+            force: If True, force assessments for all teams regardless of schedule
         """
         # Skip GM assessments after game 150 milestone (last assessment)
         if self.team_games_played:
@@ -143,8 +225,8 @@ class UIBaseballSeason(bbseason.BaseballSeason):
         for team_name, gm in self.gm_managers.items():
             games_played = self.team_games_played[team_name]
 
-            # Check if assessment is due
-            if gm.should_assess(games_played):
+            # Check if assessment is due (or force if requested)
+            if force or gm.should_assess(games_played):
                 # Get team record
                 record = self.team_win_loss[team_name]
                 wins, losses = record[0], record[1]
@@ -180,102 +262,30 @@ class UIBaseballSeason(bbseason.BaseballSeason):
 
     def sim_day_threaded(self, season_day_num: int) -> None:
         """
-        Override to emit day_started signal and inject play-by-play callbacks.
+        Override to add UI-specific signals around base class simulation.
+
+        Emits day_started signal before simulation, waits for play-by-play queue
+        during World Series, and emits injury updates after simulation.
 
         Args:
             season_day_num (int): Day number (0-indexed)
         """
-        # Emit day_started signal with schedule
+        # UI-specific: Emit day_started signal with schedule
         schedule_text = self.print_day_schedule(season_day_num)
         self.signals.emit_day_started(season_day_num, schedule_text)
         logger.debug(f"Emitted day_started for day {season_day_num + 1}")
 
-        # Run game simulation (adapted from parent's sim_day_threaded)
-        threads = []
-        queues = []
-        match_ups = []
-        todays_games = self.schedule[season_day_num]
-        teams_list = self.team_to_follow if len(self.team_to_follow) > 0 else None
-        self.baseball_data.new_game_day(teams_to_follow=teams_list)
+        # Run base class simulation (now handles callback injection via factory)
+        super().sim_day_threaded(season_day_num)
 
-        for match_up in todays_games:
-            if 'OFF DAY' not in match_up:
-                # Create play-by-play callback for this game
-                pbp_callback = self._create_play_by_play_callback(
-                    match_up[0], match_up[1], season_day_num
-                )
+        # UI-specific: During World Series, wait for play-by-play to finish before showing box scores
+        if self.ws_active and hasattr(self, 'signals') and self.signals is not None:
+            self._wait_for_play_by_play_to_finish()
 
-                game = bbgame.Game(
-                    away_team_name=match_up[0],
-                    home_team_name=match_up[1],
-                    baseball_data=self.baseball_data,
-                    game_num=season_day_num,
-                    rotation_len=self.rotation_len,
-                    print_lineup=self.print_lineup_b,
-                    chatty=self.season_chatty,
-                    print_box_score_b=self.print_box_score_b,
-                    team_to_follow=self.team_to_follow,
-                    interactive=self.interactive,
-                    play_by_play_callback=pbp_callback  # NEW: Inject callback
-                )
-                q = queue.Queue()
-                thread = threading.Thread(target=game.sim_game_threaded, args=(q,))
-                threads.append(thread)
-                queues.append(q)
-                match_ups.append(match_up)
-                thread.start()
-
-        # Collect game results
-        game_results = []
-        for ii, thread in enumerate(threads):
-            thread.join()
-            (score, inning, win_loss_list, away_box_score, home_box_score, game_recap) = queues[ii].get()
-            match_up = match_ups[ii]
-            self.update_win_loss(away_team_name=match_up[0], home_team_name=match_up[1],
-                                win_loss=win_loss_list)
-            self.baseball_data.game_results_to_season(box_score_class=away_box_score)
-            self.baseball_data.game_results_to_season(box_score_class=home_box_score)
-            game_results.append((match_up, score, game_recap, away_box_score, home_box_score))
-
-        # Process and emit signals (existing code)
-        self._process_and_print_game_results(game_results, season_day_num)
-
-        # Extract and emit injury update
+        # UI-specific: Extract and emit injury update
         injuries = self.extract_injuries()
         self.signals.emit_injury_update(injuries)
         logger.debug(f"Emitted injury_update with {len(injuries)} injuries")
-
-    def print_standings(self) -> None:
-        """
-        Override to suppress printing.
-
-        Standings are emitted as part of day_completed signal,
-        so we don't need to print them separately.
-        """
-        # Standings already emitted via day_completed signal
-        pass
-
-    def sim_start(self) -> None:
-        """
-        Override to suppress printing start info.
-
-        The UI doesn't need this console output.
-        """
-        logger.info(f"Starting {self.new_season} season with {len(self.schedule)} games per team")
-        # Suppress the print statements from parent
-        pass
-
-    def sim_end(self) -> None:
-        """
-        Override to suppress printing end info.
-
-        The UI will show its own completion message.
-        """
-        logger.info(f"Ending {self.new_season} season")
-        # Update season stats
-        self.baseball_data.update_season_stats()
-        # Suppress the print statements from parent
-        pass
 
     def extract_standings(self) -> dict:
         """
@@ -321,8 +331,8 @@ class UIBaseballSeason(bbseason.BaseballSeason):
             if len(league_df) == 0:
                 return league_df
 
-            # Sort by wins descending
-            league_df = league_df.sort_values('W', ascending=False).reset_index(drop=True)
+            # Sort by wins descending, then losses ascending (tiebreaker)
+            league_df = league_df.sort_values(['W', 'L'], ascending=[False, True]).reset_index(drop=True)
 
             # Calculate Games Back from league leader
             max_wins = league_df['W'].iloc[0]
@@ -438,3 +448,121 @@ class UIBaseballSeason(bbseason.BaseballSeason):
                 schedule_lines.append(f"{match_up[0]} @ {match_up[1]}")
 
         return f"Day {day + 1}: " + ", ".join(schedule_lines)
+
+    def run_world_series(self) -> None:
+        """
+        Override to run World Series with UI signal emission.
+
+        Follows base bbseason.py implementation but adds UI signal emissions.
+        Appends playoff games to existing schedule and continues with same season instance.
+        Enables chatty mode and adds both teams to follow for play-by-play output.
+        """
+        from bblogger import logger
+
+        # Check eligibility
+        if not self.should_run_world_series():
+            return
+
+        # Get league winners (use base class method for consistency)
+        al_winner, nl_winner = self.get_league_winners()
+        if al_winner is None or nl_winner is None:
+            logger.warning("Cannot determine league winners for World Series")
+            return
+
+        # Get records (output_handler in base class handles printing)
+        al_record = self.team_win_loss[al_winner]
+        nl_record = self.team_win_loss[nl_winner]
+
+        # Emit world_series_started signal
+        # IMPORTANT: Also set world_series_active flag IMMEDIATELY to avoid timing issues
+        # with queued signals being processed after games complete
+        if hasattr(self, 'signals') and self.signals is not None:
+            # Set world_series_active synchronously BEFORE emitting signal
+            if self.signals.main_window is not None:
+                self.signals.main_window.world_series_active = True
+                self.signals.main_window.world_series_teams = {al_winner, nl_winner}
+                logger.info(f"Set world_series_active=True synchronously for {al_winner} vs {nl_winner}")
+
+            self.signals.emit_world_series_started({
+                'al_winner': al_winner,
+                'nl_winner': nl_winner,
+                'season': self.new_season,
+                'al_record': self.team_win_loss[al_winner],
+                'nl_record': self.team_win_loss[nl_winner]
+            })
+
+        # Create World Series schedule and append to existing schedule (matches base bbseason.py:788-790)
+        ws_schedule = self.create_world_series_schedule(al_winner, nl_winner)
+        for ws_game in ws_schedule:
+            self.schedule.append(ws_game)
+
+        # Add both teams to follow and enable detailed output (matches base bbseason.py:793-796)
+        self.team_to_follow.append(al_winner)
+        self.team_to_follow.append(nl_winner)
+        self.print_box_score_b = True
+        self.print_lineup_b = True  # Enable lineup printing for World Series
+        self.season_chatty = True
+
+        # Track World Series state for game numbering in play-by-play
+        self.ws_active = True
+        self.ws_al_winner = al_winner
+        self.ws_nl_winner = nl_winner
+        self.ws_al_start_wins = al_record[WIN]
+        self.ws_nl_start_wins = nl_record[WIN]
+        logger.info(f"World Series settings: season_chatty={self.season_chatty}, team_to_follow={self.team_to_follow}")
+        logger.info(f"World Series tracking: AL {al_winner} starts at {al_record[WIN]} wins, NL {nl_winner} starts at {nl_record[WIN]} wins")
+
+        # Run World Series simulation (matches base bbseason.py:797-800)
+        while (self.season_day_num < len(self.schedule) and
+               self.team_win_loss[al_winner][WIN] - al_record[WIN] < 4 and
+               self.team_win_loss[nl_winner][WIN] - nl_record[WIN] < 4):
+            logger.info(f"Simulating World Series day {self.season_day_num + 1}")
+            self.sim_next_day()
+            # Note: play-by-play queue draining now happens inside sim_day_threaded()
+
+        # Calculate final stats (output_handler in base class handles printing)
+        self.baseball_data.update_season_stats()
+
+        # Declare champion (matches base bbseason.py:807-814)
+        ws_al_wins = self.team_win_loss[al_winner][WIN] - al_record[WIN]
+        ws_nl_wins = self.team_win_loss[nl_winner][WIN] - nl_record[WIN]
+        ws_winner = al_winner if ws_al_wins > ws_nl_wins else nl_winner
+
+        # Emit world_series_completed signal (UI-specific addition)
+        if hasattr(self, 'signals') and self.signals is not None:
+            self.signals.emit_world_series_completed({
+                'champion': ws_winner,
+                'season': self.new_season,
+                'series_result': {
+                    al_winner: ws_al_wins,
+                    nl_winner: ws_nl_wins
+                }
+            })
+
+        # Save season stats (matches base bbseason.py:816)
+        self.baseball_data.save_season_stats()
+        return
+
+    def _wait_for_play_by_play_to_finish(self, timeout: float = 10.0) -> None:
+        """
+        Wait for the play-by-play queue to drain before continuing.
+
+        This ensures the UI has time to process and display all play-by-play
+        events from the current game before the next game starts.
+
+        Args:
+            timeout: Maximum time to wait in seconds (default: 10.0)
+        """
+        start_time = time.time()
+        queue_obj = self.signals.play_by_play_queue
+
+        while time.time() - start_time < timeout:
+            queue_size = queue_obj.qsize()
+            if queue_size == 0:
+                logger.info("Play-by-play queue is empty, continuing to next game")
+                return
+            logger.debug(f"Waiting for play-by-play queue to drain ({queue_size} items remaining)")
+            time.sleep(0.1)  # Sleep 100ms between checks
+
+        logger.warning(f"Timeout waiting for play-by-play queue to drain (still {queue_obj.qsize()} items)")
+        return

@@ -131,8 +131,8 @@ class GMStrategy:
         Calculate team's strategy coefficient based on current performance.
 
         Formula combines:
-        1. Win percentage (40% weight) - overall team quality
-        2. Games back (40% weight) - playoff positioning
+        1. Win percentage (60% weight) - overall team quality
+        2. Games back (20% weight) - playoff positioning
         3. Season timing (20% weight) - urgency increases late season
 
         Args:
@@ -175,8 +175,8 @@ class GMStrategy:
         urgency = season_progress ** 2  # Quadratic urgency curve
 
         # Combine signals with weights
-        base_signal = (0.40 * win_pct_signal +
-                      0.40 * games_back_signal +
+        base_signal = (0.60 * win_pct_signal +
+                      0.20 * games_back_signal +
                       0.20 * urgency)
 
         # If not in realistic playoff race, push toward rebuild regardless of record
@@ -240,7 +240,8 @@ class PlayerValuation:
         self.max_years_remaining = 6  # Long-term contract
 
     def calculate_player_value(self, player_row: pd.Series, alpha: float,
-                               team_games_played: int, is_pitcher: bool = False) -> PlayerValue:
+                               team_games_played: int, is_pitcher: bool = False,
+                               baseball_stats=None) -> PlayerValue:
         """
         Calculate comprehensive player value with strategy weighting.
 
@@ -249,6 +250,7 @@ class PlayerValuation:
             alpha: Team strategy coefficient (0.0-1.0)
             team_games_played: Number of games the team has played this season
             is_pitcher: Whether player is a pitcher
+            baseball_stats: BaseballStats instance for accessing prior season data (optional)
 
         Returns:
             PlayerValue dataclass with all valuation components
@@ -271,7 +273,7 @@ class PlayerValuation:
         sim_war = player_row.get('Sim_WAR', 0.0)
 
         # Calculate immediate value (current season)
-        immediate_value = self._calculate_immediate_value(player_row, team_games_played, is_pitcher)
+        immediate_value = self._calculate_immediate_value(player_row, team_games_played, is_pitcher, baseball_stats)
 
         # Calculate future value (age-adjusted projections)
         future_value = self._calculate_future_value(player_row, age, is_pitcher)
@@ -301,24 +303,60 @@ class PlayerValuation:
         )
 
     def _calculate_immediate_value(self, player_row: pd.Series, team_games_played: int,
-                                   is_pitcher: bool) -> float:
+                                   is_pitcher: bool, baseball_stats=None) -> float:
         """
-        Calculate immediate value based on current season performance.
+        Calculate immediate value based on current season performance, with regression to prior season.
 
         The GM evaluates players based on observable performance (Sim_WAR) and visible factors
-        like games played and injury history. Internal simulation adjustments are NOT visible
-        to the GM - they only see the results (stats and WAR).
+        like games played and injury history. For players with limited playing time, we blend
+        their current season performance with prior season WAR to avoid undervaluing good bench
+        players or backups who haven't gotten opportunities.
 
         Components:
-        - Base: Sim_WAR (calculated purely from observable stats - H, 2B, HR, BB, SO, IP, etc.)
+        - Base: Blended WAR (weighted average of current Sim_WAR and prior season WAR)
         - Adjustment: Playing time ratio (observable - games/IP played vs expected)
 
         Args:
             player_row: Player stats row
             team_games_played: Total games the team has played this season
             is_pitcher: Whether this is a pitcher
+            baseball_stats: BaseballStats instance for accessing prior season data (optional)
         """
         sim_war = player_row.get('Sim_WAR', 0.0)
+
+        # Blend current season Sim_WAR with prior season WAR for low sample sizes
+        # This prevents undervaluing good players who haven't gotten playing time
+        if baseball_stats is not None:
+            hashcode = player_row.name  # Index is Hashcode
+
+            # Look up prior season WAR from aggregated data
+            if is_pitcher:
+                if hashcode in baseball_stats.pitching_data.index:
+                    prior_war = baseball_stats.pitching_data.loc[hashcode, 'WAR']
+                else:
+                    prior_war = 0.0
+
+                # For pitchers: use IP as sample size (80 IP = full weight on current season)
+                ip = player_row.get('IP', 0)
+                sample_threshold = 80.0  # ~half season for starters, full season for relievers
+                current_weight = min(ip / sample_threshold, 1.0) if sample_threshold > 0 else 0.0
+            else:
+                if hashcode in baseball_stats.batting_data.index:
+                    prior_war = baseball_stats.batting_data.loc[hashcode, 'WAR']
+                else:
+                    prior_war = 0.0
+
+                # For batters: use AB as sample size (200 AB = full weight on current season)
+                ab = player_row.get('AB', 0)
+                sample_threshold = 200.0  # ~half season of playing time
+                current_weight = min(ab / sample_threshold, 1.0) if sample_threshold > 0 else 0.0
+
+            # Blend current and prior season WAR
+            prior_weight = 1.0 - current_weight
+            blended_war = (current_weight * sim_war) + (prior_weight * prior_war)
+
+            # Use blended WAR as base value
+            sim_war = blended_war
 
         # Sim_WAR is calculated from observable stats only (like real-world WAR)
         # Age/injury/streak factors affect in-game performance, but WAR measures the results
@@ -492,7 +530,8 @@ class AIGeneralManager:
         """
         self.team_name = team_name
         self.assessment_frequency = assessment_frequency
-        self.last_assessment_game = 0
+        # Initialize to negative frequency so first assessment happens at game 0 (start of season)
+        self.last_assessment_game = -assessment_frequency
 
         # Initialize strategy calculator and valuation model
         self.strategy_calculator = GMStrategy()
@@ -589,7 +628,8 @@ class AIGeneralManager:
         ]
 
         for idx, batter_row in team_batters.iterrows():
-            value = self.valuator.calculate_player_value(batter_row, alpha, team_games_played, is_pitcher=False)
+            value = self.valuator.calculate_player_value(batter_row, alpha, team_games_played,
+                                                         is_pitcher=False, baseball_stats=baseball_stats)
             roster_values['batters'].append(value)
 
         # Value pitchers
@@ -598,7 +638,8 @@ class AIGeneralManager:
         ]
 
         for idx, pitcher_row in team_pitchers.iterrows():
-            value = self.valuator.calculate_player_value(pitcher_row, alpha, team_games_played, is_pitcher=True)
+            value = self.valuator.calculate_player_value(pitcher_row, alpha, team_games_played,
+                                                         is_pitcher=True, baseball_stats=baseball_stats)
             roster_values['pitchers'].append(value)
 
         # Sort by total value
@@ -777,7 +818,8 @@ class AIGeneralManager:
 
             for idx, batter_row in active_veteran_batters.iterrows():
                 player_value = self.valuator.calculate_player_value(
-                    batter_row, strategy.alpha, team_games_played, is_pitcher=False
+                    batter_row, strategy.alpha, team_games_played, is_pitcher=False,
+                    baseball_stats=baseball_stats
                 )
                 if player_value.immediate_value >= 1.5:  # Solid contributors
                     targets.append({
@@ -799,7 +841,8 @@ class AIGeneralManager:
 
             for idx, pitcher_row in prime_pitchers.iterrows():
                 player_value = self.valuator.calculate_player_value(
-                    pitcher_row, strategy.alpha, team_games_played, is_pitcher=True
+                    pitcher_row, strategy.alpha, team_games_played, is_pitcher=True,
+                    baseball_stats=baseball_stats
                 )
                 if player_value.immediate_value >= 1.8:  # Impact starters
                     targets.append({
@@ -821,7 +864,8 @@ class AIGeneralManager:
 
             for idx, batter_row in young_batters.iterrows():
                 player_value = self.valuator.calculate_player_value(
-                    batter_row, strategy.alpha, team_games_played, is_pitcher=False
+                    batter_row, strategy.alpha, team_games_played, is_pitcher=False,
+                    baseball_stats=baseball_stats
                 )
                 if player_value.future_value >= 2.5:
                     targets.append({
@@ -842,7 +886,8 @@ class AIGeneralManager:
 
             for idx, pitcher_row in young_pitchers.iterrows():
                 player_value = self.valuator.calculate_player_value(
-                    pitcher_row, strategy.alpha, team_games_played, is_pitcher=True
+                    pitcher_row, strategy.alpha, team_games_played, is_pitcher=True,
+                    baseball_stats=baseball_stats
                 )
                 if player_value.future_value >= 3.0:
                     targets.append({

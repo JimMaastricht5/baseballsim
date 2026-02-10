@@ -494,113 +494,113 @@ class BaseballStatsPreProcess:
         return df
 
     def apply_trend_based_aggregation(self, historical_df: DataFrame,
-                                       stats_to_project: List[str],
-                                       is_pitching: bool = False) -> DataFrame:
+                                      stats_to_project: List[str],
+                                      is_pitching: bool = False) -> DataFrame:
         """
-        Replace simple summation with trend-based projection to target year.
+        Creates aggregated player projections using weighted averages and Bayesian regression.
 
-        For each player, projects their statistics to a future year (e.g., 2026) based on
-        linear regression trends calculated from their year-by-year historical performance.
-        This accounts for improving or declining player performance rather than treating
-        all seasons equally.
+        Takes year-by-year historical data and produces single-row projections per player
+        by combining weighted volume averaging with Bayesian regression to league means.
+        This prevents small-sample outliers (e.g., 150-HR bench players) while preserving
+        genuine talent differences.
 
-        Stabilized 2026 Projection using Weighted Averages (5:4:3) and Bayesian Shrinkage.
-        Replaces np.polyfit to prevent small-sample outliers from breaking the simulation.
+        Algorithm:
+            1. Weight recent seasons more heavily (3:4:5 ratio for oldest to newest)
+            2. Calculate true talent rates using Bayesian regression:
+               Rate = (Career_Stat + K * League_Rate) / (Total_Sample + K)
+            3. Project counting stats: Rate × Weighted_Volume
+            4. Apply safety caps for extreme projections (e.g., HR/AB ≤ 0.08)
+
+        Bayesian K Values:
+            - Home runs (HR): 450 (high K = strong regression to prevent outliers)
+            - Other stats: 200-250 (moderate regression)
+            - Higher K = more conservative, pulls toward league average
 
         Args:
-            historical_df: Year-by-year historical data with Season and Hashcode columns
-            stats_to_project: List of stat column names to apply trends to
-            is_pitching: Boolean, True for pitchers, False for batters
+            historical_df: Year-by-year player data with 'Hashcode', 'Season', and stat columns.
+                Must include 'Player_Season_Key' index and volume columns (AB/BB or IP).
+            stats_to_project: List of stat column names to project (e.g., ['H', 'HR', 'BB', 'SO']).
+                Both rate stats (regressed) and volume stats (averaged) are supported.
+            is_pitching: True for pitchers (uses IP as denominator), False for batters (uses PA).
 
         Returns:
-            DataFrame: Aggregated data with trend projections, indexed by Hashcode
+            DataFrame: One row per player with projected stats. Includes:
+                - All columns from most recent season
+                - Updated stat projections in stats_to_project columns
+                - 'Hashcode' as index
+                - Metadata columns: 'Teams', 'Leagues', 'Years_Included'
 
-        Process:
-            1. For each unique player (by Hashcode):
-               - Extract their historical year-by-year stats
-               - For each stat column, calculate linear regression trend
-               - Project to target year (max(seasons) + 1)
-            2. Add metadata: Projection_Method, Trend_Years_Used, Years_Included
-            3. Return DataFrame ready for derived stat calculations (OBP, SLG, etc.)
+        Notes:
+            - Rate stats (H, HR, BB, SO) use Bayesian regression formula
+            - Volume stats (AB, G, IP) use unregressed weighted average
+            - League averages calculated via calculate_league_averages()
+            - Weights applied: [3, 4, 5] for [oldest, middle, newest] year
+            - Safety cap: HR/AB ratio capped at 0.065 (elite level) for batters
+
+        See Also:
+            - calculate_league_averages(): Computes league average rates
+            - regress_to_mean(): Core Bayesian regression implementation
         """
         unique_players = historical_df['Hashcode'].unique()
-        target_year = historical_df['Season'].max() + 1
-
-        # Calculate league averages once to use as the 'Mean' for regression
         league_averages = self.calculate_league_averages(historical_df, is_pitching=is_pitching)
         results = []
 
         for hashcode in unique_players:
-            # Get historical data sorted by year
             player_historical = historical_df[historical_df['Hashcode'] == hashcode].sort_values('Season')
+            # Check if we actually have data for this player
+            if player_historical.empty:
+                continue
             most_recent = player_historical.iloc[-1].copy()
 
-            # 1. Calculate Weights based on available years (up to 3)
+            # 1. Weights for yearly average volume
             num_years = len(player_historical)
-            all_weights = [3, 4, 5]
-            weights = all_weights[-num_years:]
+            weights = [3, 4, 5][-num_years:]
             sum_of_weights = sum(weights)
 
-            # 2. Set Reliability Constants (K)
-            # Higher K = More distrust of small samples (pulls harder to mean)
+            # 2. Denominators for the Bayesian Rate
             if not is_pitching:
-                # Batting denominator: Plate Appearances (AB + BB)
-                sample_size = player_historical['AB'].sum() + player_historical['BB'].sum()
-                k_values = {'HR': 400, 'H': 250, 'BB': 200, 'SO': 150, 'default': 200}
-                stat_map = {
-                    'H': 'H_per_PA', 'HR': 'HR_per_PA', 'BB': 'BB_per_PA',
-                    'SO': 'SO_per_PA', 'R': 'R_per_PA', 'RBI': 'RBI_per_PA'
-                }
+                total_sample = player_historical['AB'].sum() + player_historical['BB'].sum()
+                stat_map = {'H': 'H_per_PA', 'HR': 'HR_per_PA', 'BB': 'BB_per_PA', 'SO': 'SO_per_PA'}
+                k_values = {'HR': 450, 'default': 250}  # Increase HR K to 450
             else:
-                # Pitching denominator: Innings Pitched (IP)
-                sample_size = player_historical['IP'].sum()
-                k_values = {'HR': 400, 'ER': 300, 'H': 150, 'BB': 100, 'SO': 100, 'default': 150}
-                stat_map = {
-                    'H': 'H_per_IP', 'BB': 'BB_per_IP', 'SO': 'SO_per_IP',
-                    'HR': 'HR_per_IP', 'ER': 'ER_per_IP', 'W': 'W_rate', 'L': 'L_rate', 'SV': 'SV_rate'
-                }
+                total_sample = player_historical['IP'].sum()
+                stat_map = {'H': 'H_per_IP', 'BB': 'BB_per_IP', 'HR': 'HR_per_IP', 'ER': 'ER_per_IP'}
+                k_values = {'HR': 450, 'default': 200}
 
-            # 3. Project each stat
             for stat_col in stats_to_project:
-                if stat_col not in player_historical.columns:
-                    continue
+                # Calculate the player's raw career total for this stat
+                career_total = player_historical[stat_col].sum()
+                # Calculate the un-regressed yearly average volume
+                avg_yearly_volume = sum(player_historical[stat_col].values * weights) / sum_of_weights
 
-                values = player_historical[stat_col].values
-                # Calculate the weighted average count per season
-                weighted_avg_count = sum(v * w for v, w in zip(values, weights)) / sum_of_weights
-
-                # Apply Regression to Mean if stat is in our rate map
                 if stat_col in stat_map:
                     lg_rate = league_averages.get(stat_map[stat_col], 0)
                     k = k_values.get(stat_col, k_values['default'])
 
-                    # Decision stats (W, L, SV) use Games as the sample instead of IP
-                    current_sample = player_historical['G'].sum() if stat_col in ['W', 'L', 'SV'] else sample_size
+                    # BAYESIAN RATE: (Career_Stat + K * League_Rate) / (Total_Sample + K)
+                    true_talent_rate = (career_total + k * lg_rate) / (total_sample + k)
 
-                    # The Shrinkage Formula
-                    # (Weighted Observed + (K * League Expectation)) / (1 + K/Sample)
-                    projected_val = (weighted_avg_count + (k * lg_rate)) / (1 + (k / max(1, current_sample)))
+                    # PROJECTED COUNT: Rate * Yearly Volume
+                    # We find the 'volume column' (AB or IP) to scale the rate
+                    vol_col = 'IP' if is_pitching else 'AB'
+                    yearly_vol_stat = sum(player_historical[vol_col].values * weights) / sum_of_weights
+
+                    projected_val = true_talent_rate * yearly_vol_stat
                 else:
-                    projected_val = weighted_avg_count
+                    # For non-rate stats (AB, G, IP), use the un-regressed weighted average
+                    projected_val = avg_yearly_volume
 
                 most_recent[stat_col] = max(0.0, projected_val)
 
-            # 4. Final "Sanity Check" Caps
+            # 3. Final Safety Cap
             if not is_pitching and most_recent['AB'] > 0:
-                # Cap HR rate at 10% of ABs for non-proven players
-                if most_recent['HR'] / most_recent['AB'] > 0.10:
-                    most_recent['HR'] = most_recent['AB'] * 0.075
-            elif is_pitching and most_recent['IP'] > 0:
-                # Cap ERA floor at 2.00 to prevent 'invincible' small-sample pitchers
-                proj_era = (most_recent['ER'] / most_recent['IP']) * 9
-                if proj_era < 2.00:
-                    most_recent['ER'] = (2.50 / 9) * most_recent['IP']
+                if (most_recent['HR'] / most_recent['AB']) > 0.08:
+                    most_recent['HR'] = most_recent['AB'] * 0.065  # Cap at elite level
 
-            # Metadata for debugging
-            most_recent['Projection_Method'] = "Weighted_Bayesian"
-            most_recent['Trend_Years_Used'] = num_years
+            # resulting DataFrame is guaranteed to have these keys.
             most_recent['Years_Included'] = player_historical['Season'].tolist()
-
+            most_recent['Trend_Years_Used'] = int(len(player_historical))
+            most_recent['Projection_Method'] = "Weighted_Bayesian"
             results.append(most_recent)
 
         return pd.DataFrame(results)
@@ -656,7 +656,6 @@ class BaseballStatsPreProcess:
             is_pitching=True
         )
         # Note: Teams, Leagues, and Years_Included are now set inside apply_trend_based_aggregation
-
         # Filter to only keep players who appeared in the most recent season
         most_recent_season = max(load_seasons)
         pitching_data['In_Recent_Season'] = pitching_data['Years_Included'].apply(

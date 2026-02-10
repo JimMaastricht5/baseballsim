@@ -21,6 +21,7 @@ from dotenv.parser import Position
 
 import gameteamboxstats
 import bbstats
+import numpy as np
 from numpy import bool_, float64, int32, int64
 from pandas.core.series import Series
 from typing import Any, Dict, List, Optional, Tuple, Union
@@ -398,30 +399,52 @@ class Team:
         pos_player_stats = self.gameplay_pos_players_df.loc[index]  # data for pos player
         return pos_player_stats  # should be a series with a single row
 
-    def update_fatigue(self, cur_pitching_index: int64) -> Tuple[int, float64]:
+    def update_fatigue(self, cur_pitching_index: int64) -> Tuple[float, float64]:
         """
-        calcs the ratio of batters the pitcher has faced in game against historic avg
-        so if a pitcher faces 10 batters per game, and they have faced 8 the pitcher is 80% of the way to their
-        max outing.
-        :param cur_pitching_index: hashcode of current pitcher
-        :return: returns the impact to obp for pitcher fatigue, if tired they give up more hits
-                also returns the new cur_ratio
-        """
+       calcs the ratio of batters the pitcher has faced in game against historic avg
+       so if a pitcher faces 10 batters per game, and they have faced 8 the pitcher is 80% of the way to their
+       max outing.
+       :param cur_pitching_index: hashcode of current pitcher
+       :return: returns the impact to obp for pitcher fatigue, if tired they give up more hits
+               also returns the new cur_ratio
+               """
         in_game_fatigue = 0
         cur_game_faced = self.box_score.batters_faced(cur_pitching_index)
-        avg_faced = self.gameplay_pitching_df.AVG_faced  # avg adjusted for starting condition
+        avg_faced = self.gameplay_pitching_df.AVG_faced
+        current_cond = self.gameplay_pitching_df.Condition
 
-        # Guard against division by zero (can happen when Condition=0 or no games played)
+        # 1. Guard against division by zero
         if avg_faced == 0 or pd.isna(avg_faced):
-            logger.warning(f'AVG_faced is {avg_faced} for pitcher {cur_pitching_index}, using default value of 20')
-            avg_faced = 20.0  # Default: average batters faced per game
+            logger.warning(f'AVG_faced is {avg_faced} for pitcher {cur_pitching_index}, using default 20')
+            avg_faced = 20.0
 
-        cur_ratio = cur_game_faced / avg_faced * 100
-        logger.debug('Updating pitcher fatigue. New condition: {}', 100 - (cur_ratio * 100))
+        # 2. Calculate workload ratio (0-100+)
+        cur_ratio = (cur_game_faced / avg_faced) * 100
+
+        # 3. Apply Non-Linear Multiplier for Low Condition
+        # If condition is below fatigue_start_perc (e.g., 70), calculate a penalty scale
+        if current_cond < self.fatigue_start_perc:
+            # Calculate how far they are into the "danger zone"
+            deficit = (self.fatigue_start_perc - current_cond) / self.fatigue_start_perc
+            # This multiplier starts at 1.0 and grows quadratically as condition drops
+            # At 40 condition with 70 threshold, multiplier is ~2.3x
+            condition_multiplier = 1 + np.power(deficit * 3, 2)  # change this line if the drop off is too big
+        else:
+            condition_multiplier = 1.0
+
+        # 4. Calculate OBP Impact
         if cur_ratio >= self.fatigue_start_perc:
-            in_game_fatigue = (cur_ratio - self.fatigue_start_perc) * self.fatigue_rate
+            # Scale the original rate by our condition multiplier
+            dynamic_rate = self.fatigue_rate * condition_multiplier
+            in_game_fatigue = (cur_ratio - self.fatigue_start_perc) * dynamic_rate
+
+        # Update state
         self.set_pitching_condition(cur_ratio)
-        return in_game_fatigue, cur_ratio  # obp impact to pitcher of fatigue
+
+        logger.debug('Pitcher {}: Ratio={}, Cond={}, Penalty={:.4f}',
+                     cur_pitching_index, cur_ratio, current_cond, in_game_fatigue)
+
+        return in_game_fatigue, cur_ratio
 
     def pitching_change(self, inning: int, score_diff: int) -> int64:
         """

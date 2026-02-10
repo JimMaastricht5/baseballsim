@@ -139,18 +139,36 @@ class SimAB:
 
     def onbase(self) -> bool:
         """
-        did the batter reach base? adjusted for age, injury, and streak
-        adjustments are neg values if worse and positive for improvements
-        requires negation on pitchers,
-        :return: true if batter reached base
+        Calculates if the batter reached base using isolated player adjustments.
+        - Pitcher fatigue and adjustments make the pitcher WORSE (higher OBP).
+        - Batter adjustments make the batter BETTER or WORSE.
         """
-        return self.rng() < self.odds_ratio(self.batting.OBP + self.pitching.Game_Fatigue_Factor + self.OBP_adjustment +
-                                            self.batting.Age_Adjustment + self.batting.Injury_Perf_Adj +
-                                            self.batting.Streak_Adjustment,
-                                            self.pitching.OBP + self.pitching.Game_Fatigue_Factor + self.OBP_adjustment +
-                                            -1 * self.pitching.Age_Adjustment + -1 * self.pitching.Injury_Perf_Adj +
-                                            -1 * self.pitching.Streak_Adjustment,
-                                            self.league_batting_obp + self.OBP_adjustment, stat_type='obp')
+        # 1. Isolate Hitter Adjustments
+        # (OBP + Age + Injury + Streak)
+        hitter_adj_obp = (self.batting.OBP +
+                          self.batting.Age_Adjustment +
+                          self.batting.Injury_Perf_Adj +
+                          self.batting.Streak_Adjustment)
+
+        # 2. Isolate Pitcher Adjustments
+        # (OBP + Fatigue - Age - Injury - Streak)
+        # Note: Fatigue is ADDED because a tired pitcher allows a higher OBP.
+        # Note: Age/Injury/Streak are negated for pitchers because positive skill = lower OBP.
+        pitcher_adj_obp = (self.pitching.OBP +
+                           self.pitching.Game_Fatigue_Factor +
+                           -1 * self.pitching.Age_Adjustment +
+                           -1 * self.pitching.Injury_Perf_Adj +
+                           -1 * self.pitching.Streak_Adjustment)
+
+        # 3. Environmental Baseline
+        league_baseline = self.league_batting_obp + self.OBP_adjustment
+
+        # 4. Final Odds Ratio Calculation
+        return self.rng() < self.odds_ratio(
+            hitter_adj_obp + self.OBP_adjustment,
+            pitcher_adj_obp + self.OBP_adjustment,
+            league_baseline,
+            stat_type='obp')
 
     def bb(self) -> bool:
         """
@@ -184,13 +202,19 @@ class SimAB:
 
     def hr(self) -> bool:
         """
-        if the batter reached base was it a home run?
-        :return: true if HR
+        Refined HR logic: If a pitcher is fatigued, the probability of a
+        Home Run should also increase, not just the probability of reaching base.
         """
-        # Safeguard against division by zero - use league average if no data
         league_hr_rate = (self.league_batting_Total_HR + self.HR_adjustment) / self.league_batting_Total_OB
-        batter_hr_rate = ((self.batting.HR + self.HR_adjustment) / self.batting.Total_OB) if self.batting.Total_OB > 0 else league_hr_rate
-        pitcher_hr_rate = ((self.pitching.HR + self.HR_adjustment) / self.pitching.Total_OB) if self.pitching.Total_OB > 0 else league_hr_rate
+
+        # We apply a portion of the fatigue factor to the HR rate as well
+        # This makes 'tired' pitchers give up 'hanging sliders' (Home Runs)
+        fatigue_hr_boost = self.pitching.Game_Fatigue_Factor * 0.5
+
+        batter_hr_rate = ((self.batting.HR + self.HR_adjustment) / self.batting.Total_OB) if self.batting.Total_OB > 0 \
+            else league_hr_rate
+        pitcher_hr_rate = ((self.pitching.HR + self.HR_adjustment + fatigue_hr_boost) / self.pitching.Total_OB) \
+            if self.pitching.Total_OB > 0 else league_hr_rate
 
         return self.rng() < self.odds_ratio(batter_hr_rate, pitcher_hr_rate, league_hr_rate, stat_type='HR')
 

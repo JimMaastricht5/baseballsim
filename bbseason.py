@@ -259,69 +259,70 @@ class BaseballSeason:
     def create_schedule(self) -> None:
         """
         set the schedule for the seasons using the teams, series length, min games in season, and limit of games
-        ([['MIL', 'COL'], ['PIT', 'CIN'], ['CHC', 'STL']])  # test schedule
-        if there are an odd number of teams there may be an "OFF" day in the schedule
-        :return: None
+        Ensures every team plays exactly self.season_length games by ignoring 'OFF' days in the count.
+          ([['MIL', 'COL'], ['PIT', 'CIN'], ['CHC', 'STL']])  # test schedule
+          if there are an odd number of teams there may be an "OFF" day in the schedule
+          :return: None
         """
         # 1. Setup
-        teams_list = list(self.teams)
+        # Remove any existing 'OFF DAY' to prevent double-counting or odd lists
+        teams_list = [t for t in self.teams if t != 'OFF DAY']
         target_games = self.season_length
 
-        # Ensure we have an even number of slots for the Round Robin
+        # Round Robin requires an even number of participants
         if len(teams_list) % 2 != 0:
             teams_list.append("OFF")
 
         num_teams = len(teams_list)
         num_rounds = num_teams - 1
 
-        # Track games played by a specific "real" team to know when to stop
-        tracking_team = self.teams[0]
+        # Use the first real team to track progress
+        tracking_team = [t for t in teams_list if t != "OFF"][0]
         games_scheduled_for_tracker = 0
 
         self.schedule = []
         random.shuffle(teams_list)
 
-        # 2. Main Loop: Continue until the tracking team has HITS the target_games
+        # 2. Main Loop: Continue until the tracking team has scheduled 162 ACTUAL games
         while games_scheduled_for_tracker < target_games:
 
-            # Perform one full Round-Robin rotation
+            # Perform one full Round-Robin rotation (everyone plays everyone once)
             for _ in range(num_rounds):
-                day_matchups = []
-
-                # Check if tracker is playing a real game this round
-                # (Used to determine if this series counts toward the limit)
-
-                # In a standard circle tournament, we rotate teams_list[1:]
-                # We need to build the pairings for this "day"
+                # Generate pairs for this specific rotation round
                 round_pairs = []
-                tracker_played_this_round = False
+                tracker_has_game_this_round = False
 
                 for i in range(num_teams // 2):
                     home = teams_list[i]
                     away = teams_list[num_teams - 1 - i]
 
+                    # If the tracking team is playing a REAL team, count it
                     if tracking_team in (home, away) and "OFF" not in (home, away):
-                        tracker_played_this_round = True
+                        tracker_has_game_this_round = True
 
-                    if home != "OFF" and away != "OFF":
-                        round_pairs.append([home, away])
+                    # Add to pairings; translate "OFF" to "OFF DAY" for your print logic
+                    if home == "OFF":
+                        round_pairs.append([away, "OFF DAY"])
+                    elif away == "OFF":
+                        round_pairs.append([home, "OFF DAY"])
                     else:
-                        # Even if it's an OFF day, we need to track it
-                        # to keep the schedule consistent for other teams
-                        real_team = home if home != "OFF" else away
-                        round_pairs.append([real_team, 'OFF DAY'])
+                        round_pairs.append([home, away])
 
-                # 3. Add the series to the schedule
+                # 3. Add the series (usually 3 games) to the schedule
                 for _ in range(self.series_length):
+                    # Check if we still need games for the tracker
                     if games_scheduled_for_tracker < target_games:
-                        # Each day in the series is one entry in self.schedule
                         self.schedule.append(round_pairs)
-                        if tracker_played_this_round:
+
+                        # Only increment the game count if the tracker isn't on an OFF day
+                        if tracker_has_game_this_round:
                             games_scheduled_for_tracker += 1
                     else:
+                        # Tracker is full, but we stop here to keep team schedules aligned
                         break
 
-                # 4. Rotate teams (Standard Round Robin Circle)
+                # 4. Rotate teams (Circle Method: keep index 0 fixed, rotate the rest)
+                # [A, B, C, D] -> [A, D, B, C]
                 teams_list = [teams_list[0]] + [teams_list[-1]] + teams_list[1:-1]
 
                 if games_scheduled_for_tracker >= target_games:

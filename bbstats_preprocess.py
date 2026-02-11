@@ -89,9 +89,13 @@ class BaseballStatsPreProcess:
         # 3. a player entering their 30s (30+) will begin to show a slight year-over-year decline.
         #    assuming the peak is at age 29 at an avg OBP of 0.325, OBP = -0.00059 * (Age - 29)^2 + 0.325
         # 4. The decline often becomes more rapid after Age 34
+        # Updated constants for the Aging Curve
+        self.young_age_limit = 25  # Significant improvement up to this age
+        self.peak_start_age = 26  # Start of the plateau
+        self.peak_end_age = 30  # End of the plateau (stable peak)
+        self.decline_start_age = 31  # When the parabolic decline kicks in
         self.coeff_age_improvement = 0.0008
         self.coeff_age_decline = -0.0059
-        self.peak_perf_age = 29
 
         # load seasons
         self.load_seasons = [load_seasons] if not isinstance(load_seasons, list) else load_seasons  # convert to list
@@ -545,62 +549,80 @@ class BaseballStatsPreProcess:
         league_averages = self.calculate_league_averages(historical_df, is_pitching=is_pitching)
         results = []
 
+        # 1. Define Stat-Specific K-Values (Stabilization Points)
+        if not is_pitching:
+            # Denominator = Plate Appearances (AB + BB)
+            k_values = {
+                'SO': 60,  # K-rate stabilizes very fast
+                'BB': 120,  # Walk rate takes longer
+                'HR': 170,  # Power stabilizes mid-range
+                'H': 900,  # Hit rate (BABIP) is high variance, needs high K
+                'default': 250
+            }
+            stat_map = {'H': 'H_per_PA', 'HR': 'HR_per_PA', 'BB': 'BB_per_PA', 'SO': 'SO_per_PA'}
+            vol_col = 'AB'  # Using AB as primary scaling volume
+        else:
+            # Denominator = Innings Pitched or Batters Faced
+            k_values = {
+                'SO': 70,  # Strikeout skill for pitchers stabilizes fast
+                'BB': 200,  # Control takes longer to prove
+                'HR': 400,  # HR/FB rate is quite volatile
+                'H': 500,  # Hits allowed is heavily BABIP dependent
+                'default': 200
+            }
+            stat_map = {'H': 'H_per_IP', 'BB': 'BB_per_IP', 'HR': 'HR_per_IP', 'ER': 'ER_per_IP'}
+            vol_col = 'IP'
+
         for hashcode in unique_players:
             player_historical = historical_df[historical_df['Hashcode'] == hashcode].sort_values('Season')
-            # Check if we actually have data for this player
             if player_historical.empty:
                 continue
-            most_recent = player_historical.iloc[-1].copy()
 
-            # 1. Weights for yearly average volume
+            most_recent = player_historical.iloc[-1].copy()
             num_years = len(player_historical)
+
+            # 2. Volume Weighting (3:4:5)
             weights = [3, 4, 5][-num_years:]
             sum_of_weights = sum(weights)
 
-            # 2. Denominators for the Bayesian Rate
-            if not is_pitching:
-                total_sample = player_historical['AB'].sum() + player_historical['BB'].sum()
-                stat_map = {'H': 'H_per_PA', 'HR': 'HR_per_PA', 'BB': 'BB_per_PA', 'SO': 'SO_per_PA'}
-                k_values = {'HR': 450, 'default': 250}  # Increase HR K to 450
+            # 3. Calculate "Expected Volume" (Health-Adjusted)
+            # If 2025 volume is a massive outlier (injury), we lean back on the 3-year average
+            raw_weighted_vol = sum(player_historical[vol_col].values * weights) / sum_of_weights
+            career_avg_vol = player_historical[vol_col].mean()
+
+            # If most recent year is < 50% of career average, blend them to avoid "The Injury Trap"
+            if player_historical.iloc[-1][vol_col] < (career_avg_vol * 0.5) and num_years > 1:
+                projected_yearly_vol = (raw_weighted_vol + career_avg_vol) / 2
             else:
-                total_sample = player_historical['IP'].sum()
-                stat_map = {'H': 'H_per_IP', 'BB': 'BB_per_IP', 'HR': 'HR_per_IP', 'ER': 'ER_per_IP'}
-                k_values = {'HR': 450, 'default': 200}
+                projected_yearly_vol = raw_weighted_vol
+
+            # 4. Bayesian Rate Projection
+            total_sample = player_historical['IP'].sum() if is_pitching else (
+                        player_historical['AB'].sum() + player_historical['BB'].sum())
 
             for stat_col in stats_to_project:
-                # Calculate the player's raw career total for this stat
                 career_total = player_historical[stat_col].sum()
-                # Calculate the un-regressed yearly average volume
-                avg_yearly_volume = sum(player_historical[stat_col].values * weights) / sum_of_weights
 
                 if stat_col in stat_map:
                     lg_rate = league_averages.get(stat_map[stat_col], 0)
                     k = k_values.get(stat_col, k_values['default'])
 
-                    # BAYESIAN RATE: (Career_Stat + K * League_Rate) / (Total_Sample + K)
+                    # Bayesian Shrinkage Formula
                     true_talent_rate = (career_total + k * lg_rate) / (total_sample + k)
 
-                    # PROJECTED COUNT: Rate * Yearly Volume
-                    # We find the 'volume column' (AB or IP) to scale the rate
-                    vol_col = 'IP' if is_pitching else 'AB'
-                    yearly_vol_stat = sum(player_historical[vol_col].values * weights) / sum_of_weights
-
-                    projected_val = true_talent_rate * yearly_vol_stat
+                    # Scale by our health-adjusted volume
+                    most_recent[stat_col] = true_talent_rate * projected_yearly_vol
                 else:
-                    # For non-rate stats (AB, G, IP), use the un-regressed weighted average
-                    projected_val = avg_yearly_volume
+                    # Non-rate stats (G, GS, etc.) use unregressed weighted average
+                    most_recent[stat_col] = sum(player_historical[stat_col].values * weights) / sum_of_weights
 
-                most_recent[stat_col] = max(0.0, projected_val)
-
-            # 3. Final Safety Cap
+            # Safety Cap (unchanged)
             if not is_pitching and most_recent['AB'] > 0:
                 if (most_recent['HR'] / most_recent['AB']) > 0.08:
-                    most_recent['HR'] = most_recent['AB'] * 0.065  # Cap at elite level
+                    most_recent['HR'] = most_recent['AB'] * 0.065
 
-            # resulting DataFrame is guaranteed to have these keys.
             most_recent['Years_Included'] = player_historical['Season'].tolist()
-            most_recent['Trend_Years_Used'] = int(len(player_historical))
-            most_recent['Projection_Method'] = "Weighted_Bayesian"
+            most_recent['Projection_Method'] = "Multi_K_Bayesian"
             results.append(most_recent)
 
         return pd.DataFrame(results)
@@ -1163,26 +1185,41 @@ class BaseballStatsPreProcess:
 
     def calc_age_adjustment(self, df: pd.DataFrame) -> pd.DataFrame:
         """
-        Applies the parabolic aging curve to modify the 2026 projected rates.
-        Adjustment based on: OBP = -coeff * (Age - 29)^2
+        Applies an aging curve with a peak plateau (ages 26-30).
+        - Improvement: Age <= 25
+        - Plateau: Age 26-30 (No adjustment)
+        - Decline: Age 31+
         """
-        # Calculate the delta (e.g., -0.015 OBP points)
-        df['Age_Adjustment'] = np.where(
-            df['Age'] <= self.peak_perf_age,
-            self.coeff_age_improvement * (df['Age'] - self.peak_perf_age) ** 2,
-            self.coeff_age_decline * (df['Age'] - self.peak_perf_age) ** 2
-        )
 
-        # Apply the adjustment to counting stats to make it 'stick' in the simulation
-        # We adjust H and BB proportionally to the OBP change
-        # If a player is 40, their adjustment is negative, lowering their H and BB counts.
+        def get_adjustment(age):
+            if age <= self.young_age_limit:
+                # Still improving toward the start of the peak
+                return self.coeff_age_improvement * (age - self.peak_start_age) ** 2
+
+            elif self.peak_start_age <= age <= self.peak_end_age:
+                # In the Plateau - performance is stable
+                return 0.0
+
+            else:
+                # Decline phase - starting from the end of the plateau
+                return self.coeff_age_decline * (age - self.peak_end_age) ** 2
+
+        # Vectorized calculation for the adjustment factor
+        df['Age_Adjustment'] = df['Age'].apply(get_adjustment)
+
+        # Apply the adjustment to counting stats (H, BB, HR)
+        # We use .loc to ensure we aren't working on a slice/copy
         for index, row in df.iterrows():
-            # Avoid adjusting players with 0 stats
             if row['AB'] > 0:
-                adj_factor = 1 + (row['Age_Adjustment'] / 0.325)  # Scale based on avg OBP
-                df.at[index, 'H'] *= max(0.5, adj_factor)  # Don't let someone lose more than 50% skill
-                df.at[index, 'BB'] *= max(0.5, adj_factor)
-                df.at[index, 'HR'] *= max(0.5, adj_factor)
+                # Use 0.325 as the base OBP for scaling
+                adj_factor = 1 + (row['Age_Adjustment'] / 0.325)
+
+                # Clamp the adjustment so talent doesn't drop by more than 50% in one year
+                adj_factor = max(0.5, adj_factor)
+
+                df.at[index, 'H'] *= adj_factor
+                df.at[index, 'BB'] *= adj_factor
+                df.at[index, 'HR'] *= adj_factor
 
         return df
 

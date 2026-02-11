@@ -199,6 +199,7 @@ class BaseballSeason:
                                                returns a callback function or None.
         :return: None
         """
+        self.standings_lock = threading.Lock()  # safely modify standings in a threaded environment
         self.output_handler = output_handler if output_handler is not None else console_output_handler
         self.play_by_play_callback_factory = play_by_play_callback_factory
         self.season_day_num = 0  # set to first day of the season
@@ -233,6 +234,10 @@ class BaseballSeason:
         for team in self.teams:
             self.team_win_loss.update({team: [0, 0]})  # set team win loss to 0, 0
             self.team_games_played[team] = 0  # Initialize games played
+
+        # Link team_games_played to baseball_data for prorated 2025 stats (Phase 2: Stats Enhancement)
+        self.baseball_data.team_games_played = self.team_games_played
+
         self.team_city_dict = self.baseball_data.get_all_team_city_names()
 
         # Initialize AI General Managers for each team
@@ -258,12 +263,11 @@ class BaseballSeason:
         if there are an odd number of teams there may be an "OFF" day in the schedule
         :return: None
         """
-
         # 1. Setup
         teams_list = list(self.teams)
-        target_games = self.season_length  # e.g., 162
+        target_games = self.season_length
 
-        # Handle odd number of teams
+        # Ensure we have an even number of slots for the Round Robin
         if len(teams_list) % 2 != 0:
             teams_list.append("OFF")
 
@@ -271,49 +275,53 @@ class BaseballSeason:
         num_rounds = num_teams - 1
 
         # Track games played by a specific "real" team to know when to stop
-        # We'll use the first team in the original list
         tracking_team = self.teams[0]
         games_scheduled_for_tracker = 0
 
-        self.schedule = []  # Reset schedule
+        self.schedule = []
         random.shuffle(teams_list)
 
-        # 2. Main Loop: Continue until the tracking team has played the target games
+        # 2. Main Loop: Continue until the tracking team has HITS the target_games
         while games_scheduled_for_tracker < target_games:
 
             # Perform one full Round-Robin rotation
             for _ in range(num_rounds):
                 day_matchups = []
 
-                # Generate pairs for this round
+                # Check if tracker is playing a real game this round
+                # (Used to determine if this series counts toward the limit)
+
+                # In a standard circle tournament, we rotate teams_list[1:]
+                # We need to build the pairings for this "day"
                 round_pairs = []
-                tracker_plays_this_round = True
+                tracker_played_this_round = False
 
                 for i in range(num_teams // 2):
                     home = teams_list[i]
                     away = teams_list[num_teams - 1 - i]
 
-                    # Check if our tracking team is playing someone or has an OFF day
-                    if tracking_team in (home, away):
-                        if "OFF" in (home, away):
-                            tracker_plays_this_round = False
+                    if tracking_team in (home, away) and "OFF" not in (home, away):
+                        tracker_played_this_round = True
 
                     if home != "OFF" and away != "OFF":
                         round_pairs.append([home, away])
+                    else:
+                        # Even if it's an OFF day, we need to track it
+                        # to keep the schedule consistent for other teams
+                        real_team = home if home != "OFF" else away
+                        round_pairs.append([real_team, 'OFF DAY'])
 
                 # 3. Add the series to the schedule
                 for _ in range(self.series_length):
-                    # Only add games if we haven't hit the target yet
                     if games_scheduled_for_tracker < target_games:
+                        # Each day in the series is one entry in self.schedule
                         self.schedule.append(round_pairs)
-
-                        # Only increment count if the tracker actually played a game
-                        if tracker_plays_this_round:
+                        if tracker_played_this_round:
                             games_scheduled_for_tracker += 1
                     else:
                         break
 
-                # 4. Rotate teams
+                # 4. Rotate teams (Standard Round Robin Circle)
                 teams_list = [teams_list[0]] + [teams_list[-1]] + teams_list[1:-1]
 
                 if games_scheduled_for_tracker >= target_games:
@@ -478,15 +486,17 @@ class BaseballSeason:
         :param win_loss: list of lists with team name and integer win and loss ['MAD', [1, 0]] is a w for Mad
         :return: None
         """
-        self.team_win_loss[away_team_name] = list(
-            np.add(np.array(self.team_win_loss[away_team_name]), np.array(win_loss[0])))
-        self.team_win_loss[home_team_name] = list(
-            np.add(np.array(self.team_win_loss[home_team_name]), np.array(win_loss[1])))
+        with self.standings_lock:
+            # safely increment standings lock
+            self.team_win_loss[away_team_name] = list(
+                np.add(np.array(self.team_win_loss[away_team_name]), np.array(win_loss[0])))
+            self.team_win_loss[home_team_name] = list(
+                np.add(np.array(self.team_win_loss[home_team_name]), np.array(win_loss[1])))
 
-        # Increment games played for both teams
-        self.team_games_played[away_team_name] += 1
-        self.team_games_played[home_team_name] += 1
-        return
+            # Increment games played for both teams
+            self.team_games_played[away_team_name] += 1
+            self.team_games_played[home_team_name] += 1
+            return
 
     def calculate_games_back(self, team_name: str) -> float:
         """

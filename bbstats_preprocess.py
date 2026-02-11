@@ -555,7 +555,7 @@ class BaseballStatsPreProcess:
             k_values = {
                 'SO': 60,  # K-rate stabilizes very fast
                 'BB': 120,  # Walk rate takes longer
-                'HR': 170,  # Power stabilizes mid-range
+                'HR': 500,  # Power stabilizes mid-range
                 'H': 900,  # Hit rate (BABIP) is high variance, needs high K
                 'default': 250
             }
@@ -586,12 +586,23 @@ class BaseballStatsPreProcess:
             sum_of_weights = sum(weights)
 
             # 3. Calculate "Expected Volume" (Health-Adjusted)
-            # If 2025 volume is a massive outlier (injury), we lean back on the 3-year average
             raw_weighted_vol = sum(player_historical[vol_col].values * weights) / sum_of_weights
             career_avg_vol = player_historical[vol_col].mean()
+            recent_vol = player_historical.iloc[-1][vol_col]  # The 2025 sample size
 
-            # If most recent year is < 50% of career average, blend them to avoid "The Injury Trap"
-            if player_historical.iloc[-1][vol_col] < (career_avg_vol * 0.5) and num_years > 1:
+            # NEW: Sample Size Gate for Volume
+            # If they had < 50 ABs last year, they shouldn't be projected for a full season
+            # regardless of what they did in 2023 or 2024.
+            if not is_pitching and recent_vol < 50:
+                # We cap their 2026 volume at 120 ABs (bench player status)
+                # and average it with their raw weighted volume to be safe.
+                projected_yearly_vol = min(raw_weighted_vol, max(recent_vol * 2, 120))
+
+            elif is_pitching and recent_vol < 15:  # 15 IP for pitchers
+                projected_yearly_vol = min(raw_weighted_vol, max(recent_vol * 2, 30))
+
+            # Existing "Injury Trap" logic (fallback if the above doesn't trigger)
+            elif recent_vol < (career_avg_vol * 0.5) and num_years > 1:
                 projected_yearly_vol = (raw_weighted_vol + career_avg_vol) / 2
             else:
                 projected_yearly_vol = raw_weighted_vol
@@ -618,8 +629,8 @@ class BaseballStatsPreProcess:
 
             # Safety Cap (unchanged)
             if not is_pitching and most_recent['AB'] > 0:
-                if (most_recent['HR'] / most_recent['AB']) > 0.08:
-                    most_recent['HR'] = most_recent['AB'] * 0.065
+                if (most_recent['HR'] / most_recent['AB']) > 0.075:  # lower value tighter cap
+                    most_recent['HR'] = most_recent['AB'] * 0.060  # lower value more human
 
             most_recent['Years_Included'] = player_historical['Season'].tolist()
             most_recent['Projection_Method'] = "Multi_K_Bayesian"

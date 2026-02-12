@@ -425,7 +425,7 @@ class Game:
         batting = self.teams[self.team_hitting()].batter_stats_in_lineup(cur_batter_index)
         self.bases.new_ab(batter_num=cur_batter_index, player_name=batting.Player)
         self.at_bat.ab_outcome(pitching, batting, self.outcomes, self.outs, self.bases.is_runner_on_base_num(1),
-                               self.bases.is_runner_on_base_num(3))
+                               self.bases.is_runner_on_base_num(3), self.teams[self.team_pitching()].lineup_def_war)
         self.outs = self.outs + self.outcomes.outs_on_play
         self.bases.handle_runners(score_book_cd=self.outcomes.score_book_cd,
                                   bases_to_advance=self.outcomes.bases_to_advance,

@@ -137,20 +137,38 @@ class SimAB:
         warnings.filterwarnings("error", category=RuntimeWarning)
         return
 
-    def onbase(self) -> bool:
+    def onbase(self, current_team_def_war: float) -> bool:
         """
-        did the batter reach base? adjusted for age, injury, and streak
-        adjustments are neg values if worse and positive for improvements
-        requires negation on pitchers,
-        :return: true if batter reached base
+        Calculates if the batter reached base.
+        Now incorporates Def_WAR to simulate hits being 'taken away' by elite defense.
         """
-        return self.rng() < self.odds_ratio(self.batting.OBP + self.pitching.Game_Fatigue_Factor + self.OBP_adjustment +
-                                            self.batting.Age_Adjustment + self.batting.Injury_Perf_Adj +
-                                            self.batting.Streak_Adjustment,
-                                            self.pitching.OBP + self.pitching.Game_Fatigue_Factor + self.OBP_adjustment +
-                                            -1 * self.pitching.Age_Adjustment + -1 * self.pitching.Injury_Perf_Adj +
-                                            -1 * self.pitching.Streak_Adjustment,
-                                            self.league_batting_obp + self.OBP_adjustment, stat_type='obp')
+        # 1. Isolate Hitter Adjustments
+        hitter_adj_obp = (self.batting.OBP +
+                          self.batting.Age_Adjustment +
+                          self.batting.Injury_Perf_Adj +
+                          self.batting.Streak_Adjustment)
+
+        # 2. Isolate Pitcher & Defense Adjustments
+        # Convert cumulative lineup Def_WAR to a per-PA OBP modifier
+        # Positive Def_WAR (good defense) lowers the allowed OBP.
+        defense_mod = current_team_def_war * 0.0015
+
+        pitcher_adj_obp = (self.pitching.OBP +
+                           self.pitching.Game_Fatigue_Factor -
+                           self.pitching.Age_Adjustment -
+                           self.pitching.Injury_Perf_Adj -
+                           self.pitching.Streak_Adjustment -
+                           defense_mod)
+
+        # 3. Environmental Baseline
+        league_baseline = self.league_batting_obp + self.OBP_adjustment
+
+        # 4. Final Odds Ratio
+        return self.rng() < self.odds_ratio(
+            hitter_adj_obp + self.OBP_adjustment,
+            pitcher_adj_obp + self.OBP_adjustment,
+            league_baseline,
+            stat_type='obp')
 
     def bb(self) -> bool:
         """
@@ -184,13 +202,19 @@ class SimAB:
 
     def hr(self) -> bool:
         """
-        if the batter reached base was it a home run?
-        :return: true if HR
+        Refined HR logic: If a pitcher is fatigued, the probability of a
+        Home Run should also increase, not just the probability of reaching base.
         """
-        # Safeguard against division by zero - use league average if no data
         league_hr_rate = (self.league_batting_Total_HR + self.HR_adjustment) / self.league_batting_Total_OB
-        batter_hr_rate = ((self.batting.HR + self.HR_adjustment) / self.batting.Total_OB) if self.batting.Total_OB > 0 else league_hr_rate
-        pitcher_hr_rate = ((self.pitching.HR + self.HR_adjustment) / self.pitching.Total_OB) if self.pitching.Total_OB > 0 else league_hr_rate
+
+        # We apply a portion of the fatigue factor to the HR rate as well
+        # This makes 'tired' pitchers give up 'hanging sliders' (Home Runs)
+        fatigue_hr_boost = self.pitching.Game_Fatigue_Factor * 0.0  # adjust up from zero to incoporate feature
+
+        batter_hr_rate = ((self.batting.HR + self.HR_adjustment) / self.batting.Total_OB) if self.batting.Total_OB > 0 \
+            else league_hr_rate
+        pitcher_hr_rate = ((self.pitching.HR + self.HR_adjustment + fatigue_hr_boost) / self.pitching.Total_OB) \
+            if self.pitching.Total_OB > 0 else league_hr_rate
 
         return self.rng() < self.odds_ratio(batter_hr_rate, pitcher_hr_rate, league_hr_rate, stat_type='HR')
 
@@ -233,34 +257,39 @@ class SimAB:
 
     def gb_fo_lo(self, outs: int = 0, runner_on_first: bool = False, runner_on_third: bool = False) -> str:
         """
-        if the batter did not reach base, and it was not a k handle ground balls, fly outs and line outs
-        :param outs: number of outs in inning, used to determine double play probability
-        :param runner_on_first: is there a runner on first?  used for double play probability
-        :param runner_on_third: is there a runner on third?  used for tag up probabaility
-        :return: string containing scorebook code for the out.  gb=ground ball, dp=double play, gb fc is a ground
-            ball fielders choice, sf= is a sacrifice fly, and fo is a fly out.
+        Handles ground balls and fly outs.
+        Incorporates Def_WAR into Double Play probability.
         """
         self.dice_roll = self.rng()
-        if self.dice_roll <= self.league_GB:  # ground out
+        if self.dice_roll <= self.league_GB:
             score_book_cd = 'GB'
-            # Safeguard against division by zero - use league average if no data
+
+            # Base DP rate from batter's GIDP history
             gidp_rate = (self.batting['GIDP'] / self.batting['AB']) if self.batting['AB'] > 0 else self.dp_chance
-            if runner_on_first and outs <= 1 and self.rng() <= gidp_rate:
-            # if runner_on_first and outs <= 1 and self.rng() <= self.dp_chance:
+
+            # Modifier: Elite defense (Def_WAR) increases the chance of turning the two.
+            # 1.0 Def_WAR = +1% chance to turn the DP
+            defense_dp_boost = self.pitching.get('Def_WAR', 0) * 0.01
+
+            if runner_on_first and outs <= 1 and self.rng() <= (gidp_rate + defense_dp_boost):
                 score_book_cd = 'DP'
             elif runner_on_first and outs <= 1 and self.rng() <= self.league_GB_FC:
                 score_book_cd = 'GB FC'
-        elif self.dice_roll <= (self.league_FB + self.league_GB):  # fly out ball
+
+        elif self.dice_roll <= (self.league_FB + self.league_GB):
+            # Potential for Sacrifice Fly logic
             if self.rng() <= self.tag_up_chance and runner_on_third and outs < 2:
                 score_book_cd = 'SF'
             else:
                 score_book_cd = 'FO'
         else:
-            score_book_cd = 'LD'  # line drive
+            score_book_cd = 'LD'
+
         return score_book_cd
 
     def ab_outcome(self, pitching: Series, batting: Series, outcomes: OutCome, outs: int = 0,
-                   runner_on_first: bool = False, runner_on_third: bool = False) -> None:
+                   runner_on_first: bool = False, runner_on_third: bool = False,
+                   lineup_def_war: float = 0) -> None:
         """
         tree of the various odds of an event, each event is yes/no.  On base? Yes -> BB? no -> Hit yes (stop)
         outcome: on base or out pos 0, how in pos 1, bases to advance in pos 2, rbis in pos 3
@@ -270,12 +299,13 @@ class SimAB:
         :param outs: outs in inning
         :param runner_on_first: is there a runner on first?
         :param runner_on_third: is there a runner on third?
+        :param lineup_def_war: float representing the current lineups def war to incorporate fielding
         :return: None
         """
         self.pitching = pitching
         self.batting = batting
         outcomes.reset()
-        if self.onbase():
+        if self.onbase(lineup_def_war):
             if self.bb():
                 outcomes.set_score_book_cd('BB')
             elif self.hr():

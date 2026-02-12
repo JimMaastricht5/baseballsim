@@ -59,9 +59,13 @@ class SeasonMainWindow:
         self.world_series_active = False  # Track if World Series is running
         self.saved_standings = None  # Save regular season standings during playoffs
         self.world_series_teams = set()  # Track which teams are in World Series
+        self.simulation_start_time = None  # Track simulation start time for elapsed time
 
         self.root.title("Baseball Season Simulator")
         self.root.geometry("1500x900")
+
+        # Comparison mode toggle (Phase 3: Stats Enhancement)
+        self.comparison_mode = tk.StringVar(value="current")  # "current" or "difference"
 
         # Configure tab styling (Baseball Theme)
         style = ttk.Style()
@@ -102,6 +106,11 @@ class SeasonMainWindow:
         self._poll_queues()
 
         logger.info("Main window initialized with modular widgets")
+
+    # Menu bar removed - using in-tab toggle buttons instead (Phase 3 revision)
+    # def _create_menu_bar(self):
+    # def _on_comparison_mode_change(self):
+    # def _show_comparison_help(self):
 
     def _create_toolbar(self):
         """Create toolbar with control buttons."""
@@ -151,7 +160,7 @@ class SeasonMainWindow:
         league_notebook.add(self.league_leaders_widget.get_frame(), text="Leaders")
 
         # League Sub-tab 2: Stats
-        self.league_stats_widget = LeagueStatsWidget(league_notebook)
+        self.league_stats_widget = LeagueStatsWidget(league_notebook, self.comparison_mode)
         league_notebook.add(self.league_stats_widget.get_frame(), text="Stats")
 
         # League Sub-tab 3: IL (Injured List)
@@ -171,7 +180,7 @@ class SeasonMainWindow:
         team_notebook.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
 
         # Team Sub-tab 1: Roster
-        self.roster_widget = RosterWidget(team_notebook)
+        self.roster_widget = RosterWidget(team_notebook, self.comparison_mode)
         team_notebook.add(self.roster_widget.get_frame(), text="Roster")
 
         # Team Sub-tab 2: Games Played
@@ -231,7 +240,11 @@ class SeasonMainWindow:
 
     def start_season(self):
         """Start the season simulation."""
+        import time
         selected_team = self.toolbar.get_selected_team()
+
+        # Track simulation start time
+        self.simulation_start_time = time.time()
 
         def on_started():
             """Callback after worker starts."""
@@ -545,11 +558,28 @@ class SeasonMainWindow:
 
     def _on_simulation_complete(self):
         """Handle simulation_complete message."""
+        import time
         logger.info("Season simulation completed")
         self.toolbar.update_button_states(simulation_running=False, paused=False)
-        self.status_label.config(text=self._format_status_with_day("Season complete!"))
+
+        # Calculate elapsed time
+        elapsed_time_str = ""
+        if self.simulation_start_time is not None:
+            elapsed_seconds = time.time() - self.simulation_start_time
+            hours = int(elapsed_seconds // 3600)
+            minutes = int((elapsed_seconds % 3600) // 60)
+            seconds = int(elapsed_seconds % 60)
+
+            if hours > 0:
+                elapsed_time_str = f" (Runtime: {hours}h {minutes}m {seconds}s)"
+            elif minutes > 0:
+                elapsed_time_str = f" (Runtime: {minutes}m {seconds}s)"
+            else:
+                elapsed_time_str = f" (Runtime: {seconds}s)"
+
+        self.status_label.config(text=self._format_status_with_day(f"Season complete!{elapsed_time_str}"))
         messagebox.showinfo("Season Complete",
-                          "The season simulation has completed successfully.")
+                          f"The season simulation has completed successfully.{elapsed_time_str}")
 
     def _on_error(self, error_message: str):
         """Handle error_occurred message."""

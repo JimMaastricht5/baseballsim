@@ -221,34 +221,46 @@ class BaseballStatsPreProcess:
 
           Returns:
               dict: League average rates (per PA for batters, per IP for pitchers)
-          """
+        """
         if is_pitching:
-            # Denominator: Total Innings Pitched
-            total_ip = max(1, historical_df['IP'].sum())
-            total_g = max(1, historical_df['G'].sum())
+            # PITCHING GATE: Use pitchers with at least 20 IP for the baseline
+            qualified = historical_df[historical_df['IP'] >= 20].copy()
+
+            # If the database is small, fall back to everyone to avoid division by zero
+            if qualified.empty:
+                qualified = historical_df
+
+            total_ip = max(1, qualified['IP'].sum())
+            total_g = max(1, qualified['G'].sum())
 
             return {
-                'H_per_IP': historical_df['H'].sum() / total_ip,
-                'BB_per_IP': historical_df['BB'].sum() / total_ip,
-                'SO_per_IP': historical_df['SO'].sum() / total_ip,
-                'HR_per_IP': historical_df['HR'].sum() / total_ip,
-                'ER_per_IP': historical_df['ER'].sum() / total_ip,
-                'W_rate': historical_df['W'].sum() / total_g,
-                'L_rate': historical_df['L'].sum() / total_g,
-                'SV_rate': historical_df['SV'].sum() / total_g
+                'H_per_IP': qualified['H'].sum() / total_ip,
+                'BB_per_IP': qualified['BB'].sum() / total_ip,
+                'SO_per_IP': qualified['SO'].sum() / total_ip,
+                'HR_per_IP': qualified['HR'].sum() / total_ip,
+                'ER_per_IP': qualified['ER'].sum() / total_ip,
+                'W_rate': qualified['W'].sum() / total_g,
+                'L_rate': qualified['L'].sum() / total_g,
+                'SV_rate': qualified['SV'].sum() / total_g
             }
         else:
-            # Denominator: Total Plate Appearances (Approx: AB + BB + HBP + SF)
-            total_pa = max(1, historical_df['AB'].sum() + historical_df['BB'].sum() +
-                           historical_df.get('HBP', 0).sum() + historical_df.get('SF', 0).sum())
+            # BATTING GATE: Use hitters with at least 100 AB for the baseline
+            qualified = historical_df[historical_df['AB'] >= 100].copy()
+
+            if qualified.empty:
+                qualified = historical_df
+
+            # Denominator: Total Plate Appearances
+            total_pa = max(1, qualified['AB'].sum() + qualified['BB'].sum() +
+                           qualified.get('HBP', 0).sum() + qualified.get('SF', 0).sum())
 
             return {
-                'H_per_PA': historical_df['H'].sum() / total_pa,
-                'HR_per_PA': historical_df['HR'].sum() / total_pa,
-                'BB_per_PA': historical_df['BB'].sum() / total_pa,
-                'SO_per_PA': historical_df['SO'].sum() / total_pa,
-                'R_per_PA': historical_df['R'].sum() / total_pa,
-                'RBI_per_PA': historical_df['RBI'].sum() / total_pa
+                'H_per_PA': qualified['H'].sum() / total_pa,
+                'HR_per_PA': qualified['HR'].sum() / total_pa,
+                'BB_per_PA': qualified['BB'].sum() / total_pa,
+                'SO_per_PA': qualified['SO'].sum() / total_pa,
+                'R_per_PA': qualified['R'].sum() / total_pa,
+                'RBI_per_PA': qualified['RBI'].sum() / total_pa
             }
 
     def regress_to_mean(self, actual_stat: float, league_avg_rate: float,
@@ -497,6 +509,26 @@ class BaseballStatsPreProcess:
             df = df.drop_duplicates(subset=key_name, keep='last')
         return df
 
+    def get_k_values(self, is_pitching: bool) -> dict:
+        """Returns stabilization constants (K). Higher K = slower to trust player data."""
+        if not is_pitching:
+            return {
+                'SO': 60,  # Strikeouts stabilize fast
+                'BB': 120,
+                'HR': 600,  # High K: Prevents 20-AB players from projecting 100 HRs
+                'H': 900,  # High K: Hits are very high-variance
+                'default': 250
+            }
+        else:
+            return {
+                'SO': 70,
+                'BB': 200,
+                'HR': 350,  # Pulls fluke HR seasons toward league mean
+                'H': 500,  # Pulls BABIP toward league mean
+                'ER': 300,  # Crucial for preventing 0.00 ERA anomalies
+                'default': 200
+            }
+
     def apply_trend_based_aggregation(self, historical_df: DataFrame,
                                       stats_to_project: List[str],
                                       is_pitching: bool = False) -> DataFrame:
@@ -539,31 +571,18 @@ class BaseballStatsPreProcess:
         """
         unique_players = historical_df['Hashcode'].unique()
         league_averages = self.calculate_league_averages(historical_df, is_pitching=is_pitching)
+        k_values = self.get_k_values(is_pitching)
         results = []
 
-        # 1. TUNED K-VALUES (Recommendation #2)
+        # Map counting stats to their corresponding league average rates
         if not is_pitching:
-            k_values = {
-                'SO': 60,
-                'BB': 120,
-                'HR': 350,  # Lowered from 500 to be more sensitive to actual HR data
-                'H': 900,
-                'default': 250
-            }
             stat_map = {'H': 'H_per_PA', 'HR': 'HR_per_PA', 'BB': 'BB_per_PA', 'SO': 'SO_per_PA'}
             vol_col = 'AB'
-            gate = 300  # PA Gate
+            gate = 300  # Plate Appearance Gate
         else:
-            k_values = {
-                'SO': 70,
-                'BB': 200,
-                'HR': 350,  # Lowered to match batters
-                'H': 500,
-                'default': 200
-            }
             stat_map = {'H': 'H_per_IP', 'BB': 'BB_per_IP', 'HR': 'HR_per_IP', 'ER': 'ER_per_IP'}
             vol_col = 'IP'
-            gate = 100  # IP Gate
+            gate = 100  # Innings Pitched Gate
 
         for hashcode in unique_players:
             player_historical = historical_df[historical_df['Hashcode'] == hashcode].sort_values('Season')
@@ -573,21 +592,19 @@ class BaseballStatsPreProcess:
             most_recent = player_historical.iloc[-1].copy()
             num_years = len(player_historical)
 
-            # Determine total volume for the gate
+            # 1. Determine Sample Size (Career Totals)
             if not is_pitching:
-                total_sample = player_historical['AB'].sum() + player_historical['BB'].sum()
+                career_sample = player_historical['AB'].sum() + player_historical['BB'].sum()
             else:
-                total_sample = player_historical['IP'].sum()
-            # MARK THE METHOD for Age Adjustment logic
-            most_recent['Projection_Method'] = "Regressed" if total_sample < gate else "Trend"
+                career_sample = player_historical['IP'].sum()
 
-            # Volume Weighting (3:4:5) and Existing Gates (Unchanged as requested)
+            # 2. Volume Weighting (3:4:5 ratio) for Playing Time
             weights = [3, 4, 5][-num_years:]
             sum_of_weights = sum(weights)
             raw_weighted_vol = sum(player_historical[vol_col].values * weights) / sum_of_weights
             recent_vol = player_historical.iloc[-1][vol_col]
 
-            # original sample size gate logic here...
+            # Playing time logic (keeps bench players capped)
             if not is_pitching and recent_vol < 50:
                 projected_yearly_vol = min(raw_weighted_vol, max(recent_vol * 2, 120))
             elif is_pitching and recent_vol < 15:
@@ -595,36 +612,43 @@ class BaseballStatsPreProcess:
             else:
                 projected_yearly_vol = raw_weighted_vol
 
-            # 2. BAYESIAN RATE PROJECTION WITH ROOKIE PENALTY
-            total_sample = player_historical['IP'].sum() if is_pitching else (
-                    player_historical['AB'].sum() + player_historical['BB'].sum())
-
+            # 3. Apply Bayesian Shrinkage to Counting Stats
             for stat_col in stats_to_project:
-                career_total = player_historical[stat_col].sum()
-
                 if stat_col in stat_map:
                     lg_rate = league_averages.get(stat_map[stat_col], 0)
 
-                    # ROOKIE PENALTY (Recommendation #1)
-                    # If player has low career sample, assume they perform below league average
-                    if not is_pitching and total_sample < 300:
-                        lg_rate *= 0.80  # 20% penalty for low-sample hitters
-                    elif is_pitching and total_sample < 100:
-                        lg_rate *= 1.10  # 10% penalty for low-sample pitchers (higher rate = worse)
+                    # ROOKIE PENALTY: Regress low-sample players to a % of league average
+                    if not is_pitching and career_sample < 300:
+                        lg_rate *= 0.85  # Hitters: Start 15% worse than average
+                    elif is_pitching and career_sample < 50:
+                        lg_rate *= 1.15  # Pitchers: Start 15% worse (higher rates = worse)
 
                     k = k_values.get(stat_col, k_values['default'])
+                    career_total = player_historical[stat_col].sum()
 
-                    # Bayesian Shrinkage Formula
-                    true_talent_rate = (career_total + k * lg_rate) / (total_sample + k)
+                    # Bayesian Formula: (Career_Actual + K * League_Mean) / (Career_Sample + K)
+                    true_talent_rate = (career_total + k * lg_rate) / (career_sample + k)
                     most_recent[stat_col] = true_talent_rate * projected_yearly_vol
                 else:
+                    # Non-rate stats use standard weighted average
                     most_recent[stat_col] = sum(player_historical[stat_col].values * weights) / sum_of_weights
 
-            # Safety Caps and Metadata
+            # 4. Final Sanity Check (The "Hard Caps")
             if not is_pitching and most_recent['AB'] > 0:
-                if (most_recent['HR'] / most_recent['AB']) > 0.075:
-                    most_recent['HR'] = most_recent['AB'] * 0.060
+                # Cap HR rate at 8% (roughly a 48-HR pace for 600 ABs)
+                if (most_recent['HR'] / most_recent['AB']) > 0.080:
+                    most_recent['HR'] = most_recent['AB'] * 0.065
 
+            if is_pitching and most_recent['IP'] > 1.0:
+                # Cap ERA between 2.80 and 7.50 for the starting projection
+                proj_era = (most_recent['ER'] * 9) / most_recent['IP']
+                if proj_era < 2.80:
+                    most_recent['ER'] = (2.80 * most_recent['IP']) / 9
+                elif proj_era > 7.50:
+                    most_recent['ER'] = (7.50 * most_recent['IP']) / 9
+
+            # Metadata for simulation tracking
+            most_recent['Projection_Method'] = "Regressed" if career_sample < gate else "Trend"
             most_recent['Years_Included'] = player_historical['Season'].tolist()
             results.append(most_recent)
 

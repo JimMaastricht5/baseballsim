@@ -281,79 +281,58 @@ class BaseballStats:
 
     def calculate_prorated_2025_stats(self, team_name: Optional[str] = None,
                                       current_games_played: Optional[int] = None) -> tuple:
-        """
-        Calculate prorated 2025 stats. If team_name is None, it calculates league-wide totals.
-        """
-        # 1. Handle Auto-Calculation for League vs Team
+        # 1. Quick Validation & Auto-Calculation
         if current_games_played is None:
-            if hasattr(self, 'team_games_played') and self.team_games_played:
-                if team_name:
-                    current_games_played = self.team_games_played.get(team_name, 0)
-                else:
-                    # League-wide: Use the average games played across the entire league
-                    current_games_played = int(sum(self.team_games_played.values()) / len(self.team_games_played))
-            else:
-                current_games_played = 0
+            # Fallback to mean games played if no specific team
+            current_games_played = int(np.mean(list(self.team_games_played.values()))) if self.team_games_played else 0
 
-        if current_games_played == 0:
+        if current_games_played <= 0:
             return (pd.DataFrame(), pd.DataFrame())
 
-        # Cache check
+        # Cache check (unchanged)
         cache_key = f"{team_name if team_name else 'LEAGUE'}_{current_games_played}"
         if cache_key in self.prorated_2025_cache:
             return self.prorated_2025_cache[cache_key]
 
         self._ensure_2025_historical_loaded()
-
-        # 2. Filter Players (League-wide vs Team-specific)
-        if team_name:
-            # Team specific
-            mask_b = self.new_season_batting_data['Team'] == team_name
-            mask_p = self.new_season_pitching_data['Team'] == team_name
-        else:
-            # League wide: No filter, take everyone currently in the active season
-            mask_b = slice(None)
-            mask_p = slice(None)
-
-        current_roster_hash_b = self.new_season_batting_data[mask_b].index
-        current_roster_hash_p = self.new_season_pitching_data[mask_p].index
-
-        # Pull 2025 historical rows for these players
-        team_batting_2025 = self.historical_2025_batting[
-            self.historical_2025_batting['Hashcode'].isin(current_roster_hash_b)].copy()
-        team_pitching_2025 = self.historical_2025_pitching[
-            self.historical_2025_pitching['Hashcode'].isin(current_roster_hash_p)].copy()
-
-        # 3. Apply Proration (Now including 'G')
         prorate_factor = current_games_played / 162.0
 
-        # Batting Proration
-        if not team_batting_2025.empty:
-            team_batting_2025 = team_batting_2025.set_index('Hashcode')
-            # Added 'G' to this list to fix the totals calculation
-            batting_count_cols = ['G', 'AB', 'R', 'H', '2B', '3B', 'HR', 'RBI', 'SB', 'CS', 'BB', 'SO', 'SF', 'SH',
-                                  'HBP']
-            for col in batting_count_cols:
-                if col in team_batting_2025.columns:
-                    team_batting_2025[col] = (team_batting_2025[col] * prorate_factor).round()
-            team_batting_2025 = team_batting_stats(team_batting_2025, filter_stats=False)
+        # 2. Vectorized Filtering
+        if team_name:
+            # TEAM VIEW: Only include players currently on this team's 2026 roster
+            mask_b = self.new_season_batting_data['Team'] == team_name
+            hashes_b = self.new_season_batting_data[mask_b].index
+            df_b = self.historical_2025_batting.loc[self.historical_2025_batting['Hashcode'].isin(hashes_b)].copy()
 
-        # Pitching Proration
-        if not team_pitching_2025.empty:
-            team_pitching_2025 = team_pitching_2025.set_index('Hashcode')
-            # Added 'G' to this list as well
-            pitching_count_cols = ['G', 'IP', 'H', 'R', 'ER', 'HR', 'BB', 'SO', 'W', 'L', 'SV', 'BS', 'HLD', 'GS', 'CG',
-                                   'SHO']
-            for col in pitching_count_cols:
-                if col in team_pitching_2025.columns:
-                    if col == 'IP':
-                        team_pitching_2025[col] = (team_pitching_2025[col] * prorate_factor).round(1)
-                    else:
-                        team_pitching_2025[col] = (team_pitching_2025[col] * prorate_factor).round()
-            team_pitching_2025 = team_pitching_stats(team_pitching_2025, filter_stats=False)
+            mask_p = self.new_season_pitching_data['Team'] == team_name
+            hashes_p = self.new_season_pitching_data[mask_p].index
+            df_p = self.historical_2025_pitching.loc[self.historical_2025_pitching['Hashcode'].isin(hashes_p)].copy()
+        else:
+            # LEAGUE VIEW: Take everyone from 2025 to get the full 6,155 HR total
+            df_b = self.historical_2025_batting.copy()
+            df_p = self.historical_2025_pitching.copy()
 
-        self.prorated_2025_cache[cache_key] = (team_batting_2025, team_pitching_2025)
-        return team_batting_2025, team_pitching_2025
+        # 3. Improved Batting Proration (Vectorized)
+        if not df_b.empty:
+            df_b = df_b.set_index('Hashcode')
+            bat_cols = ['G', 'AB', 'R', 'H', '2B', '3B', 'HR', 'RBI', 'SB', 'CS', 'BB', 'SO', 'SF', 'SH', 'HBP']
+            # Vectorized multiplication and rounding
+            df_b[bat_cols] = (df_b[bat_cols] * prorate_factor).round().astype(int)
+            df_b = team_batting_stats(df_b, filter_stats=False)
+
+        # 4. Improved Pitching Proration (Base-3 IP logic)
+        if not df_p.empty:
+            df_p = df_p.set_index('Hashcode')
+            # Handle IP conversion: outs = (whole * 3) + remainder
+            total_outs = (df_p['IP'].astype(int) * 3) + ((df_p['IP'] % 1) * 10).round()
+            df_p['IP'] = ((total_outs * prorate_factor).round() / 3).apply(lambda x: int(x) + (round(x % 1 * 3) / 10))
+
+            pitch_cols = ['G', 'H', 'R', 'ER', 'HR', 'BB', 'SO', 'W', 'L', 'SV', 'BS', 'HLD', 'GS', 'CG', 'SHO']
+            df_p[pitch_cols] = (df_p[pitch_cols] * prorate_factor).round().astype(int)
+            df_p = team_pitching_stats(df_p, filter_stats=False)
+
+        self.prorated_2025_cache[cache_key] = (df_b, df_p)
+        return df_b, df_p
 
     def get_seasons(self, batter_file: str, pitcher_file: str) -> None:
         """

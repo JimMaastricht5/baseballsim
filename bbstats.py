@@ -320,7 +320,7 @@ class BaseballStats:
             df_b = self.historical_2025_batting.copy()
             df_p = self.historical_2025_pitching.copy()
 
-        # 3. Improved Batting Proration (Vectorized)
+        # 3. Batting Proration (Vectorized)
         if not df_b.empty:
             # Aggregating by Hashcode captures all segments of a traded player's 2025 season
             bat_cols = ['G', 'AB', 'R', 'H', '2B', '3B', 'HR', 'RBI', 'SB', 'CS', 'BB', 'SO', 'SF', 'SH', 'HBP']
@@ -330,7 +330,7 @@ class BaseballStats:
             df_b[bat_cols] = (df_b[bat_cols] * prorate_factor).round().astype(int)
             df_b = team_batting_stats(df_b, filter_stats=False)
 
-        # 4. Improved Pitching Proration (Base-3 IP logic with Trade Aggregation)
+        # 4. Pitching Proration (Base-3 IP logic with Trade Aggregation)
         if not df_p.empty:
             # First, convert IP to Total Outs
             df_p['Total_Outs_Calc'] = (df_p['IP'].astype(int) * 3) + ((df_p['IP'] % 1) * 10).round()

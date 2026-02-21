@@ -143,20 +143,7 @@ class RosterWidget:
 
         self.pitching_totals_labels = {}  # Store label references for updating
 
-        # Add separator
-        separator = ttk.Separator(self.frame, orient=tk.HORIZONTAL)
-        separator.pack(fill=tk.X, padx=5, pady=5)
-
-        # Add historical stats section at the bottom
-        history_label = tk.Label(self.frame, text="Player Historical Performance (Click player to view)",
-                                font=("Arial", 10, "bold"))
-        history_label.pack(padx=5, pady=(0, 5))
-
-        # Create frame for historical stats treeview
-        history_frame = tk.Frame(self.frame)
-        history_frame.pack(fill=tk.BOTH, expand=False, padx=5, pady=5)
-
-        self.history_tree = self._create_history_treeview(history_frame)
+        # Historical stats are shown in a popup window when a player is clicked
 
     def _create_roster_treeview(self, parent: tk.Widget, is_batter: bool = True) -> ttk.Treeview:
         """
@@ -216,40 +203,77 @@ class RosterWidget:
 
         return tree
 
-    def _create_history_treeview(self, parent: tk.Widget) -> ttk.Treeview:
+    def _show_history_popup(self, player_name: str, historical_df, is_batter: bool):
         """
-        Create Treeview for historical player stats.
+        Open a popup window showing player historical stats.
 
         Args:
-            parent: Parent widget
-
-        Returns:
-            ttk.Treeview: Configured treeview for historical data
+            player_name: Player name for window title
+            historical_df: DataFrame with historical stats
+            is_batter: True for batting columns, False for pitching columns
         """
-        # Common columns for both batters and pitchers
-        columns = ("Season", "Team", "Age", "G")
+        popup = tk.Toplevel()
+        popup.title(f"{player_name} - Historical Stats")
+        popup.geometry("680x280")
+        popup.resizable(True, True)
 
-        tree = ttk.Treeview(parent, columns=columns, show="headings", height=5)
+        if is_batter:
+            columns = ("Season", "Team", "Age", "G", "AB", "R", "H", "HR", "RBI", "AVG", "OBP", "SLG", "OPS")
+        else:
+            columns = ("Season", "Team", "Age", "G", "GS", "IP", "W", "L", "ERA", "WHIP", "SO")
 
-        # Configure columns
+        tree_frame = tk.Frame(popup)
+        tree_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=(10, 5))
+
+        scrollbar = ttk.Scrollbar(tree_frame, orient=tk.VERTICAL)
+        scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+
+        tree = ttk.Treeview(tree_frame, columns=columns, show="headings", height=8,
+                            yscrollcommand=scrollbar.set)
+        scrollbar.config(command=tree.yview)
+
         for col in columns:
             tree.heading(col, text=col)
-            if col == "Season":
-                tree.column(col, width=70, anchor=tk.CENTER)
-            elif col == "Team":
+            if col in ["Season", "Team"]:
                 tree.column(col, width=60, anchor=tk.CENTER)
-            elif col in ["Age", "G"]:
+            elif col in ["Age", "G", "GS", "W", "L"]:
+                tree.column(col, width=40, anchor=tk.CENTER)
+            elif col in ["AB", "R", "H", "HR", "RBI", "SO"]:
+                tree.column(col, width=45, anchor=tk.CENTER)
+            elif col in ["AVG", "OBP", "SLG", "OPS", "ERA", "WHIP"]:
+                tree.column(col, width=55, anchor=tk.CENTER)
+            elif col == "IP":
                 tree.column(col, width=50, anchor=tk.CENTER)
             else:
-                tree.column(col, width=70, anchor=tk.CENTER)
+                tree.column(col, width=50, anchor=tk.CENTER)
 
-        # Add scrollbar
-        scrollbar = ttk.Scrollbar(parent, orient=tk.VERTICAL, command=tree.yview)
-        tree.configure(yscrollcommand=scrollbar.set)
-        scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
         tree.pack(fill=tk.BOTH, expand=True)
 
-        return tree
+        for idx, row in historical_df.iterrows():
+            try:
+                if is_batter:
+                    values = (
+                        int(row.get('Season', 0)), row.get('Team', ''), int(row.get('Age', 0)),
+                        int(row.get('G', 0)), int(row.get('AB', 0)), int(row.get('R', 0)),
+                        int(row.get('H', 0)), int(row.get('HR', 0)), int(row.get('RBI', 0)),
+                        f"{float(row.get('AVG', 0)):.3f}", f"{float(row.get('OBP', 0)):.3f}",
+                        f"{float(row.get('SLG', 0)):.3f}", f"{float(row.get('OPS', 0)):.3f}"
+                    )
+                else:
+                    values = (
+                        int(row.get('Season', 0)), row.get('Team', ''), int(row.get('Age', 0)),
+                        int(row.get('G', 0)), int(row.get('GS', 0)),
+                        f"{float(row.get('IP', 0)):.1f}",
+                        int(row.get('W', 0)), int(row.get('L', 0)),
+                        f"{float(row.get('ERA', 0)):.2f}", f"{float(row.get('WHIP', 0)):.2f}",
+                        int(row.get('SO', 0))
+                    )
+                tree.insert("", tk.END, values=values)
+            except Exception as e:
+                logger.warning(f"Error inserting historical row: {e}")
+
+        tk.Button(popup, text="Close", command=popup.destroy, width=10).pack(pady=5)
+        popup.focus_set()
 
     def update_roster(self, team: str, baseball_data):
         """
@@ -668,100 +692,20 @@ class RosterWidget:
             logger.warning("baseball_data not available for historical lookup")
             return
 
-        # Fetch historical data
+        # Fetch historical data and show in popup
         try:
             historical_df = self.baseball_data.get_player_historical_data(player_name, is_batter)
 
             if historical_df.empty:
                 logger.info(f"No historical data found for {player_name}")
-                # Clear the history tree
-                for item in self.history_tree.get_children():
-                    self.history_tree.delete(item)
                 return
 
-            # Update history tree with new data
-            self._update_history_tree(historical_df, is_batter)
+            self._show_history_popup(player_name, historical_df, is_batter)
 
         except Exception as e:
             logger.error(f"Error fetching historical data for {player_name}: {e}")
             import traceback
             logger.error(traceback.format_exc())
-
-    def _update_history_tree(self, historical_df: pd.DataFrame, is_batter: bool):
-        """
-        Update the history tree with player's historical stats.
-
-        Args:
-            historical_df: DataFrame with historical stats
-            is_batter: True if batter, False if pitcher
-        """
-        # Clear existing data
-        for item in self.history_tree.get_children():
-            self.history_tree.delete(item)
-
-        # Define columns based on player type
-        if is_batter:
-            columns = ("Season", "Team", "Age", "G", "AB", "R", "H", "HR", "RBI", "AVG", "OBP", "SLG", "OPS")
-        else:
-            columns = ("Season", "Team", "Age", "G", "GS", "IP", "W", "L", "ERA", "WHIP", "SO")
-
-        # Reconfigure tree columns
-        self.history_tree['columns'] = columns
-        self.history_tree['show'] = 'headings'
-
-        # Configure column headings and widths
-        for col in columns:
-            self.history_tree.heading(col, text=col)
-            if col in ["Season", "Team"]:
-                self.history_tree.column(col, width=60, anchor=tk.CENTER)
-            elif col in ["Age", "G", "GS", "W", "L"]:
-                self.history_tree.column(col, width=40, anchor=tk.CENTER)
-            elif col in ["AB", "R", "H", "HR", "RBI", "SO"]:
-                self.history_tree.column(col, width=45, anchor=tk.CENTER)
-            elif col in ["AVG", "OBP", "SLG", "OPS", "ERA", "WHIP"]:
-                self.history_tree.column(col, width=55, anchor=tk.CENTER)
-            elif col == "IP":
-                self.history_tree.column(col, width=50, anchor=tk.CENTER)
-            else:
-                self.history_tree.column(col, width=50, anchor=tk.CENTER)
-
-        # Insert rows from historical data
-        for idx, row in historical_df.iterrows():
-            try:
-                if is_batter:
-                    values = (
-                        int(row.get('Season', 0)),
-                        row.get('Team', ''),
-                        int(row.get('Age', 0)),
-                        int(row.get('G', 0)),
-                        int(row.get('AB', 0)),
-                        int(row.get('R', 0)),
-                        int(row.get('H', 0)),
-                        int(row.get('HR', 0)),
-                        int(row.get('RBI', 0)),
-                        f"{float(row.get('AVG', 0)):.3f}",
-                        f"{float(row.get('OBP', 0)):.3f}",
-                        f"{float(row.get('SLG', 0)):.3f}",
-                        f"{float(row.get('OPS', 0)):.3f}"
-                    )
-                else:
-                    values = (
-                        int(row.get('Season', 0)),
-                        row.get('Team', ''),
-                        int(row.get('Age', 0)),
-                        int(row.get('G', 0)),
-                        int(row.get('GS', 0)),
-                        f"{float(row.get('IP', 0)):.1f}",
-                        int(row.get('W', 0)),
-                        int(row.get('L', 0)),
-                        f"{float(row.get('ERA', 0)):.2f}",
-                        f"{float(row.get('WHIP', 0)):.2f}",
-                        int(row.get('SO', 0))
-                    )
-
-                self.history_tree.insert("", tk.END, values=values)
-            except Exception as e:
-                logger.warning(f"Error inserting historical row: {e}")
 
     def _apply_filter(self, is_batter: bool = True):
         """Apply search filter to roster display."""

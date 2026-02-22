@@ -58,12 +58,15 @@ class BaseballStats:
         :param load_pitcher_file: file name of the pitching stats, year will be added as a prefix
         :param suppress_console_output: if True, suppress disabled list and hot/cold list console output
         """
+        # Add caches for 2025 historical data (Phase 1: Stats Enhancement)
+        self.historical_2025_batting = None  # Lazy-loaded cache
+        self.historical_2025_pitching = None  # Lazy-loaded cache
+        self.prorated_2025_cache = {}  # {team_name_games: (batting_df, pitching_df)}
+
         self.suppress_console_output = suppress_console_output
         self.semaphore = threading.Semaphore(1)  # one thread can update games stats at a time
-        # PERFORMANCE: Create RNG instance once, reuse for ~29x speedup
-        self._rng_instance = np.random.default_rng()
+        self._rng_instance = np.random.default_rng()  # PERFORMANCE: Create RNG instance once, reuse for ~29x speedup
         self.rnd = lambda: self._rng_instance.uniform(low=0.0, high=1.001)
-        # self.create_hash = lambda text: int(hashlib.sha256(text.encode('utf-8')).hexdigest()[:5], 16)
 
         self.numeric_bcols = ['G', 'AB', 'R', 'H', '2B', '3B', 'HR', 'RBI', 'SB', 'CS', 'BB', 'SO', 'SH', 'SF',
                               'HBP', 'Condition']  # these cols will get added to running season total
@@ -88,6 +91,7 @@ class BaseballStats:
         self.new_season_pitching_data = None
         self.new_season_batting_data = None
         self.get_seasons(load_batter_file, load_pitcher_file)  # get existing data file
+        self._log_historical_baselines()  # log historical season totals for prior year for comparision and debugging
         self.get_all_team_names = lambda: self.batting_data.Team.unique()
         self.get_all_league_names = lambda: self.batting_data.League.unique()
         self.get_all_city_names = lambda: self.batting_data.City.unique()
@@ -144,11 +148,6 @@ class BaseballStats:
         self.league_pitching_total_ob = self.pitching_data[['H', 'BB']].sum().sum()
         self.league_total_outs = self.batting_data['AB'].sum() - batting_data_sum.sum()
         self.league_k_rate_per_ab = self.batting_data['SO'].sum() / self.league_total_outs
-
-        # Add caches for 2025 historical data (Phase 1: Stats Enhancement)
-        self.historical_2025_batting = None  # Lazy-loaded cache
-        self.historical_2025_pitching = None  # Lazy-loaded cache
-        self.prorated_2025_cache = {}  # {team_name_games: (batting_df, pitching_df)}
 
         logger.debug("Cached league totals and statistics for performance optimization")
         return
@@ -281,6 +280,44 @@ class BaseballStats:
                 logger.error(f"Error loading 2025 historical data: {e}")
                 self.historical_2025_batting = pd.DataFrame()
                 self.historical_2025_pitching = pd.DataFrame()
+
+    def _log_historical_baselines(self) -> None:
+        """Logs league-wide totals from 2025 to compare against 2026 projections."""
+        self._ensure_2025_historical_loaded()
+
+        if not self.historical_2025_batting.empty:
+            # 1. Total Raw 2025 Data (Everyone in the file)
+            raw_ab = self.historical_2025_batting['AB'].sum()
+            raw_h = self.historical_2025_batting['H'].sum()
+            raw_hr = self.historical_2025_batting['HR'].sum()
+
+            # 2. Survival Data (Only players who made it into your 2026 Sim)
+            active_hashes = self.new_season_batting_data.index
+            survivor_df = self.historical_2025_batting[self.historical_2025_batting['Hashcode'].isin(active_hashes)]
+
+            surv_ab = survivor_df['AB'].sum()
+            surv_h = survivor_df['H'].sum()
+            surv_hr = survivor_df['HR'].sum()
+
+            # 3. Projected 2026 "True Talent" (What the Preprocessor generated)
+            proj_ab = self.batting_data['AB'].sum()
+            proj_hr = self.batting_data['HR'].sum()
+
+            logger.info("=== LEAGUE HISTORICAL BASELINE (2025) from bbstats _log_historical_baselines ===")
+            logger.info(f"RAW 2025 (Full File):  AB: {raw_ab:,} | H: {raw_h:,} | HR: {raw_hr:,}")
+            logger.info(f"SURVIVORS (2026 Rosters): AB: {surv_ab:,} | H: {surv_h:,} | HR: {surv_hr:,}")
+            logger.info(f"PROJECTED 2026 TOTALS:   AB: {proj_ab:,.0f} | HR: {proj_hr:,.0f}")
+
+            hr_diff = proj_hr - raw_hr
+            logger.info(f"TOTAL HR SURPLUS/DEFICIT: {hr_diff:+.0f} HRs")
+
+            if abs(hr_diff) > 200:
+                logger.warning("SIGNIFICANT HR DISCREPANCY DETECTED: Check preprocessor K-values or AB-gates.")
+
+        if not self.historical_2025_pitching.empty:
+            raw_ip = self.historical_2025_pitching['IP'].apply(lambda x: int(x) + (x % 1 * 10 / 3)).sum()
+            logger.info(f"RAW 2025 PITCHING IP: {raw_ip:,.1f}")
+        return
 
     def calculate_prorated_2025_stats(self, team_name: Optional[str] = None,
                                       current_games_played: Optional[int] = None) -> tuple:

@@ -515,7 +515,7 @@ class BaseballStatsPreProcess:
             return {
                 'SO': 60,  # Strikeouts stabilize fast
                 'BB': 120,
-                'HR': 600,  # High K: Prevents 20-AB players from projecting 100 HRs
+                'HR': 1200,  # High K: Prevents 20-AB players from projecting 100 HRs
                 'H': 900,  # High K: Hits are very high-variance
                 'default': 250
             }
@@ -606,7 +606,7 @@ class BaseballStatsPreProcess:
 
             # Playing time logic (keeps bench players capped)
             if not is_pitching and recent_vol < 50:
-                projected_yearly_vol = min(raw_weighted_vol, max(recent_vol * 2, 120))
+                projected_yearly_vol = min(raw_weighted_vol, max(recent_vol * 1.5, 60))
             elif is_pitching and recent_vol < 15:
                 projected_yearly_vol = min(raw_weighted_vol, max(recent_vol * 2, 30))
             else:
@@ -617,9 +617,12 @@ class BaseballStatsPreProcess:
                 if stat_col in stat_map:
                     lg_rate = league_averages.get(stat_map[stat_col], 0)
 
-                    # ROOKIE PENALTY: Regress low-sample players to a % of league average
+                    # ROOKIE PENALTY: Regress low-sample players to a % of league average if below thres AB
                     if not is_pitching and career_sample < 300:
-                        lg_rate *= 0.85  # Hitters: Start 15% worse than average
+                        if player_historical['HR'].sum() == 0:
+                            lg_rate *= .50  # Regress to half the league HR rate if no HRs
+                        else:
+                            lg_rate *= 0.85  # Hitters: Start 15% worse than average
                     elif is_pitching and career_sample < 50:
                         lg_rate *= 1.15  # Pitchers: Start 15% worse (higher rates = worse)
 

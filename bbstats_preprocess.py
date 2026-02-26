@@ -618,9 +618,9 @@ class BaseballStatsPreProcess:
                     lg_rate = league_averages.get(stat_map[stat_col], 0)
 
                     # ROOKIE PENALTY: Regress low-sample players to a % of league average if below thres AB
-                    if not is_pitching and career_sample < 300:
-                        if player_historical['HR'].sum() == 0:
-                            lg_rate *= .50  # Regress to half the league HR rate if no HRs
+                    if not is_pitching and career_sample < 250:
+                        if player_historical['HR'].sum() <= 10:
+                            lg_rate *= .50 * player_historical['HR'].sum() / 10 # Regress half league HR rate 0 to .5
                         else:
                             lg_rate *= 0.85  # Hitters: Start 15% worse than average
                     elif is_pitching and career_sample < 50:

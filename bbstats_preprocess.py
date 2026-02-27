@@ -657,6 +657,22 @@ class BaseballStatsPreProcess:
 
         return pd.DataFrame(results)
 
+    def is_active_candidate(self, years_list, age, career_war, most_recent_season):
+        last_active = max(years_list) if years_list else 0
+
+        # Played last year? Keep them.
+        if last_active == most_recent_season:
+            return True
+
+        # Missed exactly one year (the "Injury Gap")
+        if last_active == (most_recent_season - 1):
+            # Keep if they are young (< 33) OR if they are an established star (WAR > 8)
+            if age < 33 or career_war > 8.0:
+                return True
+
+        # Missed 2+ years? They are effectively retired for sim purposes.
+        return False
+
     def get_pitching_seasons(self, pitcher_file: str, load_seasons: List[int]) -> tuple:
         # Returns tuple of (aggregated_df, historical_df)
         # caution war and salary cols will get aggregated across multiple seasons
@@ -709,13 +725,25 @@ class BaseballStatsPreProcess:
         )
         # Note: Teams, Leagues, and Years_Included are now set inside apply_trend_based_aggregation
         # Filter to only keep players who appeared in the most recent season
-        most_recent_season = max(load_seasons)
-        pitching_data['In_Recent_Season'] = pitching_data['Years_Included'].apply(
-            lambda years: most_recent_season in years if isinstance(years, list) else False
-        )
+        # most_recent_season = max(load_seasons)
+        # pitching_data['In_Recent_Season'] = pitching_data['Years_Included'].apply(
+        #     lambda years: most_recent_season in years if isinstance(years, list) else False
+        # )
         players_before_filter = len(pitching_data)
-        pitching_data = pitching_data[pitching_data['In_Recent_Season']]
-        pitching_data = pitching_data.drop('In_Recent_Season', axis=1)
+        # pitching_data = pitching_data[pitching_data['In_Recent_Season']]
+        # pitching_data = pitching_data.drop('In_Recent_Season', axis=1)
+        most_recent_season = max(load_seasons)
+        pitching_data['Should_Retain'] = pitching_data.apply(
+            lambda row: self.is_active_candidate(
+                row['Years_Included'],
+                row['Age'],
+                row.get('WAR', 0),
+                most_recent_season
+            ), axis=1
+        )
+
+        pitching_data = pitching_data[pitching_data['Should_Retain']]
+        pitching_data = pitching_data.drop('Should_Retain', axis=1)
         players_after_filter = len(pitching_data)
         print(f"Pitchers: Filtered {players_before_filter - players_after_filter} players not in {most_recent_season} season (kept {players_after_filter})")
 
@@ -834,16 +862,30 @@ class BaseballStatsPreProcess:
         # Note: Pos, Teams, Leagues, and Years_Included are now set inside apply_trend_based_aggregation
 
         # Filter to only keep players who appeared in the most recent season
+        # most_recent_season = max(load_seasons)
+        # batting_data['In_Recent_Season'] = batting_data['Years_Included'].apply(
+        #     lambda years: most_recent_season in years if isinstance(years, list) else False
+        # )
+        # players_before_filter = len(batting_data)
+        # batting_data = batting_data[batting_data['In_Recent_Season']]
+        # batting_data = batting_data.drop('In_Recent_Season', axis=1)
+        # players_after_filter = len(batting_data)
+        # print(f"Batters: Filtered {players_before_filter - players_after_filter} players not in {most_recent_season} season (kept {players_after_filter})")
         most_recent_season = max(load_seasons)
-        batting_data['In_Recent_Season'] = batting_data['Years_Included'].apply(
-            lambda years: most_recent_season in years if isinstance(years, list) else False
+        # Apply the probability logic instead of the hard 'In_Recent_Season' check
+        batting_data['Should_Retain'] = batting_data.apply(
+            lambda row: self.is_active_candidate(
+                row['Years_Included'],
+                row['Age'],
+                row.get('WAR', 0),  # Use actual WAR if available
+                most_recent_season
+            ), axis=1
         )
-        players_before_filter = len(batting_data)
-        batting_data = batting_data[batting_data['In_Recent_Season']]
-        batting_data = batting_data.drop('In_Recent_Season', axis=1)
-        players_after_filter = len(batting_data)
-        print(f"Batters: Filtered {players_before_filter - players_after_filter} players not in {most_recent_season} season (kept {players_after_filter})")
 
+        players_before = len(batting_data)
+        batting_data = batting_data[batting_data['Should_Retain']]
+        batting_data = batting_data.drop('Should_Retain', axis=1)
+        print(f"Batters: Retained {len(batting_data)} players (Filtered {players_before - len(batting_data)} retired/inactive)")
         batting_data = batting_data.set_index('Hashcode')
 
         # Apply random data jigger if needed (to both datasets)
@@ -867,7 +909,7 @@ class BaseballStatsPreProcess:
                                                            nan=0.0, posinf=0.0), 3)
         batting_data['Total_OB'] = batting_data['H'] + batting_data['BB'] + batting_data['HBP']
         batting_data['Total_Outs'] = batting_data['AB'] - batting_data['H'] + batting_data['HBP']
-        batting_data = batting_data[batting_data['AB'] >= 10]  # drop players without enough AB
+        batting_data = batting_data[batting_data['AB'] >= 1]  # drop players without enough AB
         batting_data['E'] = 0
         batting_data['Game_Fatigue_Factor'] = 0
         batting_data['Condition'] = 100

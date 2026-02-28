@@ -275,17 +275,19 @@ class RosterWidget:
         tk.Button(popup, text="Close", command=popup.destroy, width=10).pack(pady=5)
         popup.focus_set()
 
-    def update_roster(self, team: str, baseball_data):
+    def update_roster(self, team: str, baseball_data, team_win_loss: dict = None):
         """
         Fetch and display roster data for team.
 
         Args:
             team: Team abbreviation
             baseball_data: BaseballStats instance with get_batting_data/get_pitching_data methods
+            team_win_loss: Dictionary mapping team names to [wins, losses] for calculating actual games played
         """
         # Store reference to baseball_data for later use in click handlers
         self.baseball_data = baseball_data
         self.current_team = team  # Phase 5: Stats Enhancement - track current team
+        self.team_win_loss = team_win_loss  # Store for games played calculation
 
         try:
             # Get batting data (current season)
@@ -891,10 +893,11 @@ class RosterWidget:
             widget.destroy()
         labels_dict.clear()
 
-        # Get games played for this team
+        # Get games played for this team from W-L record
         games_played = 0
-        if hasattr(self.baseball_data, 'team_games_played'):
-            games_played = self.baseball_data.team_games_played.get(self.current_team, 0)
+        if self.team_win_loss and self.current_team in self.team_win_loss:
+            wins, losses = self.team_win_loss[self.current_team]
+            games_played = wins + losses
 
         # Add games played header
         if games_played > 0:
@@ -957,11 +960,16 @@ class RosterWidget:
                 if col in current_totals.columns and col in prorated_totals.columns:
                     diff_totals[col] = current_totals[col].values[0] - prorated_totals[col].values[0]
 
+            # Create labels with game counts
+            current_label = f"2026 ({games_played} games)" if games_played > 0 else "Current"
+            if games_played >= 162:
+                season_label = f"2025 (prorated {games_played} games)"
+            else:
+                season_label = f"2025 (prorated {games_played} games)" if games_played > 0 else "2025 (Prorated)"
+
             # Insert three rows
-            # Determine label based on whether we have full season data
-            season_label = "2025 (Full Season)" if games_played >= 162 else "2025 (Prorated)"
             row_data = [
-                ("Current", current_totals, False),
+                (current_label, current_totals, False),
                 (season_label, prorated_totals, False),
                 ("Difference", diff_totals, True)
             ]
@@ -976,7 +984,8 @@ class RosterWidget:
                 totals_tree.insert("", tk.END, values=tuple(values))
         else:
             # No 2025 data or no games played, show current only
-            values = ["Current"]
+            current_label = f"2026 ({games_played} games)" if games_played > 0 else "Current"
+            values = [current_label]
             for col in columns[1:]:
                 if col in current_totals.columns:
                     values.append(self._format_total_value(current_totals[col].values[0], col, False))

@@ -243,15 +243,17 @@ class LeagueStatsWidget:
 
         return tree
 
-    def update_stats(self, baseball_data):
+    def update_stats(self, baseball_data, team_win_loss: dict = None):
         """
         Fetch and display league-wide stats.
 
         Args:
             baseball_data: BaseballStats instance with get_batting_data/get_pitching_data methods
+            team_win_loss: Dictionary mapping team names to [wins, losses] for calculating actual games played
         """
         # Store reference to baseball_data
         self.baseball_data = baseball_data
+        self.team_win_loss = team_win_loss  # Store for games played calculation
 
         try:
             # Get batting data for all teams (current season)
@@ -886,9 +888,18 @@ class LeagueStatsWidget:
             else:
                 totals_tree.column(col, width=45, anchor=tk.CENTER)
 
-        # Get prorated 2025 stats for league
+        # Determine games played from W-L records (maximum games played across all teams)
+        games_played = 0
+        if self.team_win_loss:
+            # For league stats, use max games (W+L) across all teams
+            games_played = max(
+                (wins + losses for team, (wins, losses) in self.team_win_loss.items() if team != 'OFF DAY'),
+                default=0
+            )
+
+        # Get prorated 2025 stats for league (explicitly pass games_played so we know the proration basis)
         batting_2025, pitching_2025 = self.baseball_data.calculate_prorated_2025_stats(
-            team_name=None, current_games_played=None
+            team_name=None, current_games_played=games_played if games_played > 0 else None
         )
 
         if (is_batter and not batting_2025.empty) or (not is_batter and not pitching_2025.empty):
@@ -907,18 +918,16 @@ class LeagueStatsWidget:
                 if col in current_totals.columns and col in prorated_totals.columns:
                     diff_totals[col] = current_totals[col].values[0] - prorated_totals[col].values[0]
 
-            # Determine label based on games played (if available)
-            games_played = 0
-            if hasattr(self.baseball_data, 'team_games_played') and self.baseball_data.team_games_played:
-                # For league stats, use average or max games
-                games_played = max(self.baseball_data.team_games_played.values()) if self.baseball_data.team_games_played else 0
-
-            # Label changes based on whether it's a full season
-            season_label = "2025 (Full Season)" if games_played >= 162 else "2025 (Prorated)"
+            # Create labels with game counts
+            current_label = f"2026 ({games_played} games)" if games_played > 0 else "Current"
+            if games_played >= 162:
+                season_label = f"2025 (prorated {games_played} games)"
+            else:
+                season_label = f"2025 (prorated {games_played} games)" if games_played > 0 else "2025 (Prorated)"
 
             # Insert three rows
             row_data = [
-                ("Current", current_totals, False),
+                (current_label, current_totals, False),
                 (season_label, prorated_totals, False),
                 ("Difference", diff_totals, True)
             ]
@@ -933,7 +942,8 @@ class LeagueStatsWidget:
                 totals_tree.insert("", tk.END, values=tuple(values))
         else:
             # No 2025 data, show current only
-            values = ["Current"]
+            current_label = f"2026 ({games_played} games)" if games_played > 0 else "Current"
+            values = [current_label]
             for col in columns[1:]:
                 if col in current_totals.columns:
                     values.append(self._format_total_value(current_totals[col].values[0], col, False))

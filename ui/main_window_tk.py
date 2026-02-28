@@ -698,14 +698,18 @@ class SeasonMainWindow:
         if worker and worker.season:
             self.roster_widget.update_roster(
                 self.season_team_to_follow,
-                worker.season.baseball_data
+                worker.season.baseball_data,
+                worker.season.team_win_loss
             )
 
     def _update_league_stats(self):
         """Update league stats widget with current season data."""
         worker = self.controller.get_worker()
         if worker and worker.season:
-            self.league_stats_widget.update_stats(worker.season.baseball_data)
+            self.league_stats_widget.update_stats(
+                worker.season.baseball_data,
+                worker.season.team_win_loss
+            )
 
     def _update_league_leaders(self):
         """Update league leaders widget with current season data."""

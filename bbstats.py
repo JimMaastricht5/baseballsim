@@ -364,13 +364,13 @@ class BaseballStats:
             df_b = df_b.groupby('Hashcode')[bat_cols].sum()
 
             # Vectorized multiplication and rounding
-            df_b[bat_cols] = (df_b[bat_cols] * prorate_factor).round().astype(int)
+            df_b[bat_cols] = (df_b[bat_cols] * prorate_factor).round().astype(float)
             df_b = team_batting_stats(df_b, filter_stats=False)
 
         # 4. Pitching Proration (Base-3 IP logic with Trade Aggregation)
         if not df_p.empty:
             # First, convert IP to Total Outs
-            df_p['Total_Outs_Calc'] = (df_p['IP'].astype(int) * 3) + ((df_p['IP'] % 1) * 10).round()
+            df_p['Total_Outs_Calc'] = (df_p['IP'].astype(float) * 3) + ((df_p['IP'] % 1) * 10).round()
             # Add 'AB' to the pitch_cols so it isn't dropped during groupby
             # Pitchers need 'AB' (at-bats AGAINST them) to calculate OBP and AVG_faced
             pitch_cols = ['G', 'AB', 'H', '2B', '3B', 'R', 'ER', 'HR', 'BB', 'SO', 'W', 'L', 'SV', 'BS', 'HLD', 'GS',
@@ -382,7 +382,7 @@ class BaseballStats:
             df_p = df_p.groupby('Hashcode').agg(agg_dict)
             total_outs_prorated = (df_p['Total_Outs_Calc'] * prorate_factor).round()  # Apply the Proration Factor
             df_p['IP'] = (total_outs_prorated / 3).apply(lambda x: int(x) + (round(x % 1 * 3) / 10))  # Total Outs to IP
-            df_p[pitch_cols] = (df_p[pitch_cols] * prorate_factor).round().astype(int)  # Prorate rest of counting stats
+            df_p[pitch_cols] = (df_p[pitch_cols] * prorate_factor).round().astype(float)  # Prorate rest of counting stats
             df_p = team_pitching_stats(df_p, filter_stats=False)  # final stats
 
         self.prorated_2025_cache[cache_key] = (df_b, df_p)

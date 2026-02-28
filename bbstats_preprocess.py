@@ -74,7 +74,7 @@ class BaseballStatsPreProcess:
                               'L', 'SV', 'WP', 'Total_Outs', 'Condition']  # cols will add to running season total
         self.nl = ['CHC', 'CIN', 'MIL', 'PIT', 'STL', 'ATL', 'MIA', 'NYM', 'PHI', 'WAS', 'WSN', 'COL', 'LAD', 'ARI',
                    'SDP', 'SFG']
-        self.al = ['ATH', 'BOS', 'TEX', 'NYY', 'KCR', 'BAL', 'CLE', 'TOR', 'LAA', 'CWS', 'SEA', 'MIN', 'DET', 'TBR',
+        self.al = ['ATH', 'BOS', 'TEX', 'NYY', 'KCR', 'BAL', 'CLE', 'TOR', 'LAA', 'CWS', 'CHW', 'SEA', 'MIN', 'DET', 'TBR',
                    'HOU']
         self.digit_pos_map = {'1': 'P', '2': 'C', '3': '1B', '4': '2B', '5': '3B', '6': 'SS',
                                                '7': 'LF', '8': 'CF', '9': 'RF'}
@@ -94,7 +94,7 @@ class BaseballStatsPreProcess:
         self.peak_start_age = 26  # Start of the plateau
         self.peak_end_age = 30  # End of the plateau (stable peak)
         self.decline_start_age = 31  # When the parabolic decline kicks in
-        self.coeff_age_improvement = 0.0008
+        self.coeff_age_improvement = 0.0004  # Reduced from 0.0008: Less optimistic improvement for young players
         self.coeff_age_decline = -0.0059
 
         # load seasons
@@ -513,11 +513,11 @@ class BaseballStatsPreProcess:
         """Returns stabilization constants (K). Higher K = slower to trust player data."""
         if not is_pitching:
             return {
-                'SO': 80,  # Strikeouts stabilize fast
-                'BB': 110,
-                'HR': 1500,  # High K: Prevents 20-AB players from projecting 100 HRs
-                'H': 1500,  # High K: Hits are very high-variance
-                'default': 250
+                'SO': 120,  # Increased: Pull low-K hitters toward league average more strongly
+                'BB': 140,  # Slightly increased for more regression
+                'HR': 2000,  # Increased: More conservative HR projections
+                'H': 2000,  # Increased: Stronger BABIP regression toward league mean
+                'default': 300
             }
         else:
             return {
@@ -620,11 +620,11 @@ class BaseballStatsPreProcess:
                     # ROOKIE PENALTY: Regress low-sample players to a % of league average if below thres AB
                     if not is_pitching and career_sample < 250:
                         if player_historical['HR'].sum() <= 10:
-                            lg_rate *= .50 * player_historical['HR'].sum() / 10 # Regress half league HR rate 0 to .5
+                            lg_rate *= .40 * player_historical['HR'].sum() / 10 # More conservative: 0 to .4x league HR rate
                         else:
-                            lg_rate *= 0.80  # Hitters: Start 20% worse than average
+                            lg_rate *= 0.75  # Hitters: Start 25% worse than average (was 20%)
                     elif is_pitching and career_sample < 50:
-                        lg_rate *= 1.20  # Pitchers: Start 20% worse (higher rates = worse)
+                        lg_rate *= 1.25  # Pitchers: Start 25% worse (higher rates = worse, was 20%)
 
                     k = k_values.get(stat_col, k_values['default'])
                     career_total = player_historical[stat_col].sum()
@@ -638,9 +638,17 @@ class BaseballStatsPreProcess:
 
             # 4. Final Sanity Check (The "Hard Caps")
             if not is_pitching and most_recent['AB'] > 0:
-                # Cap HR rate
-                if (most_recent['HR'] / most_recent['AB']) > 0.080:
-                    most_recent['HR'] = most_recent['AB'] * 0.065
+                # Cap HR rate at 4.5% (reasonable upper bound for elite power hitters)
+                if (most_recent['HR'] / most_recent['AB']) > 0.050:
+                    most_recent['HR'] = most_recent['AB'] * 0.045
+
+                # Cap batting average at .320 to prevent BABIP inflation
+                if (most_recent['H'] / most_recent['AB']) > 0.320:
+                    most_recent['H'] = most_recent['AB'] * 0.320
+
+                # Ensure minimum strikeout rate of 15% (league average ~22%)
+                if most_recent['AB'] > 100 and (most_recent['SO'] / most_recent['AB']) < 0.12:
+                    most_recent['SO'] = most_recent['AB'] * 0.15
 
             if is_pitching and most_recent['IP'] > 1.0:
                 # Cap ERA between 2.80 and 7.50 for the starting projection

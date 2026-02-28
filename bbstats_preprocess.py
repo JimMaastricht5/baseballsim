@@ -513,10 +513,10 @@ class BaseballStatsPreProcess:
         """Returns stabilization constants (K). Higher K = slower to trust player data."""
         if not is_pitching:
             return {
-                'SO': 60,  # Strikeouts stabilize fast
-                'BB': 120,
-                'HR': 1200,  # High K: Prevents 20-AB players from projecting 100 HRs
-                'H': 900,  # High K: Hits are very high-variance
+                'SO': 80,  # Strikeouts stabilize fast
+                'BB': 110,
+                'HR': 1500,  # High K: Prevents 20-AB players from projecting 100 HRs
+                'H': 1500,  # High K: Hits are very high-variance
                 'default': 250
             }
         else:
@@ -622,9 +622,9 @@ class BaseballStatsPreProcess:
                         if player_historical['HR'].sum() <= 10:
                             lg_rate *= .50 * player_historical['HR'].sum() / 10 # Regress half league HR rate 0 to .5
                         else:
-                            lg_rate *= 0.85  # Hitters: Start 15% worse than average
+                            lg_rate *= 0.80  # Hitters: Start 20% worse than average
                     elif is_pitching and career_sample < 50:
-                        lg_rate *= 1.15  # Pitchers: Start 15% worse (higher rates = worse)
+                        lg_rate *= 1.20  # Pitchers: Start 20% worse (higher rates = worse)
 
                     k = k_values.get(stat_col, k_values['default'])
                     career_total = player_historical[stat_col].sum()
@@ -638,7 +638,7 @@ class BaseballStatsPreProcess:
 
             # 4. Final Sanity Check (The "Hard Caps")
             if not is_pitching and most_recent['AB'] > 0:
-                # Cap HR rate at 8% (roughly a 48-HR pace for 600 ABs)
+                # Cap HR rate
                 if (most_recent['HR'] / most_recent['AB']) > 0.080:
                     most_recent['HR'] = most_recent['AB'] * 0.065
 

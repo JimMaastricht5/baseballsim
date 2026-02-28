@@ -1217,7 +1217,7 @@ if __name__ == '__main__':
 
     # handle a single full season of MLB
     if not fantasy:
-        my_team_to_follow = ['MIL','MIA']  # List of teams to follow, e.g., ['MIL', 'NYM'] for multiple
+        my_team_to_follow = ['MIL']  # List of teams to follow, e.g., ['MIL', 'NYM'] for multiple
         # my_team_to_follow = None  # or set to None for no followed teams
 
         # set a series schedule if you just want to simulate a playoff series or use the team_list param

@@ -143,11 +143,47 @@ class BaseballStats:
         self.league_pitching_totals = team_pitching_totals(self.pitching_data)
 
         # Cache additional league-wide statistics used in SimAB
-        batting_data_sum = self.batting_data[['H', 'BB', 'HBP']].sum()
-        self.league_batting_total_ob = batting_data_sum['H'] + batting_data_sum['BB'] + batting_data_sum['HBP']
-        self.league_pitching_total_ob = self.pitching_data[['H', 'BB']].sum().sum()
-        self.league_total_outs = self.batting_data['AB'].sum() - batting_data_sum.sum()
-        self.league_k_rate_per_ab = self.batting_data['SO'].sum() / self.league_total_outs
+        # batting_data_sum = self.batting_data[['H', 'BB', 'HBP']].sum()
+        # self.league_batting_total_ob = batting_data_sum['H'] + batting_data_sum['BB'] + batting_data_sum['HBP']
+        # self.league_pitching_total_ob = self.pitching_data[['H', 'BB']].sum().sum()
+        # self.league_total_outs = self.batting_data['AB'].sum() - batting_data_sum.sum()
+        # self.league_k_rate_per_ab = self.batting_data['SO'].sum() / self.league_total_outs
+
+        # Correct denominators ensure the Odds Ratio is comparing Apples to Apples
+        # --- 1. BATTER LEAGUE TOTALS (The Hitter Baseline) ---
+        b_totals = self.batting_data[['AB', 'H', 'BB', 'HBP', 'SO', 'SF', 'SH']].sum()
+
+        # Correct OBP events
+        self.league_batting_total_ob = b_totals['H'] + b_totals['BB'] + b_totals['HBP']
+
+        # Correct Plate Appearances (Denominator for Hitter-based rates)
+        # Correct Plate Appearances
+        self.league_pa_batting = b_totals['AB'] + b_totals['BB'] + b_totals['HBP'] + b_totals['SF'] + b_totals['SH']
+
+        # NEW: Explicitly set the baseline OBP for SimAB to use
+        self.league_batting_obp = self.league_batting_total_ob / self.league_pa_batting
+
+        # Correct Outs (Every out that isn't a K is a ball-in-play out)
+        self.league_total_outs = (b_totals['AB'] - b_totals['H']) + b_totals['SF'] + b_totals['SH']
+
+        # --- 2. PITCHER LEAGUE TOTALS (The Pitcher Baseline) ---
+        # We calculate BF (Batters Faced) as the equivalent of PA for pitchers
+        p_totals = self.pitching_data[['IP', 'H', 'BB', 'HBP', 'SO', 'HR']].sum()
+
+        # Convert IP (decimal) to actual Outs to avoid the "IP * 3" rounding error
+        # (IP.floor * 3) + (decimal_remainder * 10)
+        p_outs = (np.floor(p_totals['IP']) * 3) + (np.round(p_totals['IP'] % 1 * 10))
+
+        # Batters Faced (BF) = Outs + Hits + Walks + HBP
+        self.league_bf_pitching = p_outs + p_totals['H'] + p_totals['BB'] + p_totals['HBP']
+
+        # Total On-Base against Pitchers
+        self.league_pitching_total_ob = p_totals['H'] + p_totals['BB'] + p_totals['HBP']
+
+        # --- 3. CROSS-LEAGUE RATE NORMALIZATION ---
+        # This ensures SimAB's Odds Ratio is comparing Apples to Apples
+        # K-rate is most stable when calculated against Total Outs (Opportunities for an Out)
+        self.league_k_rate_per_ab = b_totals['SO'] / self.league_total_outs
 
         logger.debug("Cached league totals and statistics for performance optimization")
         return
@@ -1375,54 +1411,103 @@ def team_batting_stats(df: DataFrame, filter_stats: bool=True) -> DataFrame:
     """
     # OPTIMIZED: Filter first (creates new df), or copy only if not filtering
     if filter_stats:
-        df = df[df['AB'] > 0]  # Boolean indexing creates a new dataframe
+        df = df[df['AB'] > 0]
     else:
-        df = df.copy()  # Copy only when not filtering to avoid modifying caller's data
+        df = df.copy()
 
     df['AVG'] = trunc_col(np.nan_to_num(np.divide(df['H'], df['AB']), nan=0.0, posinf=0.0), 3)
-    df['OBP'] = trunc_col(np.nan_to_num(np.divide(df['H'] + df['BB'] + df['HBP'], df['AB'] + df['BB'] + df['HBP']),
-                          nan=0.0, posinf=0.0), 3)
+
+    # FIX: Use a single, correct OBP calculation that includes SF.
+    denominator = df['AB'] + df['BB'] + df['HBP'] + df.get('SF', 0)
+    df['OBP'] = trunc_col(np.nan_to_num(np.divide(df['H'] + df['BB'] + df['HBP'], denominator),
+                                        nan=0.0, posinf=0.0), 3)
     df['SLG'] = trunc_col(np.nan_to_num(np.divide((df['H'] - df['2B'] - df['3B'] - df['HR']) + df['2B'] * 2 +
                           df['3B'] * 3 + df['HR'] * 4, df['AB']), nan=0.0, posinf=0.0), 3)
     df['OPS'] = trunc_col(np.nan_to_num(df['OBP'] + df['SLG'], nan=0.0, posinf=0.0), 3)
     return df
 
 
-def team_pitching_stats(df: DataFrame, filter_stats: bool=True) -> DataFrame:
+def team_pitching_stats(df: DataFrame, filter_stats: bool = True) -> DataFrame:
     """
-    build up pitcher stats.  Note initial values for some cols are 0. hbp is 0, 2b are 0, 3b are 0
-    :param df: data set to calc
-    :param filter_stats boolean that drops players with no stats
-    :return: df with new cols / updated cols
+    Calculates pitcher stats using precise Out-based denominators.
+
+    :param df: dataset to calculate
+    :param filter_stats: boolean that drops players with no stats
+    :return: df with new/updated columns
     """
-    # OPTIMIZED: Filter first (creates new df), or copy only if not filtering
     if filter_stats:
-        # For pitchers, only require IP > 0 (not AB, since most pitchers don't bat)
-        df = df[df['IP'] > 0]  # Boolean indexing creates a new dataframe
+        df = df[df['IP'] > 0].copy()
     else:
-        df = df.copy()  # Copy only when not filtering to avoid modifying caller's data
+        df = df.copy()
 
-    df['AB'] = trunc_col(df['AB'], 0)
-    df['IP'] = trunc_col(df['IP'], 2)
-    # Only calculate batting stats if pitcher has at-bats (NL pitchers, two-way players)
-    df['AVG'] = trunc_col(np.where(df['AB'] > 0, df['H'] / df['AB'], 0), 3)
-    df['OBP'] = trunc_col(np.where(df['AB'] + df['BB'] > 0, (df['H'] + df['BB']) / (df['AB'] + df['BB']), 0), 3)
+    # 1. CONVERT IP TO TOTAL OUTS (The real denominator)
+    # Correctly handles the .1 and .2 notation (6.1 -> 19, 6.2 -> 20)
+    total_outs = (np.floor(df['IP']) * 3) + (np.round(df['IP'] % 1 * 10))
 
-    # Calculate 'SLG' column (only for pitchers with at-bats)
-    slg_numerator = (df['H'] - df['2B'] - df['3B'] - df['HR']) + df['2B'] * 2 + df['3B'] * 3 + df['HR'] * 4
-    df['SLG'] = trunc_col(np.where(df['AB'] > 0, slg_numerator / df['AB'], 0), 3)
-    # Calculate 'OPS' column
-    df['OPS'] = trunc_col(df['OBP'] + df['SLG'], 3)
-    # Calculate 'WHIP' and 'ERA' columns
-    df['WHIP'] = trunc_col((df['BB'] + df['H']) / df['IP'], 3)
-    df['ERA'] = trunc_col((df['ER'] / df['IP']) * 9, 2)
-    df = fill_nan_with_value(df,'ERA', 0)
-    df = fill_nan_with_value(df, 'WHIP', 0)
-    df = fill_nan_with_value(df, 'AVG', 0)
-    df = fill_nan_with_value(df, 'OBP', 0)
-    df = fill_nan_with_value(df, 'SLG', 0)
-    df = fill_nan_with_value(df, 'OPS', 0)
+    # 2. CALCULATE BATTERS FACED (TBF)
+    # TBF = Outs + Hits + Walks + HBP (if exists)
+    hbp_val = df['HBP'] if 'HBP' in df.columns else 0
+    tbf = total_outs + df['H'] + df['BB'] + hbp_val
+
+    # 3. DERIVED RATE STATISTICS
+    # WHIP: (Walks + Hits) / IP
+    df['WHIP'] = trunc_col(np.nan_to_num((df['BB'] + df['H']) / df['IP'], nan=0.0, posinf=0.0), 3)
+
+    # ERA: (ER / Total_Outs) * 27
+    df['ERA'] = trunc_col(np.nan_to_num((df['ER'] / total_outs) * 27, nan=0.0, posinf=0.0), 2)
+
+    # OBP AGAINST: (H + BB + HBP) / TBF
+    # This is the crucial gate fix for SimAB
+    df['OBP'] = trunc_col(np.nan_to_num((df['H'] + df['BB'] + hbp_val) / tbf, nan=0.0, posinf=0.0), 3)
+
+    # AVG AGAINST: H / (Total Outs + Hits)
+    # This approximates H / AB (against)
+    denom_avg = total_outs + df['H']
+    df['AVG'] = trunc_col(np.nan_to_num(df['H'] / denom_avg, nan=0.0, posinf=0.0), 3)
+
+    # 4. CLEANUP
+    cols_to_fill = ['ERA', 'WHIP', 'AVG', 'OBP', 'SLG', 'OPS']
+    for col in cols_to_fill:
+        if col in df.columns:
+            df = fill_nan_with_value(df, col, 0)
+
     return df
+
+# def team_pitching_stats(df: DataFrame, filter_stats: bool=True) -> DataFrame:
+#     """
+#     build up pitcher stats.  Note initial values for some cols are 0. hbp is 0, 2b are 0, 3b are 0
+#     :param df: data set to calc
+#     :param filter_stats boolean that drops players with no stats
+#     :return: df with new cols / updated cols
+#     """
+#     # OPTIMIZED: Filter first (creates new df), or copy only if not filtering
+#     if filter_stats:
+#         # For pitchers, only require IP > 0 (not AB, since most pitchers don't bat)
+#         df = df[df['IP'] > 0]  # Boolean indexing creates a new dataframe
+#     else:
+#         df = df.copy()  # Copy only when not filtering to avoid modifying caller's data
+#
+#     df['AB'] = trunc_col(df['AB'], 0)
+#     df['IP'] = trunc_col(df['IP'], 2)
+#     # Only calculate batting stats if pitcher has at-bats (NL pitchers, two-way players)
+#     df['AVG'] = trunc_col(np.where(df['AB'] > 0, df['H'] / df['AB'], 0), 3)
+#     df['OBP'] = trunc_col(np.where(df['AB'] + df['BB'] > 0, (df['H'] + df['BB']) / (df['AB'] + df['BB']), 0), 3)
+#
+#     # Calculate 'SLG' column (only for pitchers with at-bats)
+#     slg_numerator = (df['H'] - df['2B'] - df['3B'] - df['HR']) + df['2B'] * 2 + df['3B'] * 3 + df['HR'] * 4
+#     df['SLG'] = trunc_col(np.where(df['AB'] > 0, slg_numerator / df['AB'], 0), 3)
+#     # Calculate 'OPS' column
+#     df['OPS'] = trunc_col(df['OBP'] + df['SLG'], 3)
+#     # Calculate 'WHIP' and 'ERA' columns
+#     df['WHIP'] = trunc_col((df['BB'] + df['H']) / df['IP'], 3)
+#     df['ERA'] = trunc_col((df['ER'] / df['IP']) * 9, 2)
+#     df = fill_nan_with_value(df,'ERA', 0)
+#     df = fill_nan_with_value(df, 'WHIP', 0)
+#     df = fill_nan_with_value(df, 'AVG', 0)
+#     df = fill_nan_with_value(df, 'OBP', 0)
+#     df = fill_nan_with_value(df, 'SLG', 0)
+#     df = fill_nan_with_value(df, 'OPS', 0)
+#     return df
 
 
 def team_batting_totals(batting_df: DataFrame) -> DataFrame:

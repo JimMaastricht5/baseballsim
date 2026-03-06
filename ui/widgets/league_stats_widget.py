@@ -12,6 +12,9 @@ from tkinter import ttk
 import pandas as pd
 from bblogger import logger
 
+from ui.theme import (BG_PANEL, BG_ELEVATED, TEXT_PRIMARY, TEXT_SECONDARY,
+                      TEXT_HEADING, ACCENT_GOLD)
+
 
 class LeagueStatsWidget:
     """
@@ -33,7 +36,7 @@ class LeagueStatsWidget:
             parent: Parent tkinter widget (notebook or frame)
             comparison_mode_var: StringVar for comparison mode ("current" or "difference")
         """
-        self.frame = tk.Frame(parent)
+        self.frame = tk.Frame(parent, bg=BG_PANEL)
         self.baseball_data = None  # Will be set in update_stats
 
         # Create our own comparison mode var if not provided
@@ -64,12 +67,12 @@ class LeagueStatsWidget:
         stats_notebook.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
 
         # Sub-section 1: Position Players
-        pos_players_frame = tk.Frame(stats_notebook)
+        pos_players_frame = tk.Frame(stats_notebook, bg=BG_PANEL)
         stats_notebook.add(pos_players_frame, text="Position Players")
         self._create_pos_players_tab(pos_players_frame)
 
         # Sub-section 2: Pitchers
-        pitchers_frame = tk.Frame(stats_notebook)
+        pitchers_frame = tk.Frame(stats_notebook, bg=BG_PANEL)
         stats_notebook.add(pitchers_frame, text="Pitchers")
         self._create_pitchers_tab(pitchers_frame)
 
@@ -81,11 +84,12 @@ class LeagueStatsWidget:
             parent: Parent frame
         """
         # Create control panel at top
-        control_frame = tk.Frame(parent)
+        control_frame = tk.Frame(parent, bg=BG_PANEL)
         control_frame.pack(fill=tk.X, padx=5, pady=5)
 
         # Team filter
-        tk.Label(control_frame, text="Team:").pack(side=tk.LEFT, padx=(0, 5))
+        tk.Label(control_frame, text="Team:", font=("Segoe UI", 10),
+                 bg=BG_PANEL, fg=TEXT_PRIMARY).pack(side=tk.LEFT, padx=(0, 5))
         self.batting_team_var = tk.StringVar(value="All Teams")
         self.batting_team_combo = ttk.Combobox(control_frame, textvariable=self.batting_team_var,
                                                width=15, state="readonly")
@@ -93,26 +97,34 @@ class LeagueStatsWidget:
         self.batting_team_combo.bind('<<ComboboxSelected>>', lambda e: self._apply_filters(is_batter=True))
 
         # Player search
-        tk.Label(control_frame, text="Find Player:").pack(side=tk.LEFT, padx=(0, 5))
+        tk.Label(control_frame, text="Find Player:", font=("Segoe UI", 10),
+                 bg=BG_PANEL, fg=TEXT_PRIMARY).pack(side=tk.LEFT, padx=(0, 5))
         self.batting_search_var = tk.StringVar()
         self.batting_search_var.trace('w', lambda *args: self._apply_filters(is_batter=True))
-        batting_search_entry = tk.Entry(control_frame, textvariable=self.batting_search_var, width=20)
+        batting_search_entry = tk.Entry(control_frame, textvariable=self.batting_search_var, width=20,
+                                        font=("Segoe UI", 10), bg=BG_ELEVATED, fg=TEXT_PRIMARY,
+                                        insertbackground=TEXT_PRIMARY, relief=tk.FLAT)
         batting_search_entry.pack(side=tk.LEFT, padx=(0, 5))
 
         # Clear button
-        clear_btn = tk.Button(control_frame, text="Clear Filters",
-                             command=lambda: self._clear_filters(is_batter=True))
+        clear_btn = ttk.Button(control_frame, text="Clear Filters",
+                               command=lambda: self._clear_filters(is_batter=True),
+                               style="Nav.TButton")
         clear_btn.pack(side=tk.LEFT, padx=5)
 
         # Comparison mode toggle (Phase 3 revision)
-        tk.Label(control_frame, text="  |  View:").pack(side=tk.LEFT, padx=(10, 5))
+        tk.Label(control_frame, text="  |  View:", font=("Segoe UI", 10),
+                 bg=BG_PANEL, fg=TEXT_PRIMARY).pack(side=tk.LEFT, padx=(10, 5))
         self.batting_comparison_btn = tk.Button(control_frame, text="Show Difference from 2025",
                                                command=self._toggle_comparison_mode,
-                                               bg="#e8f4f8", relief=tk.RAISED)
+                                               bg=BG_ELEVATED, fg=TEXT_PRIMARY,
+                                               activebackground=BG_PANEL, activeforeground=TEXT_PRIMARY,
+                                               relief=tk.RAISED, font=("Segoe UI", 9))
         self.batting_comparison_btn.pack(side=tk.LEFT, padx=5)
 
         # Info label
-        self.batting_info_label = tk.Label(control_frame, text="", fg="gray")
+        self.batting_info_label = tk.Label(control_frame, text="", font=("Segoe UI", 9),
+                                           bg=BG_PANEL, fg=TEXT_SECONDARY)
         self.batting_info_label.pack(side=tk.LEFT, padx=10)
 
         # Create treeview
@@ -122,10 +134,11 @@ class LeagueStatsWidget:
         separator = ttk.Separator(parent, orient=tk.HORIZONTAL)
         separator.pack(fill=tk.X, padx=5, pady=10)
 
-        totals_label = tk.Label(parent, text="League Batting Totals", font=("Arial", 11, "bold"))
+        totals_label = tk.Label(parent, text="League Batting Totals",
+                                font=("Segoe UI", 11, "bold"), bg=BG_PANEL, fg=TEXT_HEADING)
         totals_label.pack(padx=5, pady=(0, 5))
 
-        self.batting_totals_frame = tk.Frame(parent, relief=tk.SUNKEN, borderwidth=1)
+        self.batting_totals_frame = tk.Frame(parent, bg=BG_PANEL, relief=tk.FLAT, borderwidth=0)
         self.batting_totals_frame.pack(fill=tk.X, padx=5, pady=5)
 
         self.batting_totals_labels = {}  # Store label references for updating
@@ -139,11 +152,12 @@ class LeagueStatsWidget:
             parent: Parent frame
         """
         # Create control panel at top
-        control_frame = tk.Frame(parent)
+        control_frame = tk.Frame(parent, bg=BG_PANEL)
         control_frame.pack(fill=tk.X, padx=5, pady=5)
 
         # Team filter
-        tk.Label(control_frame, text="Team:").pack(side=tk.LEFT, padx=(0, 5))
+        tk.Label(control_frame, text="Team:", font=("Segoe UI", 10),
+                 bg=BG_PANEL, fg=TEXT_PRIMARY).pack(side=tk.LEFT, padx=(0, 5))
         self.pitching_team_var = tk.StringVar(value="All Teams")
         self.pitching_team_combo = ttk.Combobox(control_frame, textvariable=self.pitching_team_var,
                                                 width=15, state="readonly")
@@ -151,26 +165,34 @@ class LeagueStatsWidget:
         self.pitching_team_combo.bind('<<ComboboxSelected>>', lambda e: self._apply_filters(is_batter=False))
 
         # Player search
-        tk.Label(control_frame, text="Find Player:").pack(side=tk.LEFT, padx=(0, 5))
+        tk.Label(control_frame, text="Find Player:", font=("Segoe UI", 10),
+                 bg=BG_PANEL, fg=TEXT_PRIMARY).pack(side=tk.LEFT, padx=(0, 5))
         self.pitching_search_var = tk.StringVar()
         self.pitching_search_var.trace('w', lambda *args: self._apply_filters(is_batter=False))
-        pitching_search_entry = tk.Entry(control_frame, textvariable=self.pitching_search_var, width=20)
+        pitching_search_entry = tk.Entry(control_frame, textvariable=self.pitching_search_var, width=20,
+                                         font=("Segoe UI", 10), bg=BG_ELEVATED, fg=TEXT_PRIMARY,
+                                         insertbackground=TEXT_PRIMARY, relief=tk.FLAT)
         pitching_search_entry.pack(side=tk.LEFT, padx=(0, 5))
 
         # Clear button
-        clear_btn = tk.Button(control_frame, text="Clear Filters",
-                             command=lambda: self._clear_filters(is_batter=False))
+        clear_btn = ttk.Button(control_frame, text="Clear Filters",
+                               command=lambda: self._clear_filters(is_batter=False),
+                               style="Nav.TButton")
         clear_btn.pack(side=tk.LEFT, padx=5)
 
         # Comparison mode toggle (Phase 3 revision)
-        tk.Label(control_frame, text="  |  View:").pack(side=tk.LEFT, padx=(10, 5))
+        tk.Label(control_frame, text="  |  View:", font=("Segoe UI", 10),
+                 bg=BG_PANEL, fg=TEXT_PRIMARY).pack(side=tk.LEFT, padx=(10, 5))
         self.pitching_comparison_btn = tk.Button(control_frame, text="Show Difference from 2025",
                                                 command=self._toggle_comparison_mode,
-                                                bg="#e8f4f8", relief=tk.RAISED)
+                                                bg=BG_ELEVATED, fg=TEXT_PRIMARY,
+                                                activebackground=BG_PANEL, activeforeground=TEXT_PRIMARY,
+                                                relief=tk.RAISED, font=("Segoe UI", 9))
         self.pitching_comparison_btn.pack(side=tk.LEFT, padx=5)
 
         # Info label
-        self.pitching_info_label = tk.Label(control_frame, text="", fg="gray")
+        self.pitching_info_label = tk.Label(control_frame, text="", font=("Segoe UI", 9),
+                                            bg=BG_PANEL, fg=TEXT_SECONDARY)
         self.pitching_info_label.pack(side=tk.LEFT, padx=10)
 
         # Create treeview
@@ -180,10 +202,11 @@ class LeagueStatsWidget:
         separator = ttk.Separator(parent, orient=tk.HORIZONTAL)
         separator.pack(fill=tk.X, padx=5, pady=10)
 
-        totals_label = tk.Label(parent, text="League Pitching Totals", font=("Arial", 11, "bold"))
+        totals_label = tk.Label(parent, text="League Pitching Totals",
+                                font=("Segoe UI", 11, "bold"), bg=BG_PANEL, fg=TEXT_HEADING)
         totals_label.pack(padx=5, pady=(0, 5))
 
-        self.pitching_totals_frame = tk.Frame(parent, relief=tk.SUNKEN, borderwidth=1)
+        self.pitching_totals_frame = tk.Frame(parent, bg=BG_PANEL, relief=tk.FLAT, borderwidth=0)
         self.pitching_totals_frame.pack(fill=tk.X, padx=5, pady=5)
 
         self.pitching_totals_labels = {}  # Store label references for updating
@@ -663,13 +686,14 @@ class LeagueStatsWidget:
         popup.title(f"{player_name} - Historical Stats")
         popup.geometry("680x280")
         popup.resizable(True, True)
+        popup.configure(bg=BG_PANEL)
 
         if is_batter:
             columns = ("Season", "Team", "Age", "G", "AB", "R", "H", "HR", "RBI", "AVG", "OBP", "SLG", "OPS")
         else:
             columns = ("Season", "Team", "Age", "G", "GS", "IP", "W", "L", "ERA", "WHIP", "SO")
 
-        tree_frame = tk.Frame(popup)
+        tree_frame = tk.Frame(popup, bg=BG_PANEL)
         tree_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=(10, 5))
 
         scrollbar = ttk.Scrollbar(tree_frame, orient=tk.VERTICAL)
@@ -719,7 +743,8 @@ class LeagueStatsWidget:
             except Exception as e:
                 logger.warning(f"Error inserting historical row: {e}")
 
-        tk.Button(popup, text="Close", command=popup.destroy, width=10).pack(pady=5)
+        ttk.Button(popup, text="Close", command=popup.destroy, width=10,
+                   style="Nav.TButton").pack(pady=5)
         popup.focus_set()
 
     def _toggle_comparison_mode(self):
@@ -728,13 +753,17 @@ class LeagueStatsWidget:
         new_mode = "difference" if current_mode == "current" else "current"
         self.comparison_mode_var.set(new_mode)
 
-        # Update button appearance and text
+        # Update button appearance and text (dark-theme appropriate colours)
         if new_mode == "difference":
-            self.batting_comparison_btn.config(text="Show Current Stats", bg="#fff3cd", relief=tk.SUNKEN)
-            self.pitching_comparison_btn.config(text="Show Current Stats", bg="#fff3cd", relief=tk.SUNKEN)
+            self.batting_comparison_btn.config(text="Show Current Stats",
+                                               bg="#3d2d00", fg=ACCENT_GOLD, relief=tk.SUNKEN)
+            self.pitching_comparison_btn.config(text="Show Current Stats",
+                                                bg="#3d2d00", fg=ACCENT_GOLD, relief=tk.SUNKEN)
         else:
-            self.batting_comparison_btn.config(text="Show Difference from 2025", bg="#e8f4f8", relief=tk.RAISED)
-            self.pitching_comparison_btn.config(text="Show Difference from 2025", bg="#e8f4f8", relief=tk.RAISED)
+            self.batting_comparison_btn.config(text="Show Difference from 2025",
+                                               bg=BG_ELEVATED, fg=TEXT_PRIMARY, relief=tk.RAISED)
+            self.pitching_comparison_btn.config(text="Show Difference from 2025",
+                                                bg=BG_ELEVATED, fg=TEXT_PRIMARY, relief=tk.RAISED)
 
         # Refresh display
         self.refresh_display()

@@ -11,6 +11,9 @@ import tkinter as tk
 from tkinter import scrolledtext, ttk
 from typing import Dict, Any
 
+from ui.theme import (BG_PANEL, BG_WIDGET, BG_DARK, TEXT_PRIMARY, TEXT_HEADING,
+                      ACCENT_BLUE, ACCENT_GOLD, BORDER)
+
 
 class PlayoffWidget:
     """
@@ -30,7 +33,7 @@ class PlayoffWidget:
         Args:
             parent: Parent tkinter widget (notebook or frame)
         """
-        self.frame = tk.Frame(parent)
+        self.frame = tk.Frame(parent, bg=BG_PANEL)
         self.ws_active = False
         self.ws_info = {}
         self.series_score = {}  # Track wins per team
@@ -40,58 +43,61 @@ class PlayoffWidget:
         self.completed_games = set()  # Track which games have ended (no more play-by-play)
 
         # Create header section
-        self.header_frame = tk.Frame(self.frame, bg="#1a3d6b", height=60)
+        self.header_frame = tk.Frame(self.frame, bg="#0d2040", height=60)
         self.header_frame.pack(fill=tk.X, pady=(0, 5))
         self.header_frame.pack_propagate(False)
 
         self.header_label = tk.Label(
             self.header_frame,
             text="World Series",
-            font=("Arial", 16, "bold"),
-            bg="#1a3d6b",
-            fg="white"
+            font=("Segoe UI", 16, "bold"),
+            bg="#0d2040",
+            fg=ACCENT_GOLD
         )
         self.header_label.pack(pady=10)
 
         # Create paned window for box scores and play-by-play
-        paned = tk.PanedWindow(self.frame, orient=tk.HORIZONTAL, sashrelief=tk.RAISED)
+        paned = tk.PanedWindow(self.frame, orient=tk.HORIZONTAL, sashrelief=tk.RAISED,
+                               bg=BG_DARK)
         paned.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
 
         # Left panel: Box scores (1/3 of space)
-        box_frame = tk.Frame(paned, width=350)
+        box_frame = tk.Frame(paned, width=350, bg=BG_PANEL)
         paned.add(box_frame, minsize=250, width=350)
 
-        box_label = tk.Label(box_frame, text="BOX SCORES", font=("Arial", 11, "bold"),
-                            bg="#f8f4e8", anchor=tk.W, padx=5)
+        box_label = tk.Label(box_frame, text="BOX SCORES", font=("Segoe UI", 11, "bold"),
+                            bg=BG_DARK, fg=ACCENT_GOLD, anchor=tk.W, padx=5)
         box_label.pack(fill=tk.X, pady=(0, 2))
 
         self.box_text = scrolledtext.ScrolledText(
-            box_frame, wrap=tk.WORD, font=("Courier", 9), state=tk.DISABLED
+            box_frame, wrap=tk.WORD, font=("Consolas", 9), state=tk.DISABLED,
+            bg=BG_WIDGET, fg=TEXT_PRIMARY, insertbackground=TEXT_PRIMARY
         )
         self.box_text.pack(fill=tk.BOTH, expand=True, padx=2, pady=2)
 
         # Configure text tags for box scores
-        self.box_text.tag_configure("header", font=("Arial", 11, "bold"), foreground="#1a3d6b")
-        self.box_text.tag_configure("game_header", font=("Courier", 10, "bold"), foreground="#2e5090")
-        self.box_text.tag_configure("normal", font=("Courier", 9))
+        self.box_text.tag_configure("header", font=("Segoe UI", 11, "bold"), foreground=ACCENT_GOLD)
+        self.box_text.tag_configure("game_header", font=("Consolas", 10, "bold"), foreground=ACCENT_BLUE)
+        self.box_text.tag_configure("normal", font=("Consolas", 9))
 
         # Right panel: Play-by-play (2/3 of space)
-        pbp_frame = tk.Frame(paned, width=700)
+        pbp_frame = tk.Frame(paned, width=700, bg=BG_PANEL)
         paned.add(pbp_frame, minsize=400, width=700)
 
         # Header with label and game selector
-        pbp_header_frame = tk.Frame(pbp_frame, bg="#e8f4f8")
+        pbp_header_frame = tk.Frame(pbp_frame, bg=BG_DARK)
         pbp_header_frame.pack(fill=tk.X, pady=(0, 2))
 
-        pbp_label = tk.Label(pbp_header_frame, text="PLAY-BY-PLAY", font=("Arial", 11, "bold"),
-                            bg="#e8f4f8", anchor=tk.W, padx=5)
+        pbp_label = tk.Label(pbp_header_frame, text="PLAY-BY-PLAY", font=("Segoe UI", 11, "bold"),
+                            bg=BG_DARK, fg=ACCENT_BLUE, anchor=tk.W, padx=5)
         pbp_label.pack(side=tk.LEFT)
 
         # Game selector dropdown
-        game_selector_frame = tk.Frame(pbp_header_frame, bg="#e8f4f8")
+        game_selector_frame = tk.Frame(pbp_header_frame, bg=BG_DARK)
         game_selector_frame.pack(side=tk.RIGHT, padx=5)
 
-        tk.Label(game_selector_frame, text="Game:", bg="#e8f4f8", font=("Arial", 9)).pack(side=tk.LEFT, padx=(0, 5))
+        tk.Label(game_selector_frame, text="Game:", bg=BG_DARK, fg=TEXT_PRIMARY,
+                 font=("Segoe UI", 9)).pack(side=tk.LEFT, padx=(0, 5))
 
         self.game_selector = ttk.Combobox(game_selector_frame, width=8, state='readonly')
         self.game_selector['values'] = ['Game 1']
@@ -100,15 +106,16 @@ class PlayoffWidget:
         self.game_selector.pack(side=tk.LEFT)
 
         self.pbp_text = scrolledtext.ScrolledText(
-            pbp_frame, wrap=tk.WORD, font=("Courier", 9), state=tk.DISABLED
+            pbp_frame, wrap=tk.WORD, font=("Consolas", 9), state=tk.DISABLED,
+            bg=BG_WIDGET, fg=TEXT_PRIMARY, insertbackground=TEXT_PRIMARY
         )
         self.pbp_text.pack(fill=tk.BOTH, expand=True, padx=2, pady=2)
 
         # Configure text tags for play-by-play
-        self.pbp_text.tag_configure("header", font=("Arial", 11, "bold"), foreground="#1a3d6b")
-        self.pbp_text.tag_configure("inning", font=("Courier", 9, "bold"), foreground="#2e5090")
-        self.pbp_text.tag_configure("normal", font=("Courier", 9))
-        self.pbp_text.tag_configure("score", font=("Courier", 9, "bold"), foreground="#c8102e")
+        self.pbp_text.tag_configure("header", font=("Segoe UI", 11, "bold"), foreground=ACCENT_GOLD)
+        self.pbp_text.tag_configure("inning", font=("Consolas", 9, "bold"), foreground=ACCENT_BLUE)
+        self.pbp_text.tag_configure("normal", font=("Consolas", 9))
+        self.pbp_text.tag_configure("score", font=("Consolas", 9, "bold"), foreground="#ff6b6b")
 
         # Show initial message
         self._show_waiting_message()

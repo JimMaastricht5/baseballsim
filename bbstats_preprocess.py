@@ -513,20 +513,20 @@ class BaseballStatsPreProcess:
         """Returns stabilization constants (K). Higher K = slower to trust player data."""
         if not is_pitching:
             return {
-                'SO': 120,  # Increased: Pull low-K hitters toward league average more strongly
-                'BB': 140,  # Slightly increased for more regression
-                'HR': 2000,  # Increased: More conservative HR projections
-                'H': 2000,  # Increased: Stronger BABIP regression toward league mean
-                'default': 300
+                'SO': 150,  # Increased: Pull low-K hitters toward league average more strongly
+                'BB': 200,  # Slightly increased for more regression
+                'HR': 2500,  # Increased: More conservative HR projections
+                'H': 2500,  # Increased: Stronger BABIP regression toward league mean
+                'default': 500
             }
         else:
             return {
-                'SO': 70,
-                'BB': 200,
-                'HR': 350,  # Pulls fluke HR seasons toward league mean
-                'H': 500,  # Pulls BABIP toward league mean
-                'ER': 300,  # Crucial for preventing 0.00 ERA anomalies
-                'default': 200
+                'SO': 100,
+                'BB': 300,
+                'HR': 600,  # Pulls fluke HR seasons toward league mean
+                'H': 1000,  # Pulls BABIP toward league mean
+                'ER': 500,  # Crucial for preventing 0.00 ERA anomalies
+                'default': 400
             }
 
     def apply_trend_based_aggregation(self, historical_df: DataFrame,
@@ -605,36 +605,47 @@ class BaseballStatsPreProcess:
             recent_vol = player_historical.iloc[-1][vol_col]
 
             # Playing time logic (keeps bench players capped)
-            if not is_pitching and recent_vol < 50:
-                projected_yearly_vol = min(raw_weighted_vol, max(recent_vol * 1.5, 60))
-            elif is_pitching and recent_vol < 15:
-                projected_yearly_vol = min(raw_weighted_vol, max(recent_vol * 2, 30))
-            else:
-                projected_yearly_vol = raw_weighted_vol
+            if not is_pitching:
+                # If they had < 100 ABs, they are likely bench/reserve.
+                # Don't let the simulation "accidentally" make them full-time starters.
+                if recent_vol < 100:
+                    projected_yearly_vol = min(raw_weighted_vol, 120)
+                else:
+                    projected_yearly_vol = raw_weighted_vol
+            elif is_pitching:
+                # If a pitcher had < 20 IP, they are likely emergency depth.
+                if recent_vol < 20:
+                    projected_yearly_vol = min(raw_weighted_vol, 30)
+                else:
+                    projected_yearly_vol = raw_weighted_vol
 
-            # 3. Apply Bayesian Shrinkage to Counting Stats
+            # 3. Apply Bayesian Shrinkage with Sliding Scale Penalty
             for stat_col in stats_to_project:
                 if stat_col in stat_map:
                     lg_rate = league_averages.get(stat_map[stat_col], 0)
 
-                    # ROOKIE PENALTY: Regress low-sample players to a % of league average if below thres AB
-                    if not is_pitching and career_sample < 250:
-                        if player_historical['HR'].sum() <= 10:
-                            lg_rate *= .40 * player_historical['HR'].sum() / 10 # More conservative: 0 to .4x league HR rate
+                    # SLIDING SCALE PENALTY:
+                    # Instead of regressing to the Mean, we regress to a "Replacement Level"
+                    # which is significantly lower than the Mean for unproven players.
+                    if career_sample < gate:
+                        # Calculate how 'unproven' they are (1.0 = 0 stats, 0.0 = at the gate)
+                        unproven_factor = (gate - career_sample) / gate
+
+                        # Batters: Regress toward 70% of league average if they have 0 stats
+                        # Pitchers: Regress toward 130% of league average (worse) if they have 0 stats
+                        if not is_pitching:
+                            penalty_multiplier = 1.0 - (0.35 * unproven_factor)  # Scales from 0.65 to 1.0
+                            lg_rate *= penalty_multiplier
                         else:
-                            lg_rate *= 0.75  # Hitters: Start 25% worse than average (was 20%)
-                    elif is_pitching and career_sample < 50:
-                        lg_rate *= 1.25  # Pitchers: Start 25% worse (higher rates = worse, was 20%)
+                            penalty_multiplier = 1.0 + (0.40 * unproven_factor)  # Scales from 1.40 to 1.0
+                            lg_rate *= penalty_multiplier
 
                     k = k_values.get(stat_col, k_values['default'])
                     career_total = player_historical[stat_col].sum()
 
-                    # Bayesian Formula: (Career_Actual + K * League_Mean) / (Career_Sample + K)
+                    # Bayesian Formula: (Career_Actual + K * (Taxed_Mean)) / (Career_Sample + K)
                     true_talent_rate = (career_total + k * lg_rate) / (career_sample + k)
                     most_recent[stat_col] = true_talent_rate * projected_yearly_vol
-                else:
-                    # Non-rate stats use standard weighted average
-                    most_recent[stat_col] = sum(player_historical[stat_col].values * weights) / sum_of_weights
 
             # 4. Final Sanity Check (The "Hard Caps")
             if not is_pitching and most_recent['AB'] > 0:

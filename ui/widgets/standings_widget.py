@@ -9,7 +9,10 @@ Displays separate American League and National League standings with sorting.
 
 import tkinter as tk
 from tkinter import ttk
-from typing import Dict, Any, Callable
+from typing import Dict, Any
+
+from ui.theme import (BG_PANEL, TEXT_HEADING, TEXT_PRIMARY,
+                      ROW_EVEN, ROW_ODD, ROW_FOLLOWED, FG_FOLLOWED)
 
 
 class StandingsWidget:
@@ -30,10 +33,12 @@ class StandingsWidget:
         Args:
             parent: Parent tkinter widget (PanedWindow or frame)
         """
-        self.standings_frame = tk.Frame(parent, relief=tk.SUNKEN, bd=1)
+        self.standings_frame = tk.Frame(parent, relief=tk.SUNKEN, bd=1, bg=BG_PANEL)
 
         # Header label
-        standings_label = tk.Label(self.standings_frame, text="STANDINGS", font=("Arial", 12, "bold"))
+        standings_label = tk.Label(self.standings_frame, text="STANDINGS",
+                                   font=("Segoe UI", 12, "bold"),
+                                   bg=BG_PANEL, fg=TEXT_HEADING)
         standings_label.pack(pady=5)
 
         # Data caching for sorting
@@ -43,10 +48,11 @@ class StandingsWidget:
         self.standings_sort_league = None  # Track which league is being sorted
 
         # AL Standings
-        al_label = tk.Label(self.standings_frame, text="AMERICAN LEAGUE", font=("Arial", 10, "bold"))
+        al_label = tk.Label(self.standings_frame, text="AMERICAN LEAGUE",
+                            font=("Segoe UI", 10, "bold"), bg=BG_PANEL, fg=TEXT_HEADING)
         al_label.pack(pady=(5, 2))
 
-        al_tree_frame = tk.Frame(self.standings_frame)
+        al_tree_frame = tk.Frame(self.standings_frame, bg=BG_PANEL)
         al_tree_frame.pack(fill=tk.BOTH, expand=True, padx=5, pady=2)
 
         al_scrollbar = ttk.Scrollbar(al_tree_frame, orient=tk.VERTICAL)
@@ -73,15 +79,20 @@ class StandingsWidget:
         self.al_standings_tree.column("pct", width=60, anchor=tk.CENTER)
         self.al_standings_tree.column("gb", width=50, anchor=tk.CENTER)
 
-        # Add tag for followed teams
-        self.al_standings_tree.tag_configure("followed", background="#e6f3ff", font=("Arial", 10, "bold"))
+        # Row tags for striping and followed team
+        self.al_standings_tree.tag_configure("even", background=ROW_EVEN)
+        self.al_standings_tree.tag_configure("odd", background=ROW_ODD)
+        self.al_standings_tree.tag_configure("followed",
+            background=ROW_FOLLOWED, foreground=FG_FOLLOWED,
+            font=("Segoe UI", 9, "bold"))
         self.al_standings_tree.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
 
         # NL Standings
-        nl_label = tk.Label(self.standings_frame, text="NATIONAL LEAGUE", font=("Arial", 10, "bold"))
+        nl_label = tk.Label(self.standings_frame, text="NATIONAL LEAGUE",
+                            font=("Segoe UI", 10, "bold"), bg=BG_PANEL, fg=TEXT_HEADING)
         nl_label.pack(pady=(10, 2))
 
-        nl_tree_frame = tk.Frame(self.standings_frame)
+        nl_tree_frame = tk.Frame(self.standings_frame, bg=BG_PANEL)
         nl_tree_frame.pack(fill=tk.BOTH, expand=True, padx=5, pady=2)
 
         nl_scrollbar = ttk.Scrollbar(nl_tree_frame, orient=tk.VERTICAL)
@@ -108,8 +119,12 @@ class StandingsWidget:
         self.nl_standings_tree.column("pct", width=60, anchor=tk.CENTER)
         self.nl_standings_tree.column("gb", width=50, anchor=tk.CENTER)
 
-        # Add tag for followed teams
-        self.nl_standings_tree.tag_configure("followed", background="#e6f3ff", font=("Arial", 10, "bold"))
+        # Row tags for striping and followed team
+        self.nl_standings_tree.tag_configure("even", background=ROW_EVEN)
+        self.nl_standings_tree.tag_configure("odd", background=ROW_ODD)
+        self.nl_standings_tree.tag_configure("followed",
+            background=ROW_FOLLOWED, foreground=FG_FOLLOWED,
+            font=("Segoe UI", 9, "bold"))
         self.nl_standings_tree.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
 
     def update_standings(self, standings_data: Dict[str, Any], followed_team: str = ''):
@@ -161,22 +176,20 @@ class StandingsWidget:
         pcts = league_data.get('pct', [])
         gbs = league_data.get('gb', [])
 
-        # Insert data into treeview
+        # Insert data into treeview with alternating row colours
         for i in range(len(teams)):
             team = teams[i]
             wl = f"{wins[i]}-{losses[i]}"
             pct = f"{pcts[i]:.3f}"
             gb = gbs[i]
 
-            # Determine if this team is followed
-            tags = ("followed",) if team == followed_team else ()
+            row_tag = "even" if i % 2 == 0 else "odd"
+            if team == followed_team:
+                tags = (row_tag, "followed")
+            else:
+                tags = (row_tag,)
 
-            tree.insert(
-                "",
-                tk.END,
-                values=(team, wl, pct, gb),
-                tags=tags
-            )
+            tree.insert("", tk.END, values=(team, wl, pct, gb), tags=tags)
 
     def _sort_standings(self, column: str, league: str):
         """
@@ -243,17 +256,16 @@ class StandingsWidget:
         # Get followed team for highlighting (need to pass from parent)
         followed_team = getattr(self, '_followed_team_cache', '')
 
-        for team, w, l, pct, gb in data:
+        for i, (team, w, l, pct, gb) in enumerate(data):
             wl = f"{w}-{l}"
             pct_str = f"{pct:.3f}"
-            tags = ("followed",) if team == followed_team else ()
+            row_tag = "even" if i % 2 == 0 else "odd"
+            if team == followed_team:
+                tags = (row_tag, "followed")
+            else:
+                tags = (row_tag,)
 
-            tree.insert(
-                "",
-                tk.END,
-                values=(team, wl, pct_str, gb),
-                tags=tags
-            )
+            tree.insert("", tk.END, values=(team, wl, pct_str, gb), tags=tags)
 
     def set_followed_team(self, team: str):
         """

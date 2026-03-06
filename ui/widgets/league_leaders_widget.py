@@ -12,6 +12,8 @@ from tkinter import ttk
 import pandas as pd
 from bblogger import logger
 
+from ui.theme import BG_PANEL, TEXT_HEADING, TEXT_SECONDARY, BORDER
+
 
 class LeagueLeadersWidget:
     """
@@ -32,7 +34,7 @@ class LeagueLeadersWidget:
         Args:
             parent: Parent tkinter widget (notebook or frame)
         """
-        self.frame = tk.Frame(parent)
+        self.frame = tk.Frame(parent, bg=BG_PANEL)
         self.baseball_data = None  # Will be set in update_leaders
         self.games_played = 0  # Will be set in update_leaders
 
@@ -41,12 +43,12 @@ class LeagueLeadersWidget:
         leaders_notebook.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
 
         # Tab 1: Position Players
-        batting_frame = tk.Frame(leaders_notebook)
+        batting_frame = tk.Frame(leaders_notebook, bg=BG_PANEL)
         leaders_notebook.add(batting_frame, text="Position Players")
         self._create_batting_leaders(batting_frame)
 
         # Tab 2: Pitchers
-        pitching_frame = tk.Frame(leaders_notebook)
+        pitching_frame = tk.Frame(leaders_notebook, bg=BG_PANEL)
         leaders_notebook.add(pitching_frame, text="Pitchers")
         self._create_pitching_leaders(pitching_frame)
 
@@ -58,21 +60,21 @@ class LeagueLeadersWidget:
             parent: Parent frame for batting leaders
         """
         # Add title with qualification note
-        title_frame = tk.Frame(parent)
+        title_frame = tk.Frame(parent, bg=BG_PANEL)
         title_frame.pack(pady=(10, 5))
 
         title_label = tk.Label(title_frame, text="Batting Leaders",
-                              font=("Arial", 12, "bold"))
+                              font=("Segoe UI", 12, "bold"), bg=BG_PANEL, fg=TEXT_HEADING)
         title_label.pack()
 
         self.batting_qual_label = tk.Label(title_frame,
                                            text="Qualification: 3.1 PA per team game",
-                                           font=("Arial", 9, "italic"),
-                                           fg="gray")
+                                           font=("Segoe UI", 9, "italic"),
+                                           bg=BG_PANEL, fg=TEXT_SECONDARY)
         self.batting_qual_label.pack()
 
         # Create frame for batting leaders (2x2 grid)
-        batting_grid = tk.Frame(parent)
+        batting_grid = tk.Frame(parent, bg=BG_PANEL)
         batting_grid.pack(fill=tk.BOTH, expand=True, padx=10, pady=5)
 
         # Configure grid to have equal weight
@@ -99,21 +101,21 @@ class LeagueLeadersWidget:
             parent: Parent frame for pitching leaders
         """
         # Add title with qualification note
-        title_frame = tk.Frame(parent)
+        title_frame = tk.Frame(parent, bg=BG_PANEL)
         title_frame.pack(pady=(10, 5))
 
         title_label = tk.Label(title_frame, text="Pitching Leaders",
-                              font=("Arial", 12, "bold"))
+                              font=("Segoe UI", 12, "bold"), bg=BG_PANEL, fg=TEXT_HEADING)
         title_label.pack()
 
         self.pitching_qual_label = tk.Label(title_frame,
                                             text="Qualification: 1.0 IP per team game",
-                                            font=("Arial", 9, "italic"),
-                                            fg="gray")
+                                            font=("Segoe UI", 9, "italic"),
+                                            bg=BG_PANEL, fg=TEXT_SECONDARY)
         self.pitching_qual_label.pack()
 
         # Create frame for pitching leaders (3x2 grid)
-        pitching_grid = tk.Frame(parent)
+        pitching_grid = tk.Frame(parent, bg=BG_PANEL)
         pitching_grid.pack(fill=tk.BOTH, expand=True, padx=10, pady=5)
 
         # Configure grid to have equal weight
@@ -151,11 +153,12 @@ class LeagueLeadersWidget:
             ttk.Treeview: Configured treeview
         """
         # Create container frame
-        container = tk.Frame(parent, relief=tk.RIDGE, borderwidth=1)
+        container = tk.Frame(parent, relief=tk.RIDGE, borderwidth=1, bg=BG_PANEL)
         container.grid(row=row, column=col, sticky="nsew", padx=5, pady=5)
 
         # Add title label
-        title_label = tk.Label(container, text=title, font=("Arial", 10, "bold"))
+        title_label = tk.Label(container, text=title, font=("Segoe UI", 10, "bold"),
+                               bg=BG_PANEL, fg=TEXT_HEADING)
         title_label.pack(pady=5)
 
         # Create treeview

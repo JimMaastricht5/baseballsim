@@ -11,6 +11,8 @@ import tkinter as tk
 from tkinter import scrolledtext
 from typing import List, Tuple, Dict, Any
 
+from ui.theme import BG_PANEL, BG_WIDGET, BG_DARK, TEXT_PRIMARY, ACCENT_BLUE, ACCENT_GOLD, BORDER
+
 
 class GamesWidget:
     """
@@ -32,48 +34,50 @@ class GamesWidget:
             parent: Parent tkinter widget (notebook or frame)
             followed_team: Team abbreviation to highlight (e.g., 'MIL', 'NYM')
         """
-        self.frame = tk.Frame(parent)
+        self.frame = tk.Frame(parent, bg=BG_PANEL)
         self.followed_team = followed_team
 
         # Create top section for RESULTS
-        results_label = tk.Label(self.frame, text="RESULTS", font=("Arial", 11, "bold"),
-                                bg="#e8f4f8", anchor=tk.W, padx=5)
+        results_label = tk.Label(self.frame, text="RESULTS", font=("Segoe UI", 11, "bold"),
+                                bg=BG_DARK, fg=ACCENT_BLUE, anchor=tk.W, padx=5)
         results_label.pack(fill=tk.X, pady=(0, 2))
 
         self.results_text = scrolledtext.ScrolledText(
-            self.frame, wrap=tk.WORD, font=("Courier", 9), state=tk.DISABLED, height=12
+            self.frame, wrap=tk.WORD, font=("Consolas", 9), state=tk.DISABLED, height=12,
+            bg=BG_WIDGET, fg=TEXT_PRIMARY, insertbackground=TEXT_PRIMARY
         )
         self.results_text.pack(fill=tk.BOTH, expand=True, padx=2, pady=2)
 
         # Configure text tags for results
-        self.results_text.tag_configure("header", font=("Arial", 12, "bold"), foreground="#2e5090")
-        self.results_text.tag_configure("day_header", font=("Arial", 12, "bold"),
-                                       foreground="#1a3d6b", spacing3=10)
-        self.results_text.tag_configure("normal_text", font=("Courier", 9, "normal"))
-        self.results_text.tag_configure("bold_team", font=("Courier", 10, "bold"), foreground="#000000")
-        self.results_text.tag_configure("separator", foreground="#888888")
+        self.results_text.tag_configure("header", font=("Segoe UI", 12, "bold"), foreground=ACCENT_BLUE)
+        self.results_text.tag_configure("day_header", font=("Segoe UI", 12, "bold"),
+                                       foreground=ACCENT_GOLD, spacing3=10)
+        self.results_text.tag_configure("normal_text", font=("Consolas", 9, "normal"))
+        self.results_text.tag_configure("bold_team", font=("Consolas", 10, "bold"), foreground=ACCENT_GOLD)
+        self.results_text.tag_configure("separator", foreground=BORDER)
 
         # Create separator
-        separator = tk.Frame(self.frame, height=3, bg="#cccccc")
+        separator = tk.Frame(self.frame, height=3, bg=BORDER)
         separator.pack(fill=tk.X, pady=2)
 
         # Create bottom section for SCHEDULE
-        schedule_label = tk.Label(self.frame, text="SCHEDULE", font=("Arial", 11, "bold"),
-                                 bg="#f8f4e8", anchor=tk.W, padx=5)
+        schedule_label = tk.Label(self.frame, text="SCHEDULE", font=("Segoe UI", 11, "bold"),
+                                 bg=BG_DARK, fg=ACCENT_BLUE, anchor=tk.W, padx=5)
         schedule_label.pack(fill=tk.X, pady=(0, 2))
 
         self.schedule_text = scrolledtext.ScrolledText(
-            self.frame, wrap=tk.WORD, font=("Courier", 9), state=tk.DISABLED, height=12
+            self.frame, wrap=tk.WORD, font=("Consolas", 9), state=tk.DISABLED, height=12,
+            bg=BG_WIDGET, fg=TEXT_PRIMARY, insertbackground=TEXT_PRIMARY
         )
         self.schedule_text.pack(fill=tk.BOTH, expand=True, padx=2, pady=2)
 
         # Configure text tags for schedule
-        self.schedule_text.tag_configure("header", font=("Arial", 12, "bold"), foreground="#2e5090")
-        self.schedule_text.tag_configure("day_header", font=("Arial", 12, "bold"),
-                                        foreground="#1a3d6b", spacing3=10)
-        self.schedule_text.tag_configure("normal_text", font=("Courier", 9, "normal"))
-        self.schedule_text.tag_configure("bold_team", font=("Courier", 10, "bold"), foreground="#000000")
-        self.schedule_text.tag_configure("separator", foreground="#888888")
+        self.schedule_text.tag_configure("header", font=("Segoe UI", 12, "bold"), foreground=ACCENT_BLUE)
+        self.schedule_text.tag_configure("day_header", font=("Segoe UI", 12, "bold"),
+                                        foreground=ACCENT_GOLD, spacing3=10)
+        self.schedule_text.tag_configure("normal_text", font=("Consolas", 9, "normal"))
+        self.schedule_text.tag_configure("bold_team", font=("Consolas", 10, "bold"), foreground=ACCENT_GOLD)
+        self.schedule_text.tag_configure("separator", foreground=BORDER)
 
         # Track games for progressive display
         self.current_day_schedule = []  # List of (away_team, home_team) tuples

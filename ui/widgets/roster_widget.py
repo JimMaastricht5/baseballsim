@@ -12,6 +12,9 @@ from tkinter import ttk
 import pandas as pd
 from bblogger import logger
 
+from ui.theme import (BG_PANEL, BG_ELEVATED, TEXT_PRIMARY, TEXT_SECONDARY,
+                      TEXT_HEADING, ACCENT_GOLD, ROW_IL, ROW_DTD)
+
 
 class RosterWidget:
     """
@@ -32,7 +35,7 @@ class RosterWidget:
             parent: Parent tkinter widget (notebook or frame)
             comparison_mode_var: StringVar for comparison mode ("current" or "difference")
         """
-        self.frame = tk.Frame(parent)
+        self.frame = tk.Frame(parent, bg=BG_PANEL)
         self.baseball_data = None  # Will be set in update_roster
 
         # Create our own comparison mode var if not provided
@@ -64,29 +67,36 @@ class RosterWidget:
         roster_notebook.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
 
         # Sub-section 1: Position Players
-        pos_players_frame = tk.Frame(roster_notebook)
+        pos_players_frame = tk.Frame(roster_notebook, bg=BG_PANEL)
         roster_notebook.add(pos_players_frame, text="Pos Players")
 
         # Add control panel with search, filters, and toggle button
-        batting_control_frame = tk.Frame(pos_players_frame)
+        batting_control_frame = tk.Frame(pos_players_frame, bg=BG_PANEL)
         batting_control_frame.pack(fill=tk.X, padx=5, pady=5)
 
         # Player search
-        tk.Label(batting_control_frame, text="Find Player:").pack(side=tk.LEFT, padx=(0, 5))
+        tk.Label(batting_control_frame, text="Find Player:", font=("Segoe UI", 10),
+                 bg=BG_PANEL, fg=TEXT_PRIMARY).pack(side=tk.LEFT, padx=(0, 5))
         self.batting_search_var.trace('w', lambda *args: self._apply_filter(is_batter=True))
-        batting_search_entry = tk.Entry(batting_control_frame, textvariable=self.batting_search_var, width=20)
+        batting_search_entry = tk.Entry(batting_control_frame, textvariable=self.batting_search_var, width=20,
+                                        font=("Segoe UI", 10), bg=BG_ELEVATED, fg=TEXT_PRIMARY,
+                                        insertbackground=TEXT_PRIMARY, relief=tk.FLAT)
         batting_search_entry.pack(side=tk.LEFT, padx=(0, 5))
 
         # Clear button
-        clear_btn = tk.Button(batting_control_frame, text="Clear Filters",
-                             command=lambda: self._clear_filter(is_batter=True))
+        clear_btn = ttk.Button(batting_control_frame, text="Clear Filters",
+                               command=lambda: self._clear_filter(is_batter=True),
+                               style="Nav.TButton")
         clear_btn.pack(side=tk.LEFT, padx=5)
 
         # Toggle button
-        tk.Label(batting_control_frame, text="  |  View:").pack(side=tk.LEFT, padx=(10, 5))
+        tk.Label(batting_control_frame, text="  |  View:", font=("Segoe UI", 10),
+                 bg=BG_PANEL, fg=TEXT_PRIMARY).pack(side=tk.LEFT, padx=(10, 5))
         self.batting_comparison_btn = tk.Button(batting_control_frame, text="Show Difference from 2025",
                                                command=self._toggle_comparison_mode,
-                                               bg="#e8f4f8", relief=tk.RAISED)
+                                               bg=BG_ELEVATED, fg=TEXT_PRIMARY,
+                                               activebackground=BG_PANEL, activeforeground=TEXT_PRIMARY,
+                                               relief=tk.RAISED, font=("Segoe UI", 9))
         self.batting_comparison_btn.pack(side=tk.LEFT, padx=5)
 
         self.pos_players_tree = self._create_roster_treeview(pos_players_frame, is_batter=True)
@@ -95,38 +105,46 @@ class RosterWidget:
         separator = ttk.Separator(pos_players_frame, orient=tk.HORIZONTAL)
         separator.pack(fill=tk.X, padx=5, pady=10)
 
-        totals_label = tk.Label(pos_players_frame, text="Team Batting Totals", font=("Arial", 11, "bold"))
+        totals_label = tk.Label(pos_players_frame, text="Team Batting Totals",
+                                font=("Segoe UI", 11, "bold"), bg=BG_PANEL, fg=TEXT_HEADING)
         totals_label.pack(padx=5, pady=(0, 5))
 
-        self.batting_totals_frame = tk.Frame(pos_players_frame, relief=tk.SUNKEN, borderwidth=1)
+        self.batting_totals_frame = tk.Frame(pos_players_frame, bg=BG_PANEL, relief=tk.FLAT, borderwidth=0)
         self.batting_totals_frame.pack(fill=tk.X, padx=5, pady=5)
 
         self.batting_totals_labels = {}  # Store label references for updating
 
         # Sub-section 2: Pitchers
-        pitchers_frame = tk.Frame(roster_notebook)
+        pitchers_frame = tk.Frame(roster_notebook, bg=BG_PANEL)
         roster_notebook.add(pitchers_frame, text="Pitchers")
 
         # Add control panel with search, filters, and toggle button
-        pitching_control_frame = tk.Frame(pitchers_frame)
+        pitching_control_frame = tk.Frame(pitchers_frame, bg=BG_PANEL)
         pitching_control_frame.pack(fill=tk.X, padx=5, pady=5)
 
         # Player search
-        tk.Label(pitching_control_frame, text="Find Player:").pack(side=tk.LEFT, padx=(0, 5))
+        tk.Label(pitching_control_frame, text="Find Player:", font=("Segoe UI", 10),
+                 bg=BG_PANEL, fg=TEXT_PRIMARY).pack(side=tk.LEFT, padx=(0, 5))
         self.pitching_search_var.trace('w', lambda *args: self._apply_filter(is_batter=False))
-        pitching_search_entry = tk.Entry(pitching_control_frame, textvariable=self.pitching_search_var, width=20)
+        pitching_search_entry = tk.Entry(pitching_control_frame, textvariable=self.pitching_search_var, width=20,
+                                         font=("Segoe UI", 10), bg=BG_ELEVATED, fg=TEXT_PRIMARY,
+                                         insertbackground=TEXT_PRIMARY, relief=tk.FLAT)
         pitching_search_entry.pack(side=tk.LEFT, padx=(0, 5))
 
         # Clear button
-        clear_btn = tk.Button(pitching_control_frame, text="Clear Filters",
-                             command=lambda: self._clear_filter(is_batter=False))
+        clear_btn = ttk.Button(pitching_control_frame, text="Clear Filters",
+                               command=lambda: self._clear_filter(is_batter=False),
+                               style="Nav.TButton")
         clear_btn.pack(side=tk.LEFT, padx=5)
 
         # Toggle button
-        tk.Label(pitching_control_frame, text="  |  View:").pack(side=tk.LEFT, padx=(10, 5))
+        tk.Label(pitching_control_frame, text="  |  View:", font=("Segoe UI", 10),
+                 bg=BG_PANEL, fg=TEXT_PRIMARY).pack(side=tk.LEFT, padx=(10, 5))
         self.pitching_comparison_btn = tk.Button(pitching_control_frame, text="Show Difference from 2025",
                                                 command=self._toggle_comparison_mode,
-                                                bg="#e8f4f8", relief=tk.RAISED)
+                                                bg=BG_ELEVATED, fg=TEXT_PRIMARY,
+                                                activebackground=BG_PANEL, activeforeground=TEXT_PRIMARY,
+                                                relief=tk.RAISED, font=("Segoe UI", 9))
         self.pitching_comparison_btn.pack(side=tk.LEFT, padx=5)
 
         self.pitchers_tree = self._create_roster_treeview(pitchers_frame, is_batter=False)
@@ -135,10 +153,11 @@ class RosterWidget:
         separator = ttk.Separator(pitchers_frame, orient=tk.HORIZONTAL)
         separator.pack(fill=tk.X, padx=5, pady=10)
 
-        totals_label = tk.Label(pitchers_frame, text="Team Pitching Totals", font=("Arial", 11, "bold"))
+        totals_label = tk.Label(pitchers_frame, text="Team Pitching Totals",
+                                font=("Segoe UI", 11, "bold"), bg=BG_PANEL, fg=TEXT_HEADING)
         totals_label.pack(padx=5, pady=(0, 5))
 
-        self.pitching_totals_frame = tk.Frame(pitchers_frame, relief=tk.SUNKEN, borderwidth=1)
+        self.pitching_totals_frame = tk.Frame(pitchers_frame, bg=BG_PANEL, relief=tk.FLAT, borderwidth=0)
         self.pitching_totals_frame.pack(fill=tk.X, padx=5, pady=5)
 
         self.pitching_totals_labels = {}  # Store label references for updating
@@ -194,9 +213,9 @@ class RosterWidget:
         scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
         tree.pack(fill=tk.BOTH, expand=True)
 
-        # Configure tags for injury highlighting
-        tree.tag_configure("day_to_day", background="#fff4cc")  # Yellow for day-to-day (<10 days)
-        tree.tag_configure("injured", background="#ffcccc")  # Red for IL (>=10 days)
+        # Configure tags for injury highlighting (dark-theme colours)
+        tree.tag_configure("day_to_day", background=ROW_DTD)   # Dark amber for day-to-day (<10 days)
+        tree.tag_configure("injured", background=ROW_IL)        # Dark red for IL (>=10 days)
 
         # Bind click handler for player selection
         tree.bind('<<TreeviewSelect>>', lambda e: self._on_player_click(tree, is_batter))
@@ -216,13 +235,14 @@ class RosterWidget:
         popup.title(f"{player_name} - Historical Stats")
         popup.geometry("680x280")
         popup.resizable(True, True)
+        popup.configure(bg=BG_PANEL)
 
         if is_batter:
             columns = ("Season", "Team", "Age", "G", "AB", "R", "H", "HR", "RBI", "AVG", "OBP", "SLG", "OPS")
         else:
             columns = ("Season", "Team", "Age", "G", "GS", "IP", "W", "L", "ERA", "WHIP", "SO")
 
-        tree_frame = tk.Frame(popup)
+        tree_frame = tk.Frame(popup, bg=BG_PANEL)
         tree_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=(10, 5))
 
         scrollbar = ttk.Scrollbar(tree_frame, orient=tk.VERTICAL)
@@ -272,7 +292,8 @@ class RosterWidget:
             except Exception as e:
                 logger.warning(f"Error inserting historical row: {e}")
 
-        tk.Button(popup, text="Close", command=popup.destroy, width=10).pack(pady=5)
+        ttk.Button(popup, text="Close", command=popup.destroy, width=10,
+                   style="Nav.TButton").pack(pady=5)
         popup.focus_set()
 
     def update_roster(self, team: str, baseball_data, team_win_loss: dict = None):
@@ -751,13 +772,17 @@ class RosterWidget:
         new_mode = "difference" if current_mode == "current" else "current"
         self.comparison_mode_var.set(new_mode)
 
-        # Update button appearance and text
+        # Update button appearance and text (dark-theme appropriate colours)
         if new_mode == "difference":
-            self.batting_comparison_btn.config(text="Show Current Stats", bg="#fff3cd", relief=tk.SUNKEN)
-            self.pitching_comparison_btn.config(text="Show Current Stats", bg="#fff3cd", relief=tk.SUNKEN)
+            self.batting_comparison_btn.config(text="Show Current Stats",
+                                               bg="#3d2d00", fg=ACCENT_GOLD, relief=tk.SUNKEN)
+            self.pitching_comparison_btn.config(text="Show Current Stats",
+                                                bg="#3d2d00", fg=ACCENT_GOLD, relief=tk.SUNKEN)
         else:
-            self.batting_comparison_btn.config(text="Show Difference from 2025", bg="#e8f4f8", relief=tk.RAISED)
-            self.pitching_comparison_btn.config(text="Show Difference from 2025", bg="#e8f4f8", relief=tk.RAISED)
+            self.batting_comparison_btn.config(text="Show Difference from 2025",
+                                               bg=BG_ELEVATED, fg=TEXT_PRIMARY, relief=tk.RAISED)
+            self.pitching_comparison_btn.config(text="Show Difference from 2025",
+                                                bg=BG_ELEVATED, fg=TEXT_PRIMARY, relief=tk.RAISED)
 
         # Refresh display
         self.refresh_display()
@@ -902,7 +927,7 @@ class RosterWidget:
         # Add games played header
         if games_played > 0:
             header_label = tk.Label(frame, text=f"({games_played} games played)",
-                                   font=("Arial", 8, "italic"), fg="gray")
+                                   font=("Segoe UI", 8, "italic"), fg=TEXT_SECONDARY, bg=BG_PANEL)
             header_label.pack(pady=(2, 5))
 
         # Calculate current totals

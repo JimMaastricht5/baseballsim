@@ -11,6 +11,7 @@ import tkinter as tk
 from tkinter import ttk, messagebox
 import queue
 
+from ui.theme import setup_dark_theme, BG_DARK, TEXT_PRIMARY
 from ui.widgets import (
     ToolbarWidget, StandingsWidget, GamesWidget, ScheduleWidget,
     InjuriesWidget, RosterWidget, AdminWidget, GamesPlayedWidget,
@@ -64,28 +65,11 @@ class SeasonMainWindow:
         self.root.title("Baseball Season Simulator")
         self.root.geometry("1500x900")
 
+        # Apply dark theme globally (configures all ttk styles)
+        setup_dark_theme(self.root)
+
         # Comparison mode toggle (Phase 3: Stats Enhancement)
         self.comparison_mode = tk.StringVar(value="current")  # "current" or "difference"
-
-        # Configure tab styling (Baseball Theme)
-        style = ttk.Style()
-        style.theme_use('default')  # Use default theme as base
-
-        # Configure the Notebook frame background
-        style.configure('TNotebook', background='#f0f0f0', borderwidth=0)
-        style.configure('TNotebook.Tab',
-            background='#2d5016',      # Baseball field green (inactive tabs)
-            foreground='#ffffff',      # White text on inactive tabs
-            padding=[12, 6],           # Tab padding (horizontal, vertical)
-            font=('TkDefaultFont', 10, 'bold'),
-            borderwidth=1
-        )
-        # Configure selected/active tab appearance
-        style.map('TNotebook.Tab',
-            background=[('selected', '#1e90ff'), ('active', '#1e90ff')],  # Dodger blue (active/hovered tab)
-            foreground=[('selected', '#ffffff'), ('active', '#ffffff')],   # White text on active tab
-            expand=[('selected', [1, 1, 1, 0])]    # Slight expansion effect
-        )
 
         # Create simulation controller
         self.controller = SimulationController(
@@ -127,7 +111,8 @@ class SeasonMainWindow:
     def _create_main_content(self):
         """Create the main layout with paned window, standings, and tabs."""
         # Horizontal paned window for standings (left) and content (right)
-        paned_window = tk.PanedWindow(self.root, orient=tk.HORIZONTAL, sashrelief=tk.RAISED)
+        paned_window = tk.PanedWindow(self.root, orient=tk.HORIZONTAL, sashrelief=tk.RAISED,
+                                      bg=BG_DARK)
         paned_window.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
 
         # Left panel: Standings widget
@@ -135,7 +120,7 @@ class SeasonMainWindow:
         paned_window.add(self.standings.get_frame(), minsize=300)
 
         # Right panel: Notebook with tabs
-        notebook_frame = tk.Frame(paned_window)
+        notebook_frame = tk.Frame(paned_window, bg=BG_DARK)
         self.notebook = ttk.Notebook(notebook_frame)
         self.notebook.pack(fill=tk.BOTH, expand=True)
 
@@ -148,7 +133,7 @@ class SeasonMainWindow:
         self.notebook.add(self.schedule_widget.get_frame(), text="Schedule")
 
         # Tab 3: League Tab with nested sub-tabs
-        league_tab_frame = tk.Frame(self.notebook)
+        league_tab_frame = tk.Frame(self.notebook, bg=BG_DARK)
         self.notebook.add(league_tab_frame, text="League")
 
         # Create inner notebook for league sub-tabs
@@ -172,7 +157,7 @@ class SeasonMainWindow:
         league_notebook.add(self.admin_widget.get_frame(), text="Admin")
 
         # Tab 4: Team Tab with nested sub-tabs
-        team_tab_frame = tk.Frame(self.notebook)
+        team_tab_frame = tk.Frame(self.notebook, bg=BG_DARK)
         self.notebook.add(team_tab_frame, text=self.season_team_to_follow)
 
         # Create inner notebook for team sub-tabs
@@ -203,12 +188,13 @@ class SeasonMainWindow:
 
     def _create_status_bar(self):
         """Create status bar frame with day counter, progress bar, and status message."""
-        status_frame = tk.Frame(self.root, relief=tk.SUNKEN, bd=1)
+        status_frame = tk.Frame(self.root, relief=tk.SUNKEN, bd=1, bg=BG_DARK)
         status_frame.pack(side=tk.BOTTOM, fill=tk.X)
 
         # Day counter label
         self.day_label = tk.Label(
-            status_frame, text=f"Day: 0 / {self.season_length}", font=("Arial", 10), anchor=tk.W
+            status_frame, text=f"Day: 0 / {self.season_length}",
+            font=("Segoe UI", 10), anchor=tk.W, bg=BG_DARK, fg=TEXT_PRIMARY
         )
         self.day_label.pack(side=tk.LEFT, padx=10)
 
@@ -223,14 +209,15 @@ class SeasonMainWindow:
 
         # Progress percentage label
         self.progress_label = tk.Label(
-            status_frame, text="0%", font=("Arial", 10), width=5
+            status_frame, text="0%", font=("Segoe UI", 10), width=5,
+            bg=BG_DARK, fg=TEXT_PRIMARY
         )
         self.progress_label.pack(side=tk.LEFT, padx=5)
 
         # Status message
         self.status_label = tk.Label(
             status_frame, text="Ready to start season simulation",
-            font=("Arial", 10), anchor=tk.W
+            font=("Segoe UI", 10), anchor=tk.W, bg=BG_DARK, fg=TEXT_PRIMARY
         )
         self.status_label.pack(side=tk.LEFT, padx=10, fill=tk.X, expand=True)
 

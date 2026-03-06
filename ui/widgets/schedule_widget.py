@@ -11,6 +11,8 @@ import tkinter as tk
 from tkinter import scrolledtext
 from typing import List, Tuple
 
+from ui.theme import BG_PANEL, BG_WIDGET, TEXT_PRIMARY, TEXT_HEADING, ACCENT_GOLD
+
 
 class ScheduleWidget:
     """
@@ -28,13 +30,13 @@ class ScheduleWidget:
             parent: Parent tkinter widget (notebook or frame)
             followed_team: Team abbreviation to highlight (e.g., 'MIL', 'NYM')
         """
-        self.frame = tk.Frame(parent)
+        self.frame = tk.Frame(parent, bg=BG_PANEL)
         self.followed_team = followed_team
 
         # Header
         schedule_header = tk.Label(
             self.frame, text="Upcoming Games (Next 14 Days)",
-            font=("Arial", 11, "bold"), pady=5
+            font=("Segoe UI", 11, "bold"), pady=5, bg=BG_PANEL, fg=TEXT_HEADING
         )
         schedule_header.pack()
 
@@ -42,22 +44,25 @@ class ScheduleWidget:
         self.schedule_text = scrolledtext.ScrolledText(
             self.frame,
             wrap=tk.WORD,
-            font=("Courier", 9),
+            font=("Consolas", 9),
             state=tk.DISABLED,
             padx=10,
-            pady=5
+            pady=5,
+            bg=BG_WIDGET,
+            fg=TEXT_PRIMARY,
+            insertbackground=TEXT_PRIMARY
         )
 
         # Configure text tags for formatting
-        self.schedule_text.tag_configure("day_header", font=("Arial", 12, "bold"),
-                                        foreground="#1a3d6b", spacing1=5, spacing3=3)
-        self.schedule_text.tag_configure("current_day", background="#ffeecc",
-                                        font=("Arial", 12, "bold"), foreground="#1a3d6b",
+        self.schedule_text.tag_configure("day_header", font=("Segoe UI", 12, "bold"),
+                                        foreground=ACCENT_GOLD, spacing1=5, spacing3=3)
+        self.schedule_text.tag_configure("current_day", background="#1f3010",
+                                        font=("Segoe UI", 12, "bold"), foreground=ACCENT_GOLD,
                                         spacing1=5, spacing3=3)
-        self.schedule_text.tag_configure("matchup", font=("Courier", 9),
+        self.schedule_text.tag_configure("matchup", font=("Consolas", 9),
                                         lmargin1=20, lmargin2=20)
-        self.schedule_text.tag_configure("bold_team", font=("Courier", 10, "bold"),
-                                        lmargin1=20, lmargin2=20, foreground="#000000")
+        self.schedule_text.tag_configure("bold_team", font=("Consolas", 10, "bold"),
+                                        lmargin1=20, lmargin2=20, foreground=ACCENT_GOLD)
 
         self.schedule_text.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
 

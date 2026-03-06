@@ -123,12 +123,12 @@ class SimAB:
         self.league_GB_FC = .10  # GB FC occur 10 out of 100 times ball in play
         self.league_FB = .372  # fly ball rate for season
         self.league_LD = .199  # line drive rate for the season
-        self.OBP_adjustment = 0  # final adjustment to line up with prior seasons, 2022 -0.025
-        self.BB_adjustment = -0.30  # final adjustment to shift more bb to H
+        self.OBP_adjustment = -0.066  # final adjustment to line up with prior seasons, 2022 -0.025
+        self.BB_adjustment = 0.0  # final adjustment to shift more bb to H
         self.HBP_rate = .0143  # 1.4% of AB in 2022
-        self.HBP_adjustment = 0.0143 * 4.0  # adjustment to shift more to or from hbp league avg is 1.4%, results 1/4 of
-        self.HR_adjustment = 1.1  # adjust for higher HR rate with new 2023 pitching rules
-        self.DBL_adjustment = 1.1  # adjust for higher 2B rate with new 2023 pitching rules
+        self.HBP_adjustment = self.HBP_rate * 0  # adjustment to shift more to or from hbp league avg is 1.4%, results 1/4 of
+        self.HR_adjustment = 0.1  # adjust for higher HR rate with new 2023 pitching rules
+        self.DBL_adjustment = 0.1  # adjust for higher 2B rate with new 2023 pitching rules
         self.dp_chance = .20  # 20% chance dp with runner on per mlb
         self.tag_up_chance = .20  # 20% chance of tagging up and scoring, per mlb
 
@@ -209,7 +209,7 @@ class SimAB:
 
         # We apply a portion of the fatigue factor to the HR rate as well
         # This makes 'tired' pitchers give up 'hanging sliders' (Home Runs)
-        fatigue_hr_boost = self.pitching.Game_Fatigue_Factor * 0.0  # adjust up from zero to incoporate feature
+        fatigue_hr_boost = self.pitching.Game_Fatigue_Factor * 0.0  # adjust up from zero to incorporate feature
 
         batter_hr_rate = ((self.batting.HR + self.HR_adjustment) / self.batting.Total_OB) if self.batting.Total_OB > 0 \
             else league_hr_rate

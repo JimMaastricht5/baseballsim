@@ -123,12 +123,12 @@ class SimAB:
         self.league_GB_FC = .10  # GB FC occur 10 out of 100 times ball in play
         self.league_FB = .372  # fly ball rate for season
         self.league_LD = .199  # line drive rate for the season
-        self.OBP_adjustment = -0.066  # final adjustment to line up with prior seasons, 2022 -0.025
+        self.OBP_adjustment = -0.015  # final adjustment to line up with prior seasons, 2022 -0.025
         self.BB_adjustment = 0.0  # final adjustment to shift more bb to H
         self.HBP_rate = .0143  # 1.4% of AB in 2022
         self.HBP_adjustment = self.HBP_rate * 0  # adjustment to shift more to or from hbp league avg is 1.4%, results 1/4 of
-        self.HR_adjustment = 0.1  # adjust for higher HR rate with new 2023 pitching rules
-        self.DBL_adjustment = 0.1  # adjust for higher 2B rate with new 2023 pitching rules
+        self.HR_adjustment = 0.0 # adjust for higher HR rate with new 2023 pitching rules
+        self.DBL_adjustment = 0.0  # adjust for higher 2B rate with new 2023 pitching rules
         self.dp_chance = .20  # 20% chance dp with runner on per mlb
         self.tag_up_chance = .20  # 20% chance of tagging up and scoring, per mlb
 
@@ -141,18 +141,16 @@ class SimAB:
         """
         Calculates if the batter reached base.
         Now incorporates Def_WAR to simulate hits being 'taken away' by elite defense.
+        Clips values to prevent Odds Ratio infinity errors.
         """
-        # 1. Isolate Hitter Adjustments
+        # 1. Hitter's Adjusted Talent
         hitter_adj_obp = (self.batting.OBP +
                           self.batting.Age_Adjustment +
                           self.batting.Injury_Perf_Adj +
                           self.batting.Streak_Adjustment)
 
-        # 2. Isolate Pitcher & Defense Adjustments
-        # Convert cumulative lineup Def_WAR to a per-PA OBP modifier
-        # Positive Def_WAR (good defense) lowers the allowed OBP.
+        # 2. Pitcher's Adjusted Talent (including Defense)
         defense_mod = current_team_def_war * 0.0015
-
         pitcher_adj_obp = (self.pitching.OBP +
                            self.pitching.Game_Fatigue_Factor -
                            self.pitching.Age_Adjustment -
@@ -160,15 +158,46 @@ class SimAB:
                            self.pitching.Streak_Adjustment -
                            defense_mod)
 
-        # 3. Environmental Baseline
+        # 3. Baseline Environment
+        # If the sim is 10% hot, OBP_adjustment should be negative (e.g., -0.015)
         league_baseline = self.league_batting_obp + self.OBP_adjustment
 
-        # 4. Final Odds Ratio
-        return self.rng() < self.odds_ratio(
-            hitter_adj_obp + self.OBP_adjustment,
-            pitcher_adj_obp + self.OBP_adjustment,
-            league_baseline,
+        # 4. Odds Ratio Resolution
+        # We clip to .001/.999 to prevent the formula from hitting 0 or 1 (infinity)
+        prob = self.odds_ratio(
+            hitter_stat=np.clip(hitter_adj_obp, 0.001, 0.999),
+            pitcher_stat=np.clip(pitcher_adj_obp, 0.001, 0.999),
+            league_stat=np.clip(league_baseline, 0.001, 0.999),
             stat_type='obp')
+        return self.rng() < prob
+
+        # # 1. Isolate Hitter Adjustments
+        # hitter_adj_obp = (self.batting.OBP +
+        #                   self.batting.Age_Adjustment +
+        #                   self.batting.Injury_Perf_Adj +
+        #                   self.batting.Streak_Adjustment)
+        #
+        # # 2. Isolate Pitcher & Defense Adjustments
+        # # Convert cumulative lineup Def_WAR to a per-PA OBP modifier
+        # # Positive Def_WAR (good defense) lowers the allowed OBP.
+        # defense_mod = current_team_def_war * 0.0015
+        #
+        # pitcher_adj_obp = (self.pitching.OBP +
+        #                    self.pitching.Game_Fatigue_Factor -
+        #                    self.pitching.Age_Adjustment -
+        #                    self.pitching.Injury_Perf_Adj -
+        #                    self.pitching.Streak_Adjustment -
+        #                    defense_mod)
+        #
+        # # 3. Environmental Baseline
+        # league_baseline = self.league_batting_obp + self.OBP_adjustment
+        #
+        # # 4. Final Odds Ratio
+        # return self.rng() < self.odds_ratio(
+        #     hitter_adj_obp + self.OBP_adjustment,
+        #     pitcher_adj_obp + self.OBP_adjustment,
+        #     league_baseline,
+        #     stat_type='obp')
 
     def bb(self) -> bool:
         """
@@ -305,25 +334,100 @@ class SimAB:
         self.pitching = pitching
         self.batting = batting
         outcomes.reset()
+
+        # Consistently calculate Plate Appearances (PA)
+        pa_batter = batting.Total_OB + (batting.AB - batting.H)
+        pa_pitcher = pitching.Total_OB + pitching.Total_Outs
+        pa_league = self.league_batting_Total_OB + self.league_Total_outs
+
+        # 1. THE PRIMARY GATE (OBP Resolution)
+        # We use your original Odds Ratio logic for the primary gate to ensure
+        # the total number of people on base is correct.
         if self.onbase(lineup_def_war):
-            if self.bb():
-                outcomes.set_score_book_cd('BB')
-            elif self.hr():
-                outcomes.set_score_book_cd('HR')
-            elif self.triple():
-                outcomes.set_score_book_cd('3B')
-            elif self.double():
-                outcomes.set_score_book_cd('2B')
-            elif self.hbp():
-                outcomes.set_score_book_cd('HBP')
-            else:
-                outcomes.set_score_book_cd('H')
-        else:  # handle outs
-            if self.k():
+
+            # 2. SUB-TYPE RESOLUTION (Relative Multipliers)
+            # We calculate how the batter/pitcher differ from league average
+            def get_mult(stat, b_val, p_val, lg_val):
+                # Simple multiplier: (Player Rate / League Rate)
+                b_mult = (b_val / pa_batter) / (lg_val / pa_league) if lg_val > 0 else 1.0
+                # For pitchers, we neutralize 3B/2B as in your code
+                if stat in ['3B', '2B']:
+                    return b_mult
+                p_mult = (p_val / pa_pitcher) / (lg_val / pa_league) if lg_val > 0 else 1.0
+                return (b_mult + p_mult) / 2  # Blended multiplier
+
+            # Get League baseline frequencies for the On-Base pool
+            lg_ob_total = self.league_batting_Total_BB + self.league_batting_Total_HR + \
+                          self.league_batting_Total_2B + self.league_batting_Total_3B + \
+                          (self.league_batting_totals_df.at[0, 'H'] - self.league_batting_Total_HR -
+                           self.league_batting_Total_2B - self.league_batting_Total_3B)
+
+            # Calculate Weights based on League Baseline * Blended Multiplier
+            weights = {
+                'BB': (self.league_batting_Total_BB / pa_league) * get_mult('BB', batting.BB, pitching.BB,
+                                                                            self.league_batting_Total_BB),
+                'HR': (self.league_batting_Total_HR / pa_league) * get_mult('HR', batting.HR, pitching.HR,
+                                                                            self.league_batting_Total_HR),
+                '3B': (self.league_batting_Total_3B / pa_league) * get_mult('3B', batting['3B'], 0,
+                                                                            self.league_batting_Total_3B),
+                '2B': (self.league_batting_Total_2B / pa_league) * get_mult('2B', batting['2B'], 0,
+                                                                            self.league_batting_Total_2B),
+                'HBP': self.HBP_rate  # Keep HBP flat as per your original code
+            }
+
+            # Calculate Singles (H) based on league baseline for singles
+            lg_singles = (self.league_batting_totals_df.at[0, 'H'] - self.league_batting_Total_HR -
+                          self.league_batting_Total_2B - self.league_batting_Total_3B)
+            weights['H'] = (lg_singles / pa_league) * get_mult('H', (
+                        batting.H - batting.HR - batting['2B'] - batting['3B']),
+                                                               (pitching.H - pitching.HR), lg_singles)
+
+            # NORMALIZE: Ensure these weights sum to 100% of the "On Base" result
+            total_w = sum(weights.values())
+            roll = self.rng() * total_w
+
+            running_total = 0
+            for event, weight in weights.items():
+                running_total += weight
+                if roll <= running_total:
+                    outcomes.set_score_book_cd(event)
+                    return
+        else:
+            # 3. OUT RESOLUTION
+            # Calculate Strikeout probability using the same multiplier logic
+            lg_k_rate = self.league_batting_totals_df.at[0, 'SO'] / pa_league
+            k_mult = ((batting.SO / pa_batter) / lg_k_rate + (pitching.SO / pa_pitcher) / lg_k_rate) / 2
+
+            # Probability of K given that an OUT has already occurred
+            prob_out = 1 - (batting.Total_OB / pa_batter)
+            if self.rng() < (lg_k_rate * k_mult / prob_out):
                 outcomes.set_score_book_cd('SO')
             else:
                 outcomes.set_score_book_cd(self.gb_fo_lo(outs, runner_on_first, runner_on_third))
         return
+
+        # self.pitching = pitching
+        # self.batting = batting
+        # outcomes.reset()
+        # if self.onbase(lineup_def_war):
+        #     if self.bb():
+        #         outcomes.set_score_book_cd('BB')
+        #     elif self.hr():
+        #         outcomes.set_score_book_cd('HR')
+        #     elif self.triple():
+        #         outcomes.set_score_book_cd('3B')
+        #     elif self.double():
+        #         outcomes.set_score_book_cd('2B')
+        #     elif self.hbp():
+        #         outcomes.set_score_book_cd('HBP')
+        #     else:
+        #         outcomes.set_score_book_cd('H')
+        # else:  # handle outs
+        #     if self.k():
+        #         outcomes.set_score_book_cd('SO')
+        #     else:
+        #         outcomes.set_score_book_cd(self.gb_fo_lo(outs, runner_on_first, runner_on_third))
+        # return
 
     def odds_ratio(self, hitter_stat: Union[float, float64], pitcher_stat: Union[float, float64],
                    league_stat: float64, stat_type: str = '') -> float64:

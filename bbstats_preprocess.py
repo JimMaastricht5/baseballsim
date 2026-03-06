@@ -915,10 +915,15 @@ class BaseballStatsPreProcess:
 
         # Calculate derived stats for AGGREGATED data
         batting_data['Season'] = str(max(load_seasons) + 1)  # Projected year (e.g., 2026)
-        batting_data['OBP'] = self.trunc_col(np.nan_to_num(np.divide(batting_data['H'] + batting_data['BB'] +
-                                                                     batting_data['HBP'], batting_data['AB'] +
-                                                                     batting_data['BB'] + batting_data['HBP']),
-                                                           nan=0.0, posinf=0.0), 3)
+        batting_data['OBP'] = self.trunc_col(np.nan_to_num(
+            np.divide(
+                batting_data['H'] + batting_data['BB'] + batting_data['HBP'],
+                batting_data['AB'] + batting_data['BB'] + batting_data['HBP'] + batting_data.get('SF', 0)
+            ), nan=0.0, posinf=0.0), 3)
+        # batting_data['OBP'] = self.trunc_col(np.nan_to_num(np.divide(batting_data['H'] + batting_data['BB'] +
+        #                                                              batting_data['HBP'], batting_data['AB'] +
+        #                                                              batting_data['BB'] + batting_data['HBP']),
+        #                                                    nan=0.0, posinf=0.0), 3)
         batting_data['SLG'] = self.trunc_col(np.nan_to_num(np.divide((batting_data['H'] - batting_data['2B'] -
                                                                       batting_data['3B'] - batting_data['HR']) +
                                                                      batting_data['2B'] * 2 +
@@ -927,7 +932,7 @@ class BaseballStatsPreProcess:
         batting_data['OPS'] = self.trunc_col(np.nan_to_num(batting_data['OBP'] + batting_data['SLG'],
                                                            nan=0.0, posinf=0.0), 3)
         batting_data['Total_OB'] = batting_data['H'] + batting_data['BB'] + batting_data['HBP']
-        batting_data['Total_Outs'] = batting_data['AB'] - batting_data['H'] + batting_data['HBP']
+        batting_data['Total_Outs'] = batting_data['AB'] - batting_data['H']
         batting_data = batting_data[batting_data['AB'] >= 1]  # drop players without enough AB
         batting_data['E'] = 0
         batting_data['Game_Fatigue_Factor'] = 0
@@ -955,7 +960,7 @@ class BaseballStatsPreProcess:
         historical_data['OPS'] = self.trunc_col(np.nan_to_num(historical_data['OBP'] + historical_data['SLG'],
                                                               nan=0.0, posinf=0.0), 3)
         historical_data['Total_OB'] = historical_data['H'] + historical_data['BB'] + historical_data['HBP']
-        historical_data['Total_Outs'] = historical_data['AB'] - historical_data['H'] + historical_data['HBP']
+        historical_data['Total_Outs'] = historical_data['AB'] - historical_data['H']
         historical_data = historical_data[historical_data['AB'] >= 10]
         historical_data['E'] = 0
         historical_data['Game_Fatigue_Factor'] = 0

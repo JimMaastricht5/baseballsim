@@ -44,6 +44,12 @@ _LIST_PATTERN = re.compile(r"\[([^\]]+)\]")
 DYNAMIC_FIELDS = ['Condition', 'Injured Days', 'Injury Description',
                   'Injury_Perf_Adj', 'Injury_Rate_Adj', 'Streak_Adjustment']
 
+# Columns used when computing per-player stat differences (current vs historical)
+BATTER_DIFF_COUNT_COLS = ['AB', 'R', 'H', '2B', '3B', 'HR', 'RBI', 'BB', 'SO']
+BATTER_DIFF_RATE_COLS = ['AVG', 'OBP', 'SLG', 'OPS']
+PITCHER_DIFF_COUNT_COLS = ['G', 'GS', 'W', 'L', 'IP', 'H', 'R', 'ER', 'HR', 'BB', 'SO', 'SV']
+PITCHER_DIFF_RATE_COLS = ['ERA', 'WHIP']
+
 
 class BaseballStats:
     def __init__(self, load_seasons: List[int], new_season: int, include_leagues: list = None,
@@ -1552,6 +1558,38 @@ def team_pitching_totals(pitching_df: DataFrame) -> DataFrame:
         df['Sim_WAR'] = pitching_df['Sim_WAR'].sum()
     df = team_pitching_stats(df, filter_stats=False)
     return df
+
+
+def calculate_stats_difference(current_df: DataFrame, hist_df: DataFrame, is_batter: bool) -> DataFrame:
+    """
+    Compute per-player difference between current season stats and a historical baseline.
+
+    For each player present in both DataFrames (matched on index), counting stats and rate
+    stats are subtracted (current - historical).  Players with no historical entry (rookies)
+    are left unchanged.
+
+    :param current_df: Current season stats DataFrame (indexed by Hashcode)
+    :param hist_df: Historical / prorated baseline DataFrame (indexed by Hashcode)
+    :param is_batter: True for batting data, False for pitching data
+    :return: Copy of current_df with difference values
+    """
+    if hist_df is None or hist_df.empty:
+        return current_df
+
+    count_cols = BATTER_DIFF_COUNT_COLS if is_batter else PITCHER_DIFF_COUNT_COLS
+    rate_cols = BATTER_DIFF_RATE_COLS if is_batter else PITCHER_DIFF_RATE_COLS
+    all_diff_cols = count_cols + rate_cols
+
+    diff_df = current_df.copy()
+    common_index = diff_df.index.intersection(hist_df.index)
+
+    for col in all_diff_cols:
+        if col in diff_df.columns and col in hist_df.columns:
+            diff_df.loc[common_index, col] = (
+                diff_df.loc[common_index, col] - hist_df.loc[common_index, col]
+            )
+
+    return diff_df
 
 
 def update_column_with_other_df(df1, col1, df2, col2):

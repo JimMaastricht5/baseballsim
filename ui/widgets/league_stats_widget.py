@@ -11,6 +11,8 @@ import tkinter as tk
 from tkinter import ttk
 import pandas as pd
 from bblogger import logger
+import bbstats
+from bbstats import calculate_stats_difference
 
 from ui.theme import (BG_PANEL, BG_ELEVATED, TEXT_PRIMARY, TEXT_SECONDARY,
                       TEXT_HEADING, ACCENT_GOLD)
@@ -812,34 +814,7 @@ class LeagueStatsWidget:
             logger.warning("No 2025 historical data available for comparison")
             return current_df
 
-        diff_df = current_df.copy()
-
-        # Join on Hashcode (index)
-        for idx in diff_df.index:
-            if idx in hist_df.index:
-                hist_row = hist_df.loc[idx]
-
-                # Counting stats: absolute difference
-                if is_batter:
-                    count_cols = ['AB', 'R', 'H', '2B', '3B', 'HR', 'RBI', 'BB', 'SO']
-                    rate_cols = ['AVG', 'OBP', 'SLG', 'OPS']
-                else:
-                    count_cols = ['G', 'GS', 'W', 'L', 'IP', 'H', 'R', 'ER', 'HR', 'BB', 'SO', 'SV']
-                    rate_cols = ['ERA', 'WHIP']
-
-                for col in count_cols:
-                    if col in diff_df.columns and col in hist_row.index:
-                        diff_df.at[idx, col] = diff_df.at[idx, col] - hist_row[col]
-
-                # Rate stats: difference (small decimals)
-                for col in rate_cols:
-                    if col in diff_df.columns and col in hist_row.index:
-                        diff_df.at[idx, col] = diff_df.at[idx, col] - hist_row[col]
-            else:
-                # No 2025 data for this player (rookie) - mark as N/A or leave as-is
-                pass
-
-        return diff_df
+        return calculate_stats_difference(current_df, hist_df, is_batter)
 
     def _format_diff_value(self, value, decimals=0):
         """
@@ -872,8 +847,6 @@ class LeagueStatsWidget:
         Args:
             is_batter: True for batting totals, False for pitching totals
         """
-        import bbstats
-
         if is_batter:
             df = self.batters_df_full
             frame = self.batting_totals_frame

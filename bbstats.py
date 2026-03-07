@@ -1471,6 +1471,13 @@ def team_pitching_stats(df: DataFrame, filter_stats: bool = True) -> DataFrame:
     denom_avg = total_outs + df['H']
     df['AVG'] = trunc_col(np.nan_to_num(df['H'] / denom_avg, nan=0.0, posinf=0.0), 3)
 
+    # SLG AGAINST: Total Bases / AB (against)
+    total_bases = (df['H'] - df['2B'] - df['3B'] - df['HR']) + df['2B'] * 2 + df['3B'] * 3 + df['HR'] * 4
+    df['SLG'] = trunc_col(np.nan_to_num(total_bases / denom_avg, nan=0.0, posinf=0.0), 3)
+
+    # OPS AGAINST: OBP + SLG
+    df['OPS'] = trunc_col(np.nan_to_num(df['OBP'] + df['SLG'], nan=0.0, posinf=0.0), 3)
+
     # 4. CLEANUP
     cols_to_fill = ['ERA', 'WHIP', 'AVG', 'OBP', 'SLG', 'OPS']
     for col in cols_to_fill:

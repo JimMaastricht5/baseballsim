@@ -513,18 +513,18 @@ class BaseballStatsPreProcess:
         """Returns stabilization constants (K). Higher K = slower to trust player data."""
         if not is_pitching:
             return {
-                'SO': 150,  # Increased: Pull low-K hitters toward league average more strongly
+                'SO': 70,  # Increased: Pull low-K hitters toward league average more strongly
                 'BB': 200,  # Slightly increased for more regression
-                'HR': 2500,  # Increased: More conservative HR projections
-                'H': 2500,  # Increased: Stronger BABIP regression toward league mean
-                'default': 500
+                'HR': 600,  # Increased: More conservative HR projections
+                'H': 900,  # Increased: Stronger BABIP regression toward league mean
+                'default': 400
             }
         else:
             return {
-                'SO': 100,
-                'BB': 300,
+                'SO': 70,
+                'BB': 200,
                 'HR': 600,  # Pulls fluke HR seasons toward league mean
-                'H': 1000,  # Pulls BABIP toward league mean
+                'H': 900,  # Pulls BABIP toward league mean
                 'ER': 500,  # Crucial for preventing 0.00 ERA anomalies
                 'default': 400
             }
@@ -631,13 +631,13 @@ class BaseballStatsPreProcess:
                         # Calculate how 'unproven' they are (1.0 = 0 stats, 0.0 = at the gate)
                         unproven_factor = (gate - career_sample) / gate
 
-                        # Batters: Regress toward 70% of league average if they have 0 stats
-                        # Pitchers: Regress toward 130% of league average (worse) if they have 0 stats
+                        # Batters: Regress toward 60% of league average if they have 0 stats
+                        # Pitchers: Regress toward 150% of league average (worse) if they have 0 stats
                         if not is_pitching:
-                            penalty_multiplier = 1.0 - (0.35 * unproven_factor)  # Scales from 0.65 to 1.0
+                            penalty_multiplier = 1.0 - (0.40 * unproven_factor)  # Scales from 0.4 to 1.0
                             lg_rate *= penalty_multiplier
                         else:
-                            penalty_multiplier = 1.0 + (0.40 * unproven_factor)  # Scales from 1.40 to 1.0
+                            penalty_multiplier = 1.0 + (0.50 * unproven_factor)  # Scales from 1.50 to 1.0
                             lg_rate *= penalty_multiplier
 
                     k = k_values.get(stat_col, k_values['default'])
@@ -650,7 +650,7 @@ class BaseballStatsPreProcess:
             # 4. Final Sanity Check (The "Hard Caps")
             if not is_pitching and most_recent['AB'] > 0:
                 # Cap HR rate at 4.5% (reasonable upper bound for elite power hitters)
-                if (most_recent['HR'] / most_recent['AB']) > 0.050:
+                if (most_recent['HR'] / most_recent['AB']) > 0.045:
                     most_recent['HR'] = most_recent['AB'] * 0.045
 
                 # Cap batting average at .320 to prevent BABIP inflation
@@ -658,14 +658,14 @@ class BaseballStatsPreProcess:
                     most_recent['H'] = most_recent['AB'] * 0.320
 
                 # Ensure minimum strikeout rate of 15% (league average ~22%)
-                if most_recent['AB'] > 100 and (most_recent['SO'] / most_recent['AB']) < 0.12:
+                if most_recent['AB'] > 100 and (most_recent['SO'] / most_recent['AB']) < 0.15:
                     most_recent['SO'] = most_recent['AB'] * 0.15
 
             if is_pitching and most_recent['IP'] > 1.0:
-                # Cap ERA between 2.80 and 7.50 for the starting projection
+                # Cap ERA between 1.97 (paul skenes)  and 7.50 for the starting projection
                 proj_era = (most_recent['ER'] * 9) / most_recent['IP']
-                if proj_era < 2.80:
-                    most_recent['ER'] = (2.80 * most_recent['IP']) / 9
+                if proj_era < 1.97:
+                    most_recent['ER'] = (1.97 * most_recent['IP']) / 9
                 elif proj_era > 7.50:
                     most_recent['ER'] = (7.50 * most_recent['IP']) / 9
 

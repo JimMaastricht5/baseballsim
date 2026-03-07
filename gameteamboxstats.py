@@ -112,7 +112,7 @@ class TeamBoxScore:
             row['IP'] = float(row['Total_Outs'] / 3)
         if outcomes.score_book_cd in ['H', '2B', '3B', 'HR', 'SO', 'BB', 'HBP']:  # Handle plate appearance
             row[outcomes.score_book_cd] += 1
-        row['H'] += (outcomes.score_book_cd not in ['BB', 'H'] and outcomes.on_base_b)  # add 1 if true else 0
+        row['H'] += (outcomes.score_book_cd not in ['BB', 'HBP', 'H'] and outcomes.on_base_b)  # 2B, 3B, HR are hits; HBP is not
         row['ER'] += outcomes.runs_scored
         row['Condition'] = float(condition)
         self.box_pitching.loc[pitcher_index] = row  # Write the row back to the DataFrame
@@ -200,13 +200,13 @@ class TeamBoxScore:
             ValueError: If a player with hashcode 0 is in scoring list
         """
         batter_stats = self.box_batting.loc[batter_index].copy()  # Store the row in a variable
-        if outcomes.score_book_cd != 'BB':  # handle walks
+        if outcomes.score_book_cd not in ['BB', 'HBP', 'SF']:  # BB, HBP, SF are PAs but not ABs
             batter_stats['AB'] += 1
-        outcome_cd = outcomes.score_book_cd # if outcomes.score_book_cd != 'SO' else 'SO'  # translate K SO for batter
+        outcome_cd = outcomes.score_book_cd
         if outcome_cd in ['H', '2B', '3B', 'HR', 'BB', 'SO', 'SF', 'HBP']:  # record  plate appearance
             batter_stats[outcome_cd] += 1
-        if outcomes.score_book_cd != 'BB' and outcomes.score_book_cd != 'H' and outcomes.on_base_b is True:
-            batter_stats['H'] += 1
+        if outcomes.score_book_cd not in ['BB', 'HBP', 'H'] and outcomes.on_base_b is True:
+            batter_stats['H'] += 1  # 2B, 3B, HR are also hits
         batter_stats['RBI'] += outcomes.runs_scored
         self.box_batting.loc[batter_index] = batter_stats  # Update the DataFrame
         self.total_hits = self.box_batting['H'].sum()

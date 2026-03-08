@@ -36,7 +36,7 @@ class SeasonWorker(threading.Thread):
     def __init__(self, load_seasons=None, new_season=2026,
                 rotation_len=5, series_length=3, season_length=162, season_chatty=False,
                 season_print_lineup_b=False, season_print_box_score_b=False,
-                team_to_follow=None):
+                team_to_follow=None, obp_adjustment=0.0):
         """
         Initialize season worker with simulation parameters.
 
@@ -61,6 +61,7 @@ class SeasonWorker(threading.Thread):
         self.season_print_lineup_b = season_print_lineup_b
         self.season_print_box_score_b = season_print_box_score_b
         self.only_nl_b = False
+        self.obp_adjustment = obp_adjustment
 
         # Create signal emitter
         self.signals = SeasonSignals()
@@ -112,7 +113,8 @@ class SeasonWorker(threading.Thread):
                 load_batter_file='aggr-stats-pp-Batting.csv',
                 load_pitcher_file='aggr-stats-pp-Pitching.csv',
                 schedule=None,  # Let it generate schedule
-                suppress_console_output=True  # Suppress disabled list and hot/cold list prints for UI
+                suppress_console_output=True,  # Suppress disabled list and hot/cold list prints for UI
+                obp_adjustment=self.obp_adjustment
             )
 
             # Call sim_start for initialization

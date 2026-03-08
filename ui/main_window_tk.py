@@ -272,8 +272,18 @@ class SeasonMainWindow:
             self.toolbar.update_button_states(simulation_running=True, paused=False)
             self.status_label.config(text=self._format_status_with_day("Starting simulation..."))
 
-        if self.controller.start_season(selected_team, on_started):
-            logger.info(f"Season started for team: {selected_team}")
+        num_games = self.toolbar.get_num_games()
+        obp_adjustment = self.toolbar.get_obp_adjustment()
+
+        # Update season_length and progress bar to reflect selected games
+        self.season_length = num_games
+        self.progress_bar.config(maximum=num_games)
+        self.day_label.config(text=f"Day: 0 / {num_games}")
+
+        if self.controller.start_season(selected_team, on_started,
+                                        season_length=num_games,
+                                        obp_adjustment=obp_adjustment):
+            logger.info(f"Season started for team: {selected_team}, games: {num_games}, OBP adjustment: {obp_adjustment}")
 
     def pause_season(self):
         """Pause the simulation."""

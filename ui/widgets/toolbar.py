@@ -64,6 +64,39 @@ class ToolbarWidget:
         # Separator
         ttk.Separator(self.toolbar, orient=tk.VERTICAL).pack(side=tk.LEFT, fill=tk.Y, padx=10)
 
+        # Number of games label and spinbox
+        tk.Label(self.toolbar, text="Games:", font=("Segoe UI", 10, "bold"),
+                 bg=BG_DARK, fg=TEXT_PRIMARY).pack(side=tk.LEFT, padx=5)
+        self.games_var = tk.StringVar(value="162")
+        self.games_spinbox = tk.Spinbox(
+            self.toolbar,
+            from_=1,
+            to=162,
+            textvariable=self.games_var,
+            width=5,
+            font=("Segoe UI", 10)
+        )
+        self.games_spinbox.pack(side=tk.LEFT, padx=5)
+
+        # OBP Adjustment label and dropdown
+        tk.Label(self.toolbar, text="OBP Adjustment:", font=("Segoe UI", 10, "bold"),
+                 bg=BG_DARK, fg=TEXT_PRIMARY).pack(side=tk.LEFT, padx=5)
+        self.obp_var = tk.StringVar(value="-0.05")
+        obp_values = [f"{v / 100:.2f}" for v in range(0, -11, -1)]
+        obp_values[0] = "0.0"
+        self.obp_combo = ttk.Combobox(
+            self.toolbar,
+            textvariable=self.obp_var,
+            values=obp_values,
+            width=6,
+            state="readonly",
+            font=("Segoe UI", 10)
+        )
+        self.obp_combo.pack(side=tk.LEFT, padx=5)
+
+        # Separator
+        ttk.Separator(self.toolbar, orient=tk.VERTICAL).pack(side=tk.LEFT, fill=tk.Y, padx=10)
+
         # Start button
         self.start_btn = ttk.Button(
             self.toolbar, text="▶  Start Season",
@@ -113,6 +146,17 @@ class ToolbarWidget:
         """Get currently selected team from dropdown."""
         return self.team_var.get()
 
+    def get_num_games(self) -> int:
+        """Get currently set number of games to simulate."""
+        try:
+            return int(self.games_var.get())
+        except ValueError:
+            return 162
+
+    def get_obp_adjustment(self) -> float:
+        """Get currently selected OBP adjustment value."""
+        return float(self.obp_var.get())
+
     def update_button_states(self, simulation_running: bool, paused: bool):
         """
         Update button enabled/disabled states based on simulation state.
@@ -121,8 +165,10 @@ class ToolbarWidget:
             simulation_running: Whether a simulation is currently running
             paused: Whether the simulation is paused
         """
-        # Disable team selection once simulation starts
+        # Disable team selection, games, and OBP adjustment once simulation starts
         self.team_combo.config(state="disabled" if simulation_running else "readonly")
+        self.games_spinbox.config(state="disabled" if simulation_running else "normal")
+        self.obp_combo.config(state="disabled" if simulation_running else "readonly")
 
         self.start_btn.config(state=tk.DISABLED if simulation_running else tk.NORMAL)
         self.pause_btn.config(state=tk.NORMAL if simulation_running and not paused else tk.DISABLED)

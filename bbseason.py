@@ -174,6 +174,7 @@ class BaseballSeason:
                  load_batter_file: str = 'aggr-stats-pp-Batting.csv',
                  load_pitcher_file: str = 'aggr-stats-pp-Pitching.csv',
                  schedule: list = None, suppress_console_output: bool = False,
+                 obp_adjustment: float = None,
                  output_handler: Optional[OutputHandlerType] = None,
                  play_by_play_callback_factory: Optional[PlayByPlayCallbackFactory] = None) -> None:
         """
@@ -216,6 +217,7 @@ class BaseballSeason:
         self.print_box_score_b = season_print_box_score_b
         self.season_chatty = season_chatty
         self.team_to_follow = season_team_to_follow if season_team_to_follow is not None else []
+        self.obp_adjustment = obp_adjustment
         logger.debug("Initializing BaseballSeason with seasons: {}, new season: {}", load_seasons, new_season)
         self.baseball_data = bbstats.BaseballStats(load_seasons=self.load_seasons, new_season=new_season,
                                                    include_leagues=include_leagues, load_batter_file=load_batter_file,
@@ -851,7 +853,8 @@ class BaseballSeason:
                                    rotation_len=self.rotation_len, print_lineup=self.print_lineup_b,
                                    chatty=self.season_chatty, print_box_score_b=self.print_box_score_b,
                                    team_to_follow=self.team_to_follow, interactive=self.interactive,
-                                   play_by_play_callback=pbp_callback)
+                                   play_by_play_callback=pbp_callback,
+                                   obp_adjustment=self.obp_adjustment)
                 score, inning, win_loss_list, game_recap = game.sim_game()
                 self.update_win_loss(away_team_name=match_up[0], home_team_name=match_up[1], win_loss=win_loss_list)
                 self.baseball_data.game_results_to_season(box_score_class=game.teams[AWAY].box_score)
@@ -900,7 +903,8 @@ class BaseballSeason:
                                    rotation_len=self.rotation_len, print_lineup=self.print_lineup_b,
                                    chatty=self.season_chatty, print_box_score_b=self.print_box_score_b,
                                    team_to_follow=self.team_to_follow, interactive=self.interactive,
-                                   play_by_play_callback=pbp_callback)
+                                   play_by_play_callback=pbp_callback,
+                                   obp_adjustment=self.obp_adjustment)
                 q = queue.Queue()
                 thread = threading.Thread(target=game.sim_game_threaded, args=(q,))
                 threads.append(thread)

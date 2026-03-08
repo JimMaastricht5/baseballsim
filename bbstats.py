@@ -293,6 +293,26 @@ class BaseballStats:
             logger.error(f"Error retrieving historical data for {player_name}: {e}")
             return pd.DataFrame()  # Return empty DataFrame on error
 
+    def get_player_projected_data(self, player_name: str, is_batter: bool = True):
+        """
+        Get projected new-season stats for a specific player.
+
+        :param player_name: Name of the player
+        :param is_batter: True for batting data, False for pitching data
+        :return: Series with projected stats, or None if not found
+        """
+        try:
+            data = self.new_season_batting_data if is_batter else self.new_season_pitching_data
+            if data is None:
+                return None
+            player_rows = data[data['Player'] == player_name]
+            if player_rows.empty:
+                return None
+            return player_rows.iloc[0]
+        except Exception as e:
+            logger.error(f"Error retrieving projected data for {player_name}: {e}")
+            return None
+
     def _ensure_2025_historical_loaded(self):
         """Lazy load 2025 historical data if not already cached."""
         if self.historical_2025_batting is None:

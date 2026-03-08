@@ -94,7 +94,7 @@ class BaseballStatsPreProcess:
         self.peak_start_age = 26  # Start of the plateau
         self.peak_end_age = 30  # End of the plateau (stable peak)
         self.decline_start_age = 31  # When the parabolic decline kicks in
-        self.coeff_age_improvement = 0.0004  # Reduced from 0.0008: Less optimistic improvement for young players
+        self.coeff_age_improvement = 0.0004  # Reduced from 0.0004: Less optimistic improvement for young players
         self.coeff_age_decline = -0.0059
 
         # load seasons
@@ -584,6 +584,46 @@ class BaseballStatsPreProcess:
             vol_col = 'IP'
             gate = 100  # Innings Pitched Gate
 
+        # Print league means and rookie penalty ranges
+        if not is_pitching:
+            h_pa  = league_averages.get('H_per_PA', 0)
+            bb_pa = league_averages.get('BB_per_PA', 0)
+            hr_pa = league_averages.get('HR_per_PA', 0)
+            so_pa = league_averages.get('SO_per_PA', 0)
+            est_obp = h_pa + bb_pa
+            est_avg = h_pa / (1 - bb_pa) if (1 - bb_pa) > 0 else 0
+            print(f"\n=== League Means (Batting, qualified >= 100 AB) ===")
+            print(f"  H/PA:  {h_pa:.4f}  BB/PA:  {bb_pa:.4f}  HR/PA:  {hr_pa:.4f}  SO/PA:  {so_pa:.4f}")
+            print(f"  Est. AVG:  {est_avg:.3f}  Est. OBP:  {est_obp:.3f}")
+            print(f"  K values:  H={k_values.get('H')}  HR={k_values.get('HR')}  "
+                  f"BB={k_values.get('BB')}  SO={k_values.get('SO')}")
+            print(f"\n=== Batting Rookie/Unproven Penalty (gate={gate} PA) ===")
+            for sample in [0, gate // 4, gate // 2, gate * 3 // 4, gate]:
+                unproven = (gate - sample) / gate
+                mult = 1.0 - (0.40 * unproven)
+                print(f"  {sample:3d} PA -> penalty_multiplier={mult:.2f}  "
+                      f"(regress to {mult * 100:.0f}% of league avg)")
+        else:
+            h_ip  = league_averages.get('H_per_IP', 0)
+            bb_ip = league_averages.get('BB_per_IP', 0)
+            so_ip = league_averages.get('SO_per_IP', 0)
+            hr_ip = league_averages.get('HR_per_IP', 0)
+            er_ip = league_averages.get('ER_per_IP', 0)
+            est_whip = h_ip + bb_ip
+            est_era  = er_ip * 9
+            print(f"\n=== League Means (Pitching, qualified >= 20 IP) ===")
+            print(f"  H/IP:  {h_ip:.4f}  BB/IP:  {bb_ip:.4f}  SO/IP:  {so_ip:.4f}  "
+                  f"HR/IP:  {hr_ip:.4f}  ER/IP:  {er_ip:.4f}")
+            print(f"  Est. WHIP:  {est_whip:.3f}  Est. ERA:  {est_era:.2f}")
+            print(f"  K values:  H={k_values.get('H')}  HR={k_values.get('HR')}  "
+                  f"BB={k_values.get('BB')}  SO={k_values.get('SO')}  ER={k_values.get('ER')}")
+            print(f"\n=== Pitching Rookie/Unproven Penalty (gate={gate} IP) ===")
+            for sample in [0, gate // 4, gate // 2, gate * 3 // 4, gate]:
+                unproven = (gate - sample) / gate
+                mult = 1.0 + (0.50 * unproven)
+                print(f"  {sample:3d} IP -> penalty_multiplier={mult:.2f}  "
+                      f"(regress to {mult * 100:.0f}% of league avg)")
+
         for hashcode in unique_players:
             player_historical = historical_df[historical_df['Hashcode'] == hashcode].sort_values('Season')
             if player_historical.empty:
@@ -825,25 +865,25 @@ class BaseballStatsPreProcess:
             historical_data['Streak_Adjustment'] = 0.0  # Always 0 for historical data
 
         # Scale up low-sample pitchers: enforce minimum 30 IP floor for sim stability
-        low_ip_mask = pitching_data['IP'] < 20
-        if low_ip_mask.any():
-            n = low_ip_mask.sum()
-            sf = 30.0 / pitching_data.loc[low_ip_mask, 'IP'].replace(0, 1)
-            count_cols = ['G', 'GS', 'CG', 'SHO', 'IP', 'H', 'ER', 'SO', 'BB', 'HR', 'W', 'L', 'SV', 'HBP', 'BK', 'WP']
-            for col in count_cols:
-                if col in pitching_data.columns:
-                    scaled = pitching_data.loc[low_ip_mask, col].mul(sf)
-                    if pd.api.types.is_integer_dtype(pitching_data[col]):
-                        pitching_data.loc[low_ip_mask, col] = scaled.round(0).astype('int64')
-                    else:
-                        pitching_data.loc[low_ip_mask, col] = scaled.round(1)
-            # Recalculate derived stats (WHIP/ERA rates unchanged by proportional scaling)
-            pitching_data.loc[low_ip_mask, 'AB'] = pitching_data.loc[low_ip_mask, 'IP'] * 3 + pitching_data.loc[low_ip_mask, 'H']
-            pitching_data.loc[low_ip_mask, 'Total_OB'] = pitching_data.loc[low_ip_mask, 'H'] + pitching_data.loc[low_ip_mask, 'BB']
-            pitching_data.loc[low_ip_mask, 'Total_Outs'] = pitching_data.loc[low_ip_mask, 'IP'] * 3
-            g_safe = pitching_data.loc[low_ip_mask, 'G'].replace(0, 1)
-            pitching_data.loc[low_ip_mask, 'AVG_faced'] = (pitching_data.loc[low_ip_mask, 'Total_OB'] + pitching_data.loc[low_ip_mask, 'Total_Outs']) / g_safe
-            print(f"Pitchers: Scaled up {n} low-sample players from <20 IP to 30 IP")
+        # low_ip_mask = pitching_data['IP'] < 20
+        # if low_ip_mask.any():
+        #     n = low_ip_mask.sum()
+        #     sf = 30.0 / pitching_data.loc[low_ip_mask, 'IP'].replace(0, 1)
+        #     count_cols = ['G', 'GS', 'CG', 'SHO', 'IP', 'H', 'ER', 'SO', 'BB', 'HR', 'W', 'L', 'SV', 'HBP', 'BK', 'WP']
+        #     for col in count_cols:
+        #         if col in pitching_data.columns:
+        #             scaled = pitching_data.loc[low_ip_mask, col].mul(sf)
+        #             if pd.api.types.is_integer_dtype(pitching_data[col]):
+        #                 pitching_data.loc[low_ip_mask, col] = scaled.round(0).astype('int64')
+        #             else:
+        #                 pitching_data.loc[low_ip_mask, col] = scaled.round(1)
+        #     # Recalculate derived stats (WHIP/ERA rates unchanged by proportional scaling)
+        #     pitching_data.loc[low_ip_mask, 'AB'] = pitching_data.loc[low_ip_mask, 'IP'] * 3 + pitching_data.loc[low_ip_mask, 'H']
+        #     pitching_data.loc[low_ip_mask, 'Total_OB'] = pitching_data.loc[low_ip_mask, 'H'] + pitching_data.loc[low_ip_mask, 'BB']
+        #     pitching_data.loc[low_ip_mask, 'Total_Outs'] = pitching_data.loc[low_ip_mask, 'IP'] * 3
+        #     g_safe = pitching_data.loc[low_ip_mask, 'G'].replace(0, 1)
+        #     pitching_data.loc[low_ip_mask, 'AVG_faced'] = (pitching_data.loc[low_ip_mask, 'Total_OB'] + pitching_data.loc[low_ip_mask, 'Total_Outs']) / g_safe
+        #     print(f"Pitchers: Scaled up {n} low-sample players from <20 IP to 30 IP")
 
         return pitching_data, historical_data
 
@@ -997,35 +1037,35 @@ class BaseballStatsPreProcess:
 
         # Scale up low-sample batters: enforce minimum 120 AB floor for sim stability
         low_ab_mask = batting_data['AB'] < 100
-        if low_ab_mask.any():
-            n = low_ab_mask.sum()
-            sf = 120.0 / batting_data.loc[low_ab_mask, 'AB'].replace(0, 1)
-            count_cols = ['G', 'AB', 'R', 'H', '2B', '3B', 'HR', 'RBI', 'SB', 'CS', 'BB', 'SO', 'SH', 'SF', 'HBP', 'GIDP']
-            for col in count_cols:
-                if col in batting_data.columns:
-                    scaled = batting_data.loc[low_ab_mask, col].mul(sf)
-                    if pd.api.types.is_integer_dtype(batting_data[col]):
-                        batting_data.loc[low_ab_mask, col] = scaled.round(0).astype('int64')
-                    else:
-                        batting_data.loc[low_ab_mask, col] = scaled.round(1)
-            # Recalculate derived stats
-            h = batting_data.loc[low_ab_mask, 'H']
-            bb = batting_data.loc[low_ab_mask, 'BB']
-            hbp = batting_data.loc[low_ab_mask, 'HBP']
-            ab = batting_data.loc[low_ab_mask, 'AB']
-            sf_col = batting_data.loc[low_ab_mask, 'SF']
-            batting_data.loc[low_ab_mask, 'Total_OB'] = h + bb + hbp
-            batting_data.loc[low_ab_mask, 'Total_Outs'] = ab - h
-            batting_data.loc[low_ab_mask, 'OBP'] = self.trunc_col(
-                np.nan_to_num(np.divide(h + bb + hbp, ab + bb + hbp + sf_col), nan=0.0, posinf=0.0), 3)
-            singles = h - batting_data.loc[low_ab_mask, '2B'] - batting_data.loc[low_ab_mask, '3B'] - batting_data.loc[low_ab_mask, 'HR']
-            batting_data.loc[low_ab_mask, 'SLG'] = self.trunc_col(
-                np.nan_to_num(np.divide(singles + batting_data.loc[low_ab_mask, '2B'] * 2 +
-                                        batting_data.loc[low_ab_mask, '3B'] * 3 + batting_data.loc[low_ab_mask, 'HR'] * 4,
-                                        ab), nan=0.0, posinf=0.0), 3)
-            batting_data.loc[low_ab_mask, 'OPS'] = self.trunc_col(
-                np.nan_to_num(batting_data.loc[low_ab_mask, 'OBP'] + batting_data.loc[low_ab_mask, 'SLG'], nan=0.0, posinf=0.0), 3)
-            print(f"Batters: Scaled up {n} low-sample players from <100 AB to 120 AB")
+        # if low_ab_mask.any():
+        #     n = low_ab_mask.sum()
+        #     sf = 120.0 / batting_data.loc[low_ab_mask, 'AB'].replace(0, 1)
+        #     count_cols = ['G', 'AB', 'R', 'H', '2B', '3B', 'HR', 'RBI', 'SB', 'CS', 'BB', 'SO', 'SH', 'SF', 'HBP', 'GIDP']
+        #     for col in count_cols:
+        #         if col in batting_data.columns:
+        #             scaled = batting_data.loc[low_ab_mask, col].mul(sf)
+        #             if pd.api.types.is_integer_dtype(batting_data[col]):
+        #                 batting_data.loc[low_ab_mask, col] = scaled.round(0).astype('int64')
+        #             else:
+        #                 batting_data.loc[low_ab_mask, col] = scaled.round(1)
+        #     # Recalculate derived stats
+        #     h = batting_data.loc[low_ab_mask, 'H']
+        #     bb = batting_data.loc[low_ab_mask, 'BB']
+        #     hbp = batting_data.loc[low_ab_mask, 'HBP']
+        #     ab = batting_data.loc[low_ab_mask, 'AB']
+        #     sf_col = batting_data.loc[low_ab_mask, 'SF']
+        #     batting_data.loc[low_ab_mask, 'Total_OB'] = h + bb + hbp
+        #     batting_data.loc[low_ab_mask, 'Total_Outs'] = ab - h
+        #     batting_data.loc[low_ab_mask, 'OBP'] = self.trunc_col(
+        #         np.nan_to_num(np.divide(h + bb + hbp, ab + bb + hbp + sf_col), nan=0.0, posinf=0.0), 3)
+        #     singles = h - batting_data.loc[low_ab_mask, '2B'] - batting_data.loc[low_ab_mask, '3B'] - batting_data.loc[low_ab_mask, 'HR']
+        #     batting_data.loc[low_ab_mask, 'SLG'] = self.trunc_col(
+        #         np.nan_to_num(np.divide(singles + batting_data.loc[low_ab_mask, '2B'] * 2 +
+        #                                 batting_data.loc[low_ab_mask, '3B'] * 3 + batting_data.loc[low_ab_mask, 'HR'] * 4,
+        #                                 ab), nan=0.0, posinf=0.0), 3)
+        #     batting_data.loc[low_ab_mask, 'OPS'] = self.trunc_col(
+        #         np.nan_to_num(batting_data.loc[low_ab_mask, 'OBP'] + batting_data.loc[low_ab_mask, 'SLG'], nan=0.0, posinf=0.0), 3)
+        #     print(f"Batters: Scaled up {n} low-sample players from <100 AB to 120 AB")
 
         return batting_data, historical_data
 
@@ -1361,6 +1401,9 @@ class BaseballStatsPreProcess:
                 return self.coeff_age_decline * (age - self.peak_end_age) ** 2
 
         # Apply row-wise to access both Age and Projection_Method
+        cols = ['H', 'BB', 'HR']
+        for col in cols:
+            df[col] = pd.to_numeric(df[col], errors='coerce')
         df['Age_Adjustment'] = df.apply(get_adjustment, axis=1)
 
         # Apply the adjustment to counting stats
@@ -1369,9 +1412,13 @@ class BaseballStatsPreProcess:
                 adj_factor = 1 + (row['Age_Adjustment'] / 0.325)
                 adj_factor = max(0.5, adj_factor)
 
-                df.at[index, 'H'] *= adj_factor
-                df.at[index, 'BB'] *= adj_factor
-                df.at[index, 'HR'] *= adj_factor
+                # Use .loc to update the values and immediately cast them
+                calculated_vals = (df.loc[index, cols].astype(float) * adj_factor).round()
+                df.loc[index, cols] = calculated_vals.astype(int)
+
+                # df.at[index, 'H'] *= adj_factor
+                # df.at[index, 'BB'] *= adj_factor
+                # df.at[index, 'HR'] *= adj_factor
 
         return df
 
@@ -1383,30 +1430,59 @@ class BaseballStatsPreProcess:
             self.new_season_pitching_data = self.get_pitching_seasons(load_pitcher_file, [self.new_season])
             self.new_season_batting_data = self.get_batting_seasons(load_batter_file, [self.new_season])
         else:  # handle random league data and or consecutive seasons
+            # --- Pitching ---
             self.new_season_pitching_data = self.pitching_data.copy()
             self.new_season_pitching_data[self.numeric_pcols] = \
                 self.new_season_pitching_data[self.numeric_pcols].astype('int')
-            self.new_season_pitching_data[self.numeric_pcols] = 0
-            self.new_season_pitching_data[['ERA', 'WHIP', 'OBP', 'AVG_faced', 'Total_OB', 'Total_Outs', 'AB',
-                                           'HLD', 'BS', 'Injured Days']] = 0
-            self.new_season_pitching_data['Condition'] = 100
-            self.new_season_pitching_data['Streak_Adjustment'] = 0.0  # All players start season with no streak
-            self.new_season_pitching_data.drop(['Total_OB', 'Total_Outs'], axis=1)
             self.new_season_pitching_data['Season'] = str(self.new_season)
             if self.new_season not in self.load_seasons:  # add a year to age if it is the next year
-                self.new_season_pitching_data['Age'] = self.new_season_pitching_data['Age'] + 1  # everyone a year older
+                self.new_season_pitching_data['Age'] = self.new_season_pitching_data['Age'] + 1
                 self.new_season_pitching_data = self.calc_age_adjustment(df=self.new_season_pitching_data)
 
+            # Calculate projected rate stats from counting stats before zeroing
+            pp = self.new_season_pitching_data
+            pp['ERA'] = self.trunc_col(np.nan_to_num(
+                np.divide(pp['ER'] * 9, pp['IP']), nan=0.0, posinf=0.0), 2)
+            pp['WHIP'] = self.trunc_col(np.nan_to_num(
+                np.divide(pp['BB'] + pp['H'], pp['IP']), nan=0.0, posinf=0.0), 3)
+            pp['OBP'] = self.trunc_col(np.nan_to_num(
+                np.divide(pp['WHIP'], 3 + pp['WHIP']), nan=0.0, posinf=0.0), 3)
+
+            # Zero counting stats for simulation tracking (preserve ERA/WHIP/OBP)
+            self.new_season_pitching_data[self.numeric_pcols] = 0
+            self.new_season_pitching_data[['AVG_faced', 'Total_OB', 'Total_Outs', 'AB',
+                                           'HLD', 'BS', 'Injured Days']] = 0
+            self.new_season_pitching_data['Condition'] = 100
+            self.new_season_pitching_data['Streak_Adjustment'] = 0.0
+            self.new_season_pitching_data.drop(['Total_OB', 'Total_Outs'], axis=1)
+
+            # --- Batting ---
             self.new_season_batting_data = self.batting_data.copy()
-            self.new_season_batting_data[self.numeric_bcols] = 0
-            self.new_season_batting_data[['AVG', 'OBP', 'SLG', 'OPS', 'Total_OB', 'Total_Outs', 'Injured Days']] = 0
-            self.new_season_batting_data['Condition'] = 100
-            self.new_season_batting_data['Streak_Adjustment'] = 0.0  # All players start season with no streak
-            self.new_season_batting_data.drop(['Total_OB', 'Total_Outs'], axis=1)
             self.new_season_batting_data['Season'] = str(self.new_season)
             if self.new_season not in self.load_seasons:  # add a year to age if it is the next year
-                self.new_season_batting_data['Age'] = self.new_season_batting_data['Age'] + 1  # everyone a year older
+                self.new_season_batting_data['Age'] = self.new_season_batting_data['Age'] + 1
                 self.new_season_batting_data = self.calc_age_adjustment(df=self.new_season_batting_data)
+
+            # Calculate projected rate stats from counting stats before zeroing
+            bp = self.new_season_batting_data
+            bp['AVG'] = self.trunc_col(np.nan_to_num(
+                np.divide(bp['H'], bp['AB']), nan=0.0, posinf=0.0), 3)
+            bp['OBP'] = self.trunc_col(np.nan_to_num(
+                np.divide(bp['H'] + bp['BB'] + bp['HBP'],
+                          bp['AB'] + bp['BB'] + bp['HBP'] + bp.get('SF', 0)),
+                nan=0.0, posinf=0.0), 3)
+            bp['SLG'] = self.trunc_col(np.nan_to_num(np.divide(
+                (bp['H'] - bp['2B'] - bp['3B'] - bp['HR']) +
+                bp['2B'] * 2 + bp['3B'] * 3 + bp['HR'] * 4,
+                bp['AB']), nan=0.0, posinf=0.0), 3)
+            bp['OPS'] = self.trunc_col(np.nan_to_num(bp['OBP'] + bp['SLG'], nan=0.0, posinf=0.0), 3)
+
+            # Zero counting stats for simulation tracking (preserve AVG/OBP/SLG/OPS)
+            self.new_season_batting_data[self.numeric_bcols] = 0
+            self.new_season_batting_data[['Total_OB', 'Total_Outs', 'Injured Days']] = 0
+            self.new_season_batting_data['Condition'] = 100
+            self.new_season_batting_data['Streak_Adjustment'] = 0.0
+            self.new_season_batting_data.drop(['Total_OB', 'Total_Outs'], axis=1)
 
         return
 
@@ -1429,3 +1505,68 @@ if __name__ == '__main__':
     # print(baseball_data.pitching_data.sort_values('Hashcode').to_string())
     # print(baseball_data.batting_data.sort_values('Hashcode').to_string())
     # print(baseball_data.new_season_pitching_data.sort_values('Hashcode').to_string())
+
+    # --- Tyler Black (MIL) sanity check ---
+    PLAYER_CHECK = 'Tyler Black'
+    TEAM_CHECK = 'MIL'
+    HDR = (f"{'Season':<10}{'Team':<6}{'Age':>4}{'G':>5}{'AB':>6}{'H':>5}"
+           f"{'2B':>4}{'3B':>4}{'HR':>4}{'RBI':>5}{'BB':>5}{'SO':>5}"
+           f"{'AVG':>7}{'OBP':>7}{'SLG':>7}{'OPS':>7}  Method")
+    SEP = '=' * 88
+
+    def _fmt_batting_row(r, season_label=None):
+        season = season_label if season_label else str(int(float(r.get('Season', 0))))
+        ab = float(r.get('AB', 0))
+        h  = float(r.get('H', 0))
+        avg_val = (h / ab) if ab > 0 else float(r.get('AVG', r.get('BA', 0.0)))
+        return (f"{season:<10}{str(r.get('Team', '')):6}{int(float(r.get('Age', 0))):>4}"
+                f"{int(float(r.get('G', 0))):>5}{int(ab):>6}{int(h):>5}"
+                f"{int(float(r.get('2B', 0))):>4}{int(float(r.get('3B', 0))):>4}"
+                f"{int(float(r.get('HR', 0))):>4}{int(float(r.get('RBI', 0))):>5}"
+                f"{int(float(r.get('BB', 0))):>5}{int(float(r.get('SO', 0))):>5}"
+                f"{avg_val:>7.3f}{float(r.get('OBP', 0)):>7.3f}"
+                f"{float(r.get('SLG', 0)):>7.3f}{float(r.get('OPS', 0)):>7.3f}"
+                f"  {r.get('Projection_Method', '')}")
+
+    def _find_player(df, name):
+        """Find player rows — handles both column and index layouts."""
+        if 'Player' in df.columns:
+            return df[df['Player'] == name]
+        reset = df.reset_index()
+        if 'Player' in reset.columns:
+            return reset[reset['Player'] == name]
+        return pd.DataFrame()
+
+    print(f"\n{SEP}")
+    print(f"  Player Check: {PLAYER_CHECK} ({TEAM_CHECK})")
+    print(SEP)
+
+    # --- Historical actuals: 2023, 2024, 2025 (read directly from saved CSV) ---
+    print(f"\n--- Historical Actuals (2023 / 2024 / 2025) ---")
+    print(HDR)
+    seasons_str = ' '.join(str(s) for s in baseball_data.load_seasons)
+    hist_bat_file = f"{seasons_str} historical-Batting.csv"
+    try:
+        hist_df = pd.read_csv(hist_bat_file, index_col='Player_Season_Key')
+        player_hist = hist_df[hist_df['Player'] == PLAYER_CHECK].sort_values('Season')
+        if player_hist.empty:
+            # Show close matches to help diagnose name differences
+            matches = hist_df[hist_df['Player'].str.contains('Black', case=False, na=False)]['Player'].unique()
+            print(f"  ('{PLAYER_CHECK}' not found — names containing 'Black': {matches.tolist()})")
+        else:
+            for _, hist_row in player_hist.iterrows():
+                print(_fmt_batting_row(hist_row))
+    except FileNotFoundError:
+        print(f"  (file not found: {hist_bat_file})")
+
+    # --- Projected values from aggregated batting_data ---
+    print(f"\n--- Projected ({baseball_data.new_season}) ---")
+    print(HDR)
+    player_proj = _find_player(baseball_data.batting_data, PLAYER_CHECK)
+    if player_proj.empty:
+        print(f"  (no projected row found for '{PLAYER_CHECK}')")
+    else:
+        for _, proj_row in player_proj.iterrows():
+            print(_fmt_batting_row(proj_row, season_label=str(baseball_data.new_season)))
+
+    print(f"{SEP}\n")

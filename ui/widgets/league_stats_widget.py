@@ -668,25 +668,28 @@ class LeagueStatsWidget:
                 logger.info(f"No historical data found for {player_name}")
                 return
 
-            self._show_history_popup(player_name, historical_df, is_batter)
+            projected_row = self.baseball_data.get_player_projected_data(player_name, is_batter)
+            self._show_history_popup(player_name, historical_df, is_batter, projected_row)
 
         except Exception as e:
             logger.error(f"Error fetching historical data for {player_name}: {e}")
             import traceback
             logger.error(traceback.format_exc())
 
-    def _show_history_popup(self, player_name: str, historical_df, is_batter: bool):
+    def _show_history_popup(self, player_name: str, historical_df, is_batter: bool,
+                            projected_row=None):
         """
-        Open a popup window showing player historical stats.
+        Open a popup window showing player historical stats with projected row at top.
 
         Args:
             player_name: Player name for window title
             historical_df: DataFrame with historical stats
             is_batter: True for batting columns, False for pitching columns
+            projected_row: Optional Series with projected new-season stats
         """
         popup = tk.Toplevel()
         popup.title(f"{player_name} - Historical Stats")
-        popup.geometry("680x280")
+        popup.geometry("680x300")
         popup.resizable(True, True)
         popup.configure(bg=BG_PANEL)
 
@@ -704,6 +707,7 @@ class LeagueStatsWidget:
         tree = ttk.Treeview(tree_frame, columns=columns, show="headings", height=8,
                             yscrollcommand=scrollbar.set)
         scrollbar.config(command=tree.yview)
+        tree.tag_configure("projected", foreground="#d4a017")
 
         for col in columns:
             tree.heading(col, text=col)
@@ -721,6 +725,32 @@ class LeagueStatsWidget:
                 tree.column(col, width=50, anchor=tk.CENTER)
 
         tree.pack(fill=tk.BOTH, expand=True)
+
+        # Insert projected row at top if available
+        if projected_row is not None:
+            try:
+                r = projected_row
+                if is_batter:
+                    avg_val = r.get('AVG', r.get('BA', 0))
+                    values = (
+                        "Projected", r.get('Team', ''), int(r.get('Age', 0)),
+                        int(r.get('G', 0)), int(r.get('AB', 0)), int(r.get('R', 0)),
+                        int(r.get('H', 0)), int(r.get('HR', 0)), int(r.get('RBI', 0)),
+                        f"{float(avg_val):.3f}", f"{float(r.get('OBP', 0)):.3f}",
+                        f"{float(r.get('SLG', 0)):.3f}", f"{float(r.get('OPS', 0)):.3f}"
+                    )
+                else:
+                    values = (
+                        "Projected", r.get('Team', ''), int(r.get('Age', 0)),
+                        int(r.get('G', 0)), int(r.get('GS', 0)),
+                        f"{float(r.get('IP', 0)):.1f}",
+                        int(r.get('W', 0)), int(r.get('L', 0)),
+                        f"{float(r.get('ERA', 0)):.2f}", f"{float(r.get('WHIP', 0)):.2f}",
+                        int(r.get('SO', 0))
+                    )
+                tree.insert("", tk.END, values=values, tags=("projected",))
+            except Exception as e:
+                logger.warning(f"Error inserting projected row: {e}")
 
         for idx, row in historical_df.iterrows():
             try:

@@ -20,6 +20,7 @@ from numpy import float64, int32, int64
 from pandas.core.frame import DataFrame
 from pandas.core.series import Series
 from typing import Dict, Union
+import threading
 
 
 class TeamBoxScore:
@@ -59,6 +60,7 @@ class TeamBoxScore:
         pcols_to_convert = ['IP', 'ERA', 'WHIP', 'OBP', 'SLG', 'OPS', 'Total_Outs', 'Condition',
                             'AVG_faced', 'Game_Fatigue_Factor']  # make sure these are floats
         self.box_pitching[pcols_to_convert] = self.box_pitching[pcols_to_convert].astype(float)
+        self.box_pitching.index = self.box_pitching.index.astype(int)  # make sure this is considered numeric
         # self.box_pitching = bbstats.remove_non_print_cols(self.box_pitching)
         self.team_box_pitching = None
         self.game_pitching_stats = None
@@ -68,6 +70,7 @@ class TeamBoxScore:
         self.box_batting[['AB', 'R', 'H', '2B', '3B', 'HR', 'RBI', 'SB', 'CS', 'BB', 'SO', 'SH', 'SF', 'HBP']] = 0
         self.box_batting[['AVG', 'OBP', 'SLG', 'OPS']] = 0.0
         self.box_batting['Condition'] = self.box_batting['Condition'].astype(float)
+        self.box_batting.index = self.box_batting.index.astype(int)
         # self.box_batting = bbstats.remove_non_print_cols(self.box_batting)
         self.team_box_batting = None
         self.game_batting_stats = None
@@ -81,6 +84,7 @@ class TeamBoxScore:
         self.condition_change_per_day = 20
         self.rnd_condition_chg = lambda: abs(np.random.normal(loc=self.condition_change_per_day,
                                                               scale=self.condition_change_per_day / 2, size=1)[0])
+        self.lock = threading.Lock()
         return
 
     def batters_faced(self, pitcher_index: int64) -> Union[int64, float64]:
@@ -93,8 +97,9 @@ class TeamBoxScore:
         Returns:
             Union[int64, float64]: Total batters faced (H + BB + IP*3)
         """
-        pitcher_stats = self.box_pitching.loc[pitcher_index]  # Store the result of .loc[] in a variable
-        return pitcher_stats.H + pitcher_stats.BB + pitcher_stats.IP * 3  # total batters faced
+        with self.lock:
+            pitcher_stats = self.box_pitching.loc[pitcher_index]  # Store the result of .loc[] in a variable
+            return pitcher_stats.H + pitcher_stats.BB + pitcher_stats.IP * 3  # total batters faced
 
     def pitching_result(self, pitcher_index: int64, outcomes: OutCome, condition: Union[float64, int]) -> None:
         """
@@ -105,17 +110,18 @@ class TeamBoxScore:
             outcomes: OutCome object with at-bat results
             condition: Current pitcher condition (0-100)
         """
-        row = self.box_pitching.loc[pitcher_index]
-        row['AB'] += (outcomes.score_book_cd != 'BB')  # add 1 if true
-        if not outcomes.on_base_b:  # Handle outs
-            row['Total_Outs'] += outcomes.outs_on_play
-            row['IP'] = float(row['Total_Outs'] / 3)
-        if outcomes.score_book_cd in ['H', '2B', '3B', 'HR', 'SO', 'BB', 'HBP']:  # Handle plate appearance
-            row[outcomes.score_book_cd] += 1
-        row['H'] += (outcomes.score_book_cd not in ['BB', 'HBP', 'H'] and outcomes.on_base_b)  # 2B, 3B, HR are hits; HBP is not
-        row['ER'] += outcomes.runs_scored
-        row['Condition'] = float(condition)
-        self.box_pitching.loc[pitcher_index] = row  # Write the row back to the DataFrame
+        with self.lock:
+            row = self.box_pitching.loc[pitcher_index]
+            row['AB'] += (outcomes.score_book_cd != 'BB')  # add 1 if true
+            if not outcomes.on_base_b:  # Handle outs
+                row['Total_Outs'] += outcomes.outs_on_play
+                row['IP'] = float(row['Total_Outs'] / 3)
+            if outcomes.score_book_cd in ['H', '2B', '3B', 'HR', 'SO', 'BB', 'HBP']:  # Handle plate appearance
+                row[outcomes.score_book_cd] += 1
+            row['H'] += (outcomes.score_book_cd not in ['BB', 'HBP', 'H'] and outcomes.on_base_b)  # 2B, 3B, HR are hits; HBP is not
+            row['ER'] += outcomes.runs_scored
+            row['Condition'] = float(condition)
+            self.box_pitching.loc[pitcher_index] = row  # Write the row back to the DataFrame
         return
 
     def add_pitcher_to_box(self, new_pitcher: Series) -> None:
@@ -125,11 +131,12 @@ class TeamBoxScore:
         Args:
             new_pitcher: Series or DataFrame with pitcher's historical stats
         """
-        new_pitcher = new_pitcher if isinstance(new_pitcher, pd.DataFrame) else new_pitcher.to_frame().T
-        new_pitcher = new_pitcher.assign(G=1, GS=0, CG=0, SHO=0, IP=0, AB=0, H=0, ER=0, SO=0, BB=0, HR=0,
-                                         W=0, L=0, SV=0, BS=0, HLD=0, ERA=0,
-                                         WHIP=0, OBP=0, SLG=0, OPS=0, Total_Outs=0, Condition=100.0)  # ?? ISSUE!!!
-        self.box_pitching = pd.concat([self.box_pitching, new_pitcher], ignore_index=False)
+        with self.lock:
+            new_pitcher = new_pitcher if isinstance(new_pitcher, pd.DataFrame) else new_pitcher.to_frame().T
+            new_pitcher = new_pitcher.assign(G=1, GS=0, CG=0, SHO=0, IP=0, AB=0, H=0, ER=0, SO=0, BB=0, HR=0,
+                                             W=0, L=0, SV=0, BS=0, HLD=0, ERA=0,
+                                             WHIP=0, OBP=0, SLG=0, OPS=0, Total_Outs=0, Condition=100.0)  # ?? ISSUE!!!
+            self.box_pitching = pd.concat([self.box_pitching, new_pitcher], ignore_index=False)
         return
 
     def pitching_win_loss_save(self, pitcher_index: int64, win_b: bool, save_b: bool) -> None:
@@ -145,18 +152,19 @@ class TeamBoxScore:
             save_b: True if save situation (close game, winning team)
         """
         # set win loss records and save if applicable
-        if win_b:  # win boolean, did this pitcher win or lose?
-            self.box_pitching.loc[pitcher_index, ['W']] += 1
-        else:
-            self.box_pitching.loc[pitcher_index, ['L']] += 1
-        if save_b:  # add one to save col for last row in box for team is save boolean is true
-            self.box_pitching.loc[self.box_pitching.index[-1], ['SV']] += 1
-            # ip_last_pitcher = self.box_pitching.loc[self.box_pitching.index[-1], ['IP']]
-            # ip_second_to_last_pitcher = self.box_pitching.loc[self.box_pitching.index[-2], ['IP']]
-            # print(f'pitching_win_loss_save {ip_last_pitcher}')
-            if (float(self.box_pitching.loc[self.box_pitching.index[-1], 'IP']) < 2.0 and
-                    float(self.box_pitching.loc[self.box_pitching.index[-2], 'IP']) > 0):  # if save was not 2 innings
-                self.box_pitching.loc[self.box_pitching.index[-2], 'HLD'] += 1
+        with self.lock:
+            if win_b:  # win boolean, did this pitcher win or lose?
+                self.box_pitching.loc[pitcher_index, ['W']] += 1
+            else:
+                self.box_pitching.loc[pitcher_index, ['L']] += 1
+            if save_b:  # add one to save col for last row in box for team is save boolean is true
+                self.box_pitching.loc[self.box_pitching.index[-1], ['SV']] += 1
+                # ip_last_pitcher = self.box_pitching.loc[self.box_pitching.index[-1], ['IP']]
+                # ip_second_to_last_pitcher = self.box_pitching.loc[self.box_pitching.index[-2], ['IP']]
+                # print(f'pitching_win_loss_save {ip_last_pitcher}')
+                if (float(self.box_pitching.loc[self.box_pitching.index[-1], 'IP']) < 2.0 and
+                        float(self.box_pitching.loc[self.box_pitching.index[-2], 'IP']) > 0):  # if save was not 2 innings
+                    self.box_pitching.loc[self.box_pitching.index[-2], 'HLD'] += 1
         return
 
     def pitching_blown_save(self, pitcher_index):
@@ -166,7 +174,8 @@ class TeamBoxScore:
         Args:
             pitcher_index: Hashcode of pitcher who blew the save
         """
-        self.box_pitching.loc[pitcher_index, ['BS']] = 1
+        with self.lock:
+            self.box_pitching.loc[pitcher_index, ['BS']] = 1
         return
 
     def steal_result(self, runner_index: int32, steal: bool = True) -> None:
@@ -177,12 +186,13 @@ class TeamBoxScore:
             runner_index: Hashcode of runner attempting steal
             steal: True if successful steal, False if caught stealing
         """
-        runner_stats = self.box_batting.loc[runner_index].copy()
-        if steal:
-            runner_stats['SB'] += 1
-        else:  # caught stealing
-            runner_stats['CS'] += 1
-        self.box_batting.loc[runner_index] = runner_stats
+        with self.lock:
+            runner_stats = self.box_batting.loc[runner_index].copy()
+            if steal:
+                runner_stats['SB'] += 1
+            else:  # caught stealing
+                runner_stats['CS'] += 1
+            self.box_batting.loc[runner_index] = runner_stats
         return
 
     def batting_result(self, batter_index: int, outcomes: OutCome, players_scored_list: Dict[int32, str]) -> None:
@@ -199,22 +209,23 @@ class TeamBoxScore:
         Raises:
             ValueError: If a player with hashcode 0 is in scoring list
         """
-        batter_stats = self.box_batting.loc[batter_index].copy()  # Store the row in a variable
-        if outcomes.score_book_cd not in ['BB', 'HBP', 'SF']:  # BB, HBP, SF are PAs but not ABs
-            batter_stats['AB'] += 1
-        outcome_cd = outcomes.score_book_cd
-        if outcome_cd in ['H', '2B', '3B', 'HR', 'BB', 'SO', 'SF', 'HBP']:  # record  plate appearance
-            batter_stats[outcome_cd] += 1
-        if outcomes.score_book_cd not in ['BB', 'HBP', 'H'] and outcomes.on_base_b is True:
-            batter_stats['H'] += 1  # 2B, 3B, HR are also hits
-        batter_stats['RBI'] += outcomes.runs_scored
-        self.box_batting.loc[batter_index] = batter_stats  # Update the DataFrame
-        self.total_hits = self.box_batting['H'].sum()
-        scored_indices = list(players_scored_list.keys())
-        if 0 in scored_indices:
-            print(f'teamgameboxstats.py batting result runners scored with zero index.')
-            raise ValueError('Player with zero index value causes problems accumulating runs')
-        self.box_batting.loc[scored_indices, 'R'] += 1
+        with self.lock:
+            batter_stats = self.box_batting.loc[batter_index].copy()  # Store the row in a variable
+            if outcomes.score_book_cd not in ['BB', 'HBP', 'SF']:  # BB, HBP, SF are PAs but not ABs
+                batter_stats['AB'] += 1
+            outcome_cd = outcomes.score_book_cd
+            if outcome_cd in ['H', '2B', '3B', 'HR', 'BB', 'SO', 'SF', 'HBP']:  # record  plate appearance
+                batter_stats[outcome_cd] += 1
+            if outcomes.score_book_cd not in ['BB', 'HBP', 'H'] and outcomes.on_base_b is True:
+                batter_stats['H'] += 1  # 2B, 3B, HR are also hits
+            batter_stats['RBI'] += outcomes.runs_scored
+            self.box_batting.loc[batter_index] = batter_stats  # Update the DataFrame
+            self.total_hits = self.box_batting['H'].sum()
+            scored_indices = list(players_scored_list.keys())
+            if 0 in scored_indices:
+                print(f'teamgameboxstats.py batting result runners scored with zero index.')
+                raise ValueError('Player with zero index value causes problems accumulating runs')
+            self.box_batting.loc[scored_indices, 'R'] += 1
         return
 
     def set_box_batting_condition(self) -> None:
@@ -224,9 +235,10 @@ class TeamBoxScore:
         Applies random condition decrease (normal distribution around condition_change_per_day)
         and clips values between 0 and 100.
         """
-        self.box_batting['Condition'] = self.box_batting. \
-            apply(lambda row: row['Condition'] - self.rnd_condition_chg(), axis=1)
-        self.box_batting['Condition'] = self.box_batting['Condition'].clip(lower=0, upper=100)
+        with self.lock:
+            self.box_batting['Condition'] = self.box_batting. \
+                apply(lambda row: row['Condition'] - self.rnd_condition_chg(), axis=1)
+            self.box_batting['Condition'] = self.box_batting['Condition'].clip(lower=0, upper=100)
         return
 
     def totals(self) -> None:
@@ -236,10 +248,11 @@ class TeamBoxScore:
         Creates copies of box scores without totals (for season accumulation)
         and generates team total rows for display.
         """
-        self.game_batting_stats = self.box_batting.copy()  # make a copy w/o totals for season accumulations
-        self.game_pitching_stats = self.box_pitching.copy()  # make a copy w/o totals for season accumulations
-        self.box_batting_totals = bbstats.team_batting_totals(self.box_batting)
-        self.box_pitching_totals = bbstats.team_pitching_totals(self.box_pitching)
+        with self.lock:
+            self.game_batting_stats = self.box_batting.copy()  # make a copy w/o totals for season accumulations
+            self.game_pitching_stats = self.box_pitching.copy()  # make a copy w/o totals for season accumulations
+            self.box_batting_totals = bbstats.team_batting_totals(self.box_batting)
+            self.box_pitching_totals = bbstats.team_pitching_totals(self.box_pitching)
         return
 
     def print_boxes(self) -> str:
@@ -252,20 +265,21 @@ class TeamBoxScore:
         Returns:
             str: Formatted box score text with batting and pitching stats
         """
-        batting_cols = ['Player', 'Team', 'Pos', 'Age', 'G', 'AB', 'R', 'H', '2B', '3B', 'HR', 'RBI',
-                        'SB', 'CS', 'BB', 'SO', 'SH', 'SF', 'HBP']
-        pitching_cols = ['Player', 'Team', 'Age', 'G', 'GS', 'CG', 'SHO', 'IP', 'H', '2B', '3B',
-                         'ER', 'SO', 'BB', 'HR', 'W', 'L', 'SV', 'BS', 'HLD']
-        df = self.box_batting[batting_cols]
-        df = pd.concat([df, self.box_batting_totals.assign(Player='Totals', Team='', Pos='', Age='')[batting_cols]])
-        self.box_printed += df.to_string(index=False, justify='right') + '\n\n'
-        # print(df.to_string(index=False, justify='right'))
-        # print('')
-        df = self.box_pitching[pitching_cols]
-        df = pd.concat([df, self.box_pitching_totals.assign(Player='Totals', Team='', Pos='', Age='')[pitching_cols]])
-        self.box_printed += df.to_string(index=False, justify='right') + '\n\n'
-        # print(df.to_string(index=False, justify='right'))
-        # print('')
+        with self.lock:
+            batting_cols = ['Player', 'Team', 'Pos', 'Age', 'G', 'AB', 'R', 'H', '2B', '3B', 'HR', 'RBI',
+                            'SB', 'CS', 'BB', 'SO', 'SH', 'SF', 'HBP']
+            pitching_cols = ['Player', 'Team', 'Age', 'G', 'GS', 'CG', 'SHO', 'IP', 'H', '2B', '3B',
+                             'ER', 'SO', 'BB', 'HR', 'W', 'L', 'SV', 'BS', 'HLD']
+            df = self.box_batting[batting_cols]
+            df = pd.concat([df, self.box_batting_totals.assign(Player='Totals', Team='', Pos='', Age='')[batting_cols]])
+            self.box_printed += df.to_string(index=False, justify='right') + '\n\n'
+            # print(df.to_string(index=False, justify='right'))
+            # print('')
+            df = self.box_pitching[pitching_cols]
+            df = pd.concat([df, self.box_pitching_totals.assign(Player='Totals', Team='', Pos='', Age='')[pitching_cols]])
+            self.box_printed += df.to_string(index=False, justify='right') + '\n\n'
+            # print(df.to_string(index=False, justify='right'))
+            # print('')
         return self.box_printed
 
     def get_batter_game_stats(self):
@@ -286,6 +300,7 @@ class TeamBoxScore:
         Returns:
             DataFrame: Copy of box_pitching without totals row
         """
-        # 2b and 3b slide toward object types, make sure they are ints
-        self.game_pitching_stats[['2B', '3B']] = self.game_pitching_stats[['2B', '3B']].astype(int)
+        with self.lock:
+            # 2b and 3b slide toward object types, make sure they are ints
+            self.game_pitching_stats[['2B', '3B']] = self.game_pitching_stats[['2B', '3B']].astype(int)
         return self.game_pitching_stats

@@ -53,7 +53,9 @@ class SimulationController:
         self.worker: Optional[SeasonWorker] = None
 
     def start_season(self, selected_team: str,
-                    on_started_callback: Optional[Callable] = None) -> bool:
+                    on_started_callback: Optional[Callable] = None,
+                    season_length: int = None,
+                    obp_adjustment: float = 0.0) -> bool:
         """
         Start the season simulation.
 
@@ -76,17 +78,19 @@ class SimulationController:
 
         logger.info(f"Starting season simulation, following team: {selected_team}")
 
-        # Create worker with simulation parameters
+        # Create worker with simulation parameters (use override if provided)
+        effective_season_length = season_length if season_length is not None else self.season_length
         self.worker = SeasonWorker(
             self.load_seasons,
             self.new_season,
             self.rotation_len,
             self.series_length,
-            self.season_length,
+            effective_season_length,
             self.season_chatty,
             self.season_print_lineup_b,
             self.season_print_box_score_b,
-            selected_team
+            selected_team,
+            obp_adjustment=obp_adjustment
         )
 
         # Start worker thread

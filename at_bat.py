@@ -88,7 +88,7 @@ class OutCome:
 
 
 class SimAB:
-    def __init__(self, baseball_data: bbstats.BaseballStats, debug_b=False) -> None:
+    def __init__(self, baseball_data: bbstats.BaseballStats, obp_adjustment=None, debug_b=False) -> None:
         """
         class handles calculating the outcome of an ab based on pitcher, batter, and league probabilities
         :param baseball_data: class containing the league data and methods
@@ -125,8 +125,8 @@ class SimAB:
         self.league_GB_FC = .10  # GB FC occur 10 out of 100 times ball in play
         self.league_FB = .372  # fly ball rate for season
         self.league_LD = .199  # line drive rate for the season
-        self.OBP_adjustment = -0.025  # final adjustment to line up with prior seasons, 2022 -0.025
-        self.BB_adjustment = 0.0  # final adjustment to shift more bb to H
+        self.OBP_adjustment = -1 * (obp_adjustment if obp_adjustment is not None else 0)
+        self.BB_adjustment = -0.07  # final adjustment to shift more bb to H
         self.HBP_rate = .0143  # 1.4% of AB in 2022
         self.HBP_adjustment = self.HBP_rate * 0  # adjustment to shift more to or from hbp league avg is 1.4%, results 1/4 of
         self.HR_adjustment = 0.0 # adjust for higher HR rate with new 2023 pitching rules
@@ -365,8 +365,12 @@ class SimAB:
 
             # Calculate Weighted Probabilities for each event
             weights = {
-                'BB': (self.league_batting_Total_BB / pa_league) * get_mult('BB', batting.BB, pitching.BB,
-                                                                            self.league_batting_Total_BB),
+                # Apply % change to the league baseline frequency
+                'BB': ((self.league_batting_Total_BB / pa_league) *
+                       (1 + self.BB_adjustment)) * get_mult('BB', batting.BB, pitching.BB,
+                                                            self.league_batting_Total_BB),
+                # 'BB': (self.league_batting_Total_BB / pa_league) * get_mult('BB', batting.BB, pitching.BB,
+                #                                                             self.league_batting_Total_BB),
 
                 'HR': (self.league_batting_Total_HR / pa_league) * get_mult('HR', batting.HR, pitching.HR,
                                                                             self.league_batting_Total_HR),

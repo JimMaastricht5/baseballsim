@@ -125,7 +125,7 @@ class SimAB:
         self.league_GB_FC = .10  # GB FC occur 10 out of 100 times ball in play
         self.league_FB = .372  # fly ball rate for season
         self.league_LD = .199  # line drive rate for the season
-        self.OBP_adjustment = -0.015  # final adjustment to line up with prior seasons, 2022 -0.025
+        self.OBP_adjustment = -0.025  # final adjustment to line up with prior seasons, 2022 -0.025
         self.BB_adjustment = 0.0  # final adjustment to shift more bb to H
         self.HBP_rate = .0143  # 1.4% of AB in 2022
         self.HBP_adjustment = self.HBP_rate * 0  # adjustment to shift more to or from hbp league avg is 1.4%, results 1/4 of

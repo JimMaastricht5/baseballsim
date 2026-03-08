@@ -824,6 +824,27 @@ class BaseballStatsPreProcess:
         if 'Streak_Adjustment' not in historical_data.columns:
             historical_data['Streak_Adjustment'] = 0.0  # Always 0 for historical data
 
+        # Scale up low-sample pitchers: enforce minimum 30 IP floor for sim stability
+        low_ip_mask = pitching_data['IP'] < 20
+        if low_ip_mask.any():
+            n = low_ip_mask.sum()
+            sf = 30.0 / pitching_data.loc[low_ip_mask, 'IP'].replace(0, 1)
+            count_cols = ['G', 'GS', 'CG', 'SHO', 'IP', 'H', 'ER', 'SO', 'BB', 'HR', 'W', 'L', 'SV', 'HBP', 'BK', 'WP']
+            for col in count_cols:
+                if col in pitching_data.columns:
+                    scaled = pitching_data.loc[low_ip_mask, col].mul(sf)
+                    if pd.api.types.is_integer_dtype(pitching_data[col]):
+                        pitching_data.loc[low_ip_mask, col] = scaled.round(0).astype('int64')
+                    else:
+                        pitching_data.loc[low_ip_mask, col] = scaled.round(1)
+            # Recalculate derived stats (WHIP/ERA rates unchanged by proportional scaling)
+            pitching_data.loc[low_ip_mask, 'AB'] = pitching_data.loc[low_ip_mask, 'IP'] * 3 + pitching_data.loc[low_ip_mask, 'H']
+            pitching_data.loc[low_ip_mask, 'Total_OB'] = pitching_data.loc[low_ip_mask, 'H'] + pitching_data.loc[low_ip_mask, 'BB']
+            pitching_data.loc[low_ip_mask, 'Total_Outs'] = pitching_data.loc[low_ip_mask, 'IP'] * 3
+            g_safe = pitching_data.loc[low_ip_mask, 'G'].replace(0, 1)
+            pitching_data.loc[low_ip_mask, 'AVG_faced'] = (pitching_data.loc[low_ip_mask, 'Total_OB'] + pitching_data.loc[low_ip_mask, 'Total_Outs']) / g_safe
+            print(f"Pitchers: Scaled up {n} low-sample players from <20 IP to 30 IP")
+
         return pitching_data, historical_data
 
     def get_batting_seasons(self, batter_file: str, load_seasons: List[int]) -> tuple:
@@ -973,6 +994,38 @@ class BaseballStatsPreProcess:
             historical_data['Injury_Perf_Adj'] = 0
         if 'Streak_Adjustment' not in historical_data.columns:
             historical_data['Streak_Adjustment'] = 0.0  # Always 0 for historical data
+
+        # Scale up low-sample batters: enforce minimum 120 AB floor for sim stability
+        low_ab_mask = batting_data['AB'] < 100
+        if low_ab_mask.any():
+            n = low_ab_mask.sum()
+            sf = 120.0 / batting_data.loc[low_ab_mask, 'AB'].replace(0, 1)
+            count_cols = ['G', 'AB', 'R', 'H', '2B', '3B', 'HR', 'RBI', 'SB', 'CS', 'BB', 'SO', 'SH', 'SF', 'HBP', 'GIDP']
+            for col in count_cols:
+                if col in batting_data.columns:
+                    scaled = batting_data.loc[low_ab_mask, col].mul(sf)
+                    if pd.api.types.is_integer_dtype(batting_data[col]):
+                        batting_data.loc[low_ab_mask, col] = scaled.round(0).astype('int64')
+                    else:
+                        batting_data.loc[low_ab_mask, col] = scaled.round(1)
+            # Recalculate derived stats
+            h = batting_data.loc[low_ab_mask, 'H']
+            bb = batting_data.loc[low_ab_mask, 'BB']
+            hbp = batting_data.loc[low_ab_mask, 'HBP']
+            ab = batting_data.loc[low_ab_mask, 'AB']
+            sf_col = batting_data.loc[low_ab_mask, 'SF']
+            batting_data.loc[low_ab_mask, 'Total_OB'] = h + bb + hbp
+            batting_data.loc[low_ab_mask, 'Total_Outs'] = ab - h
+            batting_data.loc[low_ab_mask, 'OBP'] = self.trunc_col(
+                np.nan_to_num(np.divide(h + bb + hbp, ab + bb + hbp + sf_col), nan=0.0, posinf=0.0), 3)
+            singles = h - batting_data.loc[low_ab_mask, '2B'] - batting_data.loc[low_ab_mask, '3B'] - batting_data.loc[low_ab_mask, 'HR']
+            batting_data.loc[low_ab_mask, 'SLG'] = self.trunc_col(
+                np.nan_to_num(np.divide(singles + batting_data.loc[low_ab_mask, '2B'] * 2 +
+                                        batting_data.loc[low_ab_mask, '3B'] * 3 + batting_data.loc[low_ab_mask, 'HR'] * 4,
+                                        ab), nan=0.0, posinf=0.0), 3)
+            batting_data.loc[low_ab_mask, 'OPS'] = self.trunc_col(
+                np.nan_to_num(batting_data.loc[low_ab_mask, 'OBP'] + batting_data.loc[low_ab_mask, 'SLG'], nan=0.0, posinf=0.0), 3)
+            print(f"Batters: Scaled up {n} low-sample players from <100 AB to 120 AB")
 
         return batting_data, historical_data
 

@@ -703,16 +703,16 @@ class BaseballStatsPreProcess:
             # 4. Final Sanity Check (The "Hard Caps")
             if not is_pitching and most_recent['AB'] > 0:
                 # Cap HR rate at 4.5% (reasonable upper bound for elite power hitters)
-                if (most_recent['HR'] / most_recent['AB']) > 0.045:
-                    most_recent['HR'] = most_recent['AB'] * 0.045
+                if (most_recent['HR'] / most_recent['AB']) > 0.1:
+                    most_recent['HR'] = most_recent['AB'] * 0.1
 
                 # Cap batting average at .320 to prevent BABIP inflation
-                if (most_recent['H'] / most_recent['AB']) > 0.320:
-                    most_recent['H'] = most_recent['AB'] * 0.320
+                if (most_recent['H'] / most_recent['AB']) > 0.331:
+                    most_recent['H'] = most_recent['AB'] * 0.331
 
                 # Ensure minimum strikeout rate of 15% (league average ~22%)
-                if most_recent['AB'] > 100 and (most_recent['SO'] / most_recent['AB']) < 0.15:
-                    most_recent['SO'] = most_recent['AB'] * 0.15
+                if most_recent['AB'] > 100 and (most_recent['SO'] / most_recent['AB']) < 0.125:
+                    most_recent['SO'] = most_recent['AB'] * 0.125
 
             if is_pitching and most_recent['IP'] > 1.0:
                 # Cap ERA between 1.97 (paul skenes)  and 7.50 for the starting projection

@@ -81,8 +81,8 @@ class ToolbarWidget:
         # OBP Adjustment label and dropdown
         tk.Label(self.toolbar, text="OBP Adjustment:", font=("Segoe UI", 10, "bold"),
                  bg=BG_DARK, fg=TEXT_PRIMARY).pack(side=tk.LEFT, padx=5)
-        self.obp_var = tk.StringVar(value="-0.05")
-        obp_values = [f"{v / 100:.2f}" for v in range(0, -11, -1)]
+        self.obp_var = tk.StringVar(value="-0.00")
+        obp_values = [f"{v / 100:.2f}" for v in range(10, -11, -1)]
         obp_values[0] = "0.0"
         self.obp_combo = ttk.Combobox(
             self.toolbar,

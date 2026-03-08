@@ -76,6 +76,14 @@ class BaseballStatsPreProcess:
                    'SDP', 'SFG']
         self.al = ['ATH', 'BOS', 'TEX', 'NYY', 'KCR', 'BAL', 'CLE', 'TOR', 'LAA', 'CWS', 'CHW', 'SEA', 'MIN', 'DET', 'TBR',
                    'HOU']
+        self.team_division = {
+            'BAL': 'East', 'BOS': 'East', 'NYY': 'East', 'TBR': 'East', 'TOR': 'East',
+            'CHW': 'Central', 'CWS': 'Central', 'CLE': 'Central', 'DET': 'Central', 'KCR': 'Central', 'MIN': 'Central',
+            'ATH': 'West', 'HOU': 'West', 'LAA': 'West', 'SEA': 'West', 'TEX': 'West',
+            'ATL': 'East', 'MIA': 'East', 'NYM': 'East', 'PHI': 'East', 'WAS': 'East', 'WSN': 'East',
+            'CHC': 'Central', 'CIN': 'Central', 'MIL': 'Central', 'PIT': 'Central', 'STL': 'Central',
+            'ARI': 'West', 'COL': 'West', 'LAD': 'West', 'SDP': 'West', 'SFG': 'West',
+        }
         self.digit_pos_map = {'1': 'P', '2': 'C', '3': '1B', '4': '2B', '5': '3B', '6': 'SS',
                                                '7': 'LF', '8': 'CF', '9': 'RF'}
         # Team remapping dictionary - maps old team names to new team names
@@ -771,6 +779,7 @@ class BaseballStatsPreProcess:
         pitching_data = pitching_data[pitching_data['Team'] != '']  # drop rows without a formal team name
         pitching_data['League'] = pitching_data['Team'].apply(
                 lambda x: 'NL' if x in self.nl else ('AL' if x in self.al else '') )
+        pitching_data['Division'] = pitching_data['Team'].map(self.team_division).fillna('')
         # Create Player_Season_Key BEFORE de-duplication
         pitching_data['Player_Season_Key'] = (
             pitching_data['Hashcode'].astype(str) + '_' +
@@ -924,6 +933,7 @@ class BaseballStatsPreProcess:
         batting_data['Team'] = batting_data['Team'].apply(lambda x: x if x in self.nl + self.al else '' )
         batting_data['League'] = batting_data['Team'].apply(
                 lambda x: 'NL' if x in self.nl else ('AL' if x in self.al else '') )
+        batting_data['Division'] = batting_data['Team'].map(self.team_division).fillna('')
         # players with multiple teams have a 2TM or 3TM line that is the total of all stats.  Drop rows since we total
         batting_data = batting_data[batting_data['Team'] != '']  # drop rows without a formal team name
         # Create Player_Season_Key BEFORE de-duplication

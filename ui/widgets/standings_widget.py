@@ -4,26 +4,30 @@ Copyright (c) 2024 Jim Maastricht
 
 Standings widget for baseball season simulation UI.
 
-Displays separate American League and National League standings with sorting.
+Displays standings by division with an AL / NL toggle.
+GB is calculated within each division.
 """
 
 import tkinter as tk
 from tkinter import ttk
 from typing import Dict, Any
 
-from ui.theme import (BG_PANEL, TEXT_HEADING, TEXT_PRIMARY,
-                      ROW_EVEN, ROW_ODD, ROW_FOLLOWED, FG_FOLLOWED)
+from ui.theme import (BG_PANEL, BG_ELEVATED, TEXT_HEADING, TEXT_PRIMARY,
+                      ACCENT_BLUE, ROW_EVEN, ROW_ODD, ROW_FOLLOWED, FG_FOLLOWED)
+
+# Division header row styling
+DIV_HEADER_BG = "#1a2744"
 
 
 class StandingsWidget:
     """
-    Standings widget with separate AL and NL treeviews.
+    Standings widget with AL / NL league toggle and per-division GB.
 
     Features:
-    - Separate treeviews for AL and NL
-    - Sortable by team, W-L, Pct, GB
+    - Radio-button toggle between American League and National League
+    - Three division sections (East, Central, West) with styled header rows
+    - GB calculated within each division
     - Highlights followed team
-    - Displays team record, winning percentage, and games back
     """
 
     def __init__(self, parent: tk.Widget):
@@ -31,241 +35,137 @@ class StandingsWidget:
         Initialize standings widget.
 
         Args:
-            parent: Parent tkinter widget (PanedWindow or frame)
+            parent: Parent tkinter widget
         """
         self.standings_frame = tk.Frame(parent, relief=tk.SUNKEN, bd=1, bg=BG_PANEL)
 
-        # Header label
-        standings_label = tk.Label(self.standings_frame, text="STANDINGS",
-                                   font=("Segoe UI", 12, "bold"),
-                                   bg=BG_PANEL, fg=TEXT_HEADING)
-        standings_label.pack(pady=5)
-
-        # Data caching for sorting
+        # Data caching
         self.standings_data_cache = None
-        self.standings_sort_column = "gb"  # Default sort by games back
-        self.standings_sort_reverse = True  # Descending by default
-        self.standings_sort_league = None  # Track which league is being sorted
+        self._followed_team_cache = ''
 
-        # AL Standings
-        al_label = tk.Label(self.standings_frame, text="AMERICAN LEAGUE",
-                            font=("Segoe UI", 10, "bold"), bg=BG_PANEL, fg=TEXT_HEADING)
-        al_label.pack(pady=(5, 2))
+        # Section header
+        tk.Label(self.standings_frame, text="STANDINGS",
+                 font=("Segoe UI", 12, "bold"),
+                 bg=BG_PANEL, fg=TEXT_HEADING).pack(pady=5)
 
-        al_tree_frame = tk.Frame(self.standings_frame, bg=BG_PANEL)
-        al_tree_frame.pack(fill=tk.BOTH, expand=True, padx=5, pady=2)
+        # AL / NL dropdown toggle
+        toggle_frame = tk.Frame(self.standings_frame, bg=BG_PANEL)
+        toggle_frame.pack(pady=(0, 4))
 
-        al_scrollbar = ttk.Scrollbar(al_tree_frame, orient=tk.VERTICAL)
-        al_scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+        tk.Label(toggle_frame, text="League:", font=("Segoe UI", 10, "bold"),
+                 bg=BG_PANEL, fg=TEXT_PRIMARY).pack(side=tk.LEFT, padx=(0, 5))
 
-        self.al_standings_tree = ttk.Treeview(
-            al_tree_frame,
+        self._active_league = tk.StringVar(value='AL')
+        self._league_combo = ttk.Combobox(
+            toggle_frame,
+            textvariable=self._active_league,
+            values=["AL", "NL"],
+            width=6,
+            state="readonly",
+            font=("Segoe UI", 10)
+        )
+        self._league_combo.pack(side=tk.LEFT)
+        self._league_combo.bind("<<ComboboxSelected>>", lambda _: self._on_league_toggle())
+
+        # Treeview with scrollbar
+        tree_frame = tk.Frame(self.standings_frame, bg=BG_PANEL)
+        tree_frame.pack(fill=tk.BOTH, expand=True, padx=5, pady=2)
+
+        scrollbar = ttk.Scrollbar(tree_frame, orient=tk.VERTICAL)
+        scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+
+        self.tree = ttk.Treeview(
+            tree_frame,
             columns=("team", "wl", "pct", "gb"),
             show="headings",
-            height=15,
-            yscrollcommand=al_scrollbar.set
+            height=30,
+            yscrollcommand=scrollbar.set
         )
-        al_scrollbar.config(command=self.al_standings_tree.yview)
+        scrollbar.config(command=self.tree.yview)
 
-        # Define column headings
-        self.al_standings_tree.heading("team", text="Team", command=lambda: self._sort_standings("team", "al"))
-        self.al_standings_tree.heading("wl", text="W-L", command=lambda: self._sort_standings("wl", "al"))
-        self.al_standings_tree.heading("pct", text="Pct", command=lambda: self._sort_standings("pct", "al"))
-        self.al_standings_tree.heading("gb", text="GB", command=lambda: self._sort_standings("gb", "al"))
+        self.tree.heading("team", text="Team")
+        self.tree.heading("wl", text="W-L")
+        self.tree.heading("pct", text="Pct")
+        self.tree.heading("gb", text="GB")
 
-        # Configure column widths
-        self.al_standings_tree.column("team", width=60, anchor=tk.CENTER)
-        self.al_standings_tree.column("wl", width=80, anchor=tk.CENTER)
-        self.al_standings_tree.column("pct", width=60, anchor=tk.CENTER)
-        self.al_standings_tree.column("gb", width=50, anchor=tk.CENTER)
+        self.tree.column("team", width=85, anchor=tk.CENTER)
+        self.tree.column("wl", width=80, anchor=tk.CENTER)
+        self.tree.column("pct", width=60, anchor=tk.CENTER)
+        self.tree.column("gb", width=50, anchor=tk.CENTER)
 
-        # Row tags for striping and followed team
-        self.al_standings_tree.tag_configure("even", background=ROW_EVEN)
-        self.al_standings_tree.tag_configure("odd", background=ROW_ODD)
-        self.al_standings_tree.tag_configure("followed",
-            background=ROW_FOLLOWED, foreground=FG_FOLLOWED,
-            font=("Segoe UI", 9, "bold"))
-        self.al_standings_tree.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        # Row tags
+        self.tree.tag_configure("div_header",
+                                background=DIV_HEADER_BG, foreground=ACCENT_BLUE,
+                                font=("Segoe UI", 9, "bold"))
+        self.tree.tag_configure("even", background=ROW_EVEN)
+        self.tree.tag_configure("odd", background=ROW_ODD)
+        self.tree.tag_configure("followed",
+                                background=ROW_FOLLOWED, foreground=FG_FOLLOWED,
+                                font=("Segoe UI", 9, "bold"))
 
-        # NL Standings
-        nl_label = tk.Label(self.standings_frame, text="NATIONAL LEAGUE",
-                            font=("Segoe UI", 10, "bold"), bg=BG_PANEL, fg=TEXT_HEADING)
-        nl_label.pack(pady=(10, 2))
+        self.tree.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
 
-        nl_tree_frame = tk.Frame(self.standings_frame, bg=BG_PANEL)
-        nl_tree_frame.pack(fill=tk.BOTH, expand=True, padx=5, pady=2)
-
-        nl_scrollbar = ttk.Scrollbar(nl_tree_frame, orient=tk.VERTICAL)
-        nl_scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
-
-        self.nl_standings_tree = ttk.Treeview(
-            nl_tree_frame,
-            columns=("team", "wl", "pct", "gb"),
-            show="headings",
-            height=15,
-            yscrollcommand=nl_scrollbar.set
-        )
-        nl_scrollbar.config(command=self.nl_standings_tree.yview)
-
-        # Define column headings
-        self.nl_standings_tree.heading("team", text="Team", command=lambda: self._sort_standings("team", "nl"))
-        self.nl_standings_tree.heading("wl", text="W-L", command=lambda: self._sort_standings("wl", "nl"))
-        self.nl_standings_tree.heading("pct", text="Pct", command=lambda: self._sort_standings("pct", "nl"))
-        self.nl_standings_tree.heading("gb", text="GB", command=lambda: self._sort_standings("gb", "nl"))
-
-        # Configure column widths
-        self.nl_standings_tree.column("team", width=60, anchor=tk.CENTER)
-        self.nl_standings_tree.column("wl", width=80, anchor=tk.CENTER)
-        self.nl_standings_tree.column("pct", width=60, anchor=tk.CENTER)
-        self.nl_standings_tree.column("gb", width=50, anchor=tk.CENTER)
-
-        # Row tags for striping and followed team
-        self.nl_standings_tree.tag_configure("even", background=ROW_EVEN)
-        self.nl_standings_tree.tag_configure("odd", background=ROW_ODD)
-        self.nl_standings_tree.tag_configure("followed",
-            background=ROW_FOLLOWED, foreground=FG_FOLLOWED,
-            font=("Segoe UI", 9, "bold"))
-        self.nl_standings_tree.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+    def _on_league_toggle(self):
+        """Redraw treeview when the league toggle changes."""
+        if self.standings_data_cache:
+            self._populate_tree(self._active_league.get())
 
     def update_standings(self, standings_data: Dict[str, Any], followed_team: str = ''):
         """
         Update standings display with new data.
 
         Args:
-            standings_data: Dict with 'al' and 'nl' keys, each containing:
+            standings_data: Dict with 'al' and 'nl' keys, each mapping division names
+                ('East', 'Central', 'West') to dicts containing:
                 - teams: List of team abbreviations
                 - wins: List of win counts
                 - losses: List of loss counts
                 - pct: List of win percentages
-                - gb: List of games back
+                - gb: List of games back (within division)
             followed_team: Team abbreviation to highlight
         """
-        # Cache the data for sorting
         self.standings_data_cache = standings_data
+        self._followed_team_cache = followed_team
+        self._populate_tree(self._active_league.get())
 
-        # Update AL standings
-        self._populate_league_standings(
-            self.al_standings_tree,
-            standings_data.get('al', {}),
-            followed_team
-        )
-
-        # Update NL standings
-        self._populate_league_standings(
-            self.nl_standings_tree,
-            standings_data.get('nl', {}),
-            followed_team
-        )
-
-    def _populate_league_standings(self, tree: ttk.Treeview, league_data: Dict, followed_team: str):
+    def _populate_tree(self, league: str):
         """
-        Populate a standings treeview with league data.
+        Populate the treeview for the selected league, with a header row per division.
 
         Args:
-            tree: The treeview widget to populate
-            league_data: Dict with 'teams', 'wins', 'losses', 'pct', 'gb'
-            followed_team: Team abbreviation to highlight
+            league: 'al' or 'nl'
         """
-        # Clear existing items
-        for item in tree.get_children():
-            tree.delete(item)
+        for item in self.tree.get_children():
+            self.tree.delete(item)
 
-        teams = league_data.get('teams', [])
-        wins = league_data.get('wins', [])
-        losses = league_data.get('losses', [])
-        pcts = league_data.get('pct', [])
-        gbs = league_data.get('gb', [])
+        league_data = (self.standings_data_cache or {}).get(league.lower(), {})
+        row_num = 0
 
-        # Insert data into treeview with alternating row colours
-        for i in range(len(teams)):
-            team = teams[i]
-            wl = f"{wins[i]}-{losses[i]}"
-            pct = f"{pcts[i]:.3f}"
-            gb = gbs[i]
+        for division in ('East', 'Central', 'West'):
+            div_data = league_data.get(division, {})
+            teams = div_data.get('teams', [])
+            if not teams:
+                continue
 
-            row_tag = "even" if i % 2 == 0 else "odd"
-            if team == followed_team:
-                tags = (row_tag, "followed")
-            else:
-                tags = (row_tag,)
+            # Division header row
+            self.tree.insert("", tk.END,
+                             values=(division.upper(), "", "", ""),
+                             tags=("div_header",))
 
-            tree.insert("", tk.END, values=(team, wl, pct, gb), tags=tags)
+            wins = div_data.get('wins', [])
+            losses = div_data.get('losses', [])
+            pcts = div_data.get('pct', [])
+            gbs = div_data.get('gb', [])
 
-    def _sort_standings(self, column: str, league: str):
-        """
-        Sort standings by the specified column for a specific league.
-
-        Args:
-            column: Column to sort by ('team', 'wl', 'pct', 'gb')
-            league: League to sort ('al' or 'nl')
-        """
-        if not self.standings_data_cache:
-            return
-
-        # Toggle sort direction if clicking same column in same league
-        if self.standings_sort_column == column and self.standings_sort_league == league:
-            self.standings_sort_reverse = not self.standings_sort_reverse
-        else:
-            # New column or league - use appropriate default direction
-            self.standings_sort_column = column
-            self.standings_sort_league = league
-            if column in ("pct", "wl"):
-                self.standings_sort_reverse = True  # Descending for pct and wins
-            elif column == "gb":
-                self.standings_sort_reverse = False  # Ascending for games back
-            else:
-                self.standings_sort_reverse = False  # Ascending for team names
-
-        # Get data for the specific league
-        league_data = self.standings_data_cache.get(league, {})
-        teams = league_data.get('teams', [])
-        wins = league_data.get('wins', [])
-        losses = league_data.get('losses', [])
-        pcts = league_data.get('pct', [])
-        gbs = league_data.get('gb', [])
-
-        # Create list of tuples for sorting
-        data = list(zip(teams, wins, losses, pcts, gbs))
-
-        # Sort based on column
-        if column == "team":
-            data.sort(key=lambda x: x[0], reverse=self.standings_sort_reverse)
-        elif column == "wl":
-            data.sort(key=lambda x: x[1], reverse=self.standings_sort_reverse)
-        elif column == "pct":
-            data.sort(key=lambda x: x[3], reverse=self.standings_sort_reverse)
-        elif column == "gb":
-            # Special handling for GB (leader is '-', need to sort numerically)
-            def gb_key(x):
-                gb_val = x[4]
-                if gb_val == '-':
-                    return -1.0  # Leader goes first
-                try:
-                    return float(gb_val)
-                except ValueError:
-                    return 999.0  # Put invalid values at end
-            data.sort(key=gb_key, reverse=self.standings_sort_reverse)
-
-        # Select the appropriate tree
-        tree = self.al_standings_tree if league == 'al' else self.nl_standings_tree
-
-        # Clear and repopulate treeview
-        for item in tree.get_children():
-            tree.delete(item)
-
-        # Get followed team for highlighting (need to pass from parent)
-        followed_team = getattr(self, '_followed_team_cache', '')
-
-        for i, (team, w, l, pct, gb) in enumerate(data):
-            wl = f"{w}-{l}"
-            pct_str = f"{pct:.3f}"
-            row_tag = "even" if i % 2 == 0 else "odd"
-            if team == followed_team:
-                tags = (row_tag, "followed")
-            else:
-                tags = (row_tag,)
-
-            tree.insert("", tk.END, values=(team, wl, pct_str, gb), tags=tags)
+            for i in range(len(teams)):
+                team = teams[i]
+                wl = f"{wins[i]}-{losses[i]}"
+                pct = f"{pcts[i]:.3f}"
+                gb = gbs[i]
+                tag = "even" if row_num % 2 == 0 else "odd"
+                tags = ("followed",) if team == self._followed_team_cache else (tag,)
+                self.tree.insert("", tk.END, values=(team, wl, pct, gb), tags=tags)
+                row_num += 1
 
     def set_followed_team(self, team: str):
         """

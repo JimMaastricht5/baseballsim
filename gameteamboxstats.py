@@ -135,7 +135,7 @@ class TeamBoxScore:
             new_pitcher = new_pitcher if isinstance(new_pitcher, pd.DataFrame) else new_pitcher.to_frame().T
             new_pitcher = new_pitcher.assign(G=1, GS=0, CG=0, SHO=0, IP=0, AB=0, H=0, ER=0, SO=0, BB=0, HR=0,
                                              W=0, L=0, SV=0, BS=0, HLD=0, ERA=0,
-                                             WHIP=0, OBP=0, SLG=0, OPS=0, Total_Outs=0, Condition=100.0)  # ?? ISSUE!!!
+                                             WHIP=0, OBP=0, SLG=0, OPS=0, Total_Outs=0, Condition=100.0)
             self.box_pitching = pd.concat([self.box_pitching, new_pitcher], ignore_index=False)
         return
 
@@ -153,18 +153,23 @@ class TeamBoxScore:
         """
         # set win loss records and save if applicable
         with self.lock:
-            if win_b:  # win boolean, did this pitcher win or lose?
-                self.box_pitching.loc[pitcher_index, ['W']] += 1
-            else:
-                self.box_pitching.loc[pitcher_index, ['L']] += 1
-            if save_b:  # add one to save col for last row in box for team is save boolean is true
-                self.box_pitching.loc[self.box_pitching.index[-1], ['SV']] += 1
-                # ip_last_pitcher = self.box_pitching.loc[self.box_pitching.index[-1], ['IP']]
-                # ip_second_to_last_pitcher = self.box_pitching.loc[self.box_pitching.index[-2], ['IP']]
-                # print(f'pitching_win_loss_save {ip_last_pitcher}')
-                if (float(self.box_pitching.loc[self.box_pitching.index[-1], 'IP']) < 2.0 and
-                        float(self.box_pitching.loc[self.box_pitching.index[-2], 'IP']) > 0):  # if save was not 2 innings
-                    self.box_pitching.loc[self.box_pitching.index[-2], 'HLD'] += 1
+            try:
+                if win_b:  # win boolean, did this pitcher win or lose?
+                    self.box_pitching.loc[pitcher_index, ['W']] += 1
+                else:
+                    self.box_pitching.loc[pitcher_index, ['L']] += 1
+                if save_b:  # add one to save col for last row in box for team is save boolean is true
+                    self.box_pitching.loc[self.box_pitching.index[-1], ['SV']] += 1
+                    # ip_last_pitcher = self.box_pitching.loc[self.box_pitching.index[-1], ['IP']]
+                    # ip_second_to_last_pitcher = self.box_pitching.loc[self.box_pitching.index[-2], ['IP']]
+                    # print(f'pitching_win_loss_save {ip_last_pitcher}')
+                    if (float(self.box_pitching.loc[self.box_pitching.index[-1], 'IP']) < 2.0 and
+                            float(self.box_pitching.loc[self.box_pitching.index[-2], 'IP']) > 0):  # if save was not 2 innings
+                        self.box_pitching.loc[self.box_pitching.index[-2], 'HLD'] += 1
+            except KeyError as e:
+                print(f"Error: Player ID {e} not found in the index.")
+                print(self.box_pitching.to_string())
+                pass
         return
 
     def pitching_blown_save(self, pitcher_index):

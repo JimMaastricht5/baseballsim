@@ -94,6 +94,10 @@ class OutputCategory:
     WORLD_SERIES_START = 'world_series_start'
     WORLD_SERIES_END = 'world_series_end'
 
+    # Playoffs (full bracket rounds)
+    PLAYOFF_ROUND_START = 'playoff_round_start'
+    PLAYOFF_ROUND_END = 'playoff_round_end'
+
     # Progress
     SIM_PROGRESS = 'sim_progress'
 
@@ -551,7 +555,7 @@ class BaseballSeason:
 
         return games_back
 
-    def should_run_world_playoffs(self) -> bool:
+    def should_run_playoffs(self) -> bool:
         """
         Check if playoffs should run after this season.
 

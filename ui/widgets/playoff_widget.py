@@ -160,37 +160,56 @@ class PlayoffWidget:
 
     def world_series_started(self, ws_data: Dict[str, Any]):
         """
-        Handle World Series start signal.
+        Handle playoff/World Series start signal.
+
+        Called twice during a full-bracket run:
+          1. playoff_mode=True  — full playoffs begin; activate widget, clear display
+          2. playoff_mode=False — World Series finalists known; update header/series score
 
         Args:
-            ws_data: Dict with 'al_winner', 'nl_winner', 'season', 'al_record', 'nl_record'
+            ws_data: Dict with 'al_winner', 'nl_winner', 'season', and optional
+                     'playoff_mode' (bool, default False), 'al_record', 'nl_record'
         """
-        self.ws_active = True
-        self.ws_info = ws_data
-        self.series_score = {ws_data['al_winner']: 0, ws_data['nl_winner']: 0}
-        self.game_number = 0
-        self.current_game_pbp = 1
-        self.game_pbp_data = {}  # Reset play-by-play storage
+        season = ws_data.get('season', '')
+        playoff_mode = ws_data.get('playoff_mode', False)
 
-        # Update header
-        al = ws_data['al_winner']
-        nl = ws_data['nl_winner']
-        self.header_label.config(
-            text=f"{ws_data['season']} World Series: {al} vs {nl}"
-        )
+        if playoff_mode:
+            # Full playoffs starting — reset everything and activate widget
+            self.ws_active = True
+            self.ws_info = ws_data
+            self.series_score = {}
+            self.game_number = 0
+            self.current_game_pbp = 1
+            self.game_pbp_data = {}
+            self.completed_games = set()
 
-        # Initialize game selector with Game 1
-        self.game_selector['values'] = ['Game 1']
-        self.game_selector.current(0)
+            self.header_label.config(text=f"{season} Playoffs")
 
-        # Display initial play-by-play for Game 1
-        self._display_game_pbp(1)
+            self.game_selector['values'] = ['Game 1']
+            self.game_selector.current(0)
+            self._display_game_pbp(1)
 
-        # Clear box scores
-        self.box_text.configure(state=tk.NORMAL)
-        self.box_text.delete(1.0, tk.END)
-        self.box_text.insert(tk.END, f"{ws_data['season']} World Series Box Scores\n\n", "header")
-        self.box_text.configure(state=tk.DISABLED)
+            self.box_text.configure(state=tk.NORMAL)
+            self.box_text.delete(1.0, tk.END)
+            self.box_text.insert(tk.END, f"{season} Playoffs\n\n", "header")
+            self.box_text.configure(state=tk.DISABLED)
+        else:
+            # World Series finalists known — update header and reset series score for WS
+            al = ws_data.get('al_winner', '')
+            nl = ws_data.get('nl_winner', '')
+            self.ws_info = ws_data
+            self.series_score = {al: 0, nl: 0}
+
+            self.header_label.config(text=f"{season} World Series: {al} vs {nl}")
+
+            # Add World Series divider to box scores panel
+            self.box_text.configure(state=tk.NORMAL)
+            self.box_text.insert(
+                tk.END,
+                f"\n{'─' * 28}\n{season} World Series: {al} vs {nl}\n{'─' * 28}\n\n",
+                "game_header"
+            )
+            self.box_text.configure(state=tk.DISABLED)
 
     def add_play_by_play(self, play_data: Dict[str, Any]):
         """

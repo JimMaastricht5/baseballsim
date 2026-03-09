@@ -126,7 +126,7 @@ class SimAB:
         self.league_FB = .372  # fly ball rate for season
         self.league_LD = .199  # line drive rate for the season
         self.OBP_adjustment = -1 * (obp_adjustment if obp_adjustment is not None else 0)
-        self.BB_adjustment = 0.15  # final adjustment to shift - is more h from bb + vice versa was 0.05
+        self.BB_adjustment = 0.125  # final adjustment to shift - is more h from bb + vice versa was 1.5; slightly less H than desired.
         self.HBP_rate = .0143  # 1.4% of AB in 2022
         self.HBP_adjustment = self.HBP_rate * 0  # adjustment to shift more to or from hbp league avg is 1.4%, results 1/4 of
         self.HR_adjustment = 0.0 # adjust for higher HR rate with new 2023 pitching rules

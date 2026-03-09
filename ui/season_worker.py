@@ -155,15 +155,15 @@ class SeasonWorker(threading.Thread):
                 logger.info("Regular season simulation complete")
 
                 # Check if World Series is eligible and run automatically
-                if self.season.should_run_world_series():
-                    logger.info("World Series eligible, running playoffs automatically")
+                if self.season.should_run_playoffs():
+                    logger.info("Playoffs eligible, running automatically")
                     # Emit season_complete signal (for UI updates, but don't wait for response)
                     self.signals.emit_season_complete()
 
-                    # Run World Series automatically (no user prompt)
+                    # Run full playoff bracket automatically (no user prompt)
                     if not self._stopped:
-                        logger.info("Running World Series")
-                        self.season.run_world_series()
+                        logger.info("Running playoffs")
+                        self.season.run_playoffs()
                 else:
                     logger.info("World Series not eligible (single league or short season)")
 

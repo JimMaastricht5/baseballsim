@@ -525,17 +525,19 @@ class BaseballStatsPreProcess:
         if not is_pitching:
             return {
                 'SO': 70,  # Increased: Pull low-K hitters toward league average more strongly
-                'BB': 200,  # Slightly increased for more regression
+                'BB': 800,  # Slightly increased for more regression
+                'HBP': 2500,  # Huge anchor: Requires thousands of PAs to 'believe' an HBP rate
                 'HR': 600,  # Increased: More conservative HR projections
-                'H': 900,  # Increased: Stronger BABIP regression toward league mean
+                'H': 1500,  # Increased: Stronger BABIP regression toward league mean
                 'default': 400
             }
         else:
             return {
                 'SO': 70,
-                'BB': 200,
+                'BB': 800,
+                'HBP': 2500,  # Huge anchor: Requires thousands of PAs to 'believe' an HBP rate
                 'HR': 600,  # Pulls fluke HR seasons toward league mean
-                'H': 900,  # Pulls BABIP toward league mean
+                'H': 1500,  # Pulls BABIP toward league mean
                 'ER': 500,  # Crucial for preventing 0.00 ERA anomalies
                 'default': 400
             }
@@ -608,11 +610,25 @@ class BaseballStatsPreProcess:
                 total_pa = player_historical['PA'].sum()
                 pa_to_ab_ratio = (total_pa / total_ab) if total_ab > 0 else 1.12
                 projected_yearly_pa = projected_yearly_vol * pa_to_ab_ratio
+
+                # Force a 100-AB floor for the PROJECTION FILE only.
+                # This stops .500 OBPs from appearing in the CSV/UI due to tiny denominators.
+                projected_yearly_vol = max(projected_yearly_vol, 100)
+                projected_yearly_pa = max(projected_yearly_pa, 112)
             else:
-                # Pitcher Volume Cap
+                # 1. Calculate the 'Target' (What the sim expects him to pitch)
                 projected_yearly_vol = min(raw_weighted_vol, 30) if recent_vol < 20 else raw_weighted_vol
+
+                # 2. Apply the 'Stability Floor' (The "Bañuelos Fix" for Pitchers)
+                # We force a minimum of 30.0 IP so the rounding of ER and H
+                # doesn't create 0.00 or 27.00 ERAs in the projection file.
+                projected_yearly_vol = max(projected_yearly_vol, 30.0)
+
+                # 3. Handle the Ratios
                 total_ip = player_historical['IP'].sum()
                 total_pa = player_historical['PA'].sum()
+
+                # Use 4.2 as the 'Batters Faced per Inning' average if data is missing
                 pa_to_ip_ratio = (total_pa / total_ip) if total_ip > 0 else 4.2
                 projected_yearly_pa = projected_yearly_vol * pa_to_ip_ratio
 
@@ -635,26 +651,52 @@ class BaseballStatsPreProcess:
                 proj_rate = projector.get_projection(player_historical, stat_col, rate_source)
                 proj_row[stat_col] = float(proj_rate * target_vol)
 
-            # 6. Final Ratio Guard & Metadata Restoration
+            # --- STEP 6: FINAL RATIO GUARD & CLEANUP ---
             if not is_pitching:
-                proj_row['AB'] = projected_yearly_vol
+                # 1. Standardize Volume
+                proj_row['AB'] = round(float(projected_yearly_vol), 2)
+                proj_row['PA'] = round(float(projected_yearly_pa), 2)
 
-                # Recalculate rates from counts to ensure no "drift" in the slash line
+                # 2. Round and Clean Counting Stats
+                for s in ['H', 'BB', 'HBP', 'HR', '2B', '3B', 'SO', 'SF']:
+                    proj_row[s] = max(0.0, round(float(proj_row.get(s, 0)), 2))
+
+                # 3. Recalculate Slash Line to Match the New Floor
                 denom_ab = proj_row['AB'] if proj_row['AB'] > 0 else 1
-                proj_row['BA'] = proj_row['H'] / denom_ab
-
                 denom_pa = proj_row['PA'] if proj_row['PA'] > 0 else 1
-                proj_row['OBP'] = (proj_row['H'] + proj_row['BB'] + proj_row.get('HBP', 0)) / denom_pa
 
-                # Basic SLG for the aggregated file
-                proj_row['SLG'] = (proj_row['H'] + proj_row['2B'] + 2 * proj_row['3B'] + 3 * proj_row[
-                    'HR']) / denom_ab
-                proj_row['OPS'] = proj_row['BA'] + proj_row['OBP']
+                proj_row['BA'] = round(proj_row['H'] / denom_ab, 3)
+                proj_row['OBP'] = round((proj_row['H'] + proj_row['BB'] + proj_row.get('HBP', 0)) / denom_pa, 3)
 
-            # --- RESTORED METADATA ---
+                # Standard SLG: (1B + 2*2B + 3*3B + 4*HR) / AB
+                # Since 'H' includes all hits: Singles = H - 2B - 3B - HR
+                singles = proj_row['H'] - proj_row['2B'] - proj_row['3B'] - proj_row['HR']
+                total_bases = singles + (2 * proj_row['2B']) + (3 * proj_row['3B']) + (4 * proj_row['HR'])
+                proj_row['SLG'] = round(total_bases / denom_ab, 3)
+                proj_row['OPS'] = round(proj_row['OBP'] + proj_row['SLG'], 3)
+
+            else:
+                # 1. Standardize Pitcher Volume
+                proj_row['IP'] = round(float(projected_yearly_vol), 2)
+                proj_row['PA'] = round(float(projected_yearly_pa), 2)
+
+                # 2. Round Pitching Stats
+                for s in ['H', 'BB', 'ER', 'SO', 'HR', 'W', 'L', 'SV', 'WP']:
+                    proj_row[s] = max(0.0, round(float(proj_row.get(s, 0)), 2))
+
+                # 3. Recalculate Pitching Ratios
+                denom_ip = proj_row['IP'] if proj_row['IP'] > 0 else 1.0
+                proj_row['ERA'] = round((proj_row['ER'] * 9) / denom_ip, 2)
+                proj_row['WHIP'] = round((proj_row['H'] + proj_row['BB']) / denom_ip, 2)
+
+                # Opponent OBP
+                denom_pa = proj_row['PA'] if proj_row['PA'] > 0 else 1.0
+                proj_row['OBP'] = round((proj_row['H'] + proj_row['BB']) / denom_pa, 3)
+
+            # --- FINAL METADATA & APPEND ---
             proj_row['Season'] = 2026
-            # This list is required by self.is_active_candidate()
             proj_row['Years_Included'] = player_historical['Season'].tolist()
+            # Mark method as Regressed if they hit the floor
             proj_row['Projection_Method'] = "Regressed" if player_historical[vol_col].sum() < 400 else "Trend"
 
             results.append(proj_row)

@@ -96,6 +96,8 @@ class BaseballStats:
         self.batting_data = None
         self.new_season_pitching_data = None
         self.new_season_batting_data = None
+        self.projected_batting_data = None   # Full-season projections (frozen at load time)
+        self.projected_pitching_data = None  # Full-season projections (frozen at load time)
         self.get_seasons(load_batter_file, load_pitcher_file)  # get existing data file
         self._log_historical_baselines()  # log historical season totals for prior year for comparision and debugging
         self.get_all_team_names = lambda: self.batting_data.Team.unique()
@@ -302,7 +304,9 @@ class BaseballStats:
         :return: Series with projected stats, or None if not found
         """
         try:
-            data = self.new_season_batting_data if is_batter else self.new_season_pitching_data
+            data = self.projected_batting_data if is_batter else self.projected_pitching_data
+            if data is None:
+                data = self.new_season_batting_data if is_batter else self.new_season_pitching_data
             if data is None:
                 return None
             player_rows = data[data['Player'] == player_name]
@@ -474,6 +478,9 @@ class BaseballStats:
                                                                                   f" {new_pitcher_file}", index_col='Hashcode'))
                 self.new_season_batting_data = self.add_missing_cols(pd.read_csv(str(self.new_season) +
                                                                                  f" {new_batter_file}", index_col='Hashcode'))
+                # Freeze a copy of the original projections before simulation accumulates actual stats
+                self.projected_pitching_data = self.new_season_pitching_data.copy()
+                self.projected_batting_data = self.new_season_batting_data.copy()
         except FileNotFoundError as e:
             logger.error("File not found in get_seasons(): {}", e)
             logger.error("bbstats.py, get_seasons(), file was not found.")

@@ -266,6 +266,10 @@ class LeagueStatsWidget:
         # Bind click event to show historical stats
         tree.bind('<ButtonRelease-1>', lambda e, t=tree, b=is_batter: self._on_player_click(t, b))
 
+        # Bind right-click and Ctrl+C for clipboard copy
+        tree.bind('<Button-3>', lambda e, t=tree: self._show_copy_menu(e, t))
+        tree.bind('<Control-c>', lambda e, t=tree: self._copy_selected_rows(t))
+
         return tree
 
     def update_stats(self, baseball_data, team_win_loss: dict = None):
@@ -726,6 +730,30 @@ class LeagueStatsWidget:
 
         tree.pack(fill=tk.BOTH, expand=True)
 
+        # Clipboard copy helpers for this popup
+        def _copy_history():
+            sel = tree.selection()
+            if not sel:
+                return
+            header = '\t'.join(columns)
+            rows = ['\t'.join(str(v) for v in tree.item(i, 'values')) for i in sel]
+            tree.clipboard_clear()
+            tree.clipboard_append(header + '\n' + '\n'.join(rows))
+
+        def _show_history_copy_menu(event):
+            item = tree.identify_row(event.y)
+            if item:
+                tree.selection_set(item)
+            menu = tk.Menu(tree, tearoff=0)
+            menu.add_command(label="Copy Row", command=_copy_history)
+            try:
+                menu.tk_popup(event.x_root, event.y_root)
+            finally:
+                menu.grab_release()
+
+        tree.bind('<Button-3>', _show_history_copy_menu)
+        tree.bind('<Control-c>', lambda e: _copy_history())
+
         # Insert projected row at top if available
         if projected_row is not None:
             try:
@@ -985,6 +1013,10 @@ class LeagueStatsWidget:
 
         totals_tree.pack(fill=tk.BOTH, expand=False, padx=5, pady=5)
 
+        # Right-click and Ctrl+C to copy rows
+        totals_tree.bind('<Button-3>', lambda e, t=totals_tree: self._show_copy_menu(e, t))
+        totals_tree.bind('<Control-c>', lambda e, t=totals_tree: self._copy_selected_rows(t))
+
     def _format_total_value(self, value, col_name: str, is_difference: bool = False):
         """Format a total value for display."""
         if pd.isna(value):
@@ -1004,6 +1036,29 @@ class LeagueStatsWidget:
         if is_difference and value > 0:
             return f"+{formatted}"
         return formatted
+
+    def _copy_selected_rows(self, tree: ttk.Treeview):
+        """Copy selected row(s) to clipboard as tab-separated values with column headers."""
+        selected = tree.selection()
+        if not selected:
+            return
+        columns = tree['columns']
+        header = '\t'.join(columns)
+        rows = ['\t'.join(str(v) for v in tree.item(item, 'values')) for item in selected]
+        tree.clipboard_clear()
+        tree.clipboard_append(header + '\n' + '\n'.join(rows))
+
+    def _show_copy_menu(self, event, tree: ttk.Treeview):
+        """Show right-click context menu with copy option."""
+        item = tree.identify_row(event.y)
+        if item:
+            tree.selection_set(item)
+        menu = tk.Menu(tree, tearoff=0)
+        menu.add_command(label="Copy Row", command=lambda: self._copy_selected_rows(tree))
+        try:
+            menu.tk_popup(event.x_root, event.y_root)
+        finally:
+            menu.grab_release()
 
     def get_frame(self) -> tk.Frame:
         """Get the main frame for adding to parent container."""

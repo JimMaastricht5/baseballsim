@@ -448,7 +448,8 @@ class BaseballStats:
             df_p = df_p.groupby('Hashcode').agg(agg_dict)
             total_outs_prorated = (df_p['Total_Outs_Calc'] * prorate_factor).round()  # Apply the Proration Factor
             df_p['IP'] = (total_outs_prorated / 3).apply(lambda x: int(x) + (round(x % 1 * 3) / 10))  # Total Outs to IP
-            df_p[pitch_cols] = (df_p[pitch_cols] * prorate_factor).round().astype(float)  # Prorate rest of counting stats
+            existing_pitch_cols = [col for col in pitch_cols if col in df_p.columns]
+            df_p[existing_pitch_cols] = (df_p[existing_pitch_cols] * prorate_factor).round().astype(float)  # Prorate rest of counting stats
             df_p = team_pitching_stats(df_p, filter_stats=False)  # final stats
 
         self.prorated_2025_cache[cache_key] = (df_b, df_p)
@@ -1499,7 +1500,9 @@ def team_pitching_stats(df: DataFrame, filter_stats: bool = True) -> DataFrame:
     df['AVG'] = trunc_col(np.nan_to_num(df['H'] / denom_avg, nan=0.0, posinf=0.0), 3)
 
     # SLG AGAINST: Total Bases / AB (against)
-    total_bases = (df['H'] - df['2B'] - df['3B'] - df['HR']) + df['2B'] * 2 + df['3B'] * 3 + df['HR'] * 4
+    doubles = df['2B'] if '2B' in df.columns else 0
+    triples = df['3B'] if '3B' in df.columns else 0
+    total_bases = (df['H'] - doubles - triples - df['HR']) + doubles * 2 + triples * 3 + df['HR'] * 4
     df['SLG'] = trunc_col(np.nan_to_num(total_bases / denom_avg, nan=0.0, posinf=0.0), 3)
 
     # OPS AGAINST: OBP + SLG
@@ -1579,6 +1582,7 @@ def team_pitching_totals(pitching_df: DataFrame) -> DataFrame:
     if 'R' in pitching_df.columns:
         cols_to_sum.insert(cols_to_sum.index('ER'), 'R')  # Add R before ER
 
+    cols_to_sum = [col for col in cols_to_sum if col in pitching_df.columns]
     df = pitching_df[cols_to_sum].sum().astype(int)
     df = df.to_frame().T
     df = df.assign(G=np.max(pitching_df['G']))

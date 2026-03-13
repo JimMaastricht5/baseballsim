@@ -325,6 +325,8 @@ class BaseballStatsPreProcess:
             pitching_data['Hashcode'].astype(str) + '_' +
             pitching_data['Season'].astype(str)
         )
+        outs = (pitching_data['IP'].astype(int) * 3) + np.round((pitching_data['IP'] % 1) * 10)
+        pitching_data['PA'] = outs + pitching_data['H'] + pitching_data['BB'] + pitching_data.get('HBP', 0)
 
         # *** Create HISTORICAL data (year-by-year) - one row per player per season ***
         historical_data = pitching_data.copy()
@@ -366,7 +368,9 @@ class BaseballStatsPreProcess:
                 historical_data[stats_col] = historical_data[stats_col].apply(self.jigger_data)
 
         # Calculate derived stats for AGGREGATED data
-        pitching_data['AB'] = pitching_data['IP'] * 3 + pitching_data['H']
+        # 1. Convert .1/.2 format to total outs
+        outs = (pitching_data['IP'].astype(int) * 3) + np.round((pitching_data['IP'] % 1) * 10)
+        pitching_data['AB'] = outs + pitching_data['H']
         pitching_data['2B'] = 0
         pitching_data['3B'] = 0
         pitching_data['HBP'] = 0
@@ -910,22 +914,23 @@ if __name__ == '__main__':
                                             load_batter_file='player-stats-Batters.csv',
                                             load_pitcher_file='player-stats-Pitching.csv')
 
-    # Expand this list as needed for your MIL checks
-    PLAYERS_TO_CHECK = [
-        'Tyler Black',
-        'William Contreras',
-        'Christian Yelich',
-        'Jackson Chourio',
-        'Caleb Durbin',
-        'Cal Raleigh'
-    ]
+    # Mixed list of Batters and Pitchers for your checks
+    BATTERS_TO_CHECK = ['Tyler Black', 'William Contreras', 'Jackson Chourio', 'Cal Raleigh']
+    PITCHERS_TO_CHECK = ['Freddy Peralta', 'Logan Webb', 'Jared Jones', 'Tobias Myers']
 
-    HDR = (f"{'Season':<10}{'Team':<6}{'Age':>4}{'G':>5}{'AB':>6}{'H':>5}"
-           f"{'2B':>4}{'3B':>4}{'HR':>4}{'RBI':>5}{'BB':>5}{'SO':>5}"
-           f"{'AVG':>7}{'OBP':>7}{'SLG':>7}{'OPS':>7}  Method")
+    # --- HEADERS ---
+    B_HDR = (f"{'Season':<10}{'Team':<6}{'Age':>4}{'G':>5}{'AB':>6}{'H':>5}"
+             f"{'2B':>4}{'3B':>4}{'HR':>4}{'BB':>5}{'SO':>5}"
+             f"{'AVG':>7}{'OBP':>7}{'SLG':>7}{'OPS':>7}  Method")
+
+    P_HDR = (f"{'Season':<10}{'Team':<6}{'Age':>4}{'G':>5}{'GS':>5}{'IP':>7}"
+             f"{'H':>5}{'ER':>5}{'BB':>5}{'SO':>5}"
+             f"{'K/9':>7}{'WHIP':>7}{'ERA':>7}  Method")
+
     SEP = '=' * 105
 
 
+    # --- FORMATTING HELPERS ---
     def _fmt_batting_row(r, season_label=None):
         season = season_label if season_label else str(int(float(r.get('Season', 0))))
         ab = float(r.get('AB', 0))
@@ -935,10 +940,29 @@ if __name__ == '__main__':
         return (f"{season:<10}{str(r.get('Team', '')):6}{int(float(r.get('Age', 0))):>4}"
                 f"{int(float(r.get('G', 0))):>5}{int(ab):>6}{int(h):>5}"
                 f"{int(float(r.get('2B', 0))):>4}{int(float(r.get('3B', 0))):>4}"
-                f"{int(float(r.get('HR', 0))):>4}{int(float(r.get('RBI', 0))):>5}"
-                f"{int(float(r.get('BB', 0))):>5}{int(float(r.get('SO', 0))):>5}"
+                f"{int(float(r.get('HR', 0))):>4}{int(float(r.get('BB', 0))):>5}{int(float(r.get('SO', 0))):>5}"
                 f"{avg_val:>7.3f}{float(r.get('OBP', 0)):>7.3f}"
                 f"{float(r.get('SLG', 0)):>7.3f}{float(r.get('OPS', 0)):>7.3f}  "
+                f"{method:<10}")
+
+
+    def _fmt_pitching_row(r, season_label=None):
+        season = season_label if season_label else str(int(float(r.get('Season', 0))))
+        ip = float(r.get('IP', 0))
+        # Convert IP format (.1/.2) to True IP for math
+        ip_true = int(ip) + (ip % 1) * 10 / 3
+
+        # Calculate rates for historical rows that might not have them
+        k9 = (float(r.get('SO', 0)) * 9 / ip_true) if ip_true > 0 else 0
+        whip = float(r.get('WHIP', (float(r.get('H', 0)) + float(r.get('BB', 0))) / ip_true if ip_true > 0 else 0))
+        era = float(r.get('ERA', (float(r.get('ER', 0)) * 9 / ip_true) if ip_true > 0 else 0))
+        method = r.get('Projection_Method', 'Actual')
+
+        return (f"{season:<10}{str(r.get('Team', '')):6}{int(float(r.get('Age', 0))):>4}"
+                f"{int(float(r.get('G', 0))):>5}{int(float(r.get('GS', 0))):>5}{ip:>7.1f}"
+                f"{int(float(r.get('H', 0))):>5}{int(float(r.get('ER', 0))):>5}"
+                f"{int(float(r.get('BB', 0))):>5}{int(float(r.get('SO', 0))):>5}"
+                f"{k9:>7.2f}{whip:>7.2f}{era:>7.2f}  "
                 f"{method:<10}")
 
 
@@ -948,26 +972,38 @@ if __name__ == '__main__':
         return reset[reset['Player'] == name] if 'Player' in reset.columns else pd.DataFrame()
 
 
-    # Get history for comparison
+    # --- LOAD HISTORICAL DATA ---
     seasons_str = ' '.join(str(s) for s in baseball_data.load_seasons)
-    hist_bat_file = f"{seasons_str} historical-Batting.csv"
     try:
-        hist_df = pd.read_csv(hist_bat_file, index_col='Player_Season_Key')
+        hist_bat_df = pd.read_csv(f"{seasons_str} historical-Batting.csv", index_col='Player_Season_Key')
+        hist_pit_df = pd.read_csv(f"{seasons_str} historical-Pitching.csv", index_col='Player_Season_Key')
     except FileNotFoundError:
-        hist_df = pd.DataFrame()
+        hist_bat_df = hist_pit_df = pd.DataFrame()
 
-    for player_name in PLAYERS_TO_CHECK:
-        print(f"\n{SEP}\n  SANITY CHECK: {player_name.upper()}\n{SEP}")
-        print(f"--- Historical Actuals ---\n{HDR}")
-        if not hist_df.empty:
-            player_hist = hist_df[hist_df['Player'] == player_name].sort_values('Season')
-            for _, hist_row in player_hist.iterrows():
-                print(_fmt_batting_row(hist_row))
+    # --- RUN BATTER CHECKS ---
+    for player_name in BATTERS_TO_CHECK:
+        print(f"\n{SEP}\n  BATTER CHECK: {player_name.upper()}\n{SEP}")
+        print(f"--- Historical Actuals ---\n{B_HDR}")
+        if not hist_bat_df.empty:
+            p_hist = hist_bat_df[hist_bat_df['Player'] == player_name].sort_values('Season')
+            for _, r in p_hist.iterrows(): print(_fmt_batting_row(r))
 
-        print(f"\n--- 2026 Projection (Restored Logic) ---\n{HDR}")
         player_proj = _find_player(baseball_data.batting_data, player_name)
         if not player_proj.empty:
-            for _, proj_row in player_proj.iterrows():
-                print(_fmt_batting_row(proj_row, season_label="2026 PROJ"))
+            print(f"\n--- 2026 Projection ---\n{B_HDR}")
+            for _, r in player_proj.iterrows(): print(_fmt_batting_row(r, "2026 PROJ"))
+
+    # --- RUN PITCHER CHECKS ---
+    for player_name in PITCHERS_TO_CHECK:
+        print(f"\n{SEP}\n  PITCHER CHECK: {player_name.upper()}\n{SEP}")
+        print(f"--- Historical Actuals ---\n{P_HDR}")
+        if not hist_pit_df.empty:
+            p_hist = hist_pit_df[hist_pit_df['Player'] == player_name].sort_values('Season')
+            for _, r in p_hist.iterrows(): print(_fmt_pitching_row(r))
+
+        player_proj = _find_player(baseball_data.pitching_data, player_name)
+        if not player_proj.empty:
+            print(f"\n--- 2026 Projection ---\n{P_HDR}")
+            for _, r in player_proj.iterrows(): print(_fmt_pitching_row(r, "2026 PROJ"))
 
     print(f"\n{SEP}\n")

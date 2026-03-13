@@ -79,7 +79,7 @@ class PlayerProjector:
         """
         Finalized Entry Point: Synchronizes Volume and Tethers Stats.
         """
-        vol_col = 'IP' if is_p else 'PA'
+        vol_col = 'PA'
 
         # 1. VOLUME TARGETING
         num_years = len(history)
@@ -92,7 +92,14 @@ class PlayerProjector:
             proj_vol = (raw_vol * trust_factor) + (corridor_vol * (1 - trust_factor))
             proj_vol = min(proj_vol, 700)
         else:
-            proj_vol = max(30, min(raw_vol, 220))
+            # Define Workhorse: 2+ seasons of 750+ PA (roughly 185-190 IP)
+            is_workhorse = (history[vol_col] > 750).sum() >= 2
+            if is_workhorse:
+                proj_vol = max(150, min(raw_vol, 850))  # Workhorses get a much higher ceiling (up to ~220 IP)
+            else:
+                # Standard starters are capped more strictly to prevent
+                # small-sample or injury-prone guys from getting 200 IP
+                proj_vol = max(75, min(raw_vol, 650))
 
         # 2. INITIALIZE RESULT
         result = history.iloc[-1].to_dict()
@@ -121,115 +128,21 @@ class PlayerProjector:
                 ratio = self.get_projection(history, stat, 'H', is_p)
                 result[stat] = proj_h * ratio
 
-            # 6. DERIVE AB (The Accuracy Lock)
-            # AB = PA - (BB + HBP + SF)
             result['AB'] = result['PA'] - (result.get('BB', 0) + result.get('HBP', 0) + result.get('SF', 0))
-
             if result['AB'] < result['H']:
                 result['AB'] = result['H'] / 0.280  # Safety floor
         else:
-            result['AB'] = proj_vol * 3.1
-            result['IP'] = proj_vol
+            proj_outs = result['PA'] - (result['H'] + result['BB'])
+            result['AB'] = proj_outs + result['H']
+            result['IP'] = (proj_outs // 3) + ((proj_outs % 3) / 10)
 
         return result
-        # # 1. ESTABLISH MASTER DENOMINATOR
-        # vol_col = 'IP' if is_p else 'PA'
-        #
-        # # 2. VOLUME & WEIGHTING (Philosophy #2: Trend Recognition)
-        # num_years = len(history)
-        # weights = np.array([3, 4, 5][-num_years:])
-        #
-        # # Calculate Weighted average volume
-        # raw_vol = np.sum(history[vol_col].values * weights) / weights.sum()
-        # recent_vol = history.iloc[-1][vol_col]
-        #
-        # # 3. VOLUME TARGETING (Philosophy #3: Injury/Sample Smoothing)
-        # if not is_p:
-        #     # Define the 'Prospect/Utility' Corridor
-        #     corridor_vol = max(150, min(raw_vol, 350))
-        #
-        #     # Calculate 'Trust' factor: How close are they to a full season?
-        #     # A player with 450+ PA is 100% trusted; a player with 100 PA is 20% trusted.
-        #     trust_factor = np.clip(raw_vol / 450, 0, 1)
-        #
-        #     # BLEND: High-volume stars keep their raw_vol; low-volume players stay in corridor.
-        #     # This eliminates the '399 PA' cliff.
-        #     proj_vol = (raw_vol * trust_factor) + (corridor_vol * (1 - trust_factor))
-        #
-        #     # Global Hitter Cap
-        #     proj_vol = min(proj_vol, 700)
-        # else:
-        #     # Pitching Volume logic (IP)
-        #     if recent_vol >= 100:  # Established Starter
-        #         proj_vol = raw_vol
-        #     else:
-        #         proj_vol = max(30, min(raw_vol, 80))
-        #
-        #     proj_vol = min(proj_vol, 220)  # Modern IP ceiling
-        #
-        # # 4. INITIALIZE RESULT & LOCK VOLUME
-        # result = history.iloc[-1].to_dict()
-        # result[vol_col] = proj_vol  # This is the ANCHOR for all following math
-        # result['Years_Included'] = history['Season'].tolist()
-        #
-        # # Method Labeling
-        # career_vol = history[vol_col].sum()
-        # if num_years == 1 and career_vol >= 350:
-        #     result['Projection_Method'] = "1-Year Starter"
-        # elif num_years >= 3:
-        #     result['Projection_Method'] = "Trend"
-        # else:
-        #     result['Projection_Method'] = "Regressed"
-        #
-        # # 5. PROJECT EVERY STAT (Strictly against the locked proj_vol)
-        #     # First, project the base rates (H and BB) to act as anchors
-        #     for stat in ['H', 'BB', 'SO']:
-        #         rate = self.get_projection(history, stat, vol_col, is_p)
-        #         result[stat] = rate * proj_vol
-        #
-        #     # Now, project XBH tethered to the NEW projected Hits (result['H'])
-        #     xbh_stats = ['2B', '3B', 'HR']
-        #     total_xbh = 0
-        #     proj_h = result['H']
-        #
-        #     for stat in xbh_stats:
-        #         # We use 'H' as the vol_col here to get the Ratio (XBH/H)
-        #         rate_of_hits = self.get_projection(history, stat, 'H', is_p)
-        #         result[stat] = round(proj_h * rate_of_hits)
-        #         total_xbh += result[stat]
-        #
-        #     # Safety check: if XBH > Hits, scale them down
-        #     if total_xbh > proj_h and proj_h > 0:
-        #         factor = proj_h / total_xbh
-        #         for stat in xbh_stats:
-        #             result[stat] = np.floor(result[stat] * factor)
-        #     elif proj_h == 0:
-        #         for stat in xbh_stats:
-        #             result[stat] = 0
-        #
-        # # 6. DERIVE SECONDARY VOLUME (AB)
-        # if not is_p:
-        #     # Instead of a ratio, use the counts we just projected in Step 5
-        #     # AB = PA - (BB + HBP + SF)
-        #     # This ensures AVG, OBP, and SLG are mathematically perfect.
-        #     bb_count = result.get('BB', 0)
-        #     hbp_count = result.get('HBP', 0)
-        #     sf_count = result.get('SF', 0)
-        #
-        #     result['AB'] = result['PA'] - (bb_count + hbp_count + sf_count)
-        #
-        #     # Emergency Sanity: Prevent H > AB in edge cases
-        #     if result['H'] > result['AB']:
-        #         result['AB'] = result['H'] + 1
-        #
-        # return result
 
     def get_projection(self, player_history: pd.DataFrame, stat_col: str, vol_col: str,
                        is_pitching: bool) -> float:
         num_years = len(player_history)
         career_vol = player_history[vol_col].sum()
         age_2026 = int(player_history.iloc[-1]['Age']) + 1
-        is_pitching = (vol_col == 'IP')
 
         # --- STEP 1: STRATEGY SELECTION ---
         if num_years == 1 and career_vol >= 300:
@@ -275,11 +188,11 @@ class PlayerProjector:
     def _regress_to_mean(self, history: pd.DataFrame, stat_col: str, vol_col: str) -> float:
         career_total = history[stat_col].sum()
         career_vol = history[vol_col].sum()
-        is_p = (vol_col == 'IP')
+        is_p = 'IP' in history.columns
 
         # 1. Fetch the correct K and League Rate
         k_map = self.k_vals_pitcher if is_p else self.k_vals_batter
-        k = k_map.get(stat_col, k_map['default'])
+        k = k_map.get(stat_col, k_map.get('default', 400))
         lg_rate = self.lg_avgs.get(f"{stat_col}_per_{vol_col}", 0.10)
 
         # 2. POWER TETHERING (The Logic Anchor)
@@ -300,7 +213,10 @@ class PlayerProjector:
             # Return the Stat/PA rate
             return regressed_ratio * regressed_h_rate
 
-        # 3. STANDARD BAYESIAN CALC
+        # 3. STANDARD BAYESIAN CALC (Pitchers and Non-Tethered Hitter Stats)
+        if career_vol + k == 0:
+            return lg_rate
+
         return (career_total + k * lg_rate) / (career_vol + k)
 
     def _linear_regression(self, history: pd.DataFrame, stat_col: str, vol_col: str) -> float:
@@ -323,13 +239,37 @@ class PlayerProjector:
         weights = np.array([3, 4, 5][-len(rates):])
         return np.average(rates, weights=weights)
 
-    def _get_aging_multiplier(self, age, is_p):
-        if age <= 25:
-            m = -0.002 * (age - 26) ** 2 + 1.05
-        elif age <= 30:
-            m = 1.0
+    def _get_aging_multiplier(self, age: int, is_p: bool) -> float:
+        """
+        Calculates a parabolic multiplier based on age.
+        Hitters: Peak 25-28.
+        Pitchers: Peak 27-29.
+        """
+        if not is_p:
+            # --- HITTER CURVE ---
+            if age <= 24:
+                # High growth phase
+                m = -0.0025 * (age - 27) ** 2 + 1.06
+            elif age <= 28:
+                # The Prime
+                m = 1.02
+            else:
+                # Steady decline
+                m = 1.0 - (0.004 * (age - 28) ** 2)
         else:
-            m = 1.0 - (0.0035 * (age - 30) ** 2)
+            # --- PITCHER CURVE ---
+            if age <= 26:
+                # Gradual development
+                m = -0.0015 * (age - 28) ** 2 + 1.04
+            elif age <= 30:
+                # Peak stability
+                m = 1.01
+            else:
+                # Late-career decline (slightly more punishing after 34)
+                decay_factor = 0.0035 if age < 34 else 0.005
+                m = 1.0 - (decay_factor * (age - 30) ** 2)
+
+        # Sanity clip to prevent wild swings (80% floor, 110% ceiling)
         return np.clip(m, 0.80, 1.10)
 
     def _is_injury_year(self, history, vol_col):
@@ -358,70 +298,89 @@ class PlayerProjector:
 
 
 if __name__ == "__main__":
-    # 1. Setup Mock Averages & K-Values (League Mean per PA)
+    import pandas as pd
+    import numpy as np
+
+    # 1. Setup Mock Averages (Universal PA-based rates)
+    # Note: K/PA and H/PA are roughly 1/4th of their per-inning counterparts
     mock_lg = {
-        'H_per_PA': 0.210, '2B_per_PA': 0.045, '3B_per_PA': 0.005,
-        'HR_per_PA': 0.028, 'BB_per_PA': 0.085, 'SO_per_PA': 0.225,
-        'AB_per_PA': 0.880, 'H_per_IP': 0.950, 'SO_per_IP': 1.100,
-        'BB_per_IP': 0.350
+        'H_per_PA': 0.220,
+        '2B_per_PA': 0.045,
+        '3B_per_PA': 0.005,
+        'HR_per_PA': 0.030,
+        'BB_per_PA': 0.085,
+        'SO_per_PA': 0.225,
+        'ER_per_PA': 0.110,
+        'HBP_per_PA': 0.010,
+        'SF_per_PA': 0.005
     }
 
     projector = PlayerProjector(mock_lg)
 
     # 2. Raw Historical Data
     raw_data = pd.DataFrame([
-        # Tyler Black: High BB profile
+        # --- BATTERS ---
         {'Hashcode': 'TB1', 'Player': 'Tyler Black', 'Season': 2024, 'Age': 23,
          'AB': 49, 'H': 10, '2B': 2, '3B': 0, 'HR': 0, 'BB': 7, 'HBP': 0, 'SF': 0, 'SO': 17},
-
-        # Caleb Durbin: 1-Year Starter
         {'Hashcode': 'CD1', 'Player': 'Caleb Durbin', 'Season': 2025, 'Age': 25,
          'AB': 445, 'H': 114, '2B': 25, '3B': 0, 'HR': 11, 'BB': 30, 'HBP': 2, 'SF': 3, 'SO': 50},
 
-        # William Contreras: Multi-Year Trend
-        {'Hashcode': 'WC1', 'Player': 'W. Contreras', 'Season': 2023, 'Age': 25,
-         'AB': 540, 'H': 156, '2B': 38, '3B': 1, 'HR': 17, 'BB': 63, 'HBP': 4, 'SF': 5, 'SO': 126},
-        {'Hashcode': 'WC1', 'Player': 'W. Contreras', 'Season': 2024, 'Age': 26,
-         'AB': 595, 'H': 167, '2B': 37, '3B': 2, 'HR': 23, 'BB': 78, 'HBP': 3, 'SF': 6, 'SO': 139},
-        {'Hashcode': 'WC1', 'Player': 'W. Contreras', 'Season': 2025, 'Age': 27,
-         'AB': 566, 'H': 147, '2B': 28, '3B': 0, 'HR': 17, 'BB': 84, 'HBP': 5, 'SF': 4, 'SO': 120}
+        # --- PITCHERS ---
+        # Jared Jones (Rookie): 70.1 IP
+        {'Hashcode': 'JJ1', 'Player': 'Jared Jones', 'Season': 2024, 'Age': 22,
+         'IP': 70.1, 'H': 60, 'ER': 30, 'BB': 25, 'SO': 85, 'HR': 10},
+
+        # Logan Webb (Veteran): 213.2 IP
+        {'Hashcode': 'LW1', 'Player': 'Logan Webb', 'Season': 2024, 'Age': 27,
+         'IP': 213.2, 'H': 200, 'ER': 80, 'BB': 50, 'SO': 180, 'HR': 20}
     ])
 
-    # 3. Apply the PA calculation (Simulating bbstats_preprocess)
-    # Using .fillna(0) ensures no PA results in a NaN
-    for col in ['AB', 'BB', 'HBP', 'SF']:
-        if col not in raw_data.columns:
-            raw_data[col] = 0
+    # 3. Pre-process PA (Standardizing the Denominator)
+    processed_rows = []
+    for _, row in raw_data.iterrows():
+        r = row.to_dict()
+        if 'IP' in r and pd.notnull(r['IP']):
+            # Pitching PA = (IP_Whole * 3 + IP_Dec * 10) + H + BB
+            outs = (int(r['IP']) * 3) + np.round((r['IP'] % 1) * 10)
+            r['PA'] = outs + r['H'] + r.get('BB', 0)
+            r['is_pitcher'] = True
         else:
-            raw_data[col] = raw_data[col].fillna(0)
+            # Hitting PA = AB + BB + HBP + SF
+            r['PA'] = r.get('AB', 0) + r.get('BB', 0) + r.get('HBP', 0) + r.get('SF', 0)
+            r['is_pitcher'] = False
+            r['IP'] = np.nan
+        processed_rows.append(r)
 
-    raw_data['PA'] = raw_data['AB'] + raw_data['BB'] + raw_data['HBP'] + raw_data['SF']
+    df_ready = pd.DataFrame(processed_rows)
 
-    # 4. RUN BULK PROJECTION
-    stats_to_project = ['H', '2B', '3B', 'HR', 'BB', 'SO']
-    projections_df = projector.calculate_projected_stats(raw_data, stats_to_project, is_p=False)
+    # 4. RUN PROJECTIONS
+    hitter_stats = ['H', '2B', '3B', 'HR', 'BB', 'SO']
+    pitcher_stats = ['H', 'BB', 'SO', 'HR', 'ER']
 
-    # 5. POST-PROJECTION CALCS
-    # Ensure AB exists and is non-zero to avoid division by zero errors
-    projections_df['AVG'] = projections_df['H'] / projections_df['AB'].replace(0, np.nan)
-    projections_df['OBP'] = (projections_df['H'] + projections_df['BB']) / projections_df['PA'].replace(0, np.nan)
+    h_proj = projector.calculate_projected_stats(df_ready[~df_ready['is_pitcher']], hitter_stats, is_p=False)
+    p_proj = projector.calculate_projected_stats(df_ready[df_ready['is_pitcher']], pitcher_stats, is_p=True)
 
-    singles = projections_df['H'] - (projections_df['2B'] + projections_df['3B'] + projections_df['HR'])
-    projections_df['SLG'] = (singles + 2 * projections_df['2B'] + 3 * projections_df['3B'] + 4 * projections_df['HR']) / \
-                            projections_df['AB'].replace(0, np.nan)
+    # 5. OUTPUT BATTERS
+    print("\n" + "=" * 100)
+    print(f"{'BATTER':<18} | {'METHOD':<15} | {'PA':<5} | {'AB':<5} | {'H':<5} | {'AVG':<6} | {'OBP':<6}")
+    print("-" * 100)
+    for _, row in h_proj.iterrows():
+        avg = row['H'] / row['AB'] if row['AB'] > 0 else 0
+        obp = (row['H'] + row['BB']) / row['PA'] if row['PA'] > 0 else 0
+        print(
+            f"{row['Player']:<18} | {row['Projection_Method']:<15} | {int(row['PA']):<5} | {int(row['AB']):<5} | {int(row['H']):<5} | {avg:<6.3f} | {obp:<6.3f}")
 
-    # 6. OUTPUT RESULTS (With logic to avoid ValueError on NaN)
-    print("\n" + "=" * 110)
-    print(f"{'PLAYER':<18} | {'METHOD':<15} | {'PA':<5} | {'AB':<5} | {'H':<5} | {'AVG':<6} | {'OBP':<6} | {'SLG':<6}")
-    print("=" * 110)
+    # 6. OUTPUT PITCHERS
+    print("\n" + "=" * 100)
+    print(f"{'PITCHER':<18} | {'METHOD':<15} | {'IP':<6} | {'PA(BF)':<7} | {'AB':<5} | {'K/9':<6} | {'WHIP':<6}")
+    print("-" * 100)
+    for _, row in p_proj.iterrows():
+        # WHIP and K/9 calculations
+        outs = (int(row['IP']) * 3) + np.round((row['IP'] % 1) * 10)
+        ip_true = outs / 3
+        whip = (row['H'] + row['BB']) / ip_true if ip_true > 0 else 0
+        k9 = (row['SO'] * 9) / ip_true if ip_true > 0 else 0
 
-    for _, row in projections_df.iterrows():
-        # Clean formatting: Convert to int if possible, otherwise display 0
-        pa = int(row['PA']) if pd.notnull(row['PA']) else 0
-        ab = int(row['AB']) if pd.notnull(row['AB']) else 0
-        h = int(row['H']) if pd.notnull(row['H']) else 0
-
-        print(f"{row['Player']:<18} | {row['Projection_Method']:<15} | "
-              f"{pa:<5} | {ab:<5} | {h:<5} | "
-              f"{row['AVG']:<6.3f} | {row['OBP']:<6.3f} | {row['SLG']:<6.3f}")
-    print("-" * 110)
+        print(
+            f"{row['Player']:<18} | {row['Projection_Method']:<15} | {row['IP']:<6.1f} | {int(row['PA']):<7} | {int(row['AB']):<5} | {k9:<6.2f} | {whip:<6.2f}")
+    print("=" * 100)

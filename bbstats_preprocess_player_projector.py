@@ -26,7 +26,23 @@ from typing import Dict, List, Optional
 
 
 class PlayerProjector:
+    """
+    Multi-strategy statistical engine for projecting MLB player performance.
+
+    Selects among several projection strategies per player based on career
+    length, sample size, injury history, and age. Applies Bayesian shrinkage,
+    linear trend detection, injury smoothing, and aging curve adjustments.
+    """
+
     def __init__(self, league_averages: Dict[str, float], gate_pa: int = 400):
+        """
+        Initialize the projector with league context.
+
+        :param league_averages: Dict of league-average rates keyed as
+            '{stat}_per_{vol_col}' (e.g. 'H_per_PA', 'SO_per_PA').
+        :param gate_pa: PA threshold at which full trust in player data is
+            granted for aging-curve dampening. Default 400.
+        """
         self.lg_avgs = league_averages
         self.gate = gate_pa
 
@@ -34,16 +50,16 @@ class PlayerProjector:
         self.k_vals_batter = {
             'H': 150,  # Lowered: Trust Batting Average more quickly
             '2B': 250,  # Respect doubles
-            '3B': 500,  # Triples are high-variance/luck-based
-            'HR': 350,  # Power stabilizes around 300-400 AB
+            '3B': 800,  # Triples are high-variance/luck-based
+            'HR': 300,  # Power stabilizes around 300-400 AB
             'BB': 400,  # Plate discipline is fairly stable
-            'SO': 150,  # Strikeout rate stabilizes very quickly (~60 PA)
+            'SO': 100,  # Strikeout rate stabilizes very quickly (~60 PA)
             'HBP': 1500,  # Extremely high: Don't project many HBPs for rookies
             'default': 300
         }
 
         self.k_vals_pitcher = {
-            'H': 1000,  # Hits allowed (BABIP) regresses heavily
+            'H': 150,  # Hits allowed (BABIP) regresses heavily
             'BB': 400,  # Walk rate
             'SO': 100,  # K-rate stabilizes very fast for pitchers
             'HR': 600,  # HR/FB rate takes time to stabilize
@@ -140,6 +156,28 @@ class PlayerProjector:
 
     def get_projection(self, player_history: pd.DataFrame, stat_col: str, vol_col: str,
                        is_pitching: bool) -> float:
+        """
+        Select a projection strategy for a single stat and return a per-vol-unit rate.
+
+        Strategy selection order:
+          1. Single-year starter (1 season, >= 300 vol) — lightly regressed actual rate.
+          2. Low sample / single season < 300 vol — Bayesian regression to mean.
+          3. Injury-year V-shape detected — injury smoothing across three seasons.
+          4. Consistent monotone trend (3+ seasons) — linear regression of rates.
+          5. Default — recency-weighted career average.
+
+        After selecting a raw rate the method applies:
+          - Aging curve multiplier (dampened by career volume trust factor).
+          - Unproven tax: penalty on positive stats for batters with < 500 career PA,
+            or bonus on negative stats (H, BB, ER, HR against) for pitchers.
+          - Sanity caps via _apply_sanity_caps.
+
+        :param player_history: DataFrame of a single player's season rows sorted by Season.
+        :param stat_col: Stat column to project (e.g. 'H', 'HR', 'SO').
+        :param vol_col: Volume denominator column ('PA' for batters, 'PA' for pitchers).
+        :param is_pitching: True if projecting a pitcher stat.
+        :return: Projected per-vol-unit rate as a float.
+        """
         num_years = len(player_history)
         career_vol = player_history[vol_col].sum()
         age_2026 = int(player_history.iloc[-1]['Age']) + 1
@@ -166,26 +204,53 @@ class PlayerProjector:
         safe_vol = max(1, career_vol)
         if not is_pitching:
             unproven_factor = max(0, 1.0 - (safe_vol / 500))
-            tax_multiplier = 1.0 - (0.15 * unproven_factor)
+            tax_multiplier = 1.0 - (0.125 * unproven_factor)  # started at 0.15, try 0.125
             if stat_col != 'SO':
                 final_rate *= tax_multiplier
         else:
             unproven_factor = max(0, 1.0 - (safe_vol / 150))
             if stat_col in ['H', 'BB', 'ER', 'HR']:
-                final_rate *= (1.0 + (0.15 * unproven_factor))
+                final_rate *= (1.0 + (0.125 * unproven_factor))
             else:
-                final_rate *= (1.0 - (0.15 * unproven_factor))
+                final_rate *= (1.0 - (0.125 * unproven_factor))
 
         # --- STEP 4: RETURN & SANITY ---
         final_rate = self._apply_sanity_caps(final_rate, stat_col, is_pitching)
         return float(final_rate) if final_rate is not None and not np.isnan(final_rate) else 0.0
 
     def _project_single_year_starter(self, history: pd.DataFrame, stat_col: str, vol_col: str) -> float:
+        """
+        Project a player with exactly one qualifying season (>= 300 vol).
+
+        Blends the player's actual per-vol rate (80%) with the league average (20%)
+        to lightly regress without fully discarding a real starter's performance.
+
+        :param history: Single-row DataFrame for the player.
+        :param stat_col: Stat column to project.
+        :param vol_col: Volume denominator column.
+        :return: Blended per-vol rate.
+        """
         actual_rate = history.iloc[-1][stat_col] / max(1, history.iloc[-1][vol_col])
         lg_rate = self.lg_avgs.get(f"{stat_col}_per_{vol_col}", 0.10)
         return (actual_rate * 0.80) + (lg_rate * 0.20)
 
     def _regress_to_mean(self, history: pd.DataFrame, stat_col: str, vol_col: str) -> float:
+        """
+        Bayesian regression to the league mean for low-sample players.
+
+        Uses a K-value (prior strength) from k_vals_batter / k_vals_pitcher to
+        weight the player's observed rate against the league average rate.
+        Formula: (career_total + K * lg_rate) / (career_vol + K).
+
+        For extra-base hits (2B, 3B, HR) the regression is tethered to hits:
+        the XBH/H ratio is regressed separately, then converted back to a PA rate
+        via the regressed H/PA rate.
+
+        :param history: Player's historical season DataFrame.
+        :param stat_col: Stat column to regress.
+        :param vol_col: Volume denominator column.
+        :return: Bayesian-regressed per-vol rate.
+        """
         career_total = history[stat_col].sum()
         career_vol = history[vol_col].sum()
         is_p = 'IP' in history.columns
@@ -220,6 +285,21 @@ class PlayerProjector:
         return (career_total + k * lg_rate) / (career_vol + k)
 
     def _linear_regression(self, history: pd.DataFrame, stat_col: str, vol_col: str) -> float:
+        """
+        Project via linear regression of per-vol rates across seasons.
+
+        Fits a line to the year-over-year rate history, then projects one step
+        forward. The slope is clipped to +/- 0.015 per year and dampened by the
+        number of seasons to prevent extreme extrapolation. The projection is
+        also capped at 115% (or 105% for age >= 30) of the historical peak rate.
+
+        Falls back to _weighted_career_average if polyfit raises an exception.
+
+        :param history: Player's historical season DataFrame (>= 3 rows expected).
+        :param stat_col: Stat column to project.
+        :param vol_col: Volume denominator column.
+        :return: Projected per-vol rate from the trend line.
+        """
         rates = (history[stat_col] / history[vol_col].replace(0, 1)).values
         num_years = len(rates)
         x = np.arange(num_years)
@@ -235,6 +315,17 @@ class PlayerProjector:
         return max(0.0, min(proj, max_allowed))
 
     def _weighted_career_average(self, history, stat_col, vol_col):
+        """
+        Recency-weighted average of per-vol rates across all available seasons.
+
+        Weights are taken from the tail of [3, 4, 5] so the most recent season
+        is always weighted 5, the prior 4, and two seasons back 3.
+
+        :param history: Player's historical season DataFrame.
+        :param stat_col: Stat column to average.
+        :param vol_col: Volume denominator column.
+        :return: Weighted per-vol rate.
+        """
         rates = (history[stat_col] / history[vol_col].replace(0, 1)).values
         weights = np.array([3, 4, 5][-len(rates):])
         return np.average(rates, weights=weights)
@@ -273,23 +364,71 @@ class PlayerProjector:
         return np.clip(m, 0.80, 1.10)
 
     def _is_injury_year(self, history, vol_col):
+        """
+        Detect a V-shaped volume pattern indicating a missed/shortened injury year.
+
+        Returns True when all three conditions hold for the middle season:
+          - Middle season volume < 40% of the prior season volume.
+          - Most recent season volume > 150% of the middle season volume.
+          - At least 3 seasons of history are available.
+
+        :param history: Player's historical season DataFrame sorted by Season.
+        :param vol_col: Volume denominator column to inspect.
+        :return: True if a V-shape injury pattern is detected.
+        """
         if len(history) < 3: return False
         vols = history[vol_col].values
         return vols[-2] < (vols[-3] * 0.4) and vols[-1] > (vols[-2] * 1.5)
 
     def _project_with_injury_smoothing(self, history, stat_col, vol_col):
+        """
+        Project a rate by down-weighting the injury-shortened middle season.
+
+        When a V-shape is detected the three seasons are blended as:
+          pre-injury (45%) + injury year (10%) + return year (45%)
+        to prevent the low-volume injury season from dragging down the projection.
+        Falls back to _weighted_career_average when fewer than 3 seasons exist.
+
+        :param history: Player's historical season DataFrame sorted by Season.
+        :param stat_col: Stat column to project.
+        :param vol_col: Volume denominator column.
+        :return: Smoothed per-vol rate.
+        """
         rates = (history[stat_col] / history[vol_col].replace(0, 1)).values
         if len(rates) >= 3:
             return (rates[-3] * 0.45) + (rates[-2] * 0.10) + (rates[-1] * 0.45)
         return self._weighted_career_average(history, stat_col, vol_col)
 
     def _is_consistent_trend(self, history, stat_col, vol_col):
+        """
+        Return True if the per-vol rate has moved monotonically across all seasons.
+
+        A consistent trend means every year-over-year change in the per-vol rate
+        is either all non-negative (rising) or all non-positive (falling). Requires
+        at least 2 seasons; returns False for a single season.
+
+        :param history: Player's historical season DataFrame sorted by Season.
+        :param stat_col: Stat column to inspect.
+        :param vol_col: Volume denominator column.
+        :return: True if a consistent upward or downward trend exists.
+        """
         rates = (history[stat_col] / history[vol_col].replace(0, 1)).values
         if len(rates) < 2: return False
         diffs = np.diff(rates)
         return all(d >= 0 for d in diffs) or all(d <= 0 for d in diffs)
 
     def _apply_sanity_caps(self, rate, stat_col, is_p):
+        """
+        Clamp a projected per-vol rate to physically realistic maximums.
+
+        Batter caps (per PA): HBP <= 3.5%, BB <= 18.5%, H <= 38.0%.
+        No pitcher caps are currently applied; the method returns the rate unchanged.
+
+        :param rate: Projected per-vol rate to clamp.
+        :param stat_col: Stat column name, used to look up the cap.
+        :param is_p: True if this is a pitcher stat (caps not applied).
+        :return: Rate after applying any relevant cap.
+        """
         if not is_p:
             caps = {'HBP': 0.035, 'BB': 0.185, 'H': 0.380}
             if stat_col in caps:

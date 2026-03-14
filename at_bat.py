@@ -126,7 +126,7 @@ class SimAB:
         self.league_FB = .372  # fly ball rate for season
         self.league_LD = .199  # line drive rate for the season
         self.OBP_adjustment = -1 * (obp_adjustment if obp_adjustment is not None else 0)
-        self.BB_adjustment = 0.15  # shift bb to h with neg number
+        self.BB_adjustment = 0.0  # shift bb to h with neg number
         self.HBP_rate = .0143  # 1.4% of AB in 2022
         self.HBP_adjustment = self.HBP_rate * 0  # adjustment to shift more to or from hbp league avg is 1.4%, results 1/4 of
         self.HR_adjustment = 0.0 # adjust for higher HR rate with new 2023 pitching rules
@@ -168,34 +168,6 @@ class SimAB:
             stat_type='obp')
 
         return self.rng() < prob
-
-        # # 1. Isolate Hitter Adjustments
-        # hitter_adj_obp = (self.batting.OBP +
-        #                   self.batting.Age_Adjustment +
-        #                   self.batting.Injury_Perf_Adj +
-        #                   self.batting.Streak_Adjustment)
-        #
-        # # 2. Isolate Pitcher & Defense Adjustments
-        # # Convert cumulative lineup Def_WAR to a per-PA OBP modifier
-        # # Positive Def_WAR (good defense) lowers the allowed OBP.
-        # defense_mod = current_team_def_war * 0.0015
-        #
-        # pitcher_adj_obp = (self.pitching.OBP +
-        #                    self.pitching.Game_Fatigue_Factor -
-        #                    self.pitching.Age_Adjustment -
-        #                    self.pitching.Injury_Perf_Adj -
-        #                    self.pitching.Streak_Adjustment -
-        #                    defense_mod)
-        #
-        # # 3. Environmental Baseline
-        # league_baseline = self.league_batting_obp + self.OBP_adjustment
-        #
-        # # 4. Final Odds Ratio
-        # return self.rng() < self.odds_ratio(
-        #     hitter_adj_obp + self.OBP_adjustment,
-        #     pitcher_adj_obp + self.OBP_adjustment,
-        #     league_baseline,
-        #     stat_type='obp')
 
     def bb(self) -> bool:
         """

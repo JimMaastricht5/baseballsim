@@ -57,9 +57,45 @@ from bblogger import logger
 
 
 class BaseballStatsPreProcess:
+    """
+    Preprocessing pipeline for raw MLB player statistics.
+
+    Loads one or more seasons of raw RotoWire/Baseball-Reference CSV files,
+    cleans and normalises the data, runs trend-based projections via
+    PlayerProjector, and writes three sets of output files:
+
+    - Aggregated files  (``{seasons} aggr-stats-pp-*.csv``) — one row per
+      player with career/projected totals, used by the game simulator.
+    - Historical files  (``{seasons} historical-*.csv``) — one row per
+      player per season, used by projections and analysis.
+    - New-season files  (``{new_season} New-Season-stats-pp-*.csv``) —
+      rate stats preserved, counting stats zeroed, ready to start a new season.
+
+    Optionally replaces all real player, team, and league names with randomly
+    generated ones (``generate_random_data=True``) for anonymised simulation.
+    """
+
     def __init__(self, load_seasons: List[int], new_season: Optional[int] = None, generate_random_data: bool = False,
                  load_batter_file: str = 'player-stats-Batters.csv',
                  load_pitcher_file: str = 'player-stats-Pitching.csv') -> None:
+        """
+        Load and preprocess baseball statistics for the specified seasons.
+
+        Orchestrates the full pipeline: reads CSV files, merges salary data,
+        applies team remapping, calculates defensive WAR, optionally randomises
+        data, optionally creates new-season projections, and saves all outputs.
+
+        :param load_seasons: One or more season years to load (e.g. [2023, 2024, 2025]).
+        :param new_season: If provided, creates a new-season projection file for
+            this year (e.g. 2026). If it equals the last load season, the actual
+            partial-season file is used; otherwise stats are derived from the
+            aggregated data.
+        :param generate_random_data: When True, replaces all player, team, city,
+            and league names with randomly generated ones before saving.
+        :param load_batter_file: Base filename for raw batter CSV files
+            (year prefix added automatically, e.g. ``'player-stats-Batters.csv'``).
+        :param load_pitcher_file: Base filename for raw pitcher CSV files.
+        """
         self.create_hash = lambda text: int(hashlib.sha256(text.encode('utf-8')).hexdigest()[:5], 16)
         self.jigger_data = lambda x: x + int(np.abs(np.random.normal(loc=x * .10, scale=2, size=1)))
 
@@ -123,6 +159,19 @@ class BaseballStatsPreProcess:
         return
 
     def save_data(self) -> None:
+        """
+        Write all processed DataFrames to CSV files.
+
+        Saves up to four file pairs depending on what was generated:
+
+        - Aggregated pitching/batting files (always saved).
+        - Historical pitching/batting files (saved when historical data exists).
+        - New-season pitching/batting files (saved when ``new_season`` was set).
+
+        File names are prefixed with the joined load-season years
+        (e.g. ``'2023 2024 2025 aggr-stats-pp-Batting.csv'``).
+        Random-data runs use ``'random-'`` variants of each name.
+        """
         # Aggregated files now include 'aggr' in name
         f_pname_aggr = 'random-aggr-stats-pp-Pitching.csv' if self.generate_random_data else 'aggr-stats-pp-Pitching.csv'
         f_bname_aggr = 'random-aggr-stats-pp-Batting.csv' if self.generate_random_data else 'aggr-stats-pp-Batting.csv'
@@ -155,12 +204,23 @@ class BaseballStatsPreProcess:
 
     @staticmethod
     def group_col_to_list(df: DataFrame, key_col: str, col: str, new_col: str) -> DataFrame:
-        # Groups unique values in a column by a key column
-        # Args: df (pd.DataFrame): The dataframe containing the columns.
-        #    key_col (str): The name of the column containing the key.
-        #    col (str): The name of the column to find unique values in.
-        #    new_col (str): The name of the new column to contain the data
-        # Returns: list: A list of dictionaries containing unique values grouped by key.
+        """
+        Aggregate unique values of a column into a list, grouped by a key column.
+
+        Iterates the DataFrame and builds a set of unique values in ``col`` for
+        each unique value of ``key_col``. Comma-separated strings (e.g. position
+        strings like ``"P,SS,2B"``) are split into individual tokens before
+        collecting. The result is stored as a Python list in ``new_col``.
+
+        Used to combine team and position data for players who appeared on
+        multiple teams in a season (mid-season trades).
+
+        :param df: DataFrame to operate on.
+        :param key_col: Column whose values act as the grouping key.
+        :param col: Column whose unique values are collected into a list.
+        :param new_col: Name of the new column to write the aggregated lists into.
+        :return: The original DataFrame with ``new_col`` added.
+        """
         groups = {}
         for i, row in df.iterrows():
             key = row[key_col]
@@ -198,19 +258,43 @@ class BaseballStatsPreProcess:
 
     @staticmethod
     def find_duplicate_rows(df: DataFrame, column_names: str) -> DataFrame:
-        #  This function finds duplicate rows in a DataFrame based on a specified column.
-        # Args: df (pandas.DataFrame): The DataFrame to analyze.
-        #   column_names (list): The name of the column containing strings for comparison.
-        # Returns: pandas.DataFrame: A new DataFrame containing only the rows with duplicate string values.
+        """
+        Return all rows that have duplicate values in the specified column(s).
+
+        Drops NaN values from the target column(s) before checking, and uses
+        ``keep=False`` so that every instance of a duplicated value is included
+        in the result (not just the second or later occurrence).
+
+        :param df: DataFrame to inspect.
+        :param column_names: Column name (or list of column names) to check for
+            duplicate values.
+        :return: Subset of ``df`` containing only the duplicated rows.
+        """
         filtered_df = df[column_names].dropna()
         duplicates = filtered_df.duplicated(keep=False)  # keep both rows
         return df[duplicates]
 
     @staticmethod
     def remove_non_numeric(text):
+        """
+        Strip all non-digit characters from a string.
+
+        :param text: Input string (e.g. a raw position code like ``"1/6"``).
+        :return: String containing only the digit characters from ``text``.
+        """
         return ''.join(char for char in text if char.isdigit())
 
     def translate_pos(self, digit_string):
+        """
+        Convert a string of numeric position codes to comma-separated abbreviations.
+
+        Maps each digit character through ``self.digit_pos_map``
+        (e.g. ``'1'`` → ``'P'``, ``'6'`` → ``'SS'``). Unrecognised characters
+        are passed through unchanged. Trailing comma is stripped.
+
+        :param digit_string: String of position digits (e.g. ``"163"``).
+        :return: Comma-separated position abbreviation string (e.g. ``"P,SS,1B"``).
+        """
         return ''.join(self.digit_pos_map.get(digit, digit) + ',' for digit in digit_string).rstrip(',')
 
     def calculate_league_averages(self, historical_df: pd.DataFrame, is_pitching: bool = False) -> dict:
@@ -269,6 +353,25 @@ class BaseballStatsPreProcess:
 
     def de_dup_df(self, df: DataFrame, key_name: str, dup_column_names: str,
                   stats_cols_to_sum: List[str], drop_dups: bool = False) -> DataFrame:
+        """
+        Collapse duplicate rows by summing stat columns, then optionally drop extras.
+
+        For each set of rows sharing a duplicate value in ``dup_column_names``,
+        writes the column-wise sum of ``stats_cols_to_sum`` back into every
+        duplicate row. If ``drop_dups`` is True, only the last row for each
+        duplicate key is kept (useful for mid-season trade aggregation).
+
+        :param df: DataFrame to de-duplicate (modified in place).
+        :param key_name: Column used to identify which rows belong together
+            (e.g. ``'Hashcode'`` or ``'Player_Season_Key'``).
+        :param dup_column_names: Column name(s) passed to ``find_duplicate_rows``
+            to detect which rows are duplicates.
+        :param stats_cols_to_sum: List of numeric column names whose values
+            should be summed across duplicate rows.
+        :param drop_dups: If True, drop all but the last occurrence of each
+            duplicate key after summing.
+        :return: De-duplicated (and optionally reduced) DataFrame.
+        """
         dup_hashcodes = self.find_duplicate_rows(df=df, column_names=dup_column_names)
         for dfrow_key in dup_hashcodes[key_name].unique():
             df_rows = df.loc[df[key_name] == dfrow_key]
@@ -280,6 +383,23 @@ class BaseballStatsPreProcess:
         return df
 
     def is_active_candidate(self, years_list, age, career_war, most_recent_season):
+        """
+        Determine whether a player should be retained in the simulation roster.
+
+        A player is kept when any of these conditions hold:
+        - They played in the most recent loaded season (``last_active == most_recent_season``).
+        - They missed exactly one season AND are either under 33 years old or
+          have career WAR > 8.0 (established star recovering from injury).
+
+        Players missing two or more consecutive seasons are treated as retired
+        and excluded.
+
+        :param years_list: List of season years the player appeared in.
+        :param age: Player's age as of the most recent season row.
+        :param career_war: Player's cumulative WAR across all seasons loaded.
+        :param most_recent_season: The latest season year in the loaded dataset.
+        :return: True if the player should be included in the simulation, False otherwise.
+        """
         last_active = max(years_list) if years_list else 0
 
         # Played last year? Keep them.
@@ -295,6 +415,34 @@ class BaseballStatsPreProcess:
         return False
 
     def get_pitching_seasons(self, pitcher_file: str, load_seasons: List[int]) -> tuple:
+        """
+        Load, clean, and project pitcher data for the specified seasons.
+
+        Reads one CSV file per season, concatenates them, drops irrelevant
+        columns (FIP, HR9, etc.), creates a SHA-256 Hashcode from the player
+        name, merges salary data, and filters out multi-team summary rows.
+
+        Produces two outputs:
+        - **Historical DataFrame** (indexed by ``Player_Season_Key``): one row
+          per player per season, de-duplicated across mid-season trades.
+        - **Aggregated DataFrame** (indexed by ``Hashcode``): trend-projected
+          stats for the upcoming season via ``PlayerProjector``, filtered to
+          active candidates only (played recently or star with injury gap).
+
+        Derived columns added to aggregated data: ``AB``, ``2B``, ``3B``,
+        ``HBP``, ``OBP``, ``Total_OB``, ``Total_Outs``, ``AVG_faced``,
+        ``Game_Fatigue_Factor``, ``Condition``, ``Status``, ``BS``, ``HLD``,
+        ``Injury_Rate_Adj``, ``Injury_Perf_Adj``, ``Streak_Adjustment``.
+
+        .. caution::
+            WAR and salary columns are summed across seasons during the merge;
+            interpret career totals accordingly.
+
+        :param pitcher_file: Base filename for raw pitcher CSVs
+            (year prefix added automatically).
+        :param load_seasons: List of season years to load and project from.
+        :return: Tuple of ``(aggregated_df, historical_df)``.
+        """
         # Returns tuple of (aggregated_df, historical_df)
         # caution war and salary cols will get aggregated across multiple seasons
         pitching_data = None
@@ -402,6 +550,36 @@ class BaseballStatsPreProcess:
         return pitching_data, historical_data
 
     def get_batting_seasons(self, batter_file: str, load_seasons: List[int]) -> tuple:
+        """
+        Load, clean, and project batter data for the specified seasons.
+
+        Reads one CSV file per season, concatenates them, drops irrelevant
+        columns (OPS+, rOBA, TB, etc.), creates a SHA-256 Hashcode from the
+        player name, merges salary data, translates numeric position codes, and
+        filters out multi-team summary rows.
+
+        Produces two outputs:
+        - **Historical DataFrame** (indexed by ``Player_Season_Key``): one row
+          per player per season, de-duplicated across mid-season trades.
+        - **Aggregated DataFrame** (indexed by ``Hashcode``): trend-projected
+          stats for the upcoming season via ``PlayerProjector``, filtered to
+          active candidates only.
+
+        Derived columns added to aggregated data: ``OBP``, ``SLG``, ``OPS``,
+        ``Total_OB``, ``Total_Outs``, ``E``, ``Game_Fatigue_Factor``,
+        ``Condition``, ``Status``, ``Injury_Rate_Adj``, ``Injury_Perf_Adj``,
+        ``Streak_Adjustment``.
+
+        Same columns are also calculated for the historical DataFrame.
+
+        .. caution::
+            WAR and salary columns are summed across seasons during the merge.
+
+        :param batter_file: Base filename for raw batter CSVs
+            (year prefix added automatically).
+        :param load_seasons: List of season years to load and project from.
+        :return: Tuple of ``(aggregated_df, historical_df)``.
+        """
         # Returns tuple of (aggregated_df, historical_df)
         batting_data = None
         stats_bcols_sum = ['G', 'AB', 'R', 'H', '2B', '3B', 'HR', 'RBI', 'SB', 'CS', 'BB', 'SO', 'SH', 'SF', 'HBP',
@@ -540,6 +718,16 @@ class BaseballStatsPreProcess:
         return batting_data, historical_data
 
     def get_seasons(self, batter_file: str, pitcher_file: str) -> None:
+        """
+        Load and preprocess all pitching and batting data for the configured seasons.
+
+        Delegates to ``get_pitching_seasons`` and ``get_batting_seasons``, storing
+        the results in ``self.pitching_data``, ``self.pitching_data_historical``,
+        ``self.batting_data``, and ``self.batting_data_historical``.
+
+        :param batter_file: Base filename for raw batter CSV files.
+        :param pitcher_file: Base filename for raw pitcher CSV files.
+        """
         self.pitching_data, self.pitching_data_historical = self.get_pitching_seasons(pitcher_file, self.load_seasons)
         self.batting_data, self.batting_data_historical = self.get_batting_seasons(batter_file, self.load_seasons)
         return
@@ -704,6 +892,14 @@ class BaseballStatsPreProcess:
         return
 
     def randomize_data(self):
+        """
+        Replace all real identifiers with randomly generated ones.
+
+        Calls ``create_leagues``, ``randomize_city_names``, and
+        ``randomize_player_names`` in sequence. Raises an exception if any
+        resulting Hashcode index contains a zero value, which would corrupt
+        the base-runner representation.
+        """
         self.create_leagues()
         self.randomize_city_names()
         self.randomize_player_names()
@@ -712,6 +908,14 @@ class BaseballStatsPreProcess:
         return
 
     def create_leagues(self):
+        """
+        Replace AL/NL league names with fictional league abbreviations.
+
+        Substitutes ``'AL'`` → ``'ACB'`` (Armchair Baseball) and
+        ``'NL'`` → ``'NBL'`` (Nerd Baseball) in both aggregated and historical
+        DataFrames for pitching and batting. Also updates the ``Leagues`` list
+        column to match.
+        """
         # replace AL and NL with random league names, set leagues column to match
         league_names = ['ACB', 'NBL']  # Armchair Baseball and Nerd Baseball, Some Other League SOL, No Name NNL
 
@@ -737,6 +941,16 @@ class BaseballStatsPreProcess:
         return
 
     def randomize_city_names(self):
+        """
+        Replace real MLB team abbreviations with random city abbreviations and mascots.
+
+        Reads city names from the imported ``city`` module and animal mascots
+        from ``animals.txt``. Builds a mapping of 3-letter city abbreviations to
+        ``[city_name, mascot]`` pairs, then randomly samples enough entries to
+        cover all unique team names in the dataset. Updates ``Team``, ``City``,
+        ``Mascot``, and ``Teams`` columns in all four DataFrames (aggregated and
+        historical, pitching and batting).
+        """
         # create team name and mascots, set teams column to match
         city_dict = {}
         current_team_names = self.batting_data.Team.unique()  # get list of current team names
@@ -778,6 +992,12 @@ class BaseballStatsPreProcess:
 
     @staticmethod
     def randomize_mascots(length):
+        """
+        Return a random sample of animal mascot names from ``animals.txt``.
+
+        :param length: Number of mascot names to return.
+        :return: List of ``length`` unique animal name strings.
+        """
         with open('animals.txt', 'r') as f:
             animals = f.readlines()
         animals = [animal.strip() for animal in animals]
@@ -785,6 +1005,15 @@ class BaseballStatsPreProcess:
         return mascots
 
     def randomize_player_names(self):
+        """
+        Replace all player names and Hashcodes with randomly generated ones.
+
+        Builds a pool of random full names by mixing first and last names drawn
+        from the combined pitcher and batter roster. Assigns unique names to each
+        player in the aggregated DataFrames, recalculates their SHA-256 Hashcodes,
+        then propagates the new names and Hashcodes into the historical DataFrames
+        by mapping from the old Hashcode (extracted from ``Player_Season_Key``).
+        """
         # change pitching_data and batting data names, team name, etc
         df = pd.concat([self.batting_data.Player.str.split(pat=' ', n=1, expand=True),
                         self.pitching_data.Player.str.split(pat=' ', n=1, expand=True)])
@@ -841,6 +1070,26 @@ class BaseballStatsPreProcess:
         return
 
     def create_new_season_from_existing(self, load_batter_file: str, load_pitcher_file: str) -> None:
+        """
+        Generate new-season DataFrames with rate stats preserved and counting stats zeroed.
+
+        Two code paths:
+        - **Actual partial season** (``new_season == load_seasons[-1]`` and not random):
+          Reads real partial-season files directly via ``get_pitching_seasons``
+          and ``get_batting_seasons``.
+        - **Projected next season** (any other case, including random data):
+          Copies the aggregated DataFrames, calculates ERA/WHIP/OBP (pitchers)
+          or AVG/OBP/SLG/OPS (batters) from the projected counting stats, then
+          zeros all counting stats so the simulator starts fresh. Player ages are
+          incremented by 1 when ``new_season`` is not in ``load_seasons``.
+
+        Results are stored in ``self.new_season_pitching_data`` and
+        ``self.new_season_batting_data``.
+
+        :param load_batter_file: Base batter file name (used for the partial-season path).
+        :param load_pitcher_file: Base pitcher file name (used for the partial-season path).
+        :raises Exception: If pitching or batting data has not been loaded yet.
+        """
         if self.pitching_data is None or self.batting_data is None:
             raise Exception('load at least one season of pitching and batting')
         # blend of actual partial season, load org new season from file
@@ -904,6 +1153,16 @@ class BaseballStatsPreProcess:
 
     @staticmethod
     def trunc_col(df_n: ndarray, d: int = 3) -> ndarray:
+        """
+        Truncate a numeric array to ``d`` decimal places without rounding.
+
+        Avoids floating-point rounding artefacts by shifting the decimal,
+        casting to int (which floors toward zero), then shifting back.
+
+        :param df_n: NumPy array or scalar to truncate.
+        :param d: Number of decimal places to keep. Default 3.
+        :return: Array of the same shape with values truncated to ``d`` decimals.
+        """
         return (df_n * 10 ** d).astype(int) / 10 ** d
 
 
@@ -932,6 +1191,13 @@ if __name__ == '__main__':
 
     # --- FORMATTING HELPERS ---
     def _fmt_batting_row(r, season_label=None):
+        """
+        Format a batter row dict into a fixed-width display string.
+
+        :param r: Dict-like row (from ``DataFrame.iterrows`` or ``to_dict``).
+        :param season_label: Override the season string; if None, reads from ``r['Season']``.
+        :return: Formatted string with season, team, age, counting stats, and rate stats.
+        """
         season = season_label if season_label else str(int(float(r.get('Season', 0))))
         ab = float(r.get('AB', 0))
         h = float(r.get('H', 0))
@@ -947,6 +1213,17 @@ if __name__ == '__main__':
 
 
     def _fmt_pitching_row(r, season_label=None):
+        """
+        Format a pitcher row dict into a fixed-width display string.
+
+        Converts the ``IP`` decimal format (e.g. 213.2 means 213 and 2/3 innings)
+        to true innings for K/9 and WHIP calculations. Falls back to computing
+        ERA and WHIP from counting stats when pre-calculated values are absent.
+
+        :param r: Dict-like row (from ``DataFrame.iterrows`` or ``to_dict``).
+        :param season_label: Override the season string; if None, reads from ``r['Season']``.
+        :return: Formatted string with season, team, age, IP, counting stats, and rate stats.
+        """
         season = season_label if season_label else str(int(float(r.get('Season', 0))))
         ip = float(r.get('IP', 0))
         # Convert IP format (.1/.2) to True IP for math
@@ -967,6 +1244,13 @@ if __name__ == '__main__':
 
 
     def _find_player(df, name):
+        """
+        Search for a player by name in a DataFrame, handling both column and index layouts.
+
+        :param df: DataFrame to search (may have ``Player`` as a column or require index reset).
+        :param name: Exact player name string to match.
+        :return: Subset DataFrame of matching rows, or empty DataFrame if not found.
+        """
         if 'Player' in df.columns: return df[df['Player'] == name]
         reset = df.reset_index()
         return reset[reset['Player'] == name] if 'Player' in reset.columns else pd.DataFrame()

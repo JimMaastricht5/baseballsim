@@ -146,13 +146,11 @@ class SimAB:
         Clips values to prevent Odds Ratio infinity errors.
         """
         # 1. Player Adjustments
-        h_obp = self.batting.OBP + self.batting.Age_Adjustment + \
-                self.batting.Injury_Perf_Adj + self.batting.Streak_Adjustment
+        h_obp = self.batting.OBP + self.batting.Injury_Perf_Adj + self.batting.Streak_Adjustment
 
         # 2. Pitcher & Defense Adjustments
         defense_mod = current_team_def_war * 0.0015
-        p_obp = self.pitching.OBP + self.pitching.Game_Fatigue_Factor - \
-                self.pitching.Age_Adjustment - self.pitching.Injury_Perf_Adj - \
+        p_obp = self.pitching.OBP + self.pitching.Game_Fatigue_Factor - self.pitching.Injury_Perf_Adj - \
                 self.pitching.Streak_Adjustment - defense_mod
 
         # 3. Environment (Apply OBP_adjustment ONLY to the baseline)

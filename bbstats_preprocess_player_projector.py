@@ -191,7 +191,7 @@ class PlayerProjector:
         vol_col = 'PA'
         # If we are projecting BATTING stats for a player whose role is PITCHER
         # Give them 'Pitcher-at-the-Plate' rates (essentially zero).
-        if not is_p and 'Pitcher' in str(history['Hashcode'].iloc[0]):
+        if not is_p and 'Pitcher' in str(history['Role'].iloc[0]):
             result = {s: 0.0 for s in stats}
             result['PA'] = history['PA'].iloc[-1]  # Keep their expected PA volume
             result['AB'] = result['PA']
@@ -562,7 +562,6 @@ if __name__ == "__main__":
     import numpy as np
 
     # 1. Setup Mock Averages (Universal PA-based rates)
-    # Note: K/PA and H/PA are roughly 1/4th of their per-inning counterparts
     mock_lg = {
         'H_per_PA': 0.230,
         '2B_per_PA': 0.050,
@@ -586,28 +585,27 @@ if __name__ == "__main__":
          'AB': 445, 'H': 114, '2B': 25, '3B': 0, 'HR': 11, 'BB': 30, 'HBP': 2, 'SF': 3, 'SO': 50},
 
         # --- PITCHERS ---
-        # Jared Jones (Rookie): 70.1 IP
         {'Hashcode': 'JJ1', 'Player': 'Jared Jones', 'Season': 2024, 'Age': 22,
          'IP': 70.1, 'H': 60, 'ER': 30, 'BB': 25, 'SO': 85, 'HR': 10},
-
-        # Logan Webb (Veteran): 213.2 IP
         {'Hashcode': 'LW1', 'Player': 'Logan Webb', 'Season': 2024, 'Age': 27,
          'IP': 213.2, 'H': 200, 'ER': 80, 'BB': 50, 'SO': 180, 'HR': 20}
     ])
 
-    # 3. Pre-process PA (Standardizing the Denominator)
+    # 3. Pre-process PA and assign 'Role' (Critical to prevent KeyError)
     processed_rows = []
     for _, row in raw_data.iterrows():
         r = row.to_dict()
         if 'IP' in r and pd.notnull(r['IP']):
-            # Pitching PA = (IP_Whole * 3 + IP_Dec * 10) + H + BB
+            # Pitching PA (Batters Faced) = (IP_Whole * 3 + IP_Dec * 10) + H + BB
             outs = (int(r['IP']) * 3) + np.round((r['IP'] % 1) * 10)
             r['PA'] = outs + r['H'] + r.get('BB', 0)
             r['is_pitcher'] = True
+            r['Role'] = 'Pitcher'  # Explicitly added for internal class logic
         else:
             # Hitting PA = AB + BB + HBP + SF
             r['PA'] = r.get('AB', 0) + r.get('BB', 0) + r.get('HBP', 0) + r.get('SF', 0)
             r['is_pitcher'] = False
+            r['Role'] = 'Batter'   # Explicitly added for internal class logic
             r['IP'] = np.nan
         processed_rows.append(r)
 
@@ -627,12 +625,11 @@ if __name__ == "__main__":
     for _, row in h_proj.iterrows():
         avg = row['H'] / row['AB'] if row['AB'] > 0 else 0
         obp = (row['H'] + row['BB']) / row['PA'] if row['PA'] > 0 else 0
-        print(
-            f"{row['Player']:<18} | {row['Projection_Method']:<15} | {int(row['PA']):<5} | {int(row['AB']):<5} | {int(row['H']):<5} | {avg:<6.3f} | {obp:<6.3f}")
+        print(f"{row['Player']:<18} | {row['Projection_Method']:<15} | {int(row['PA']):<5} | {int(row['AB']):<5} | {int(row['H']):<5} | {avg:<6.3f} | {obp:<6.3f}")
 
     # 6. OUTPUT PITCHERS
     print("\n" + "=" * 100)
-    print(f"{'PITCHER':<18} | {'METHOD':<15} | {'IP':<6} | {'PA(BF)':<7} | {'AB':<5} | {'K/9':<6} | {'WHIP':<6}")
+    print(f"{'PITCHER':<18} | {'METHOD':<15} | {'IP':<6} | {'PA(BF)':<7} | {'K/9':<6} | {'WHIP':<6}")
     print("-" * 100)
     for _, row in p_proj.iterrows():
         # WHIP and K/9 calculations
@@ -641,6 +638,5 @@ if __name__ == "__main__":
         whip = (row['H'] + row['BB']) / ip_true if ip_true > 0 else 0
         k9 = (row['SO'] * 9) / ip_true if ip_true > 0 else 0
 
-        print(
-            f"{row['Player']:<18} | {row['Projection_Method']:<15} | {row['IP']:<6.1f} | {int(row['PA']):<7} | {int(row['AB']):<5} | {k9:<6.2f} | {whip:<6.2f}")
+        print(f"{row['Player']:<18} | {row['Projection_Method']:<15} | {row['IP']:<6.1f} | {int(row['PA']):<7} | {k9:<6.2f} | {whip:<6.2f}")
     print("=" * 100)

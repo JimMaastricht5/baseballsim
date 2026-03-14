@@ -289,7 +289,7 @@ class PlayerValuation:
 
         return PlayerValue(
             player_name=player_name,
-            hashcode=int(hashcode),
+            hashcode=hashcode,
             total_value=total_value,
             immediate_value=immediate_value,
             future_value=future_value,

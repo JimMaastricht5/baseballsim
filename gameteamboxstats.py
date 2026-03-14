@@ -60,7 +60,7 @@ class TeamBoxScore:
         pcols_to_convert = ['IP', 'ERA', 'WHIP', 'OBP', 'SLG', 'OPS', 'Total_Outs', 'Condition',
                             'AVG_faced', 'Game_Fatigue_Factor']  # make sure these are floats
         self.box_pitching[pcols_to_convert] = self.box_pitching[pcols_to_convert].astype(float)
-        self.box_pitching.index = self.box_pitching.index.astype(int)  # make sure this is considered numeric
+        self.box_pitching.index = self.box_pitching.index.astype(str)  # make sure this is considered numeric
         # self.box_pitching = bbstats.remove_non_print_cols(self.box_pitching)
         self.team_box_pitching = None
         self.game_pitching_stats = None
@@ -70,7 +70,7 @@ class TeamBoxScore:
         self.box_batting[['AB', 'R', 'H', '2B', '3B', 'HR', 'RBI', 'SB', 'CS', 'BB', 'SO', 'SH', 'SF', 'HBP']] = 0
         self.box_batting[['AVG', 'OBP', 'SLG', 'OPS']] = 0.0
         self.box_batting['Condition'] = self.box_batting['Condition'].astype(float)
-        self.box_batting.index = self.box_batting.index.astype(int)
+        self.box_batting.index = self.box_batting.index.astype(str)
         # self.box_batting = bbstats.remove_non_print_cols(self.box_batting)
         self.team_box_batting = None
         self.game_batting_stats = None

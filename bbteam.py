@@ -243,7 +243,7 @@ class Team:
         # loop over lineup from lead off to last, build lineup list and set player fielding pos in lineup df
         # note cur_lineup_index should be the same as lineup_index_list, but just to be certain we rebuild it.
         for row_num in range(0, len(self.gameplay_lineup_df)):
-            player_index = int64(self.gameplay_lineup_df.index[row_num])  # grab the index of the player
+            player_index = self.gameplay_lineup_df.index[row_num]  # grab the index of the player
             self.gameplay_lineup_df.loc[player_index, 'Pos'] = pos_index_dict[player_index]  # field pos in lineup
             self.new_season_lineup_df.loc[player_index, 'Pos'] = pos_index_dict[player_index]
         self.lineup_def_war = self.calculate_active_defense(self.gameplay_lineup_df)  # need to recalc after lineup chg

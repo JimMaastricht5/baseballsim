@@ -5,65 +5,103 @@ import numpy as np
 df_proj = pd.read_csv('2023 2024 2025 aggr-stats-pp-Batting.csv')
 df_hist = pd.read_csv('2023 2024 2025 historical-Batting.csv')
 
+# Ensure 2025 is isolated for comparison
+df_25 = df_hist[df_hist['Season'] == 2025].copy()
 
-# Helper to find column names that might vary
-def get_col(df, options):
-    for opt in options:
-        if opt in df.columns:
-            return opt
-    return None
+# Pre-calculate Projection Rates
+df_proj['BA'] = df_proj['H'] / df_proj['AB']
+df_proj['OBP'] = (df_proj['H'] + df_proj['BB'] + df_proj['HBP']) / df_proj['PA']
+df_proj['SLG'] = (df_proj['H'] + df_proj['2B'] + 2 * df_proj['3B'] + 3 * df_proj['HR']) / df_proj['AB']
+df_proj['Spread'] = df_proj['OBP'] - df_proj['BA']
 
-
-# 1. League Integrity Check
+# 1. Global League Integrity
+print("=" * 80)
+print(f"{'PREDICTED 2026 LEAGUE slash Line':^80}")
+print("=" * 80)
 lg_ba = df_proj['H'].sum() / df_proj['AB'].sum()
 lg_obp = (df_proj['H'] + df_proj['BB'] + df_proj['HBP']).sum() / df_proj['PA'].sum()
-lg_spread = lg_obp - lg_ba
+lg_slg = (df_proj['H'] + df_proj['2B'] + 2 * df_proj['3B'] + 3 * df_proj['HR']).sum() / df_proj['AB'].sum()
 
-print("=" * 60)
-print(f"PREDICTED 2026 LEAGUE QUALITY")
-print("=" * 60)
-print(f"League BA:     {lg_ba:.3f}")
-print(f"League OBP:    {lg_obp:.3f} (Target: ~.315)")
-print(f"League Spread: {lg_spread:.3f} (Target: ~.070)")
-print("=" * 60)
+print(f"League AVG: {lg_ba:.3f} | League OBP: {lg_obp:.3f} | League SLG: {lg_slg:.3f}")
+print(f"OBP Spread: {lg_obp - lg_ba:.3f} (Target: ~.070)")
+print("-" * 80)
 
-# 2. Specific Player Spotlight: Caleb Durbin
-durbin_proj = df_proj[df_proj['Player'].str.contains('Caleb Durbin', na=False)]
-durbin_hist = df_hist[(df_hist['Player'].str.contains('Caleb Durbin', na=False)) & (df_hist['Season'] == 2025)]
 
-print("\n--- CALEB DURBIN VALIDATION ---")
-if not durbin_proj.empty and not durbin_hist.empty:
-    # Resolve column names for historical vs projected
-    h_ba = get_col(durbin_hist, ['AVG', 'BA', 'BAvg'])
-    p_ba = get_col(durbin_proj, ['BA', 'AVG'])
+# 2. Side-by-Side Spotlight Function
+def player_diagnosis(name):
+    # Filter to find the player
+    p_hist_matches = df_25[df_25['Player'].str.contains(name, na=False)]
+    p_proj_matches = df_proj[df_proj['Player'].str.contains(name, na=False)]
 
-    comparison = pd.DataFrame({
-        'Metric': ['AB', 'H', 'HR', 'BA', 'OBP', 'SLG'],
-        '2025 Actual': [
-            durbin_hist['AB'].iloc[0], durbin_hist['H'].iloc[0], durbin_hist['HR'].iloc[0],
-            durbin_hist[h_ba].iloc[0] if h_ba else 0,
-            durbin_hist['OBP'].iloc[0], durbin_hist['SLG'].iloc[0]
-        ],
-        '2026 Proj': [
-            durbin_proj['AB'].iloc[0], durbin_proj['H'].iloc[0], durbin_proj['HR'].iloc[0],
-            durbin_proj[p_ba].iloc[0] if p_ba else 0,
-            durbin_proj['OBP'].iloc[0], durbin_proj['SLG'].iloc[0]
-        ]
-    })
-    print(comparison.to_string(index=False))
+    if p_hist_matches.empty or p_proj_matches.empty:
+        print(f"\n--- DIAGNOSIS: {name} (NOT FOUND) ---")
+        return
+
+    p_hist = p_hist_matches.iloc[0]
+    p_proj = p_proj_matches.iloc[0]
+
+    # ADD HASHCODE TO OUTPUT
+    hist_hash = p_hist.get('Hashcode', 'MISSING')
+    proj_hash = p_proj.get('Hashcode', 'MISSING')
+
+    print(f"\n--- DIAGNOSIS: {name} ---")
+    print(f"2025 Hash: {hist_hash}")
+    print(f"2026 Hash: {proj_hash}")
+    if hist_hash != proj_hash:
+        print("!!! WARNING: Hashcode mismatch between history and projection !!!")
+
+    stats = ['PA', 'AB', 'H', '2B', 'HR', 'BB', 'SO', 'BA', 'OBP', 'SLG']
+
+    # Build comparison frame
+    comp = pd.DataFrame({
+        '2025 Act': [p_hist.get(s, 0) for s in stats],
+        '2026 Proj': [p_proj.get(s, 0) for s in stats]
+    }, index=stats)
+
+    comp['2025 Act'] = pd.to_numeric(comp['2025 Act'], errors='coerce')
+    comp['2026 Proj'] = pd.to_numeric(comp['2026 Proj'], errors='coerce')
+    comp['Delta'] = comp['2026 Proj'] - comp['2025 Act']
+
+    print(comp.round(3).to_string())
+
+
+# Run spotlight for your key test cases
+player_diagnosis('Will Smith')  # Check the mashup specifically
+player_diagnosis('Caleb Durbin')
+player_diagnosis('Cal Raleigh')
+player_diagnosis('Eric Haase')
+
+# 3. Leak Detector (The "Will Smith" Check)
+print("\n" + "=" * 80)
+print(f"{'OBP & SPREAD OUTLIERS (POTENTIAL MATH LEAKS)':^80}")
+print("=" * 80)
+# Flag anyone with OBP > .550 or Spread > .150
+leaks = df_proj[(df_proj['OBP'] > 0.550) | (df_proj['Spread'] > 0.150)].sort_values('Spread', ascending=False)
+if not leaks.empty:
+    # Included Hashcode here to see if outliers share a hash
+    print(leaks[['Player', 'Hashcode', 'PA', 'BA', 'OBP', 'Spread', 'BB']].head(15).to_string(index=False))
 else:
-    print("[ALERT] Caleb Durbin not found in one of the files.")
+    print("No OBP leaks detected.")
 
-# 3. Identify "Math Breakers"
-# Ensure BA and OBP columns are referenced correctly
-p_ba = get_col(df_proj, ['BA', 'AVG'])
-df_proj['OBP_BA_Spread'] = df_proj['OBP'] - df_proj[p_ba]
-suspects = df_proj[df_proj['PA'] >= 100].sort_values('OBP_BA_Spread', ascending=False).head(10)
+# 4. Top Hits / Top Drops (The "Regression" Check)
+print("\n" + "=" * 80)
+print(f"{'BIGGEST REGRESSION HITS (AVG)':^80}")
+print("=" * 80)
 
-print("\n--- TOP 10 ELITE DISCIPLINE (OR POTENTIAL LEAKS) ---")
-print(suspects[['Player', 'PA', p_ba, 'OBP', 'OBP_BA_Spread', 'BB', 'HBP']])
+# Merge on Hashcode instead of Name to ensure clean tracking
+merged = pd.merge(df_25, df_proj, on='Hashcode', suffixes=('_25', '_26'))
 
-# 4. Check for Scientific Notation
-float_errors = df_proj[df_proj['HBP'] < 0]
-if not float_errors.empty:
-    print(f"\n[ALERT] Found {len(float_errors)} rows with negative HBP values!")
+# If names don't match after hashing merge, we have a name-string issue
+merged['Name_Match'] = merged['Player_25'] == merged['Player_26']
+
+merged['BA_25'] = merged['H_25'] / merged['AB_25'].replace(0, 1)
+merged['BA_26'] = merged['H_26'] / merged['AB_26'].replace(0, 1)
+merged['BA_Delta'] = merged['BA_26'] - merged['BA_25']
+
+print("\nTop 5 Gainers in AVG (Check for Hash Collisions):")
+print(merged.sort_values('BA_Delta', ascending=False)[['Player_26', 'Hashcode', 'BA_25', 'BA_26', 'BA_Delta']].head(
+    5).to_string(index=False))
+
+print("\nTop 10 RAW MATH (Check for high BA outliers):")
+cols = ['Player_26', 'Hashcode', 'PA_26', 'H_26', 'AB_26', 'BA_26']
+print(merged.sort_values('BA_26', ascending=False)[cols].head(10).to_string(index=False))

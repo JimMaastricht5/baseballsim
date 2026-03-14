@@ -79,8 +79,10 @@ class Bases:
         self.baserunners = list(np.roll(self.baserunners, bases_to_advance))  # advance runners
         self.runs_scored = np.count_nonzero(self.baserunners[-4:])  # 0 ab 1, 2, 3 are bases. 4-7 run crossed home=len 4
         for player_num in self.baserunners[-4:]:  # get player ids that scored
-            if len(self.baserunners_names[player_num]) > 0:  # base runner names is a lookup and does not need reset
-                self.player_scored[player_num] = self.baserunners_names[player_num]
+            # Check if player_num is '0' or 0 (Empty Base) before looking up name
+            if str(player_num) != '0' and player_num in self.baserunners_names:
+                if len(self.baserunners_names[player_num]) > 0:
+                    self.player_scored[player_num] = self.baserunners_names[player_num]
         self.baserunners[-4] = 0  # send the runners that score back to the dug out
         # self.baserunners = [baserunner if i <= 3 else 0 for i, baserunner in enumerate(self.baserunners)]  #resetbases
         self.baserunners[4:] = [0] * 4  # reset based without list comprehension
@@ -298,8 +300,10 @@ class Bases:
         desc = ''
         base_names = ['AB', '1st', '2nd', '3rd', 'home', 'scored', 'scored', 'scored']  # leave this for sort order
         base_names_zip = set(zip(base_names, self.baserunners))
-        base_names_with_runners = list(filter(lambda base_name_zip: base_name_zip[1] > 0 and base_name_zip[0] != 'AB'
-                                              and base_name_zip[0] != 'home', base_names_zip))
+        # Change base_name_zip[1] > 0 to str(base_name_zip[1]) != '0'
+        base_names_with_runners = list(
+            filter(lambda base_name_zip: str(base_name_zip[1]) != '0' and base_name_zip[0] != 'AB'
+                                         and base_name_zip[0] != 'home', base_names_zip))
         base_names_with_runners.sort()
         for base_name in base_names_with_runners:
             desc = base_name[0] if desc == '' else desc + ', ' + base_name[0]

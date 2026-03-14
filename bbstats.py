@@ -304,7 +304,11 @@ class BaseballStats:
         :return: Series with projected stats, or None if not found
         """
         try:
-            data = self.projected_batting_data if is_batter else self.projected_pitching_data
+            # batting_data/pitching_data hold the PlayerProjector output with projected
+            # counting stats intact; projected_batting_data zeros them for simulation tracking.
+            data = self.batting_data if is_batter else self.pitching_data
+            if data is None:
+                data = self.projected_batting_data if is_batter else self.projected_pitching_data
             if data is None:
                 data = self.new_season_batting_data if is_batter else self.new_season_pitching_data
             if data is None:

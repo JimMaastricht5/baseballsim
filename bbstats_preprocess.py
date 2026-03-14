@@ -96,7 +96,7 @@ class BaseballStatsPreProcess:
             (year prefix added automatically, e.g. ``'player-stats-Batters.csv'``).
         :param load_pitcher_file: Base filename for raw pitcher CSV files.
         """
-        self.create_hash = lambda text: int(hashlib.sha256(text.encode('utf-8')).hexdigest()[:5], 16)
+        # self.create_hash = lambda text: int(hashlib.sha256(text.encode('utf-8')).hexdigest()[:5], 16)
         self.jigger_data = lambda x: x + int(np.abs(np.random.normal(loc=x * .10, scale=2, size=1)))
 
         self.numeric_bcols = ['G', 'AB', 'R', 'H', '2B', '3B', 'HR', 'RBI', 'SB', 'CS', 'BB', 'SO', 'SH', 'SF',
@@ -148,6 +148,9 @@ class BaseballStatsPreProcess:
 
         self.df_salary = salary.retrieve_salary('mlb-salaries-2000-24.csv', self.create_hash)
         self.get_seasons(load_batter_file, load_pitcher_file)  # get existing data file
+        collision = set(self.batting_data.index).intersection(set(self.pitching_data.index))
+        if collision:
+            logger.error(f"Hash Collision Detected: {collision}")
         self.apply_team_remapping()  # apply team name remapping before other processing
         self.calculate_def_war()  # calculate defensive WAR from prior season
         self.generate_random_data = generate_random_data
@@ -157,6 +160,12 @@ class BaseballStatsPreProcess:
             self.create_new_season_from_existing(load_batter_file, load_pitcher_file)
         self.save_data()
         return
+
+    def create_hash(self, name, role):
+        # This ensures "Will Smith_Hitter" and "Will Smith_Pitcher"
+        # generate two completely unique hex/integer values
+        combined_string = f"{name}_{role}"
+        return hashlib.md5(combined_string.encode()).hexdigest()
 
     def save_data(self) -> None:
         """
@@ -446,7 +455,7 @@ class BaseballStatsPreProcess:
         # Returns tuple of (aggregated_df, historical_df)
         # caution war and salary cols will get aggregated across multiple seasons
         pitching_data = None
-        stats_pcols_sum = ['G', 'GS', 'CG', 'SHO', 'IP', 'H', 'ER', 'SO', 'BB', 'HR', 'W', 'L', 'SV', 'HBP', 'BK',
+        stats_pcols_sum = ['G', 'PA', 'GS', 'CG', 'SHO', 'IP', 'H', 'ER', 'SO', 'BB', 'HR', 'W', 'L', 'SV', 'HBP', 'BK',
                            'WP']
         for season in load_seasons:
             df = pd.read_csv(str(season) + f" {pitcher_file}")
@@ -457,11 +466,13 @@ class BaseballStatsPreProcess:
         pitching_data.drop(['Rk', 'Lg', 'W-L%', 'GF', 'IBB', 'ERA+', 'FIP', 'H9', 'BB9', 'SO9', 'SO/BB',
                             'HR9', 'Awards', 'Player-additional', 'BF'],inplace=True, axis=1)
         pitching_data['Player'] = pitching_data['Player'].str.replace('*', '').str.replace('#', '')
-        pitching_data['Hashcode'] = pitching_data['Player'].apply(self.create_hash)
+        pitching_data['Hashcode'] = pitching_data['Player'].apply(lambda x: self.create_hash(x, 'Pitcher'))
 
-        pitching_data = pd.merge(pitching_data, self.df_salary, on='Hashcode', how='left')  # war and salary cols
+        # Filter salary to only Pitchers before merging
+        pitcher_salaries = self.df_salary[self.df_salary['Role'] == 'Pitcher']
+        pitching_data = pd.merge(pitching_data, pitcher_salaries, on='Hashcode', how='left')
         pitching_data = salary.fill_nan_salary(pitching_data, 'Salary')  # set league min for missing data
-        pitching_data = salary.fill_nan_salary(pitching_data, 'MLS', 0)  # set min for missing data
+        # pitching_data = salary.fill_nan_salary(pitching_data, 'MLS', 0)  # set min for missing data
         pitching_data['Team'] = pitching_data['Team'].apply(lambda x: x if x in self.nl + self.al else '')
         # players with multiple teams have a 2TM or 3TM line that is the total of all stats.  Drop rows since we total
         pitching_data = pitching_data[pitching_data['Team'] != '']  # drop rows without a formal team name
@@ -582,7 +593,7 @@ class BaseballStatsPreProcess:
         """
         # Returns tuple of (aggregated_df, historical_df)
         batting_data = None
-        stats_bcols_sum = ['G', 'AB', 'R', 'H', '2B', '3B', 'HR', 'RBI', 'SB', 'CS', 'BB', 'SO', 'SH', 'SF', 'HBP',
+        stats_bcols_sum = ['G', 'PA', 'AB', 'R', 'H', '2B', '3B', 'HR', 'RBI', 'SB', 'CS', 'BB', 'SO', 'SH', 'SF', 'HBP',
                            'GIDP']
         for season in load_seasons:
             df = pd.read_csv(str(season) + f" {batter_file}")
@@ -593,11 +604,13 @@ class BaseballStatsPreProcess:
         batting_data.drop(['Rk', 'Lg', 'OPS+', 'rOBA', 'Rbat+', 'TB', 'IBB', 'Awards',
                            'Player-additional'],inplace=True, axis=1)
         batting_data['Player'] = batting_data['Player'].str.replace('#', '').str.replace('*', '')
-        batting_data['Hashcode'] = batting_data['Player'].apply(self.create_hash)
+        batting_data['Hashcode'] = batting_data['Player'].apply(lambda x: self.create_hash(x, 'Hitter'))
 
-        batting_data = pd.merge(batting_data, self.df_salary, on='Hashcode', how='left')  # war and salary cols
+        # Filter salary to only Hitters before merging
+        hitter_salaries = self.df_salary[self.df_salary['Role'] == 'Hitter']
+        batting_data = pd.merge(batting_data, hitter_salaries, on='Hashcode', how='left')
         batting_data = salary.fill_nan_salary(batting_data, 'Salary')  # set league min for missing data
-        batting_data = salary.fill_nan_salary(batting_data, 'MLS', 0)  # set min for missing data
+        # batting_data = salary.fill_nan_salary(batting_data, 'MLS', 0)  # set min for missing data
         batting_data['Pos'] = batting_data['Pos'].apply(self.remove_non_numeric).apply(self.translate_pos)
         # DON'T group by Hashcode yet - we need year-by-year data for historical file
         batting_data['Team'] = batting_data['Team'].apply(lambda x: x if x in self.nl + self.al else '' )
@@ -774,122 +787,84 @@ class BaseballStatsPreProcess:
 
     def calculate_def_war(self) -> None:
         """
-        Calculate Def_WAR (defensive/baserunning value) from prior season data.
-
-        Def_WAR = Real_2025_WAR - Calculated_Sim_WAR_2025
-
-        This captures the defensive and baserunning contributions that aren't
-        measured by our offensive/pitching Sim_WAR calculations.
+        Calculate Def_WAR (defensive/baserunning value) for both Hitters and Pitchers.
+        Def_WAR = Real_WAR - Calculated_Sim_WAR.
+        Ensures unique joins via Hashcode to prevent 'Will Smith' mashups.
         """
-        if not self.load_seasons or len(self.load_seasons) == 0:
+        if not self.load_seasons:
             print("No seasons loaded, skipping Def_WAR calculation")
             return
 
-        # Use the most recent season as the prior season
         prior_season = max(self.load_seasons)
         print(f"Calculating Def_WAR from {prior_season} season data...")
 
         # === PITCHERS ===
         if self.pitching_data_historical is not None:
-            # Filter for prior season only
             prior_p = self.pitching_data_historical[
                 self.pitching_data_historical['Season'] == prior_season
-            ].copy()
-
-            # Filter for meaningful playing time (using IP >= 5 for Def_WAR calculation since we need reliable stats)
+                ].copy()
             prior_p = prior_p[prior_p['IP'] >= 5].copy()
 
-            if len(prior_p) > 0:
-                # Calculate FIP for each pitcher
+            if not prior_p.empty:
                 prior_p['FIP'] = ((13 * prior_p['HR'] + 3 * prior_p['BB'] - 2 * prior_p['SO']) / prior_p['IP']) + 3.10
-
-                # Calculate league average FIP
                 league_fip = prior_p['FIP'].mean()
                 replacement_fip = league_fip + 1.0
-
-                # Calculate Sim_WAR using our formula
                 prior_p['Calculated_Sim_WAR'] = ((replacement_fip - prior_p['FIP']) / 9.0) * prior_p['IP'] / 10.0
-
-                # Calculate Def_WAR = Real_WAR - Sim_WAR
                 prior_p['Def_WAR'] = prior_p['WAR'] - prior_p['Calculated_Sim_WAR']
 
-                # Merge Def_WAR into aggregated data by Hashcode
-                def_war_p = prior_p[['Hashcode', 'Def_WAR']].copy()
-                def_war_p = def_war_p.set_index('Hashcode')
+                def_war_p_map = prior_p[['Hashcode', 'Def_WAR', 'WAR']].drop_duplicates('Hashcode').set_index(
+                    'Hashcode')
 
-                # Add Def_WAR column to aggregated pitching data
-                self.pitching_data = self.pitching_data.join(def_war_p[['Def_WAR']], how='left')
+                if 'Def_WAR' in self.pitching_data.columns:
+                    self.pitching_data.drop('Def_WAR', axis=1, inplace=True)
 
-                # Fill NaN with 0.0 for players without prior season data
+                self.pitching_data = self.pitching_data.join(def_war_p_map['Def_WAR'], how='left')
                 self.pitching_data['Def_WAR'] = self.pitching_data['Def_WAR'].fillna(0.0)
-
-                # Also update WAR column to use prior season value
-                prior_war_p = prior_p[['Hashcode', 'WAR']].copy()
-                prior_war_p = prior_war_p.rename(columns={'WAR': 'Prior_Season_WAR'})
-                prior_war_p = prior_war_p.set_index('Hashcode')
-                self.pitching_data = self.pitching_data.join(prior_war_p[['Prior_Season_WAR']], how='left')
-                self.pitching_data['WAR'] = self.pitching_data['Prior_Season_WAR'].fillna(self.pitching_data['WAR'])
-                self.pitching_data.drop('Prior_Season_WAR', axis=1, inplace=True)
-
+                self.pitching_data['WAR'] = def_war_p_map['WAR'].combine_first(self.pitching_data['WAR'])
                 print(f"  Pitchers: Added Def_WAR for {(self.pitching_data['Def_WAR'] != 0).sum()} players")
-                print(f"  Pitchers: Def_WAR range: {self.pitching_data['Def_WAR'].min():.2f} to {self.pitching_data['Def_WAR'].max():.2f}")
             else:
                 self.pitching_data['Def_WAR'] = 0.0
-                print("  Pitchers: No players with IP >= 5 in prior season")
 
         # === BATTERS ===
         if self.batting_data_historical is not None:
-            # Filter for prior season only
             prior_b = self.batting_data_historical[
                 self.batting_data_historical['Season'] == prior_season
-            ].copy()
-
-            # Filter for meaningful playing time
+                ].copy()
             prior_b = prior_b[prior_b['AB'] >= 100].copy()
 
-            if len(prior_b) > 0:
-                # Calculate wOBA
+            if not prior_b.empty:
+                # 1. Calculate wOBA (Simulated Offensive Value)
                 singles = prior_b['H'] - prior_b['2B'] - prior_b['3B'] - prior_b['HR']
-                woba_numerator = (0.69 * prior_b['BB'] + 0.72 * prior_b['HBP'] + 0.88 * singles +
-                                  1.24 * prior_b['2B'] + 1.56 * prior_b['3B'] + 1.95 * prior_b['HR'])
-                prior_b['PA'] = prior_b['AB'] + prior_b['BB'] + prior_b['HBP'] + prior_b['SF']
-                prior_b['wOBA'] = woba_numerator / prior_b['PA']
+                woba_num = (0.69 * prior_b['BB'] + 0.72 * prior_b['HBP'] + 0.88 * singles +
+                            1.24 * prior_b['2B'] + 1.56 * prior_b['3B'] + 1.95 * prior_b['HR'])
 
-                # Calculate league average wOBA
+                # Use PA as denominator for wOBA
+                prior_b['PA_calc'] = prior_b['AB'] + prior_b['BB'] + prior_b['HBP'] + prior_b.get('SF', 0)
+                prior_b['wOBA'] = woba_num / prior_b['PA_calc'].replace(0, 1)
+
+                # 2. Calculate Sim_WAR
                 league_woba = prior_b['wOBA'].mean()
                 replacement_woba = league_woba - 0.020
+                prior_b['Calculated_Sim_WAR'] = ((prior_b['wOBA'] - replacement_woba) / 1.15) * prior_b[
+                    'PA_calc'] / 10.0
 
-                # Calculate Sim_WAR using our formula
-                prior_b['Calculated_Sim_WAR'] = ((prior_b['wOBA'] - replacement_woba) / 1.15) * prior_b['PA'] / 10.0
-
-                # Calculate Def_WAR = Real_WAR - Sim_WAR
+                # 3. Calculate Def_WAR (Baserunning + Defense)
                 prior_b['Def_WAR'] = prior_b['WAR'] - prior_b['Calculated_Sim_WAR']
 
-                # Merge Def_WAR into aggregated data by Hashcode
-                def_war_b = prior_b[['Hashcode', 'Def_WAR']].copy()
-                def_war_b = def_war_b.set_index('Hashcode')
+                # 4. Create mapping and Join
+                def_war_b_map = prior_b[['Hashcode', 'Def_WAR', 'WAR']].drop_duplicates('Hashcode').set_index(
+                    'Hashcode')
 
-                # Add Def_WAR column to aggregated batting data
-                self.batting_data = self.batting_data.join(def_war_b[['Def_WAR']], how='left')
+                if 'Def_WAR' in self.batting_data.columns:
+                    self.batting_data.drop('Def_WAR', axis=1, inplace=True)
 
-                # Fill NaN with 0.0 for players without prior season data
+                self.batting_data = self.batting_data.join(def_war_b_map['Def_WAR'], how='left')
                 self.batting_data['Def_WAR'] = self.batting_data['Def_WAR'].fillna(0.0)
-
-                # Also update WAR column to use prior season value
-                prior_war_b = prior_b[['Hashcode', 'WAR']].copy()
-                prior_war_b = prior_war_b.rename(columns={'WAR': 'Prior_Season_WAR'})
-                prior_war_b = prior_war_b.set_index('Hashcode')
-                self.batting_data = self.batting_data.join(prior_war_b[['Prior_Season_WAR']], how='left')
-                self.batting_data['WAR'] = self.batting_data['Prior_Season_WAR'].fillna(self.batting_data['WAR'])
-                self.batting_data.drop('Prior_Season_WAR', axis=1, inplace=True)
+                self.batting_data['WAR'] = def_war_b_map['WAR'].combine_first(self.batting_data['WAR'])
 
                 print(f"  Batters: Added Def_WAR for {(self.batting_data['Def_WAR'] != 0).sum()} players")
-                print(f"  Batters: Def_WAR range: {self.batting_data['Def_WAR'].min():.2f} to {self.batting_data['Def_WAR'].max():.2f}")
             else:
                 self.batting_data['Def_WAR'] = 0.0
-                print("  Batters: No players with AB >= 100 in prior season")
-
-        return
 
     def randomize_data(self):
         """
@@ -1028,12 +1003,12 @@ class BaseballStatsPreProcess:
         # load new names and reset hashcode index for AGGREGATED data
         self.batting_data['Player'] = random_names[: len(self.batting_data)]  # grab first x rows of list
         self.batting_data = self.batting_data.reset_index()
-        self.batting_data['Hashcode'] = self.batting_data['Player'].apply(self.create_hash)
+        self.batting_data['Hashcode'] = self.batting_data['Player'].apply(lambda x: self.create_hash(x, 'Hitter'))
         self.batting_data = self.batting_data.set_index('Hashcode')
 
         self.pitching_data['Player'] = random_names[-len(self.pitching_data):]  # next x rows list
         self.pitching_data = self.pitching_data.reset_index()
-        self.pitching_data['Hashcode'] = self.pitching_data['Player'].apply(self.create_hash)
+        self.pitching_data['Hashcode'] = self.pitching_data['Player'].apply(lambda x: self.create_hash(x, 'Pitcher'))
         self.pitching_data = self.pitching_data.set_index('Hashcode')
 
         # Update HISTORICAL data with same player names (need to map old hashcode to new)
@@ -1046,7 +1021,7 @@ class BaseballStatsPreProcess:
             old_to_new_player = dict(zip(self.batting_data.reset_index()['Hashcode'], self.batting_data.reset_index()['Player']))
             self.batting_data_historical['Player'] = self.batting_data_historical['Old_Hashcode'].map(old_to_new_player)
             # Recalculate hashcode and Player_Season_Key
-            self.batting_data_historical['Hashcode'] = self.batting_data_historical['Player'].apply(self.create_hash)
+            self.batting_data_historical['Hashcode'] = self.batting_data_historical['Player'].apply(lambda x: self.create_hash(x, 'Hitter'))
             self.batting_data_historical['Player_Season_Key'] = (
                 self.batting_data_historical['Hashcode'].astype(str) + '_' +
                 self.batting_data_historical['Season'].astype(str)
@@ -1059,7 +1034,7 @@ class BaseballStatsPreProcess:
             self.pitching_data_historical['Old_Hashcode'] = self.pitching_data_historical['Player_Season_Key'].str.split('_').str[0].astype(int)
             old_to_new_player = dict(zip(self.pitching_data.reset_index()['Hashcode'], self.pitching_data.reset_index()['Player']))
             self.pitching_data_historical['Player'] = self.pitching_data_historical['Old_Hashcode'].map(old_to_new_player)
-            self.pitching_data_historical['Hashcode'] = self.pitching_data_historical['Player'].apply(self.create_hash)
+            self.pitching_data_historical['Hashcode'] = self.pitching_data_historical['Player'].apply(lambda x: self.create_hash(x, 'Pitcher'))
             self.pitching_data_historical['Player_Season_Key'] = (
                 self.pitching_data_historical['Hashcode'].astype(str) + '_' +
                 self.pitching_data_historical['Season'].astype(str)
@@ -1102,8 +1077,6 @@ class BaseballStatsPreProcess:
             self.new_season_pitching_data[self.numeric_pcols] = \
                 self.new_season_pitching_data[self.numeric_pcols].astype('int')
             self.new_season_pitching_data['Season'] = str(self.new_season)
-            if self.new_season not in self.load_seasons:  # add a year to age if it is the next year
-                self.new_season_pitching_data['Age'] = self.new_season_pitching_data['Age'] + 1
 
             # Calculate projected rate stats from counting stats before zeroing
             pp = self.new_season_pitching_data
@@ -1121,12 +1094,12 @@ class BaseballStatsPreProcess:
             self.new_season_pitching_data['Condition'] = 100
             self.new_season_pitching_data['Streak_Adjustment'] = 0.0
             self.new_season_pitching_data.drop(['Total_OB', 'Total_Outs'], axis=1)
+            if self.new_season not in self.load_seasons:  # add a year to age if it is the next year
+                self.new_season_pitching_data['Age'] = self.new_season_pitching_data['Age'] + 1
 
             # --- Batting ---
             self.new_season_batting_data = self.batting_data.copy()
             self.new_season_batting_data['Season'] = str(self.new_season)
-            if self.new_season not in self.load_seasons:  # add a year to age if it is the next year
-                self.new_season_batting_data['Age'] = self.new_season_batting_data['Age'] + 1
 
             # Calculate projected rate stats from counting stats before zeroing
             bp = self.new_season_batting_data
@@ -1141,6 +1114,8 @@ class BaseballStatsPreProcess:
                 bp['2B'] * 2 + bp['3B'] * 3 + bp['HR'] * 4,
                 bp['AB']), nan=0.0, posinf=0.0), 3)
             bp['OPS'] = self.trunc_col(np.nan_to_num(bp['OBP'] + bp['SLG'], nan=0.0, posinf=0.0), 3)
+            if self.new_season not in self.load_seasons:  # add a year to age if it is the next year
+                self.new_season_batting_data['Age'] = self.new_season_batting_data['Age'] + 1
 
             # Zero counting stats for simulation tracking (preserve AVG/OBP/SLG/OPS)
             self.new_season_batting_data[self.numeric_bcols] = 0
@@ -1174,8 +1149,8 @@ if __name__ == '__main__':
                                             load_pitcher_file='player-stats-Pitching.csv')
 
     # Mixed list of Batters and Pitchers for your checks
-    BATTERS_TO_CHECK = ['Tyler Black', 'William Contreras', 'Jackson Chourio', 'Cal Raleigh']
-    PITCHERS_TO_CHECK = ['Freddy Peralta', 'Logan Webb', 'Jared Jones', 'Tobias Myers']
+    BATTERS_TO_CHECK = ['Tyler Black', 'William Contreras', 'Jackson Chourio', 'Cal Raleigh', 'Will Smith']
+    PITCHERS_TO_CHECK = ['Freddy Peralta', 'Logan Webb', 'Jared Jones', 'Tobias Myers', 'Will Smith']
 
     # --- HEADERS ---
     B_HDR = (f"{'Season':<10}{'Team':<6}{'Age':>4}{'G':>5}{'AB':>6}{'H':>5}"

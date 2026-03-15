@@ -477,12 +477,17 @@ class BaseballStats:
                     pd.read_csv(f'{seasons_str} {pitcher_file}', index_col='Hashcode'))
                 self.batting_data = self.add_missing_cols(
                     pd.read_csv(f'{seasons_str} {batter_file}', index_col='Hashcode'))
+                self.pitching_data.index = self.pitching_data.index.map(lambda x: int(str(x)))  # ensure hash is int
+                self.batting_data.index = self.batting_data.index.map(lambda x: int(str(x)))
 
             if self.new_season_pitching_data is None or self.new_season_batting_data is None:
                 self.new_season_pitching_data = self.add_missing_cols(pd.read_csv(str(self.new_season) +
                                                                                   f" {new_pitcher_file}", index_col='Hashcode'))
                 self.new_season_batting_data = self.add_missing_cols(pd.read_csv(str(self.new_season) +
                                                                                  f" {new_batter_file}", index_col='Hashcode'))
+                self.new_season_pitching_data.index = self.new_season_pitching_data.index.map(lambda x: int(str(x)))  # ensure is is treated as an int
+                self.new_season_batting_data.index = self.new_season_batting_data.index.map(lambda x: int(str(x)))
+
                 # Freeze a copy of the original projections before simulation accumulates actual stats
                 self.projected_pitching_data = self.new_season_pitching_data.copy()
                 self.projected_batting_data = self.new_season_batting_data.copy()

@@ -165,7 +165,8 @@ class BaseballStatsPreProcess:
         # This ensures "Will Smith_Hitter" and "Will Smith_Pitcher"
         # generate two completely unique hex/integer values
         combined_string = f"{name}_{role}"
-        return hashlib.md5(combined_string.encode()).hexdigest()
+        hex_hash = hashlib.md5(combined_string.encode()).hexdigest()
+        return int(hex_hash, 16)
 
     def save_data(self) -> None:
         """
@@ -1016,7 +1017,7 @@ class BaseballStatsPreProcess:
         if self.batting_data_historical is not None:
             # Extract hashcode from Player_Season_Key (format: hashcode_season)
             self.batting_data_historical = self.batting_data_historical.reset_index()
-            self.batting_data_historical['Old_Hashcode'] = self.batting_data_historical['Player_Season_Key'].str.split('_').str[0].astype(int)
+            self.batting_data_historical['Old_Hashcode'] = self.batting_data_historical['Player_Season_Key'].str.split('_').str[0].apply(int)
             # Map old hashcode to new player name from aggregated data
             old_to_new_player = dict(zip(self.batting_data.reset_index()['Hashcode'], self.batting_data.reset_index()['Player']))
             self.batting_data_historical['Player'] = self.batting_data_historical['Old_Hashcode'].map(old_to_new_player)
@@ -1031,7 +1032,7 @@ class BaseballStatsPreProcess:
 
         if self.pitching_data_historical is not None:
             self.pitching_data_historical = self.pitching_data_historical.reset_index()
-            self.pitching_data_historical['Old_Hashcode'] = self.pitching_data_historical['Player_Season_Key'].str.split('_').str[0].astype(int)
+            self.pitching_data_historical['Old_Hashcode'] = self.pitching_data_historical['Player_Season_Key'].str.split('_').str[0].apply(int)
             old_to_new_player = dict(zip(self.pitching_data.reset_index()['Hashcode'], self.pitching_data.reset_index()['Player']))
             self.pitching_data_historical['Player'] = self.pitching_data_historical['Old_Hashcode'].map(old_to_new_player)
             self.pitching_data_historical['Hashcode'] = self.pitching_data_historical['Player'].apply(lambda x: self.create_hash(x, 'Pitcher'))

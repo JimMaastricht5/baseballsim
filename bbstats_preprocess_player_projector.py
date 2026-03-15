@@ -59,12 +59,11 @@ class PlayerProjector:
         }
 
         self.k_vals_pitcher = {
-            'H': 250,  # Hits allowed (BABIP) regresses heavily
-            'BB': 350,  # Walk rate
-            'SO': 200,  # K-rate stabilizes very fast for pitchers
-            'HR': 300,  # HR/FB rate takes time to stabilize
-            'ER': 400,  # Essential for preventing 0.00 ERA anomalies
-            'default': 400
+            'H': 150,  # Hits allowed (BABIP) regresses heavily
+            'BB': 200,  # Walk rate
+            'SO': 100,  # K-rate stabilizes very fast for pitchers
+            'ER': 150,  # Essential for preventing 0.00 ERA anomalies
+            'default': 200
         }
 
     def calculate_projected_stats(self, history: pd.DataFrame,
@@ -93,187 +92,418 @@ class PlayerProjector:
         # Return a full DataFrame ready for bbstats_preprocess
         return pd.DataFrame(all_projections)
 
-    def _get_projection(self, player_history: pd.DataFrame, stat_col: str, vol_col: str,
-                       is_pitching: bool) -> float:
-        """
-        Select a projection strategy for a single stat and return a per-vol-unit rate.
+    # def _get_projection(self, player_history: pd.DataFrame, stat_col: str, vol_col: str,
+    #                    is_pitching: bool) -> float:
+    #     """
+    #     Select a projection strategy for a single stat and return a per-vol-unit rate.
+    #
+    #     Strategy selection order:
+    #       1. Single-year starter (1 season, >= 300 vol) — lightly regressed actual rate.
+    #       2. Low sample / single season < 300 vol — Bayesian regression to mean.
+    #       3. Injury-year V-shape detected — injury smoothing across three seasons.
+    #       4. Consistent monotone trend (2+ seasons) — linear regression of rates.
+    #       5. Default — recency-weighted career average.
+    #
+    #     After selecting a raw rate the method applies:
+    #       - Aging curve multiplier (dampened by career volume trust factor).
+    #       - Unproven tax: penalty on positive stats for batters with < 500 career PA,
+    #         or bonus on negative stats (H, BB, ER, HR against) for pitchers.
+    #       - Sanity caps via _apply_sanity_caps.
+    #
+    #     :param player_history: DataFrame of a single player's season rows sorted by Season.
+    #     :param stat_col: Stat column to project (e.g. 'H', 'HR', 'SO').
+    #     :param vol_col: Volume denominator column ('PA' for batters, 'PA' for pitchers).
+    #     :param is_pitching: True if projecting a pitcher stat.
+    #     :return: Projected per-vol-unit rate as a float.
+    #     """
+    #     num_years = len(player_history)
+    #     career_vol = player_history[vol_col].sum()
+    #     age_2026 = int(player_history.iloc[-1]['Age']) + 1
+    #     player_name = player_history.iloc[-1].get('Player', 'Unknown')
+    #
+    #     # --- DEBUG TRACE FOR WILL SMITH ---
+    #     # Retrieve Hashcode (check index if not a column)
+    #     player_hash = player_history.index[0] if player_history.index.name == 'Hashcode' else player_history.iloc[
+    #         -1].get('Hashcode', 'N/A')
+    #     is_debug = "Will Smith" in player_name
+    #     if is_debug:
+    #         print(f"\n{'=' * 60}")
+    #         print(f"DEBUG [{player_name}] | Hashcode: {player_hash}")
+    #         print(f"DEBUG | Projecting: {stat_col} per {vol_col}")
+    #         # This will help identify if the data is being duplicated/stacked
+    #         print(f"DEBUG | History Rows: {num_years} | Career Vol: {career_vol}")
+    #
+    #     # --- STEP 1: STRATEGY SELECTION ---
+    #     if num_years == 1 and career_vol >= 300:
+    #         method = "1-Year Starter"
+    #         raw_rate = self._project_single_year_starter(player_history, stat_col, vol_col)
+    #     elif (career_vol / num_years) < 100 or num_years < 2:
+    #         method = "Regress to Mean"
+    #         raw_rate = self._regress_to_mean(player_history, stat_col, vol_col)
+    #     elif self._is_injury_year(player_history, vol_col):
+    #         method = "Injury Smooth"
+    #         raw_rate = self._project_with_injury_smoothing(player_history, stat_col, vol_col)
+    #     elif self._is_consistent_trend(player_history, stat_col, vol_col) and num_years >= 2:
+    #         method = "Trend"
+    #         # NEW: Implement Trend Resistance and Growth Floors
+    #         trend_rate = self._linear_regression(player_history, stat_col, vol_col)
+    #         w_avg_rate = self._weighted_career_average(player_history, stat_col, vol_col)
+    #
+    #         if not is_pitching:
+    #             # A. Growth Floor: Prospects < 26 shouldn't 'slope' into oblivion
+    #             if age_2026 <= 25:
+    #                 raw_rate = max(trend_rate, w_avg_rate)
+    #             # B. Veteran Anchor: Blend trend with career for proven stars
+    #             elif num_years >= 3:
+    #                 raw_rate = (trend_rate * 0.50) + (w_avg_rate * 0.50)
+    #             else:
+    #                 raw_rate = trend_rate
+    #         else:
+    #             raw_rate = trend_rate
+    #     else:
+    #         method = "Weighted Avg"
+    #         raw_rate = self._weighted_career_average(player_history, stat_col, vol_col)
+    #
+    #     # --- STEP 2: AGING & GROWTH ---
+    #     trust = min(career_vol / self.gate, 1.0)
+    #     full_m = self._get_aging_multiplier(age_2026, is_pitching)
+    #     dampened_m = 1.0 + (full_m - 1.0) * trust
+    #     final_rate = raw_rate * dampened_m
+    #
+    #     # --- STEP 3: THE GLOBAL UNPROVEN TAX ---
+    #     safe_vol = max(1, career_vol)
+    #     if not is_pitching:
+    #         unproven_factor = np.clip(1.0 - (safe_vol / 500), 0, 1)
+    #         # CHANGE: Reduced penalty from 0.250 to 0.120 to 'warm up' the league
+    #         tax_multiplier = 1.0 - (0.120 * unproven_factor)
+    #
+    #         if stat_col == 'SO':
+    #             final_rate *= (1.0 + (0.08 * unproven_factor))
+    #         else:
+    #             final_rate *= tax_multiplier
+    #     else:
+    #         unproven_factor = max(0, 1.0 - (safe_vol / 150))
+    #         if stat_col in ['H', 'BB', 'ER', 'HR']:
+    #             final_rate *= (1.0 + (0.12 * unproven_factor))
+    #         else:
+    #             final_rate *= (1.0 - (0.12 * unproven_factor))
+    #
+    #     # --- STEP 4: RETURN & SANITY ---
+    #     if is_debug:
+    #         print(f"   -> Final Rate (Post-Aging/Tax): {final_rate:.6f}")
+    #
+    #     final_rate = self._apply_sanity_caps(final_rate, stat_col, is_pitching)
+    #     return float(final_rate) if final_rate is not None and not np.isnan(final_rate) else 0.0
 
-        Strategy selection order:
-          1. Single-year starter (1 season, >= 300 vol) — lightly regressed actual rate.
-          2. Low sample / single season < 300 vol — Bayesian regression to mean.
-          3. Injury-year V-shape detected — injury smoothing across three seasons.
-          4. Consistent monotone trend (2+ seasons) — linear regression of rates.
-          5. Default — recency-weighted career average.
-
-        After selecting a raw rate the method applies:
-          - Aging curve multiplier (dampened by career volume trust factor).
-          - Unproven tax: penalty on positive stats for batters with < 500 career PA,
-            or bonus on negative stats (H, BB, ER, HR against) for pitchers.
-          - Sanity caps via _apply_sanity_caps.
-
-        :param player_history: DataFrame of a single player's season rows sorted by Season.
-        :param stat_col: Stat column to project (e.g. 'H', 'HR', 'SO').
-        :param vol_col: Volume denominator column ('PA' for batters, 'PA' for pitchers).
-        :param is_pitching: True if projecting a pitcher stat.
-        :return: Projected per-vol-unit rate as a float.
-        """
+    def _get_projection_batter(self, player_history: pd.DataFrame, stat_col: str, vol_col: str) -> float:
         num_years = len(player_history)
         career_vol = player_history[vol_col].sum()
         age_2026 = int(player_history.iloc[-1]['Age']) + 1
-        player_name = player_history.iloc[-1].get('Player', 'Unknown')
 
-        # --- DEBUG TRACE FOR WILL SMITH ---
-        # Retrieve Hashcode (check index if not a column)
-        player_hash = player_history.index[0] if player_history.index.name == 'Hashcode' else player_history.iloc[
-            -1].get('Hashcode', 'N/A')
-        is_debug = "Will Smith" in player_name
-        if is_debug:
-            print(f"\n{'=' * 60}")
-            print(f"DEBUG [{player_name}] | Hashcode: {player_hash}")
-            print(f"DEBUG | Projecting: {stat_col} per {vol_col}")
-            # This will help identify if the data is being duplicated/stacked
-            print(f"DEBUG | History Rows: {num_years} | Career Vol: {career_vol}")
-
-        # --- STEP 1: STRATEGY SELECTION ---
+        # 1. STRATEGY SELECTION
         if num_years == 1 and career_vol >= 300:
-            method = "1-Year Starter"
             raw_rate = self._project_single_year_starter(player_history, stat_col, vol_col)
         elif (career_vol / num_years) < 100 or num_years < 2:
-            method = "Regress to Mean"
             raw_rate = self._regress_to_mean(player_history, stat_col, vol_col)
-        elif self._is_injury_year(player_history, vol_col):
-            method = "Injury Smooth"
-            raw_rate = self._project_with_injury_smoothing(player_history, stat_col, vol_col)
         elif self._is_consistent_trend(player_history, stat_col, vol_col) and num_years >= 2:
-            method = "Trend"
-            raw_rate = self._linear_regression(player_history, stat_col, vol_col)
+            # GROWTH FLOOR: Use Max of Trend vs Weighted Avg for young players
+            trend_rate = self._linear_regression(player_history, stat_col, vol_col)
+            w_avg_rate = self._weighted_career_average(player_history, stat_col, vol_col)
+            raw_rate = max(trend_rate, w_avg_rate) if age_2026 <= 25 else trend_rate
         else:
-            method = "Weighted Avg"
             raw_rate = self._weighted_career_average(player_history, stat_col, vol_col)
-        if is_debug:
-            print(f"   -> Method: {method} | Raw Rate: {raw_rate:.6f}")
 
-        # --- STEP 2: AGING & GROWTH ---
+        # 2. AGING & TAX
         trust = min(career_vol / self.gate, 1.0)
-        full_m = self._get_aging_multiplier(age_2026, is_pitching)
-        dampened_m = 1.0 + (full_m - 1.0) * trust
-        final_rate = raw_rate * dampened_m
-        # --- STEP 3: THE GLOBAL UNPROVEN TAX ---
-        safe_vol = max(1, career_vol)
-        if not is_pitching:
-            unproven_factor = max(0, 1.0 - (safe_vol / 500))
-            tax_multiplier = 1.0 - (0.250 * unproven_factor)  # TB projects at .223 up from 2025 .204
-            if stat_col == 'SO':
-                # Flip the tax for SO: Unproven guys strike out MORE
-                final_rate *= (1.0 + (0.08 * unproven_factor))
-            else:
-                final_rate *= tax_multiplier
+        multiplier = 1.0 + (self._get_aging_multiplier(age_2026, False) - 1.0) * trust
+
+        unproven_factor = np.clip(1.0 - (career_vol / 500), 0, 1)
+        tax = 1.0 - (0.12 * unproven_factor) if stat_col != 'SO' else 1.0 + (0.08 * unproven_factor)
+
+        return float(np.clip(raw_rate * multiplier * tax, 0, 0.450))  # Realistic ceiling
+
+    def _get_projection_pitcher(self, player_history: pd.DataFrame, stat_col: str, vol_col: str) -> float:
+        num_years = len(player_history)
+        career_vol = player_history[vol_col].sum()
+        age_2026 = int(player_history.iloc[-1]['Age']) + 1
+
+        # 1. STRATEGY SELECTION (Pitchers lean more on Weighted Averages to stabilize ERA)
+        if num_years < 2 or career_vol < 150:
+            raw_rate = self._regress_to_mean(player_history, stat_col, vol_col)
         else:
-            unproven_factor = max(0, 1.0 - (safe_vol / 150))
-            if stat_col in ['H', 'BB', 'ER', 'HR']:
-                final_rate *= (1.0 + (0.15 * unproven_factor))
+            # For Pitchers, blend Trend with Weighted Average 50/50 to prevent death spirals
+            trend_rate = self._linear_regression(player_history, stat_col, vol_col)
+            w_avg_rate = self._weighted_career_average(player_history, stat_col, vol_col)
+            raw_rate = (trend_rate * 0.5) + (w_avg_rate * 0.5)
+
+        # 2. AGING & TAX
+        multiplier = self._get_aging_multiplier(age_2026, True)
+
+        unproven_factor = np.clip(1.0 - (career_vol / 250), 0, 1)
+        tax = 1.0 + (0.07 * unproven_factor) if stat_col in ['H', 'BB', 'ER'] else 1.0 - (0.07 * unproven_factor)
+
+        final_rate = raw_rate * multiplier * tax
+
+        # 3. ANTI-GHOST LOGIC (The Gravity Anchor)
+        # Instead of max(rate, 2.10), we pull outliers back toward a 'Great' baseline
+        if stat_col == 'ER':
+            # 0.085 is roughly a 2.80 ERA. If they project better than that, pull them back.
+            elite_anchor = 0.085
+            if final_rate < elite_anchor:
+                # Gravity pulls them 50% of the way to a 3.50 ERA (0.108 rate)
+                gravity_well = 0.108
+                final_rate = (final_rate + gravity_well) / 2
+
+        # (Step 4) outlier brake
+        if stat_col == 'ER' and vol_col == 'IP_Dec':
+            lg_er_per_ip = self.lg_avgs.get('ER_per_IP', 4.25) / 9
+            # If a player has < 150 career IP, don't let them be better than 90% of league average
+            # This keeps position players like Torrens from looking like Cy Young winners
+            if career_vol < 150:
+                final_rate = max(final_rate, lg_er_per_ip * 0.9)
             else:
-                final_rate *= (1.0 - (0.15 * unproven_factor))
+                # For established guys, allow them to be elite (up to 40% of league average)
+                final_rate = max(final_rate, lg_er_per_ip * 0.4)
 
-        # --- STEP 4: RETURN & SANITY ---
-        if is_debug:
-            print(f"   -> Final Rate (Post-Aging/Tax): {final_rate:.6f}")
+        return float(final_rate)
 
-        final_rate = self._apply_sanity_caps(final_rate, stat_col, is_pitching)
-        return float(final_rate) if final_rate is not None and not np.isnan(final_rate) else 0.0
+    def _project_single_player(self, history: pd.DataFrame, stats: List[str], is_p: bool) -> dict:
+        """Dispatcher to route players to the correct projection engine."""
+        # 1. Handle Role-specific routing
+        role = str(history['Role'].iloc[0])
 
-    def _project_single_player(self, history: pd.DataFrame,
-                               stats: List[str],
-                               is_p: bool) -> dict:
-        """
-        Finalized Entry Point: Synchronizes Volume and Tethers Stats.
-        """
-        vol_col = 'PA'
-        # If we are projecting BATTING stats for a player whose role is PITCHER
-        # Give them 'Pitcher-at-the-Plate' rates (essentially zero).
-        if not is_p and 'Pitcher' in str(history['Role'].iloc[0]):
+        if is_p:
+            return self._project_pitcher(history)
+
+        # Handle Pitchers-at-the-plate (Batting stats for Pitchers)
+        if 'Pitcher' in role:
             result = {s: 0.0 for s in stats}
-            result['PA'] = history['PA'].iloc[-1]  # Keep their expected PA volume
-            result['AB'] = result['PA']
-            result['SO'] = result['PA'] * 0.50  # Pitchers strike out a lot
-            result['AVG'] = 0.000
+            result['PA'] = history['PA'].iloc[-1]
+            result['AB'], result['SO'], result['AVG'] = result['PA'], result['PA'] * 0.50, 0.0
+            result['Projection_Method'] = "Pitcher-Hitting"
             return result
 
-        # 1. VOLUME TARGETING
+        return self._project_batter(history)
+
+    def _project_batter(self, history: pd.DataFrame) -> dict:
         num_years = len(history)
+
+        # Volume Logic
         weights = np.array([3, 4, 5][-num_years:])
-        raw_vol = np.sum(history[vol_col].fillna(0).values * weights) / weights.sum()
+        raw_vol = np.sum(history['PA'].fillna(0).values * weights) / weights.sum()
+        proj_vol = min(max(150, raw_vol), 700)
 
-        if not is_p:
-            corridor_vol = max(150, min(raw_vol, 350))
-            trust_factor = np.clip(raw_vol / 450, 0, 1)
-            proj_vol = (raw_vol * trust_factor) + (corridor_vol * (1 - trust_factor))
-            proj_vol = min(proj_vol, 700)
-        else:
-            # Define Workhorse: 2+ seasons of 750+ PA (roughly 185-190 IP)
-            is_workhorse = (history[vol_col] > 750).sum() >= 2
-            if is_workhorse:
-                proj_vol = max(150, min(raw_vol, 850))  # Workhorses get a much higher ceiling (up to ~220 IP)
-            else:
-                # Standard starters are capped more strictly to prevent
-                # small-sample or injury-prone guys from getting 200 IP
-                proj_vol = max(75, min(raw_vol, 650))
-
-        # 2. INITIALIZE RESULT
         result = history.iloc[-1].to_dict()
-        result[vol_col] = proj_vol
+        result['PA'] = proj_vol
         result['Years_Included'] = history['Season'].tolist()
+        result['Projection_Method'] = "Trend" if num_years >= 2 else "Regressed"
 
-        # 3. METHOD LABELING
-        career_vol = history[vol_col].sum()
-        if num_years == 1 and career_vol >= 350:
-            result['Projection_Method'] = "1-Year Starter"
-        elif num_years >= 2:
-            result['Projection_Method'] = "Trend"
+        # A. Project Anchors (BB and SO per PA)
+        result['BB'] = self._get_projection_batter(history, 'BB', 'PA') * proj_vol
+        result['SO'] = self._get_projection_batter(history, 'SO', 'PA') * proj_vol
+
+        # B. Sync AB/Hits to avoid the 7-point leak
+        result['AB'] = proj_vol - (result.get('BB', 0) + result.get('HBP', 0) + result.get('SF', 0))
+        proj_ba = self._get_projection_batter(history, 'H', 'AB')
+        result['H'] = result['AB'] * proj_ba
+
+        # C. Tether Power to the NEW Hit total
+        proj_h_count = max(0.1, result['H'])
+        for stat in ['2B', '3B', 'HR']:
+            ratio = self._get_projection_batter(history, stat, 'H')
+            result[stat] = proj_h_count * ratio
+
+        result['AVG'] = result['H'] / max(1, result['AB'])
+        result['OBP'] = (result['H'] + result['BB']) / proj_vol
+        return result
+
+    def _project_pitcher(self, history: pd.DataFrame) -> dict:
+        """
+        Project a pitcher's 2026 performance using standardized unit logic.
+        Converts box-score IP (e.g. 200.1) to True Decimal IP (200.33)
+        to prevent math leaks.
+        """
+        num_years = len(history)
+
+        # 1. IP CONVERSION (The Logan Webb Fix)
+        # Create a temporary column of true decimal innings for calculation
+        history = history.copy()
+        history['IP_Dec'] = history['IP'].apply(lambda x: int(x) + (x % 1) * 3.333)
+
+        # 2. VOLUME LOGIC (BF/PA Target)
+        is_workhorse = (history['PA'] > 750).sum() >= 2
+        raw_vol = history['PA'].iloc[-1]
+        # Workhorses get a higher cap/floor to ensure the rotation stays full
+        if is_workhorse:
+            proj_vol = max(700, min(raw_vol, 850))
         else:
-            result['Projection_Method'] = "Regressed"
+            proj_vol = max(75, min(raw_vol, 650))
 
-        # 4. PROJECT ANCHOR STATS (H, BB, SO)
-        for stat in ['H', 'BB', 'SO']:
-            num_years = len(history)
-            career_vol = history[vol_col].sum()
-            is_proven = (num_years >= 2 and career_vol >= 1000)
+        # 3. INITIALIZE RESULT
+        result = history.iloc[-1].to_dict()
+        result['PA'] = proj_vol
+        result['Years_Included'] = history['Season'].tolist()
+        result['Projection_Method'] = "Trend" if num_years >= 2 else "Regressed"
 
-            if stat == 'H' and not is_proven and not is_p:
-                # ONLY protect the Batting Average for young players
-                rate_avg = self._weighted_career_average(history, stat, vol_col)
-                rate_trend = self._get_projection(history, stat, vol_col, is_p)
-                rate = max(rate_avg, rate_trend)
-            else:
-                # BB and SO should ALWAYS be regressed skeptically
-                rate = self._get_projection(history, stat, vol_col, is_p)
+        # 4. PROJECT PERIPHERALS (Rates per Batter Faced)
+        # These use PA as the denominator and are relatively stable
+        result['H'] = self._get_projection_pitcher(history, 'H', 'PA') * proj_vol
+        result['BB'] = self._get_projection_pitcher(history, 'BB', 'PA') * proj_vol
+        result['SO'] = self._get_projection_pitcher(history, 'SO', 'PA') * proj_vol
 
-            result[stat] = rate * proj_vol
+        # 5. DERIVE OUTS AND IP
+        # In baseball, PA - Hits - Walks - (HBP/SF) = Outs.
+        # We'll use a simplified (PA - H - BB) to find the 2026 Outs.
+        proj_outs = max(1, proj_vol - (result['H'] + result['BB']))
+        proj_ip_true = proj_outs / 3
 
-        # 5. PROJECT TETHERED STATS (2B, 3B, HR)
-        if not is_p:
-            proj_h = max(0.001, result['H']) # The safety floor in case hits is 0
-            for stat in ['2B', '3B', 'HR']:
-                # Project ratio relative to Hits
-                ratio = self._get_projection(history, stat, 'H', is_p)
-                result[stat] = proj_h * ratio
+        # 6. PROJECT EARNED RUNS (The Unit Correction)
+        # We project the rate of ER per INNING (not per 9 innings).
+        # 'IP_Dec' ensures we aren't dividing by 200.1 when we mean 200.33.
+        er_per_inning = self._get_projection_pitcher(history, 'ER', 'IP_Dec')
 
-            proj_h_rate = result['H'] / max(1, result['PA'])
-            result['AB'] = result['PA'] - (result.get('BB', 0) + result.get('HBP', 0) + result.get('SF', 0))
-            # Dynamic Safety Floor
-            # If ABs drop below Hits, we calculate a floor based on their projected talent.
-            # We add a small buffer (0.02) to ensure the AVG doesn't literally hit 1.000.
-            if result['AB'] <= result['H']:
-                # Use the higher of their projected rate or a league-average floor
-                # This lets stars be .320 hitters and bench guys be .240 hitters
-                talent_floor = max(0.240, proj_h_rate + 0.02)
-                result['AB'] = result['H'] / talent_floor
-        else:
-            proj_outs = result['PA'] - (result['H'] + result['BB'])
-            result['AB'] = proj_outs + result['H']
-            result['IP'] = (proj_outs // 3) + ((proj_outs % 3) / 10)
+        # Apply a SOFT floor (1.50 ERA equivalent) rather than the 1.91 hard floor
+        # lg_era (4.25) / 9 = 0.472 runs per inning. 0.472 * 0.35 = 0.165 (1.48 ERA)
+        lg_er_per_ip = self.lg_avgs.get('ER_per_IP', 4.25) / 9
+        er_per_inning = max(er_per_inning, lg_er_per_ip * 0.35)
+
+        result['ER'] = er_per_inning * proj_ip_true
+
+        # 7. FINAL DISPLAY FORMATTING
+        # Convert IP back to box score format (e.g., 187.1)
+        result['IP'] = (proj_outs // 3) + ((proj_outs % 3) / 10)
+        result['IP_True'] = proj_ip_true
+
+        # Recalculate rates for the CSV output
+        result['ERA'] = (result['ER'] * 9) / proj_ip_true
+        result['WHIP'] = (result['H'] + result['BB']) / proj_ip_true
+
+        # Calculate AB (Hits + Outs)
+        result['AB'] = result['H'] + proj_outs
 
         return result
+
+    # def _project_single_player(self, history: pd.DataFrame,
+    #                            stats: List[str],
+    #                            is_p: bool) -> dict:
+    #     """
+    #     Finalized Entry Point: Synchronizes Volume and Tethers Stats.
+    #     """
+    #     vol_col = 'PA'
+    #     # If we are projecting BATTING stats for a player whose role is PITCHER
+    #     # Give them 'Pitcher-at-the-Plate' rates (essentially zero).
+    #     if not is_p and 'Pitcher' in str(history['Role'].iloc[0]):
+    #         result = {s: 0.0 for s in stats}
+    #         result['PA'] = history['PA'].iloc[-1]  # Keep their expected PA volume
+    #         result['AB'] = result['PA']
+    #         result['SO'] = result['PA'] * 0.50  # Pitchers strike out a lot
+    #         result['AVG'] = 0.000
+    #         return result
+    #
+    #     # 1. VOLUME TARGETING
+    #     num_years = len(history)
+    #     weights = np.array([3, 4, 5][-num_years:])
+    #     raw_vol = np.sum(history[vol_col].fillna(0).values * weights) / weights.sum()
+    #
+    #     if not is_p:
+    #         corridor_vol = max(150, min(raw_vol, 350))
+    #         trust_factor = np.clip(raw_vol / 450, 0, 1)
+    #         proj_vol = (raw_vol * trust_factor) + (corridor_vol * (1 - trust_factor))
+    #         proj_vol = min(proj_vol, 700)
+    #     else:
+    #         # NEW: Workhorse Stamina Floor for Pitchers
+    #         is_workhorse = (history[vol_col] > 750).sum() >= 2
+    #         if is_workhorse:
+    #             # Workhorses get a floor to keep the sim from running cold on IP
+    #             proj_vol = max(700, min(raw_vol, 850))
+    #         else:
+    #             proj_vol = max(75, min(raw_vol, 650))
+    #
+    #     # 2. INITIALIZE RESULT
+    #     result = history.iloc[-1].to_dict()
+    #     result[vol_col] = proj_vol
+    #     result['Years_Included'] = history['Season'].tolist()
+    #
+    #     # 3. METHOD LABELING
+    #     career_vol = history[vol_col].sum()
+    #     if num_years == 1 and career_vol >= 350:
+    #         result['Projection_Method'] = "1-Year Starter"
+    #     elif num_years >= 2:
+    #         result['Projection_Method'] = "Trend"
+    #     else:
+    #         result['Projection_Method'] = "Regressed"
+    #
+    #     # 4. PROJECT ANCHOR STATS (H, BB, SO)
+    #     for stat in ['H', 'BB', 'SO']:
+    #         num_years = len(history)
+    #         career_vol = history[vol_col].sum()
+    #         is_proven = (num_years >= 2 and career_vol >= 1000)
+    #
+    #         if stat == 'H' and not is_proven and not is_p:
+    #             # ONLY protect the Batting Average for young players
+    #             rate_avg = self._weighted_career_average(history, stat, vol_col)
+    #             rate_trend = self._get_projection(history, stat, vol_col, is_p)
+    #             rate = max(rate_avg, rate_trend)
+    #         # SAFETY CAP: Prevent the 'Tobias Myers' 0.42 ERA
+    #         elif is_p and stat == 'ER':
+    #             # ER per PA (Batter Faced) should never be lower than ~1.5%
+    #             # (Which is roughly a 1.80 - 2.00 ERA floor)
+    #             lg_er_rate = self.lg_avgs.get('ER_per_PA', 0.110)
+    #             rate = max(rate, lg_er_rate * 0.4)  # Floor at 40% of league average
+    #         else:
+    #             # BB and SO should ALWAYS be regressed skeptically
+    #             rate = self._get_projection(history, stat, vol_col, is_p)
+    #
+    #         result[stat] = rate * proj_vol
+    #
+    #     # 5. PROJECT TETHERED STATS (2B, 3B, HR)
+    #     if not is_p:
+    #         # A. Calculate the 'True Talent' Batting Average Rate (H/AB)
+    #         # We use AB as the volume column here to ensure the BA is the anchor
+    #         proj_ba = self._get_projection(history, 'H', 'AB', is_p)
+    #
+    #         # B. Calculate AB via subtraction (this is our denominator)
+    #         result['AB'] = result['PA'] - (result.get('BB', 0) + result.get('HBP', 0) + result.get('SF', 0))
+    #
+    #         # C. SYNC HITS: Hits MUST be (AB * BA) to prevent the 7-point leak
+    #         result['H'] = result['AB'] * proj_ba
+    #
+    #         # D. Tether Power to the NEW Hit total
+    #         proj_h = max(0.1, result['H'])
+    #         for stat in ['2B', '3B', 'HR']:
+    #             ratio = self._get_projection(history, stat, 'H', is_p)
+    #             result[stat] = proj_h * ratio
+    #
+    #         # E. Final Consistency Check
+    #         result['AVG'] = result['H'] / max(1, result['AB'])
+    #     else:
+    #         # A. Calculate the 'True Talent' ERA Rate (ER per 27 outs)
+    #         # We use this as the primary anchor to keep the sim from running too 'cold'
+    #         proj_era = self._get_projection(history, 'ER', 'IP', is_pitching=True)
+    #
+    #         # B. Calculate Outs (The denominator for IP)
+    #         proj_outs = result['PA'] - (result['H'] + result['BB'])
+    #
+    #         # C. SYNC ER: Use the projected ERA to derive ER from the calculated outs
+    #         # Formula: (ERA * IP_True) / 9  where IP_True = Outs / 3
+    #         result['ER'] = (proj_era * (proj_outs / 3)) / 9
+    #
+    #         # D. Derive AB and IP for display
+    #         result['AB'] = proj_outs + result['H']
+    #         result['IP'] = (proj_outs // 3) + ((proj_outs % 3) / 10)
+    #
+    #         # E. Final Consistency Check for the CSV
+    #         result['ERA'] = proj_era
+    #         result['WHIP'] = (result['H'] + result['BB']) / (proj_outs / 3)
+    #         # # A. Tether Earned Runs to Baserunners (H + BB) instead of PA
+    #         # # This prevents the 'independent ER rate' from keeping the ERA too high.
+    #         # er_per_br = self._get_projection(history, 'ER', 'H', is_pitching=True)  # Using H as proxy for BR in history
+    #         # result['ER'] = (result['H'] + result['BB']) * er_per_br
+    #         # proj_outs = result['PA'] - (result['H'] + result['BB'])
+    #         # result['AB'] = proj_outs + result['H']
+    #         # result['IP'] = (proj_outs // 3) + ((proj_outs % 3) / 10)
+    #
+    #     return result
 
     def _project_single_year_starter(self, history: pd.DataFrame, stat_col: str, vol_col: str) -> float:
         """
@@ -416,18 +646,24 @@ class PlayerProjector:
         except:
             return self._weighted_career_average(history, stat_col, vol_col)
 
-        # EXPERIENCE-BASED DAMPENING:
-        # If they have 3+ years of data OR 1000+ PAs, we trust the trend almost 100%
-        is_proven = num_years >= 2 or career_vol >= 750
-        dampener = 0.95 if is_proven else min(0.25 * num_years, 0.8)
+        # 1. TIGHTEN PROVEN STATUS: Require 3 seasons AND 1000 PAs to trust a full trend
+        is_proven = num_years >= 3 and career_vol >= 1000
 
-        # Allow steeper slopes for proven power/hitters to capture surges
-        max_slope = 0.035 if (stat_col in ['HR', '2B', 'H'] and is_proven) else 0.020
+        # 2. VOLUME-BASED DAMPENING:
+        # Instead of just counting years, we scale trust based on career volume.
+        # A player with 200 PA should only have ~20% of their trend trusted.
+        vol_trust = np.clip(career_vol / 1000, 0, 1)
+        dampener = 0.95 if is_proven else (0.8 * vol_trust)
+
+        # 3. TIGHTEN SLOPES:
+        # Don't let unproven players (like Abraham Toro) jump 11 points in a single year.
+        max_slope = 0.035 if (stat_col in ['HR', '2B', 'H'] and is_proven) else 0.012
         slope = np.clip(slope, -max_slope, max_slope)
-
         proj = (slope * dampener * num_years) + intercept
-        # Proven players get a higher ceiling relative to their career peak
-        max_allowed_mult = 1.25 if is_proven else 1.10
+
+        # 4. CAP CEILING:
+        # Unproven players shouldn't be projected to blast 20% past their career peak.
+        max_allowed_mult = 1.25 if is_proven else 1.05
         max_allowed = rates.max() * max_allowed_mult
 
         return max(0.0, min(proj, max_allowed))
@@ -563,80 +799,86 @@ if __name__ == "__main__":
 
     # 1. Setup Mock Averages (Universal PA-based rates)
     mock_lg = {
-        'H_per_PA': 0.230,
-        '2B_per_PA': 0.050,
-        '3B_per_PA': 0.002,
-        'HR_per_PA': 0.035,
-        'BB_per_PA': 0.085,
-        'SO_per_PA': 0.225,
-        'ER_per_PA': 0.110,
+        'H_per_PA': 0.238,  # Increased to allow more baserunners
+        'BB_per_PA': 0.088,
+        'SO_per_PA': 0.220,
+        'ER_per_IP': 4.35,  # The "Target Anchor" - set this slightly higher than target
+        'H_per_AB': 0.250,
+        '2B_per_H': 0.180,
+        '3B_per_H': 0.010,
+        'HR_per_H': 0.120,
         'HBP_per_PA': 0.010,
         'SF_per_PA': 0.005
     }
 
     projector = PlayerProjector(mock_lg)
 
-    # 2. Raw Historical Data
+    # 2. Expanded Raw Historical Data (Real 2023-2025 Samples)
     raw_data = pd.DataFrame([
-        # --- BATTERS ---
-        {'Hashcode': 'TB1', 'Player': 'Tyler Black', 'Season': 2024, 'Age': 23,
+        # --- TYLER BLACK: Small sample size test ---
+        {'Hashcode': 'TB1', 'Player': 'Tyler Black', 'Season': 2024, 'Age': 23, 'Role': 'Batter',
          'AB': 49, 'H': 10, '2B': 2, '3B': 0, 'HR': 0, 'BB': 7, 'HBP': 0, 'SF': 0, 'SO': 17},
-        {'Hashcode': 'CD1', 'Player': 'Caleb Durbin', 'Season': 2025, 'Age': 25,
-         'AB': 445, 'H': 114, '2B': 25, '3B': 0, 'HR': 11, 'BB': 30, 'HBP': 2, 'SF': 3, 'SO': 50},
 
-        # --- PITCHERS ---
-        {'Hashcode': 'JJ1', 'Player': 'Jared Jones', 'Season': 2024, 'Age': 22,
-         'IP': 70.1, 'H': 60, 'ER': 30, 'BB': 25, 'SO': 85, 'HR': 10},
-        {'Hashcode': 'LW1', 'Player': 'Logan Webb', 'Season': 2024, 'Age': 27,
-         'IP': 213.2, 'H': 200, 'ER': 80, 'BB': 50, 'SO': 180, 'HR': 20}
+        # --- JACKSON CHOURIO: The Growth Floor Test (Age 21) ---
+        {'Hashcode': 'JC1', 'Player': 'Jackson Chourio', 'Season': 2024, 'Age': 20, 'Role': 'Batter',
+         'AB': 528, 'H': 145, '2B': 29, '3B': 4, 'HR': 21, 'BB': 39, 'HBP': 3, 'SF': 2, 'SO': 121},
+        {'Hashcode': 'JC1', 'Player': 'Jackson Chourio', 'Season': 2025, 'Age': 21, 'Role': 'Batter',
+         'AB': 549, 'H': 148, '2B': 35, '3B': 4, 'HR': 21, 'BB': 30, 'HBP': 3, 'SF': 6, 'SO': 121},
+
+        # --- WILLIAM CONTRERAS: The Veteran Anchor Test ---
+        {'Hashcode': 'WC1', 'Player': 'William Contreras', 'Season': 2023, 'Age': 25, 'Role': 'Batter',
+         'AB': 540, 'H': 156, '2B': 38, '3B': 1, 'HR': 17, 'BB': 63, 'HBP': 5, 'SF': 2, 'SO': 126},
+        {'Hashcode': 'WC1', 'Player': 'William Contreras', 'Season': 2024, 'Age': 26, 'Role': 'Batter',
+         'AB': 595, 'H': 167, '2B': 37, '3B': 2, 'HR': 23, 'BB': 78, 'HBP': 3, 'SF': 3, 'SO': 139},
+        {'Hashcode': 'WC1', 'Player': 'William Contreras', 'Season': 2025, 'Age': 27, 'Role': 'Batter',
+         'AB': 566, 'H': 147, '2B': 28, '3B': 0, 'HR': 17, 'BB': 84, 'HBP': 3, 'SF': 6, 'SO': 120},
+
+        # --- FREDDY PERALTA: The 1.91 Ghost ERA Test ---
+        {'Hashcode': 'FP1', 'Player': 'Freddy Peralta', 'Season': 2023, 'Age': 27, 'Role': 'Pitcher',
+         'IP': 165.2, 'H': 131, 'ER': 71, 'BB': 54, 'SO': 210, 'HR': 26},
+        {'Hashcode': 'FP1', 'Player': 'Freddy Peralta', 'Season': 2024, 'Age': 28, 'Role': 'Pitcher',
+         'IP': 173.2, 'H': 143, 'ER': 71, 'BB': 68, 'SO': 200, 'HR': 25},
+        {'Hashcode': 'FP1', 'Player': 'Freddy Peralta', 'Season': 2025, 'Age': 29, 'Role': 'Pitcher',
+         'IP': 176.2, 'H': 124, 'ER': 53, 'BB': 66, 'SO': 204, 'HR': 21},
+
+        # --- TOBIAS MYERS: The Low-Inning Outlier Test ---
+        {'Hashcode': 'TM1', 'Player': 'Tobias Myers', 'Season': 2024, 'Age': 25, 'Role': 'Pitcher',
+         'IP': 138.0, 'H': 126, 'ER': 46, 'BB': 36, 'SO': 127},
+        {'Hashcode': 'TM1', 'Player': 'Tobias Myers', 'Season': 2025, 'Age': 26, 'Role': 'Pitcher',
+         'IP': 50.2, 'H': 54, 'ER': 20, 'BB': 15, 'SO': 38}
     ])
 
-    # 3. Pre-process PA and assign 'Role' (Critical to prevent KeyError)
+    # 3. Pre-process PA and assign 'Role'
     processed_rows = []
     for _, row in raw_data.iterrows():
         r = row.to_dict()
         if 'IP' in r and pd.notnull(r['IP']):
-            # Pitching PA (Batters Faced) = (IP_Whole * 3 + IP_Dec * 10) + H + BB
             outs = (int(r['IP']) * 3) + np.round((r['IP'] % 1) * 10)
             r['PA'] = outs + r['H'] + r.get('BB', 0)
             r['is_pitcher'] = True
-            r['Role'] = 'Pitcher'  # Explicitly added for internal class logic
         else:
-            # Hitting PA = AB + BB + HBP + SF
             r['PA'] = r.get('AB', 0) + r.get('BB', 0) + r.get('HBP', 0) + r.get('SF', 0)
             r['is_pitcher'] = False
-            r['Role'] = 'Batter'   # Explicitly added for internal class logic
             r['IP'] = np.nan
         processed_rows.append(r)
 
     df_ready = pd.DataFrame(processed_rows)
 
     # 4. RUN PROJECTIONS
-    hitter_stats = ['H', '2B', '3B', 'HR', 'BB', 'SO']
-    pitcher_stats = ['H', 'BB', 'SO', 'HR', 'ER']
-
-    h_proj = projector.calculate_projected_stats(df_ready[~df_ready['is_pitcher']], hitter_stats, is_p=False)
-    p_proj = projector.calculate_projected_stats(df_ready[df_ready['is_pitcher']], pitcher_stats, is_p=True)
+    h_proj = projector.calculate_projected_stats(df_ready[~df_ready['is_pitcher']], [], is_p=False)
+    p_proj = projector.calculate_projected_stats(df_ready[df_ready['is_pitcher']], [], is_p=True)
 
     # 5. OUTPUT BATTERS
     print("\n" + "=" * 100)
-    print(f"{'BATTER':<18} | {'METHOD':<15} | {'PA':<5} | {'AB':<5} | {'H':<5} | {'AVG':<6} | {'OBP':<6}")
+    print(f"{'BATTER CHECK':<18} | {'METHOD':<12} | {'PA':<5} | {'AB':<5} | {'H':<5} | {'AVG':<6} | {'OBP':<6}")
     print("-" * 100)
     for _, row in h_proj.iterrows():
-        avg = row['H'] / row['AB'] if row['AB'] > 0 else 0
-        obp = (row['H'] + row['BB']) / row['PA'] if row['PA'] > 0 else 0
-        print(f"{row['Player']:<18} | {row['Projection_Method']:<15} | {int(row['PA']):<5} | {int(row['AB']):<5} | {int(row['H']):<5} | {avg:<6.3f} | {obp:<6.3f}")
+        print(f"{row['Player']:<18} | {row['Projection_Method']:<12} | {int(row['PA']):<5} | {int(row['AB']):<5} | {int(row['H']):<5} | {row['AVG']:<6.3f} | {row['OBP']:<6.3f}")
 
     # 6. OUTPUT PITCHERS
     print("\n" + "=" * 100)
-    print(f"{'PITCHER':<18} | {'METHOD':<15} | {'IP':<6} | {'PA(BF)':<7} | {'K/9':<6} | {'WHIP':<6}")
+    print(f"{'PITCHER CHECK':<18} | {'METHOD':<12} | {'IP':<6} | {'K/9':<6} | {'WHIP':<6} | {'ERA':<6}")
     print("-" * 100)
     for _, row in p_proj.iterrows():
-        # WHIP and K/9 calculations
-        outs = (int(row['IP']) * 3) + np.round((row['IP'] % 1) * 10)
-        ip_true = outs / 3
-        whip = (row['H'] + row['BB']) / ip_true if ip_true > 0 else 0
-        k9 = (row['SO'] * 9) / ip_true if ip_true > 0 else 0
-
-        print(f"{row['Player']:<18} | {row['Projection_Method']:<15} | {row['IP']:<6.1f} | {int(row['PA']):<7} | {k9:<6.2f} | {whip:<6.2f}")
+        print(f"{row['Player']:<18} | {row['Projection_Method']:<12} | {row['IP']:<6.1f} | { (row['SO']*9)/(row['IP_True']):<6.2f} | {row['WHIP']:<6.2f} | {row['ERA']:<6.2f}")
     print("=" * 100)

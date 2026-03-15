@@ -26,6 +26,7 @@ from pandas.core.series import Series
 from typing import List, Tuple, Optional
 import queue
 from bblogger import logger
+import threading
 
 AWAY = 0
 HOME = 1
@@ -66,6 +67,7 @@ class Game:
         :param show_bench: show the players not in game along with the lineup
         :param debug: prints extra info
         """
+        self.thread_lock = threading.Lock()
         self.game_recap = ''
         if baseball_data is None:
             self.baseball_data = bbstats.BaseballStats(load_seasons=load_seasons, new_season=new_season,
@@ -419,8 +421,9 @@ class Game:
         """
         cur_pitcher_index = self.teams[self.team_pitching()].cur_pitcher_index
         pitching = self.teams[self.team_pitching()].cur_pitcher_stats()  # data for pitcher
-        pitching.Game_Fatigue_Factor, cur_percentage = \
-            self.teams[self.team_pitching()].update_fatigue(cur_pitcher_index)
+        with self.thread_lock:
+            pitching.Game_Fatigue_Factor, cur_percentage = \
+                self.teams[self.team_pitching()].update_fatigue(cur_pitcher_index)
 
         cur_batter_index = self.teams[self.team_hitting()].batter_index_in_lineup(self.batting_num[self.team_hitting()])
         batting = self.teams[self.team_hitting()].batter_stats_in_lineup(cur_batter_index)
@@ -432,10 +435,12 @@ class Game:
                                   bases_to_advance=self.outcomes.bases_to_advance,
                                   on_base_b=self.outcomes.on_base_b, outs=self.outs)
         self.outcomes.set_runs_score(self.bases.runs_scored)  # runs and rbis for batter and pitcher
+        with self.thread_lock:
+            self.teams[self.team_pitching()].box_score.pitching_result(cur_pitcher_index, self.outcomes,
+                                                                       pitching.Condition)
+            self.teams[self.team_hitting()].box_score.batting_result(cur_batter_index, self.outcomes,
+                                                                     self.bases.player_scored)
 
-        self.teams[self.team_pitching()].box_score.pitching_result(cur_pitcher_index, self.outcomes, pitching.Condition)
-        self.teams[self.team_hitting()].box_score.batting_result(cur_batter_index, self.outcomes,
-                                                                 self.bases.player_scored)
         if self.chatty:
             out_text = 'Out' if self.outs <= 1 else 'Outs'
             play_text = (f'Pitcher: {pitching.Player} against {self.team_names[self.team_hitting()]} '

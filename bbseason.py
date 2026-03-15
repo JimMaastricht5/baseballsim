@@ -690,8 +690,8 @@ class BaseballSeason:
                 return
 
         # Calculate current Sim WAR values before assessments
-        # NOTE: calculate_sim_war() requires semaphore protection
-        with self.baseball_data.semaphore:
+        # NOTE: calculate_sim_war() requires lock protection
+        with self.baseball_data.thread_lock:
             self.baseball_data.calculate_sim_war()
 
         # Determine which teams to print

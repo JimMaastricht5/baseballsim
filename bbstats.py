@@ -13,7 +13,7 @@ Key Features:
 - Loads both aggregated (career) and new season player statistics
 - Caches league-wide statistics for 2-3x performance improvement
 - Manages dynamic player state (condition, injuries, streaks)
-- Thread-safe stats updates via semaphore locking
+- Thread-safe stats updates via lock
 - Syncs condition and injury data between historical and new season stats
 - Calculates all derived baseball statistics (AVG, OBP, SLG, ERA, WHIP, etc.)
 
@@ -70,7 +70,7 @@ class BaseballStats:
         self.prorated_2025_cache = {}  # {team_name_games: (batting_df, pitching_df)}
 
         self.suppress_console_output = suppress_console_output
-        self.semaphore = threading.Semaphore(1)  # one thread can update games stats at a time
+        self.thread_lock = threading.Lock()  # one thread can update games stats at a time
         self._rng_instance = np.random.default_rng()  # PERFORMANCE: Create RNG instance once, reuse for ~29x speedup
         self.rnd = lambda: self._rng_instance.uniform(low=0.0, high=1.001)
 
@@ -397,7 +397,7 @@ class BaseballStats:
         :param current_games_played:
         :return:
         """
-        with self.semaphore:  # prevent reads while being written to elsewhere
+        with self.thread_lock:  # prevent concurrent reads/writes
             # 1. Quick Validation & Auto-Calculation
             if current_games_played is None:
                 # Fallback to mean games played if no specific team
@@ -597,7 +597,7 @@ class BaseballStats:
         :param box_score_class: box score from game to add to season stats
         :return: None
         """
-        with self.semaphore:
+        with self.thread_lock:
             batting_box_score = box_score_class.get_batter_game_stats()
             pitching_box_score = box_score_class.get_pitcher_game_stats()
 
@@ -937,7 +937,7 @@ class BaseballStats:
         :param teams_to_follow: Optional list of team names to show hot/cold players for
         :return: None
         """
-        with self.semaphore:
+        with self.thread_lock:
             self.is_injured()
             self.update_streaks()  # Update streaks for active players only
             self.print_hot_cold_players(teams_to_follow)  # Print hot/cold players for followed teams
@@ -974,7 +974,7 @@ class BaseballStats:
         make thread safe, should only be called by season controller once
         :return: None
         """
-        with self.semaphore:
+        with self.thread_lock:
             logger.debug('Calculating team pitching stats...')
             # self.new_season_pitching_data = \
             #     team_pitching_stats(self.new_season_pitching_data[self.new_season_pitching_data['IP'] > 0].fillna(0))
@@ -1013,91 +1013,90 @@ class BaseballStats:
 
        Results stored in 'Sim_WAR' column for both batting and pitching dataframes.
 
-       NOTE: This function should be called from within a semaphore-protected context.
-       It does NOT acquire its own semaphore to avoid deadlock.
+       NOTE: This function should be called from within a lock-protected context.
+       It does NOT acquire its own lock to avoid deadlock.
 
        :return: None (modifies dataframes in place)
            """
-        # NOTE: No semaphore here - caller must hold it
+        with self.thread_lock:
+            # 1. Determine common seasonal progress anchor
+            # We use the max games played in the league to determine how far we are into the 162-game schedule
+            max_games_played = max(self.new_season_batting_data['G'].max(), 1)
 
-        # 1. Determine common seasonal progress anchor
-        # We use the max games played in the league to determine how far we are into the 162-game schedule
-        max_games_played = max(self.new_season_batting_data['G'].max(), 1)
+            # Calculate the fade weight: 1.0 at Game 0, sliding toward 0.1 at Game 162
+            # We use a floor of 0.1 so that career track records always provide a tiny anchor.
+            prior_weight = max(0.1, 1.0 - (max_games_played / 162.0))
+            logger.debug(f'Sim_WAR calculation: Seasonal progress {max_games_played}/162. Prior weight: {prior_weight:.2f}')
 
-        # Calculate the fade weight: 1.0 at Game 0, sliding toward 0.1 at Game 162
-        # We use a floor of 0.1 so that career track records always provide a tiny anchor.
-        prior_weight = max(0.1, 1.0 - (max_games_played / 162.0))
-        logger.debug(f'Sim_WAR calculation: Seasonal progress {max_games_played}/162. Prior weight: {prior_weight:.2f}')
+            # ===== BATTER SIM WAR =====
+            batting_df = self.new_season_batting_data
+            active_batters = batting_df['AB'] >= 10
 
-        # ===== BATTER SIM WAR =====
-        batting_df = self.new_season_batting_data
-        active_batters = batting_df['AB'] >= 10
+            if active_batters.sum() > 0:
+                # Calculate wOBA
+                singles = batting_df['H'] - batting_df['2B'] - batting_df['3B'] - batting_df['HR']
+                woba_numerator = (0.69 * batting_df['BB'] + 0.72 * batting_df['HBP'] + 0.88 * singles +
+                                  1.24 * batting_df['2B'] + 1.56 * batting_df['3B'] + 1.95 * batting_df['HR'])
+                plate_appearances = batting_df['AB'] + batting_df['BB'] + batting_df['HBP'] + batting_df['SF']
+                woba = np.where(plate_appearances > 0, woba_numerator / plate_appearances, 0.0)
 
-        if active_batters.sum() > 0:
-            # Calculate wOBA
-            singles = batting_df['H'] - batting_df['2B'] - batting_df['3B'] - batting_df['HR']
-            woba_numerator = (0.69 * batting_df['BB'] + 0.72 * batting_df['HBP'] + 0.88 * singles +
-                              1.24 * batting_df['2B'] + 1.56 * batting_df['3B'] + 1.95 * batting_df['HR'])
-            plate_appearances = batting_df['AB'] + batting_df['BB'] + batting_df['HBP'] + batting_df['SF']
-            woba = np.where(plate_appearances > 0, woba_numerator / plate_appearances, 0.0)
+                # League averages & replacement level
+                league_woba = np.mean(woba[active_batters])
+                replacement_woba = league_woba - 0.020
 
-            # League averages & replacement level
-            league_woba = np.mean(woba[active_batters])
-            replacement_woba = league_woba - 0.020
+                # Offensive runs above replacement and conversion to Wins
+                runs_above_replacement = ((woba - replacement_woba) / 1.15) * plate_appearances
+                sim_war_current = runs_above_replacement / 10.0
 
-            # Offensive runs above replacement and conversion to Wins
-            runs_above_replacement = ((woba - replacement_woba) / 1.15) * plate_appearances
-            sim_war_current = runs_above_replacement / 10.0
+                # Add Def_WAR (scaled by current participation)
+                if 'Def_WAR' in batting_df.columns:
+                    scaled_def_war = batting_df['Def_WAR'] * (batting_df['G'] / 162.0)
+                    sim_war_current += scaled_def_war
 
-            # Add Def_WAR (scaled by current participation)
-            if 'Def_WAR' in batting_df.columns:
-                scaled_def_war = batting_df['Def_WAR'] * (batting_df['G'] / 162.0)
-                sim_war_current += scaled_def_war
+                # BLEND: Current Season Results + (Prior Season WAR * Dynamic Fade Weight)
+                batting_df['Sim_WAR'] = np.where(active_batters,
+                                                 sim_war_current + (batting_df['WAR'] * prior_weight),
+                                                 batting_df['WAR'] * prior_weight)
 
-            # BLEND: Current Season Results + (Prior Season WAR * Dynamic Fade Weight)
-            batting_df['Sim_WAR'] = np.where(active_batters,
-                                             sim_war_current + (batting_df['WAR'] * prior_weight),
-                                             batting_df['WAR'] * prior_weight)
+                logger.debug('Batting Sim_WAR blended with prior_weight: {:.2f}', prior_weight)
+            else:
+                # Before any games are played, Sim_WAR is just the Prior WAR
+                batting_df['Sim_WAR'] = batting_df['WAR']
 
-            logger.debug('Batting Sim_WAR blended with prior_weight: {:.2f}', prior_weight)
-        else:
-            # Before any games are played, Sim_WAR is just the Prior WAR
-            batting_df['Sim_WAR'] = batting_df['WAR']
+            # ===== PITCHER SIM WAR =====
+            pitching_df = self.new_season_pitching_data
+            active_pitchers = pitching_df['IP'] >= 5
 
-        # ===== PITCHER SIM WAR =====
-        pitching_df = self.new_season_pitching_data
-        active_pitchers = pitching_df['IP'] >= 5
+            if active_pitchers.sum() > 0:
+                # Calculate FIP
+                fip_constant = 3.10
+                fip_numerator = (13 * pitching_df['HR'] + 3 * pitching_df['BB'] - 2 * pitching_df['SO'])
+                fip = np.where(pitching_df['IP'] > 0, (fip_numerator / pitching_df['IP']) + fip_constant, 0.0)
 
-        if active_pitchers.sum() > 0:
-            # Calculate FIP
-            fip_constant = 3.10
-            fip_numerator = (13 * pitching_df['HR'] + 3 * pitching_df['BB'] - 2 * pitching_df['SO'])
-            fip = np.where(pitching_df['IP'] > 0, (fip_numerator / pitching_df['IP']) + fip_constant, 0.0)
+                # League averages & replacement level
+                league_fip = np.mean(fip[active_pitchers])
+                replacement_fip = league_fip + 1.0
 
-            # League averages & replacement level
-            league_fip = np.mean(fip[active_pitchers])
-            replacement_fip = league_fip + 1.0
+                # Runs prevented and conversion to Wins
+                runs_above_replacement = ((replacement_fip - fip) / 9.0) * pitching_df['IP']
+                sim_war_current = runs_above_replacement / 10.0
 
-            # Runs prevented and conversion to Wins
-            runs_above_replacement = ((replacement_fip - fip) / 9.0) * pitching_df['IP']
-            sim_war_current = runs_above_replacement / 10.0
+                # Add Def_WAR (scaled by typical pitcher participation)
+                if 'Def_WAR' in pitching_df.columns:
+                    scaled_def_war = pitching_df['Def_WAR'] * (pitching_df['G'] / 50.0)
+                    sim_war_current += scaled_def_war
 
-            # Add Def_WAR (scaled by typical pitcher participation)
-            if 'Def_WAR' in pitching_df.columns:
-                scaled_def_war = pitching_df['Def_WAR'] * (pitching_df['G'] / 50.0)
-                sim_war_current += scaled_def_war
+                # BLEND: Current Season Results + (Prior Season WAR * Dynamic Fade Weight)
+                pitching_df['Sim_WAR'] = np.where(active_pitchers,
+                                                  sim_war_current + (pitching_df['WAR'] * prior_weight),
+                                                  pitching_df['WAR'] * prior_weight)
 
-            # BLEND: Current Season Results + (Prior Season WAR * Dynamic Fade Weight)
-            pitching_df['Sim_WAR'] = np.where(active_pitchers,
-                                              sim_war_current + (pitching_df['WAR'] * prior_weight),
-                                              pitching_df['WAR'] * prior_weight)
+                logger.debug('Pitching Sim_WAR blended with prior_weight: {:.2f}', prior_weight)
+            else:
+                # Initial state
+                pitching_df['Sim_WAR'] = pitching_df['WAR']
 
-            logger.debug('Pitching Sim_WAR blended with prior_weight: {:.2f}', prior_weight)
-        else:
-            # Initial state
-            pitching_df['Sim_WAR'] = pitching_df['WAR']
-
-        return
+            return
 
     def move_a_player_between_teams(self, player_index, new_team):
         is_batter, is_pitcher = self.is_batter_or_pitcher(player_index)

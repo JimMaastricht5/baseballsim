@@ -216,8 +216,7 @@ class UIBaseballSeason(bbseason.BaseballSeason):
                 return
 
         # Calculate current Sim WAR values before assessments
-        with self.baseball_data.semaphore:
-            self.baseball_data.calculate_sim_war()
+        self.baseball_data.calculate_sim_war()
 
         # Determine which teams to print (or in our case, emit)
         teams_to_print = self._get_teams_to_print()

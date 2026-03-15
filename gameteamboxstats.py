@@ -53,6 +53,8 @@ class TeamBoxScore:
         # self.rnd = lambda: np.random.default_rng().uniform(low=0.0, high=1.001)  # random generator between 0 and 1
         self.box_printed = ''
         self.box_pitching = pitching.copy()
+        _ = self.box_pitching.index._engine  # Force pandas to build the index engine now for threading protection
+
         self.box_pitching[['G', 'GS']] = 1
         self.box_pitching[['CG', 'SHO', 'AB', 'H', '2B', '3B', 'ER', 'SO', 'BB', 'HR', 'W', 'L', 'SV', 'BS',
                            'HLD']] = 0
@@ -66,6 +68,8 @@ class TeamBoxScore:
         self.game_pitching_stats = None
 
         self.box_batting = lineup.copy()
+        _ = self.box_batting.index._engine  # Force pandas to build the index engine now for threading protection
+
         self.box_batting[['G']] = 1
         self.box_batting[['AB', 'R', 'H', '2B', '3B', 'HR', 'RBI', 'SB', 'CS', 'BB', 'SO', 'SH', 'SF', 'HBP']] = 0
         self.box_batting[['AVG', 'OBP', 'SLG', 'OPS']] = 0.0

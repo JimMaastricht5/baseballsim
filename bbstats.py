@@ -220,18 +220,26 @@ class BaseballStats:
         loads data for batters
         :param team_name: single team name is optional, alt is full league
         :param prior_season: is this data from a prior season or the current one?
-        :return: dataframe of seasons data
+        :return: dataframe of seasons data (always a copy - safe for concurrent access)
         """
-        if team_name is None:
-            df = self.batting_data if prior_season else self.new_season_batting_data
+        if prior_season:
+            # batting_data is static after load - no lock needed, but copy for consistency
+            if team_name is None:
+                df = self.batting_data.copy()
+            else:
+                with self.thread_lock:
+                    df_new = self.new_season_batting_data[
+                        self.new_season_batting_data['Team'] == team_name].copy()
+                df = self.batting_data[self.batting_data.index.isin(df_new.index)].copy()
         else:
-            df_new = self.new_season_batting_data[self.new_season_batting_data['Team'] == team_name]
-            df_cur = self.batting_data[self.batting_data.index.isin(df_new.index)]
-            df = df_cur if prior_season else df_new
+            # new_season_batting_data is mutated by game threads - snapshot under lock
+            with self.thread_lock:
+                if team_name is None:
+                    df = self.new_season_batting_data.copy()
+                else:
+                    df = self.new_season_batting_data[
+                        self.new_season_batting_data['Team'] == team_name].copy()
         logger.debug('Getting batting data for team: {}', team_name)
-        logger.debug('New season batting data sample:\n{}', self.new_season_batting_data.head(5).to_string())
-        logger.debug('Available teams: {}', self.new_season_batting_data['Team'].unique())
-        logger.debug('Retrieved batting data sample:\n{}', df.head(5).to_string())
         df = team_batting_stats(df, filter_stats=False)
         df = self.add_missing_cols(df)
 
@@ -242,14 +250,25 @@ class BaseballStats:
         loads data for pitchers
         :param team_name: single team name is optional, alt is full league
         :param prior_season: is this data from a prior season or the current one?
-        :return: df with seasons data
+        :return: df with seasons data (always a copy - safe for concurrent access)
         """
-        if team_name is None:
-            df = self.pitching_data if prior_season else self.new_season_pitching_data
+        if prior_season:
+            # pitching_data is static after load - no lock needed, but copy for consistency
+            if team_name is None:
+                df = self.pitching_data.copy()
+            else:
+                with self.thread_lock:
+                    df_new = self.new_season_pitching_data[
+                        self.new_season_pitching_data['Team'] == team_name].copy()
+                df = self.pitching_data[self.pitching_data.index.isin(df_new.index)].copy()
         else:
-            df_new = self.new_season_pitching_data[self.new_season_pitching_data['Team'] == team_name]
-            df_cur = self.pitching_data[self.pitching_data.index.isin(df_new.index)]
-            df = df_cur if prior_season else df_new
+            # new_season_pitching_data is mutated by game threads - snapshot under lock
+            with self.thread_lock:
+                if team_name is None:
+                    df = self.new_season_pitching_data.copy()
+                else:
+                    df = self.new_season_pitching_data[
+                        self.new_season_pitching_data['Team'] == team_name].copy()
         # Don't filter stats - include pitchers with 0 IP (important for roster display at season start)
         df = team_pitching_stats(df, filter_stats=False)
         df = self.add_missing_cols(df)

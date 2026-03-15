@@ -397,67 +397,68 @@ class BaseballStats:
         :param current_games_played:
         :return:
         """
-        # 1. Quick Validation & Auto-Calculation
-        if current_games_played is None:
-            # Fallback to mean games played if no specific team
-            current_games_played = int(np.mean(list(self.team_games_played.values()))) if self.team_games_played else 0
+        with self.semaphore:  # prevent reads while being written to elsewhere
+            # 1. Quick Validation & Auto-Calculation
+            if current_games_played is None:
+                # Fallback to mean games played if no specific team
+                current_games_played = int(np.mean(list(self.team_games_played.values()))) if self.team_games_played else 0
 
-        if current_games_played <= 0:
-            return (pd.DataFrame(), pd.DataFrame())
+            if current_games_played <= 0:
+                return (pd.DataFrame(), pd.DataFrame())
 
-        # Cache check (unchanged)
-        cache_key = f"{team_name if team_name else 'LEAGUE'}_{current_games_played}"
-        if cache_key in self.prorated_2025_cache:
-            return self.prorated_2025_cache[cache_key]
+            # Cache check (unchanged)
+            cache_key = f"{team_name if team_name else 'LEAGUE'}_{current_games_played}"
+            if cache_key in self.prorated_2025_cache:
+                return self.prorated_2025_cache[cache_key]
 
-        self._ensure_2025_historical_loaded()
-        prorate_factor = current_games_played / 162.0
+            self._ensure_2025_historical_loaded()
+            prorate_factor = current_games_played / 162.0
 
-        # 2. Vectorized Filtering
-        if team_name:
-            # TEAM VIEW: Only include players currently on this team's 2026 roster
-            mask_b = self.new_season_batting_data['Team'] == team_name
-            hashes_b = self.new_season_batting_data[mask_b].index
-            df_b = self.historical_2025_batting.loc[self.historical_2025_batting['Hashcode'].isin(hashes_b)].copy()
+            # 2. Vectorized Filtering
+            if team_name:
+                # TEAM VIEW: Only include players currently on this team's 2026 roster
+                mask_b = self.new_season_batting_data['Team'] == team_name
+                hashes_b = self.new_season_batting_data[mask_b].index
+                df_b = self.historical_2025_batting.loc[self.historical_2025_batting['Hashcode'].isin(hashes_b)].copy()
 
-            mask_p = self.new_season_pitching_data['Team'] == team_name
-            hashes_p = self.new_season_pitching_data[mask_p].index
-            df_p = self.historical_2025_pitching.loc[self.historical_2025_pitching['Hashcode'].isin(hashes_p)].copy()
-        else:
-            df_b = self.historical_2025_batting.copy()
-            df_p = self.historical_2025_pitching.copy()
+                mask_p = self.new_season_pitching_data['Team'] == team_name
+                hashes_p = self.new_season_pitching_data[mask_p].index
+                df_p = self.historical_2025_pitching.loc[self.historical_2025_pitching['Hashcode'].isin(hashes_p)].copy()
+            else:
+                df_b = self.historical_2025_batting.copy()
+                df_p = self.historical_2025_pitching.copy()
 
-        # 3. Batting Proration (Vectorized)
-        if not df_b.empty:
-            # Aggregating by Hashcode captures all segments of a traded player's 2025 season
-            bat_cols = ['G', 'AB', 'R', 'H', '2B', '3B', 'HR', 'RBI', 'SB', 'CS', 'BB', 'SO', 'SF', 'SH', 'HBP']
-            df_b = df_b.groupby('Hashcode')[bat_cols].sum()
+            # 3. Batting Proration (Vectorized)
+            if not df_b.empty:
+                # Aggregating by Hashcode captures all segments of a traded player's 2025 season
+                bat_cols = ['G', 'AB', 'R', 'H', '2B', '3B', 'HR', 'RBI', 'SB', 'CS', 'BB', 'SO', 'SF', 'SH', 'HBP']
+                df_b = df_b.groupby('Hashcode')[bat_cols].sum()
 
-            # Vectorized multiplication and rounding
-            df_b[bat_cols] = (df_b[bat_cols] * prorate_factor).round().astype(float)
-            df_b = team_batting_stats(df_b, filter_stats=False)
+                # Vectorized multiplication and rounding
+                df_b[bat_cols] = (df_b[bat_cols] * prorate_factor).round().astype(float)
+                df_b = team_batting_stats(df_b, filter_stats=False)
 
-        # 4. Pitching Proration (Base-3 IP logic with Trade Aggregation)
-        if not df_p.empty:
-            # First, convert IP to Total Outs
-            df_p['Total_Outs_Calc'] = (df_p['IP'].astype(float) * 3) + ((df_p['IP'] % 1) * 10).round()
-            # Add 'AB' to the pitch_cols so it isn't dropped during groupby
-            # Pitchers need 'AB' (at-bats AGAINST them) to calculate OBP and AVG_faced
-            pitch_cols = ['G', 'AB', 'H', '2B', '3B', 'R', 'ER', 'HR', 'BB', 'SO', 'W', 'L', 'SV', 'BS', 'HLD', 'GS',
-                          'CG', 'SHO']
-            agg_dict = {col: 'sum' for col in pitch_cols if col in df_p.columns}
-            agg_dict['Total_Outs_Calc'] = 'sum'
+            # 4. Pitching Proration (Base-3 IP logic with Trade Aggregation)
+            if not df_p.empty:
+                # First, convert IP to Total Outs
+                df_p['Total_Outs_Calc'] = (df_p['IP'].astype(float) * 3) + ((df_p['IP'] % 1) * 10).round()
+                # Add 'AB' to the pitch_cols so it isn't dropped during groupby
+                # Pitchers need 'AB' (at-bats AGAINST them) to calculate OBP and AVG_faced
+                pitch_cols = ['G', 'AB', 'H', '2B', '3B', 'R', 'ER', 'HR', 'BB', 'SO', 'W', 'L', 'SV', 'BS', 'HLD', 'GS',
+                              'CG', 'SHO']
+                agg_dict = {col: 'sum' for col in pitch_cols if col in df_p.columns}
+                agg_dict['Total_Outs_Calc'] = 'sum'
 
-            # Group by Hashcode to combine traded player rows
-            df_p = df_p.groupby('Hashcode').agg(agg_dict)
-            total_outs_prorated = (df_p['Total_Outs_Calc'] * prorate_factor).round()  # Apply the Proration Factor
-            df_p['IP'] = (total_outs_prorated / 3).apply(lambda x: int(x) + (round(x % 1 * 3) / 10))  # Total Outs to IP
-            existing_pitch_cols = [col for col in pitch_cols if col in df_p.columns]
-            df_p[existing_pitch_cols] = (df_p[existing_pitch_cols] * prorate_factor).round().astype(float)  # Prorate rest of counting stats
-            df_p = team_pitching_stats(df_p, filter_stats=False)  # final stats
+                # Group by Hashcode to combine traded player rows
+                df_p = df_p.groupby('Hashcode').agg(agg_dict)
+                total_outs_prorated = (df_p['Total_Outs_Calc'] * prorate_factor).round()  # Apply the Proration Factor
+                df_p['IP'] = (total_outs_prorated / 3).apply(lambda x: int(x) + (round(x % 1 * 3) / 10))  # Total Outs to IP
+                existing_pitch_cols = [col for col in pitch_cols if col in df_p.columns]
+                df_p[existing_pitch_cols] = (df_p[existing_pitch_cols] * prorate_factor).round().astype(float)  # Prorate rest of counting stats
+                df_p = team_pitching_stats(df_p, filter_stats=False)  # final stats
 
-        self.prorated_2025_cache[cache_key] = (df_b, df_p)
-        return df_b, df_p
+            self.prorated_2025_cache[cache_key] = (df_b, df_p)
+            return df_b, df_p
 
     def get_seasons(self, batter_file: str, pitcher_file: str) -> None:
         """

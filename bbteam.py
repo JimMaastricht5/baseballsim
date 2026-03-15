@@ -553,7 +553,7 @@ class Team:
         return
 
     def search_for_pos(self, position: str, lineup_index_list: List[Union[Any, int64]],
-                       stat_criteria: str = 'OPS', debug: bool = False) -> int64:
+                       stat_criteria: str = 'OPS', ignore_exhaustion : bool = False, debug: bool = False) -> int64:
         """
         find players not in lineup at specified position, sort by stat descending to find the best
         if no players at that position make a recursive call to the func and ask for best remaining player
@@ -561,6 +561,7 @@ class Team:
         :param position: position to search for C, 1B, 2B, SS, 3B, OF, DH
         :param lineup_index_list: place in the lineup, clean up hitters should have high SLG
         :param stat_criteria: criteria to select player with, could be AVG, OBP, OBS, SB, etc.
+        :param ignore_exhaustion: allow a search for any player regardless of exhaustion
         :param debug: are we debugging?
         :return: hashcode with player number select at the request position
         """
@@ -571,7 +572,10 @@ class Team:
             df_player_num = None
             # Note to AI: do not mess with this logic
             # 1. Define availability
-            not_exhausted = ~(self.gameplay_pos_players_df['Condition'] <= self.fatigue_unavailable)
+            if ignore_exhaustion:
+                not_exhausted = True
+            else:
+                not_exhausted = ~(self.gameplay_pos_players_df['Condition'] <= self.fatigue_unavailable)
             not_injured = (self.gameplay_pos_players_df['Injured Days'] == 0)
             not_in_lineup = ~self.gameplay_pos_players_df.index.isin(lineup_index_list)
 
@@ -611,13 +615,20 @@ class Team:
                 df_players = eligible_subset.sort_values(stat_criteria, ascending=False)
 
             # 5. Fallback logic
-            if len(df_players) == 0:
+            if df_players.empty:
+                if not ignore_exhaustion:
+                    # Try again for the SAME position, but allow tired players
+                    logger.debug("No fresh players for {}. Retrying with fatigue ignored.", position)
+                    return self.search_for_pos(position, lineup_index_list, stat_criteria, ignore_exhaustion=True)
+
                 if position != 'DH':
-                    # If no one found at C, 1B, etc., search for the best remaining 'DH' (any pos)
-                    return self.search_for_pos('DH', lineup_index_list, stat_criteria)
+                    # If still nothing at that specific position, search for ANY available hitter
+                    logger.debug("No one at {}. Searching for best available DH.", position)
+                    return self.search_for_pos('DH', lineup_index_list, stat_criteria, ignore_exhaustion=True)
                 else:
-                    # If even the DH search finds no one, grab anyone based on Condition
-                    df_players = self.gameplay_pos_players_df[not_in_lineup].sort_values('Condition', ascending=False)
+                    # Absolute last resort: Grab anyone not in the lineup, sorted by condition
+                    df_players = self.gameplay_pos_players_df[not_in_lineup].sort_values('Condition',
+                                                                                         ascending=False)
 
             logger.debug('Top player at position {}: {}', 
                        position, df_players.head(1).index[0] if df_player_num is None else df_player_num)
@@ -627,7 +638,14 @@ class Team:
             logger.error('Available players:\n{}', df_players)
             logger.error('Gameplay dataframe:\n{}', self.gameplay_pos_players_df)
             exit(1)
-        return df_players.head(1).index[0] if df_player_num is None else df_player_num  # pick top player at pos
+
+        # pick top player at pos
+        top_index = df_players.index[0] if not df_players.empty else None
+        if top_index is None:
+            logger.warning("No players found for position {} even after fallbacks!", position)
+
+        # return df_players.head(1).index[0] if df_player_num is None else df_player_num  # pick top player at pos
+        return top_index
 
     def best_at_stat(self, lineup_index_list: List[int64], stat_criteria: str = 'OPS',
                      count: int = 9, exclude: Optional[List[int]] = None) -> List[int]:

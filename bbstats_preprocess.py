@@ -466,6 +466,7 @@ class BaseballStatsPreProcess:
         # drop unwanted cols
         pitching_data.drop(['Rk', 'Lg', 'W-L%', 'GF', 'IBB', 'ERA+', 'FIP', 'H9', 'BB9', 'SO9', 'SO/BB',
                             'HR9', 'Awards', 'Player-additional', 'BF'],inplace=True, axis=1)
+        pitching_data = pitching_data[~((pitching_data['IP'] < 10) & (pitching_data['G'] < 5))]  # remove pos players pitching
         pitching_data['Player'] = pitching_data['Player'].str.replace('*', '').str.replace('#', '')
         pitching_data['Hashcode'] = pitching_data['Player'].apply(lambda x: self.create_hash(x, 'Pitcher'))
 

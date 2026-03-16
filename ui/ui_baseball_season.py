@@ -215,8 +215,10 @@ class UIBaseballSeason(bbseason.BaseballSeason):
             if max_games > 150:
                 return
 
-        # Calculate current Sim WAR values before assessments
-        self.baseball_data.calculate_sim_war()
+        # calculate_sim_war() requires caller to hold thread_lock (non-reentrant lock design;
+        # internal lock was removed to prevent deadlock — see bbstats.py docstring)
+        with self.baseball_data.thread_lock:
+            self.baseball_data.calculate_sim_war()
 
         # Determine which teams to print (or in our case, emit)
         teams_to_print = self._get_teams_to_print()

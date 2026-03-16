@@ -179,6 +179,19 @@ class SimulationController:
             bool: True if assessments ran successfully, False otherwise
         """
         if self.worker and self.worker.season:
+            # check_gm_assessments() must only be called from the UI thread when the worker is
+            # blocked at its pause point (_pause_event cleared = worker waiting, not mid-sim).
+            # If the worker is alive and _pause_event is set, it is actively running sim logic
+            # and a concurrent call would race on baseball_data.
+            if self.worker.is_alive() and self.worker._pause_event.is_set():
+                from tkinter import messagebox
+                messagebox.showwarning(
+                    "Pause Required",
+                    "Please pause the simulation before running GM assessments manually.")
+                if status_callback:
+                    status_callback("Pause simulation first to run GM assessments")
+                return False
+
             logger.info("Running forced GM assessments for all teams")
             try:
                 # Call check_gm_assessments with force=True

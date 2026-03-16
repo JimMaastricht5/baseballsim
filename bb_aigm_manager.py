@@ -986,8 +986,9 @@ class AIGeneralManager:
             team_record, games_back, games_played
         )
 
-        # Calculate final Sim WAR to get updated player values
-        baseball_stats.calculate_sim_war()
+        # calculate_sim_war() requires the caller to hold thread_lock (non-reentrant lock design)
+        with baseball_stats.thread_lock:
+            baseball_stats.calculate_sim_war()
 
         # Value all players with final season stats
         roster_values = self._value_roster(baseball_stats, strategy.alpha, games_played)

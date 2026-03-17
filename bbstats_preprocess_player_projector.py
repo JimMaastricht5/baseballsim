@@ -1,24 +1,22 @@
 """
 PLAYER PROJECTOR MODULE
 -----------------------
-This class implements a multi-strategy statistical engine to project MLB player
-performance for the 2026 season. Rather than applying a 'one-size-fits-all'
-Bayesian formula, this engine acts as a selector, analyzing a players
-career trajectory, age, and health history to determine the most realistic
-true talentt level.
+Multi-strategy statistical engine for projecting MLB player performance.
+Rather than a one-size-fits-all formula, the engine selects a projection
+strategy per player based on career trajectory, sample size, and age.
 
 Core Philosophies:
-1. BAYESIAN SHRINKAGE: For low-sample players (rookies), regress heavily
-   toward a league mean that is staggered, penalizing inexperience.
-2. TREND RECOGNITION: For established stars, prioritize linear trajectory
-   over simple averages, allowing for late-career surges or age-related declines.
-3. INJURY SMOOTHING: detect 'V-shaped' volume patterns (e.g., 2024 injury)
-   to prevent a high-variance, low-volume year from unfairly anchoring a projection.
-4. GROWTH FLOOR: For players <26 years old, project the higher of the Trend
-   or the Weighted Average, ensuring prospects do not slope downward after
-   tough adjustment year.
-5. AGING CURVE: A final parabolic multiplier (Growth/Prime/Decline) is applied
-based on the player's biological age in 2026.
+1. BAYESIAN SHRINKAGE: Low-sample players are regressed toward a computed
+   league mean. K-values per stat control the strength of the pull.
+2. TREND RECOGNITION: Players with a consistent monotonic rate history use
+   linear regression, dampened by career volume and proven-player status.
+3. INJURY SMOOTHING: V-shaped volume patterns can be smoothed via
+   _project_with_injury_smoothing to prevent a shortened year from anchoring
+   the projection (available utility; not called in the main flow).
+4. AGE FLOORS: Young players (<=25) and prime-age players (27-32) use the
+   higher of the trend or weighted average, preventing unfair downward slopes.
+5. AGING CURVE: A parabolic multiplier (Growth/Prime/Decline) is applied
+   based on the player's projected age, dampened by career volume trust.
 """
 import numpy as np
 import pandas as pd
@@ -29,9 +27,9 @@ class PlayerProjector:
     """
     Multi-strategy statistical engine for projecting MLB player performance.
 
-    Selects among several projection strategies per player based on career
-    length, sample size, injury history, and age. Applies Bayesian shrinkage,
-    linear trend detection, injury smoothing, and aging curve adjustments.
+    Selects a projection strategy per player based on career length, sample
+    size, and age. Applies Bayesian shrinkage, linear trend detection, age
+    floors, and an aging curve. Entry point is calculate_projected_stats.
     """
 
     def __init__(self, league_averages: Dict[str, float], gate_pa: int = 400):
@@ -70,9 +68,16 @@ class PlayerProjector:
                                   stats: List[str],
                                   is_p: bool) -> pd.DataFrame:
         """
-        New Bulk Entry Point.
-        Iterates through the entire historical DataFrame and returns a
-        projected DataFrame for the new season.
+        Project stats for every player in the historical DataFrame.
+
+        Filters to seasons before 2026, iterates unique Hashcodes, and
+        calls _project_single_player for each. Players with zero career PA
+        are skipped. Returns one projected row per player.
+
+        :param history: Multi-season historical DataFrame with a 'Hashcode' column.
+        :param stats: Stat columns to project (used by dispatcher routing).
+        :param is_p: True for pitchers, False for batters.
+        :return: DataFrame of projected stats, one row per player.
         """
         history = history[history['Season'] < 2026].copy()
         unique_players = history['Hashcode'].unique()
@@ -94,22 +99,25 @@ class PlayerProjector:
 
     def _get_projection_batter(self, player_history: pd.DataFrame, stat_col: str, vol_col: str) -> float:
         """
-        Select the best projection strategy for a single batter stat and apply aging.
+        Project a single per-vol rate for a batter and apply aging/tax.
 
         Strategy selection priority:
-          1. Single qualifying season (>= 300 vol): lightly regressed blend.
-          2. Low volume or < 2 seasons: Bayesian regression to league mean.
-          3. Consistent trend with >= 2 seasons: linear regression, with a growth
-             floor for players aged <= 25 (max of trend vs weighted average).
-          4. Otherwise: recency-weighted career average.
+          1. One qualifying season (>= 300 vol): 80/20 blend with league mean.
+          2. Low volume (< 100 PA/yr avg) or < 2 seasons: Bayesian regression.
+          3. Consistent monotonic trend, >= 2 seasons: linear regression with
+             an age floor — young (<=25) and prime (27-32) players use the
+             higher of the trend or weighted average to prevent over-extrapolation.
+          4. Otherwise: recency-weighted career average, with a prime anchor
+             (ages 27-33, 600+ PA) preventing projection from falling below
+             93% of the most recent season's rate.
 
-        After selecting a raw rate, an aging multiplier (parabolic, dampened by
-        career volume trust) and an unproven-player tax are applied.
+        The selected raw rate is then multiplied by a parabolic aging factor
+        (dampened by career volume trust) and a small unproven-player tax.
 
         :param player_history: Historical season DataFrame for one player, sorted by Season.
         :param stat_col: Stat column to project (e.g. 'H', 'BB', 'SO').
         :param vol_col: Volume denominator column (e.g. 'PA', 'AB', 'H').
-        :return: Projected per-vol rate, clipped to [0, 0.450].
+        :return: Projected per-vol rate, clipped to [0, 0.480].
         """
         num_years = len(player_history)
         career_vol = player_history[vol_col].sum()
@@ -155,22 +163,29 @@ class PlayerProjector:
 
     def _get_projection_pitcher(self, player_history: pd.DataFrame, stat_col: str, vol_col: str) -> float:
         """
-        Select the best projection strategy for a single pitcher stat and apply aging.
+        Project a single per-vol rate for a pitcher and apply aging/tax.
 
         Strategy selection:
           - < 2 seasons or < 150 career vol: Bayesian regression to league mean.
-          - Otherwise: 50/50 blend of linear trend and weighted career average,
-            preventing wild swings from single-season outliers.
+          - Otherwise: 50/50 blend of linear trend and weighted career average
+            to prevent single-season outliers from dominating.
 
-        After selecting a raw rate, a full aging multiplier and an unproven-pitcher
-        tax are applied. An anti-ghost gravity anchor pulls sub-elite ER rates back
-        toward a 2.80 ERA baseline, and a hard outlier brake prevents position
-        players from projecting as Cy Young candidates.
+        An OBP anchor is applied to H and BB before aging: pitchers projecting
+        more than 18% below the league mean (threshold = lg_target * 0.82) are
+        pulled 60% toward the mean to prevent unrealistic OBP suppression.
+
+        Aging for H/BB/ER inverts the multiplier when the pitcher is declining
+        (raw_m < 1.0) so those rates increase with age rather than decrease.
+        An unproven tax inflates H/BB/ER for pitchers with < 250 career vol.
+
+        For ER: a gravity anchor pulls projections better than ~2.80 ERA halfway
+        toward a ~3.50 ERA baseline. A hard floor prevents fringe pitchers (< 150
+        career IP) from projecting as elite starters.
 
         :param player_history: Historical season DataFrame for one player, sorted by Season.
         :param stat_col: Stat column to project (e.g. 'H', 'BB', 'SO', 'ER').
         :param vol_col: Volume denominator column (e.g. 'PA', 'IP_Dec').
-        :return: Projected per-vol rate (not yet multiplied by projected volume).
+        :return: Projected per-vol rate, before multiplication by projected volume.
         """
         num_years = len(player_history)
         career_vol = player_history[vol_col].sum()
@@ -190,7 +205,7 @@ class PlayerProjector:
             lg_target = self.lg_avgs.get(f"{stat_col}_per_{vol_col}", 0.240)
 
             # Catch pitchers projecting >13% better than league average
-            # and pull 40% toward mean to prevent unrealistic OBP suppression
+            # and pull 60% toward the mean to prevent unrealistic OBP suppression
             if raw_rate < (lg_target * 0.87):
                 raw_rate = (raw_rate * 0.40) + (lg_target * 0.60)
 
@@ -235,7 +250,13 @@ class PlayerProjector:
         return self._apply_sanity_caps(float(final_rate), stat_col, is_p=True, player_history=player_history)
 
     def _project_single_player(self, history: pd.DataFrame, stats: List[str], is_p: bool) -> dict:
-        """Dispatcher to route players to the correct projection engine."""
+        """
+        Route one player's history to the correct projection engine.
+
+        Pitchers always go to _project_pitcher. Position players with a
+        'Pitcher' role token in their Role field get zeroed batting stats
+        (NL-style pitcher hitting). All others go to _project_batter.
+        """
         # 1. Handle Role-specific routing
         role = str(history['Role'].iloc[0])
 
@@ -301,9 +322,19 @@ class PlayerProjector:
 
     def _project_pitcher(self, history: pd.DataFrame) -> dict:
         """
-        Project a pitcher's 2026 performance using standardized unit logic.
-        Converts box-score IP (e.g. 200.1) to True Decimal IP (200.33)
-        to prevent math leaks.
+        Build a full projected stat line for a pitcher.
+
+        Box-score IP (e.g. 200.1) is converted to true decimal IP (200.33)
+        before any rate calculations to prevent fractional-inning math errors.
+        Volume (PA/BF) is anchored to the most recent season, with a higher
+        cap/floor for workhorses (2+ seasons > 750 PA). H, BB, and SO are
+        projected as rates per batter faced; outs and IP are derived from
+        those counts. ER is projected as a rate per true decimal inning, then
+        a soft ERA floor (~1.48) is enforced. ERA, WHIP, and box-score IP are
+        recalculated from final counts for CSV output.
+
+        :param history: Historical season DataFrame for one pitcher, sorted by Season.
+        :return: Dict of projected stat values ready for DataFrame assembly.
         """
         num_years = len(history)
 
@@ -433,8 +464,7 @@ class PlayerProjector:
             reg_ratio = (career_total + k_ratio * lg_ratio) / (career_h + k_ratio)
             return float(reg_ratio)
 
-        # 3. THE ANCHOR LOGIC (H, BB, SO)
-        # This is where Will Smith's Hits will now correctly land.
+        # 3. STANDARD ANCHOR (H, BB, SO)
         lg_rate = self.lg_avgs.get(f"{stat_col}_per_{vol_col}")
         if lg_rate is None:
             # CRITICAL: If calculating BA (H/AB), don't fallback to a PA rate (0.10)
@@ -452,14 +482,15 @@ class PlayerProjector:
         """
         Project via linear regression of per-vol rates across seasons.
 
-        Fits a line to the year-over-year rate history, then projects one step
-        forward. The slope is clipped to +/- 0.020 per year and dampened by the
-        number of seasons to prevent extreme extrapolation. The projection is
-        also capped at 120% (or 105% for age >= 30) of the historical peak rate.
+        Fits a line to the per-vol rate history and extrapolates one step
+        forward. The slope is clipped to ±0.035/yr for proven players (3+
+        seasons, 1000+ PA) on key stats, or ±0.012/yr otherwise, then
+        dampened by career volume trust to prevent extrapolation on thin data.
+        The result is capped at 120% of the career rate peak for proven
+        players, 112% otherwise. Falls back to _weighted_career_average if
+        polyfit raises an exception.
 
-        Falls back to _weighted_career_average if polyfit raises an exception.
-
-        :param history: Player's historical season DataFrame (>= 3 rows expected).
+        :param history: Player's historical season DataFrame, sorted by Season.
         :param stat_col: Stat column to project.
         :param vol_col: Volume denominator column.
         :return: Projected per-vol rate from the trend line.
@@ -499,13 +530,14 @@ class PlayerProjector:
         """
         Recency-weighted average of per-vol rates across all available seasons.
 
-        Weights are taken from the tail of [3, 4, 5] so the most recent season
-        is always weighted 5, the prior 4, and two seasons back 3.
+        Weights are taken from the tail of [2, 4, 6] so the most recent season
+        carries 50% of the weight, the prior season 33%, and two seasons back
+        17%. Returns a rate (e.g. 0.243), not a raw count.
 
         :param history: Player's historical season DataFrame.
         :param stat_col: Stat column to average.
         :param vol_col: Volume denominator column.
-        :return: Weighted per-vol rate.
+        :return: Recency-weighted per-vol rate.
         """
         # Ensure we are averaging the RATES, not the raw totals
         rates = (history[stat_col] / history[vol_col].replace(0, 1)).values
@@ -516,9 +548,17 @@ class PlayerProjector:
 
     def _get_aging_multiplier(self, age: int, is_p: bool) -> float:
         """
-        Calculates a parabolic multiplier based on age.
-        Hitters: Peak 25-28.
-        Pitchers: Peak 27-29.
+        Return a parabolic performance multiplier for the given age.
+
+        Hitters: parabolic growth to ~27 (peak ~1.06 at age 22), flat prime
+        1.02 from 25-30, mild decline 0.99 at 31-34, accelerating thereafter.
+        Pitchers: slower development to ~28 (peak ~1.04), flat prime 1.01 from
+        27-30, then quadratic decline (steeper after 34). Result is clipped
+        to [0.80, 1.10] to prevent extreme swings.
+
+        :param age: Player's projected age.
+        :param is_p: True for pitchers, False for hitters.
+        :return: Multiplier in [0.80, 1.10].
         """
         if not is_p:
             # --- HITTER CURVE ---
@@ -605,15 +645,20 @@ class PlayerProjector:
 
     def _apply_sanity_caps(self, rate, stat_col, is_p, player_history=None):
         """
-        Clamp a projected per-vol rate to physically realistic maximums.
+        Clamp a projected per-vol rate to physically realistic bounds.
 
-        Batter caps (per PA): HBP <= 3.5%, BB <= 18.5%, H <= 38.0%.
-        No pitcher caps are currently applied; the method returns the rate unchanged.
+        Batter caps: HBP/PA <= 3.5%, BB/PA <= 22.0%, H/AB <= 38.0%.
+        An ISO-based identity gate also caps HR/H at 4% for slap hitters
+        (career ISO < 0.100).
+
+        Pitcher bounds: SO/PA floor of 8.0% (~3.0 K/9), BB/PA cap of 13.0%
+        (~4.8 BB/9), H/PA cap of 33.0%.
 
         :param rate: Projected per-vol rate to clamp.
-        :param stat_col: Stat column name, used to look up the cap.
-        :param is_p: True if this is a pitcher stat (caps not applied).
-        :return: Rate after applying any relevant cap.
+        :param stat_col: Stat column name used to look up the cap.
+        :param is_p: True for pitcher stats, False for batter stats.
+        :param player_history: Optional batter history for ISO-gate calculation.
+        :return: Rate after applying any relevant cap or floor.
         """
         if not is_p:
             # --- BATTER CAPS ---

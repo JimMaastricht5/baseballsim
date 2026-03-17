@@ -328,17 +328,28 @@ class BaseballStatsPreProcess:
 
             total_ip = max(1, qualified['IP'].sum())
             total_g = max(1, qualified['G'].sum())
+            total_pa = max(1, qualified['PA'].sum()) if 'PA' in qualified.columns else None
 
-            return {
+            lg_avgs = {
                 'H_per_IP': qualified['H'].sum() / total_ip,
                 'BB_per_IP': qualified['BB'].sum() / total_ip,
                 'SO_per_IP': qualified['SO'].sum() / total_ip,
                 'HR_per_IP': qualified['HR'].sum() / total_ip,
-                'ER_per_IP': qualified['ER'].sum() / total_ip,
+                # Store ERA (9-inning format) so projector's /9 division works correctly
+                'ER_per_IP': (qualified['ER'].sum() / total_ip) * 9,
                 'W_rate': qualified['W'].sum() / total_g,
                 'L_rate': qualified['L'].sum() / total_g,
                 'SV_rate': qualified['SV'].sum() / total_g
             }
+            # Add PA-based rates used by projector OBP anchor and Bayesian regression.
+            # Without these, the projector falls back to 0.240 for BB_per_PA,
+            # which inflates all pitcher walk rates by ~2x.
+            if total_pa:
+                lg_avgs['H_per_PA'] = qualified['H'].sum() / total_pa
+                lg_avgs['BB_per_PA'] = qualified['BB'].sum() / total_pa
+                lg_avgs['SO_per_PA'] = qualified['SO'].sum() / total_pa
+                lg_avgs['ER_per_PA'] = qualified['ER'].sum() / total_pa
+            return lg_avgs
         else:
             # BATTING GATE: Use hitters with at least 100 AB for the baseline
             qualified = historical_df[historical_df['AB'] >= 100].copy()
@@ -349,9 +360,15 @@ class BaseballStatsPreProcess:
             # Denominator: Total Plate Appearances
             total_pa = max(1, qualified['AB'].sum() + qualified['BB'].sum() +
                            qualified.get('HBP', 0).sum() + qualified.get('SF', 0).sum())
+            total_ab = max(1, qualified['AB'].sum())
 
             return {
                 'H_per_PA': qualified['H'].sum() / total_pa,
+                # H_per_AB is the true batting average baseline used by Bayesian regression
+                # when projecting H/AB (vol_col='AB'). Without it, regression falls back to
+                # H_per_PA (~0.225) instead of the correct H/AB (~0.248), slightly deflating
+                # batting average projections for low-sample batters.
+                'H_per_AB': qualified['H'].sum() / total_ab,
                 'HR_per_PA': qualified['HR'].sum() / total_pa,
                 '2B_per_PA': qualified['2B'].sum() / total_pa,
                 '3B_per_PA': qualified['3B'].sum() / total_pa,

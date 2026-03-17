@@ -48,7 +48,7 @@ class PlayerProjector:
 
         # Higher K = Stronger pull toward league average (less trust in small samples)
         self.k_vals_batter = {
-            'H': 25,  # Lowered: Trust Batting Average more quickly
+            'H': 40,  # Slightly raised: reduces over-regression for mid-sample batters
             '2B': 80,  # Respect doubles
             '3B': 200,  # Triples are high-variance/luck-based
             'HR': 60,  # Power stabilizes around 300-400 AB
@@ -121,12 +121,25 @@ class PlayerProjector:
         elif (career_vol / num_years) < 100 or num_years < 2:
             raw_rate = self._regress_to_mean(player_history, stat_col, vol_col)
         elif self._is_consistent_trend(player_history, stat_col, vol_col) and num_years >= 2:
-            # GROWTH FLOOR: Use Max of Trend vs Weighted Avg for young players
             trend_rate = self._linear_regression(player_history, stat_col, vol_col)
             w_avg_rate = self._weighted_career_average(player_history, stat_col, vol_col)
-            raw_rate = max(trend_rate, w_avg_rate) if age_2026 <= 25 else trend_rate
+            if age_2026 <= 25:
+                # GROWTH FLOOR: young players project the higher of trend vs weighted avg
+                raw_rate = max(trend_rate, w_avg_rate)
+            elif 27 <= age_2026 <= 32:
+                # PRIME FLOOR: don't let a declining trend extrapolate below the career
+                # weighted average - mild declines shouldn't be over-projected downward
+                raw_rate = max(trend_rate, w_avg_rate)
+            else:
+                raw_rate = trend_rate
         else:
             raw_rate = self._weighted_career_average(player_history, stat_col, vol_col)
+            # PRIME ANCHOR: for established prime hitters (27-33) with no consistent trend,
+            # the most recent season acts as a soft floor - prevents a bounceback year from
+            # being washed out by poor earlier seasons (and vice versa for outlier good years)
+            if 27 <= age_2026 <= 33 and career_vol >= 600 and stat_col in ['H', 'BB']:
+                recent_rate = player_history.iloc[-1][stat_col] / max(1, player_history.iloc[-1][vol_col])
+                raw_rate = max(raw_rate, recent_rate * 0.93)
 
         # 2. AGING & TAX
         trust = min(career_vol / self.gate, 1.0)
@@ -174,13 +187,12 @@ class PlayerProjector:
 
         # anchor OBP
         if stat_col in ['H', 'BB']:
-            # Target a modern H/PA of ~0.240
             lg_target = self.lg_avgs.get(f"{stat_col}_per_{vol_col}", 0.240)
 
-            # If the projection is >25% better than league average,
-            # pull it back 50% toward the mean
-            if raw_rate < (lg_target * 0.75):
-                raw_rate = (raw_rate + lg_target) / 2
+            # Catch pitchers projecting >13% better than league average
+            # and pull 40% toward mean to prevent unrealistic OBP suppression
+            if raw_rate < (lg_target * 0.87):
+                raw_rate = (raw_rate * 0.40) + (lg_target * 0.60)
 
         # 2. AGING & TAX
         # Get raw skill multiplier
@@ -497,7 +509,7 @@ class PlayerProjector:
         """
         # Ensure we are averaging the RATES, not the raw totals
         rates = (history[stat_col] / history[vol_col].replace(0, 1)).values
-        weights = np.array([3, 4, 5][-len(rates):])
+        weights = np.array([2, 4, 6][-len(rates):])
 
         # This returns a percentage (e.g., 0.230), NOT a count of hits
         return np.average(rates, weights=weights)

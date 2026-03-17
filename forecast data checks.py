@@ -34,7 +34,7 @@ def check_batting_integrity():
     print("-" * 90)
 
     # Spotlights
-    for name in ['Will Smith', 'Caleb Durbin', 'Cal Raleigh', 'Eric Haase']:
+    for name in ['Will Smith', 'Caleb Durbin', 'Cal Raleigh', 'Eric Haase', 'Brice Turang']:
         p_proj = df_proj[df_proj['Player'].str.contains(name, na=False)].iloc[0:1]
         p_hist = df_25[df_25['Player'].str.contains(name, na=False)].iloc[0:1]
 

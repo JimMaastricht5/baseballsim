@@ -51,7 +51,7 @@ class GMAssessmentWidget:
         # Update Assessment button
         self.update_assessment_btn = ttk.Button(
             gm_header_frame, text="Update Assessment",
-            command=update_callback, width=16, style="GM.TButton"
+            command=update_callback, width=18, style="GM.TButton"
         )
         self.update_assessment_btn.pack(side=tk.RIGHT, padx=10)
         self.update_assessment_btn.config(state=tk.DISABLED)  # Initially disabled

@@ -57,9 +57,9 @@ class PlayerProjector:
         }
 
         self.k_vals_pitcher = {
-            'H': 300,  # Hits allowed (BABIP) regresses heavily
-            'BB': 800,  # Walk rate
-            'SO': 150,  # K-rate stabilizes very fast for pitchers
+            'H': 2000,  # Hits allowed (BABIP) regresses heavily
+            'BB': 200,  # Walk rate
+            'SO': 200,  # K-rate stabilizes very fast for pitchers
             'ER': 300,  # Essential for preventing 0.00 ERA anomalies
             'default': 250
         }
@@ -342,6 +342,7 @@ class PlayerProjector:
         # Create a temporary column of true decimal innings for calculation
         history = history.copy()
         history['IP_Dec'] = history['IP'].apply(lambda x: int(x) + (x % 1) * 3.333)
+        history['BIP'] = (history['PA'] - history['SO'] - history['BB']).clip(lower=1)
 
         # 2. VOLUME LOGIC (BF/PA Target)
         is_workhorse = (history['PA'] > 750).sum() >= 2
@@ -360,9 +361,13 @@ class PlayerProjector:
 
         # 4. PROJECT PERIPHERALS (Rates per Batter Faced)
         # These use PA as the denominator and are relatively stable
-        result['H'] = self._get_projection_pitcher(history, 'H', 'PA') * proj_vol
+        # determine non contact outcomes first
         result['BB'] = self._get_projection_pitcher(history, 'BB', 'PA') * proj_vol
         result['SO'] = self._get_projection_pitcher(history, 'SO', 'PA') * proj_vol
+
+        # calculate balls in play projection, then project hits based on BIP only BABIP
+        proj_bip = proj_vol - result['BB'] - result['SO']
+        result['H'] = self._get_projection_pitcher(history, 'H', 'BIP') * proj_bip
 
         # 5. DERIVE OUTS AND IP
         # In baseball, PA - Hits - Walks - (HBP/SF) = Outs.
@@ -520,7 +525,7 @@ class PlayerProjector:
         proj = (slope * dampener * num_years) + intercept
 
         # 4. CAP CEILING:
-        # Unproven players shouldn't be projected to blast 25% past their career peak; younger players 15%
+        # Unproven players shouldn't be projected to blast 25% past their career peak; younger players 12%
         max_allowed_mult = 1.20 if is_proven else 1.12
         max_allowed = rates.max() * max_allowed_mult
 

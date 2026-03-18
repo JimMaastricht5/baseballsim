@@ -86,6 +86,113 @@ def check_pitching_integrity():
         print(stiflers[['Player', 'PA', 'H_PA', 'BB_PA', 'OBP_Against']].head(10).to_string(index=False))
 
 
+def diagnose_h_surplus():
+    # Load all datasets
+    df_b_proj = pd.read_csv(B_PROJ_FILE)
+    df_b_hist = pd.read_csv(B_HIST_FILE)
+    df_p_proj = pd.read_csv(P_PROJ_FILE)
+    df_p_hist = pd.read_csv(P_HIST_FILE)
+
+    # Filter for 2025 (The Baseline)
+    b_25 = df_b_hist[df_b_hist['Season'] == 2025]
+    p_25 = df_p_hist[df_p_hist['Season'] == 2025]
+
+    # Calculate Aggregate H/PA (The true "Hit Density" metric)
+    # Using PA as the denominator for both avoids AB vs BF confusion
+    b_25_h_rate = b_25['H'].sum() / b_25['PA'].sum()
+    b_26_h_rate = df_b_proj['H'].sum() / df_b_proj['PA'].sum()
+
+    p_25_h_rate = p_25['H'].sum() / p_25['PA'].sum()
+    p_26_h_rate = df_p_proj['H'].sum() / df_p_proj['PA'].sum()
+
+    # Calculate Deltas (Points of H/PA)
+    hitter_delta = (b_26_h_rate - b_25_h_rate) * 1000
+    pitcher_delta = (p_26_h_rate - p_25_h_rate) * 1000
+
+    print("\n" + "=" * 90)
+    print(f"{'HIT INFLATION DIAGNOSTIC (Rates per 1000 PA)':^90}")
+    print("=" * 90)
+
+    results = pd.DataFrame({
+        '2025 Hist Rate': [b_25_h_rate, p_25_h_rate],
+        '2026 Proj Rate': [b_26_h_rate, p_26_h_rate],
+        'Delta (Points)': [hitter_delta, pitcher_delta]
+    }, index=['Hitters (H/PA)', 'Pitchers (H_Allowed/PA)'])
+
+    print(results.round(4))
+    print("-" * 90)
+
+    if hitter_delta > pitcher_delta:
+        print(f"PROBABLE CULPRIT: HITTERS. They are projected for {hitter_delta:.1f} more hits per 1000 PA than 2025.")
+    else:
+        print(f"PROBABLE CULPRIT: PITCHERS. They are allowing {pitcher_delta:.1f} more hits per 1000 PA than 2025.")
+
+
+def identify_pitching_outliers(min_pa=50):
+    df_proj = pd.read_csv(P_PROJ_FILE)
+    df_hist = pd.read_csv(P_HIST_FILE)
+    df_25 = df_hist[df_hist['Season'] == 2025].copy()
+
+    # Calculate 2025 Historical Rates
+    df_25['H_PA_25'] = df_25['H'] / df_25['PA'].replace(0, 1)
+
+    # Merge on Player
+    merged = pd.merge(
+        df_proj[['Player', 'PA', 'H']],
+        df_25[['Player', 'H_PA_25']],
+        on='Player'
+    )
+
+    # Calculate Projection Rates
+    merged['H_PA_26'] = merged['H'] / merged['PA'].replace(0, 1)
+
+    # Calculate Delta and Weighted Impact
+    # Impact = How many 'Extra Hits' this player adds to the league total
+    merged['H_Delta'] = merged['H_PA_26'] - merged['H_PA_25']
+    merged['H_Surplus'] = merged['H_Delta'] * merged['PA']
+
+    # Filter for meaningful volume
+    outliers = merged[merged['PA'] >= min_pa].sort_values('H_Surplus', ascending=False)
+
+    print("\n" + "=" * 90)
+    print(f"{'TOP 10 PITCHING HIT-INFLATION DRIVERS':^90}")
+    print("=" * 90)
+    print(outliers[['Player', 'PA', 'H_PA_25', 'H_PA_26', 'H_Delta', 'H_Surplus']].head(10).to_string(index=False))
+    print("-" * 90)
+
+
+def deep_dive_pitching_outliers():
+    df_proj = pd.read_csv(P_PROJ_FILE)
+    df_hist = pd.read_csv(P_HIST_FILE)
+    df_25 = df_hist[df_hist['Season'] == 2025].copy()
+
+    # Calculate Rates for 2025
+    df_25['K_PA_25'] = df_25['SO'] / df_25['PA'].replace(0, 1)
+    df_25['H_PA_25'] = df_25['H'] / df_25['PA'].replace(0, 1)
+
+    # Calculate Rates for 2026 Proj
+    df_proj['K_PA_26'] = df_proj['SO'] / df_proj['PA'].replace(0, 1)
+    df_proj['H_PA_26'] = df_proj['H'] / df_proj['PA'].replace(0, 1)
+
+    merged = pd.merge(df_proj, df_25[['Player', 'K_PA_25', 'H_PA_25']], on='Player')
+
+    # Identify the "Why"
+    merged['K_Loss'] = merged['K_PA_26'] - merged['K_PA_25']
+    merged['H_Gain'] = merged['H_PA_26'] - merged['H_PA_25']
+
+    # "The BABIP Leak": Hits are up, but Strikeouts are stable
+    # "The Stuff Decay": Hits are up because Strikeouts are down
+    print("\n" + "=" * 90)
+    print(f"{'WHY ARE THEY LEAKING HITS?':^90}")
+    print("=" * 90)
+    print(merged.sort_values('H_Gain', ascending=False)[
+              ['Player', 'PA', 'H_Gain', 'K_Loss']
+          ].head(10).to_string(index=False))
+
+
 if __name__ == "__main__":
     check_batting_integrity()
     check_pitching_integrity()
+    diagnose_h_surplus()
+    identify_pitching_outliers()
+    deep_dive_pitching_outliers()

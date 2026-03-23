@@ -86,7 +86,8 @@ class SimulationController:
             self.season_chatty,
             self.season_print_lineup_b,
             self.season_print_box_score_b,
-            selected_team
+            selected_team,
+            start_paused=True
         )
 
         # Start worker thread

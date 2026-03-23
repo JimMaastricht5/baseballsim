@@ -4,12 +4,13 @@ Copyright (c) 2024 Jim Maastricht
 
 Admin widget for baseball season simulation UI.
 
-Provides player management functionality - move players between teams.
+Provides player management functionality - move players between teams,
+retire players, and place players on the disabled list.
 """
 
 import tkinter as tk
 from tkinter import ttk, messagebox
-from typing import List, Dict, Any, Callable
+from typing import List, Dict, Any, Callable, Optional
 from bblogger import logger
 
 
@@ -21,25 +22,29 @@ class AdminWidget:
     - Search players by name
     - Filter by team
     - Move players between teams
+    - Retire players (remove from new season)
+    - Place players on disabled list (injured list)
     - Save changes to CSV files
     """
 
-    def __init__(self, parent: tk.Widget, get_worker_callback: Callable):
+    def __init__(self, parent: tk.Widget, get_worker_callback: Callable, on_change_callback: Optional[Callable] = None):
         """
         Initialize admin widget.
 
         Args:
             parent: Parent tkinter widget (notebook or frame)
             get_worker_callback: Callback function to get worker instance
+            on_change_callback: Optional callback to call when player changes are made
         """
         self.frame = tk.Frame(parent)
         self.get_worker = get_worker_callback
+        self.on_change_callback = on_change_callback
         self.admin_all_players = []  # Cached player list
 
         # Header with instructions
         admin_header = tk.Label(
             self.frame,
-            text="Player Management - Move players between teams",
+            text="Player Management - Move, Retire, or Disable Players",
             font=("Arial", 11, "bold"),
             pady=5
         )
@@ -83,7 +88,7 @@ class AdminWidget:
             list_frame,
             columns=("player", "pos", "team", "age", "type", "hashcode"),
             show="headings",
-            height=20,
+            height=15,
             yscrollcommand=tree_scroll_y.set,
             xscrollcommand=tree_scroll_x.set
         )
@@ -123,27 +128,73 @@ class AdminWidget:
         self.admin_dest_team_combo['values'] = []
         self.admin_dest_team_combo.pack(side=tk.LEFT, padx=5)
 
-        move_btn = tk.Button(
+        self.move_btn = tk.Button(
             action_frame,
             text="Move Player",
             command=self.move_player,
             bg="#4CAF50",
             fg="white",
             font=("Arial", 10, "bold"),
-            width=15
+            width=15,
+            state=tk.DISABLED
         )
-        move_btn.pack(side=tk.LEFT, padx=20)
+        self.move_btn.pack(side=tk.LEFT, padx=5)
 
-        save_btn = tk.Button(
+        self.retire_btn = tk.Button(
             action_frame,
-            text="Save Changes to CSV",
+            text="Retire Player",
+            command=self.retire_player,
+            bg="#FF5722",
+            fg="white",
+            font=("Arial", 10, "bold"),
+            width=15,
+            state=tk.DISABLED
+        )
+        self.retire_btn.pack(side=tk.LEFT, padx=5)
+
+        self.save_btn = tk.Button(
+            action_frame,
+            text="Save Changes",
             command=self.save_changes,
             bg="#2196F3",
             fg="white",
             font=("Arial", 10, "bold"),
-            width=20
+            width=15,
+            state=tk.DISABLED
         )
-        save_btn.pack(side=tk.LEFT, padx=10)
+        self.save_btn.pack(side=tk.LEFT, padx=5)
+
+        # Disabled List (IL) section
+        il_frame = tk.LabelFrame(self.frame, text="Place Player on Disabled List", font=("Arial", 10, "bold"), padx=10, pady=5)
+        il_frame.pack(fill=tk.X, padx=10, pady=(5, 0))
+
+        il_inner_frame = tk.Frame(il_frame)
+        il_inner_frame.pack(fill=tk.X, pady=5)
+
+        tk.Label(il_inner_frame, text="Injury Days:", font=("Arial", 10)).pack(side=tk.LEFT, padx=5)
+        self.il_days_var = tk.StringVar(value="30")
+        il_days_entry = tk.Entry(il_inner_frame, textvariable=self.il_days_var, width=8, font=("Arial", 10))
+        il_days_entry.pack(side=tk.LEFT, padx=5)
+
+        il_hint_label = tk.Label(
+            il_inner_frame,
+            text="(Short: 5-14, Medium: 15-29, Long: 30+)",
+            font=("Arial", 8),
+            fg="#888888"
+        )
+        il_hint_label.pack(side=tk.LEFT, padx=5)
+
+        self.place_il_btn = tk.Button(
+            il_inner_frame,
+            text="Place on IL",
+            command=self.place_on_il,
+            bg="#9C27B0",
+            fg="white",
+            font=("Arial", 10, "bold"),
+            width=15,
+            state=tk.DISABLED
+        )
+        self.place_il_btn.pack(side=tk.LEFT, padx=10)
 
         # Status message
         self.admin_status_label = tk.Label(
@@ -217,6 +268,21 @@ class AdminWidget:
             import traceback
             logger.error(traceback.format_exc())
             self.admin_status_label.config(text=f"Error loading players: {e}", fg="#ff0000")
+
+    def enable_buttons(self):
+        """Enable admin buttons when simulation is fully paused."""
+        self.move_btn.config(state=tk.NORMAL)
+        self.retire_btn.config(state=tk.NORMAL)
+        self.save_btn.config(state=tk.NORMAL)
+        self.place_il_btn.config(state=tk.NORMAL)
+        self.admin_status_label.config(text="Ready. Simulation paused - you can move, retire, or place players on IL.", fg="#006600")
+
+    def disable_buttons(self):
+        """Disable admin buttons when simulation is running."""
+        self.move_btn.config(state=tk.DISABLED)
+        self.retire_btn.config(state=tk.DISABLED)
+        self.save_btn.config(state=tk.DISABLED)
+        self.place_il_btn.config(state=tk.DISABLED)
 
     def _filter_players(self):
         """Filter and display players based on search text and team filter."""
@@ -332,6 +398,10 @@ class AdminWidget:
             baseball_data = worker.season.baseball_data
             baseball_data.move_a_player_between_teams(hashcode, dest_team)
 
+            # Notify listeners of change
+            if self.on_change_callback:
+                self.on_change_callback()
+
             # Update in-memory list
             for player in self.admin_all_players:
                 if player['hashcode'] == hashcode:
@@ -405,6 +475,163 @@ class AdminWidget:
                 "Save Failed",
                 f"Error saving changes: {str(e)}"
             )
+
+    def retire_player(self):
+        """Retire selected player, removing them from new season DataFrames."""
+        worker = self.get_worker()
+
+        if worker and worker.is_alive() and not worker._paused:
+            messagebox.showwarning(
+                "Simulation Running",
+                "Please pause the simulation before retiring players."
+            )
+            return
+
+        if not worker or not worker.season:
+            messagebox.showwarning(
+                "No Simulation",
+                "Please start a simulation before retiring players."
+            )
+            return
+
+        selected_items = self.admin_players_tree.selection()
+        if not selected_items:
+            messagebox.showwarning(
+                "No Player Selected",
+                "Please select a player to retire."
+            )
+            return
+
+        selected_item = selected_items[0]
+        values = self.admin_players_tree.item(selected_item, 'values')
+        player_name = values[0]
+        player_type = values[4]
+        hashcode = int(values[5])
+
+        confirm = messagebox.askyesno(
+            "Confirm Retirement",
+            f"Retire {player_name} ({player_type})?\n\n"
+            f"This will permanently remove them from the new season roster.\n"
+            f"Click 'Save Changes' to persist."
+        )
+
+        if not confirm:
+            return
+
+        try:
+            baseball_data = worker.season.baseball_data
+            success, name, ptype = baseball_data.retire_player(hashcode)
+
+            if success:
+                # Notify listeners of change
+                if self.on_change_callback:
+                    self.on_change_callback()
+
+                # Remove from in-memory list
+                self.admin_all_players = [
+                    p for p in self.admin_all_players if p['hashcode'] != hashcode
+                ]
+
+                # Refresh the treeview
+                self._filter_players()
+
+                self.admin_status_label.config(
+                    text=f"Retired {name} ({ptype}). Click 'Save Changes' to persist.",
+                    fg="#FF5722"
+                )
+                logger.info(f"Retired player {hashcode} ({name})")
+            else:
+                messagebox.showerror("Retire Failed", f"Could not retire player {player_name}")
+
+        except Exception as e:
+            logger.error(f"Error retiring player: {e}")
+            messagebox.showerror("Retire Failed", f"Error retiring player: {str(e)}")
+
+    def place_on_il(self):
+        """Place selected player on the injured list."""
+        worker = self.get_worker()
+
+        if worker and worker.is_alive() and not worker._paused:
+            messagebox.showwarning(
+                "Simulation Running",
+                "Please pause the simulation before placing players on IL."
+            )
+            return
+
+        if not worker or not worker.season:
+            messagebox.showwarning(
+                "No Simulation",
+                "Please start a simulation before placing players on IL."
+            )
+            return
+
+        selected_items = self.admin_players_tree.selection()
+        if not selected_items:
+            messagebox.showwarning(
+                "No Player Selected",
+                "Please select a player to place on the disabled list."
+            )
+            return
+
+        try:
+            injury_days = int(self.il_days_var.get())
+            if injury_days < 1 or injury_days > 365:
+                messagebox.showwarning(
+                    "Invalid Injury Days",
+                    "Please enter a number between 1 and 365 for injury days."
+                )
+                return
+        except ValueError:
+            messagebox.showwarning(
+                "Invalid Input",
+                "Please enter a valid number for injury days."
+            )
+            return
+
+        selected_item = selected_items[0]
+        values = self.admin_players_tree.item(selected_item, 'values')
+        player_name = values[0]
+        player_type = values[4]
+        hashcode = int(values[5])
+
+        confirm = messagebox.askyesno(
+            "Confirm IL Placement",
+            f"Place {player_name} ({player_type}) on Disabled List?\n\n"
+            f"Approximate injury duration: {injury_days} days\n"
+            f"The system will generate an appropriate injury description."
+        )
+
+        if not confirm:
+            return
+
+        try:
+            baseball_data = worker.season.baseball_data
+            success, injury_desc, actual_days, ptype = baseball_data.place_player_on_il(hashcode, injury_days)
+
+            if success:
+                # Notify listeners of change
+                if self.on_change_callback:
+                    self.on_change_callback()
+
+                il_type = "IL" if actual_days >= 10 else "Day-to-Day"
+                self.admin_status_label.config(
+                    text=f"Placed {player_name} on {il_type}: {injury_desc} ({actual_days} days). "
+                         f"Click 'Save Changes' to persist.",
+                    fg="#9C27B0"
+                )
+                logger.info(f"Placed player {hashcode} ({player_name}) on IL: {injury_desc} ({actual_days} days)")
+                messagebox.showinfo(
+                    "IL Placement Complete",
+                    f"{player_name} has been placed on the {il_type}.\n\n"
+                    f"Injury: {injury_desc}\n"
+                    f"Duration: {actual_days} days"
+                )
+            else:
+                messagebox.showerror("IL Placement Failed", f"Could not place player {player_name} on IL")
+
+        except Exception as e:
+            logger.error(f"Error placing player on IL: {e}")
+            messagebox.showerror("IL Placement Failed", f"Error: {str(e)}")
 
     def get_frame(self) -> tk.Frame:
         """Get the main frame for adding to parent container."""

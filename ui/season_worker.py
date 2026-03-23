@@ -36,7 +36,7 @@ class SeasonWorker(threading.Thread):
     def __init__(self, load_seasons=None, new_season=2026,
                 rotation_len=5, series_length=3, season_length=162, season_chatty=False,
                 season_print_lineup_b=False, season_print_box_score_b=False,
-                team_to_follow=None):
+                team_to_follow=None, start_paused=False):
         """
         Initialize season worker with simulation parameters.
 
@@ -61,6 +61,7 @@ class SeasonWorker(threading.Thread):
         self.season_print_lineup_b = season_print_lineup_b
         self.season_print_box_score_b = season_print_box_score_b
         self.only_nl_b = False
+        self.start_paused = start_paused
 
         # Create signal emitter
         self.signals = SeasonSignals()
@@ -117,6 +118,12 @@ class SeasonWorker(threading.Thread):
 
             # Call sim_start for initialization
             self.season.sim_start()
+
+            # If starting in paused state, set pause flag before loop begins
+            if self.start_paused:
+                self._paused = True
+                self._pause_event.clear()
+                self.signals.emit_pause_state("paused")
 
             # Simulation loop
             total_days = len(self.season.schedule)
@@ -189,7 +196,9 @@ class SeasonWorker(threading.Thread):
 
         # Wait outside the lock
         if self._paused and not self._stopped:
+            self.signals.emit_pause_state("paused")
             self._pause_event.wait()
+            self.signals.emit_pause_state("running")
             logger.debug("Worker thread resumed")
 
     def pause(self):
@@ -201,6 +210,7 @@ class SeasonWorker(threading.Thread):
         """
         with self._pause_lock:
             self._paused = True
+        self.signals.emit_pause_state("pausing")
         logger.info("Pause requested")
 
     def resume(self):

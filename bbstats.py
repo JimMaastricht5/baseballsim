@@ -1001,6 +1001,90 @@ class BaseballStats:
         is_pitcher = True if player_index in self.pitching_data.index else False
         return is_batter, is_pitcher
 
+    def retire_player(self, player_index: int) -> tuple:
+        """
+        Retire a player, removing them from new season DataFrames.
+
+        Args:
+            player_index: Player's hashcode/index
+
+        Returns:
+            tuple: (success: bool, player_name: str, player_type: str)
+        """
+        is_batter, is_pitcher = self.is_batter_or_pitcher(player_index)
+
+        if not is_batter and not is_pitcher:
+            logger.warning(f"Player {player_index} not found in batting or pitching data")
+            return (False, '', '')
+
+        player_name = ''
+        player_type = ''
+
+        if is_batter:
+            if player_index in self.new_season_batting_data.index:
+                player_name = self.new_season_batting_data.loc[player_index, 'Player']
+                player_type = 'Batter'
+                self.new_season_batting_data = self.new_season_batting_data.drop(player_index)
+                logger.info(f"Retired batter {player_name} ({player_index})")
+
+        if is_pitcher:
+            if player_index in self.new_season_pitching_data.index:
+                player_name = self.new_season_pitching_data.loc[player_index, 'Player']
+                player_type = 'Pitcher'
+                self.new_season_pitching_data = self.new_season_pitching_data.drop(player_index)
+                logger.info(f"Retired pitcher {player_name} ({player_index})")
+
+        return (True, player_name, player_type)
+
+    def place_player_on_il(self, player_index: int, injury_days: int) -> tuple:
+        """
+        Place a player on the injured list with a specified injury duration.
+
+        Uses the injury system to generate an appropriate injury description
+        based on the player type (batter/pitcher) and duration.
+
+        Args:
+            player_index: Player's hashcode/index
+            injury_days: Exact number of days for the injury
+
+        Returns:
+            tuple: (success: bool, injury_description: str, injury_days: int, player_type: str)
+        """
+        is_batter, is_pitcher = self.is_batter_or_pitcher(player_index)
+
+        if not is_batter and not is_pitcher:
+            logger.warning(f"Player {player_index} not found in batting or pitching data")
+            return (False, '', 0, '')
+
+        player_type = ''
+        injury_desc = ''
+
+        if is_pitcher:
+            if player_index in self.new_season_pitching_data.index:
+                player_type = 'Pitcher'
+                injury_desc = self.injury_system.get_pitcher_injury(injury_days)
+                self.new_season_pitching_data.loc[player_index, 'Injured Days'] = injury_days
+                self.new_season_pitching_data.loc[player_index, 'Injury Description'] = injury_desc
+                self.new_season_pitching_data.loc[player_index, 'Condition'] = max(
+                    0, self.new_season_pitching_data.loc[player_index, 'Condition'] - 30
+                )
+                logger.info(f"Placed pitcher {self.new_season_pitching_data.loc[player_index, 'Player']} "
+                           f"on IL with {injury_desc} ({injury_days} days)")
+
+        if is_batter:
+            if player_index in self.new_season_batting_data.index:
+                player_type = 'Batter'
+                injury_desc = self.injury_system.get_batter_injury(injury_days)
+                self.new_season_batting_data.loc[player_index, 'Injured Days'] = injury_days
+                self.new_season_batting_data.loc[player_index, 'Injury Description'] = injury_desc
+                self.new_season_batting_data.loc[player_index, 'Condition'] = max(
+                    0, self.new_season_batting_data.loc[player_index, 'Condition'] - 30
+                )
+                logger.info(f"Placed batter {self.new_season_batting_data.loc[player_index, 'Player']} "
+                           f"on IL with {injury_desc} ({injury_days} days)")
+
+        return (True, injury_desc, injury_days, player_type)
+
     def print_current_season(self, teams: Optional[List[str]] = None, summary_only_b: bool = False) -> None:
         """
         prints the current season being played

@@ -7,19 +7,25 @@ PRIMARY FUNCTION:
   SeasonMainWindow class to launch the application.
 
 USAGE:
-    python bbseason_ui.py
+    python bbseason_ui.py                    # No dialog, uses defaults
+    python bbseason_ui.py --dialog          # Shows startup dialog
+    python bbseason_ui.py --team NYM        # Follow NYM, no dialog
+    python bbseason_ui.py --games 81         # 81 games, no dialog
 
-OPTIONAL COMMAND-LINE ARGUMENTS (Future Enhancement):
-    --seasons 2023,2024,2025    Years to load stats from
-    --new-season 2026           Season to simulate
-    --follow NYM,LAD            Teams to follow in detail
-    --random                    Use random data (appends "random" to file name)
+OPTIONAL COMMAND-LINE ARGUMENTS:
+    --dialog              Show startup dialog for team/games selection
+    --team TEAM          Team to follow (e.g., MIL, NYM)
+    --games N            Number of games to simulate (1-162)
+    --seasons YYYY,YYYY  Years to load stats from
+    --new-season YYYY    Season to simulate
 Contact: JimMaastricht5@gmail.com
 """
 
 import tkinter as tk
 from tkinter import ttk, messagebox
 import datetime
+import argparse
+import sys
 
 from ui.main_window_tk import SeasonMainWindow
 from bblogger import logger
@@ -154,9 +160,9 @@ class StartupDialog:
         return self.confirmed, self.selected_team, self.num_games
 
 
-def main(load_seasons=[2023, 2024, 2025], new_season = 2026, season_length = 162, series_length = 3,
-         rotation_len = 5, season_chatty = False, season_print_lineup_b = False,
-         season_print_box_score_b = False, season_team_to_follow = None, show_startup_dialog = True):
+def main(load_seasons=None, new_season=2026, season_length=162, series_length=3,
+         rotation_len=5, season_chatty=True, season_print_lineup_b=True,
+         season_print_box_score_b=True, season_team_to_follow='MIL', show_startup_dialog=False):
     """
     Main entry point for the UI application.
 
@@ -164,8 +170,11 @@ def main(load_seasons=[2023, 2024, 2025], new_season = 2026, season_length = 162
     and starts the tkinter event loop.
 
     Args:
-        show_startup_dialog: If True, shows startup dialog to select team and games (default True)
+        show_startup_dialog: If True, shows startup dialog to select team and games (default False)
     """
+    if load_seasons is None:
+        load_seasons = [2023, 2024, 2025]
+    
     logger.info("Starting Baseball Season Simulator UI (tkinter)")
 
     # Show startup dialog if requested
@@ -189,6 +198,7 @@ def main(load_seasons=[2023, 2024, 2025], new_season = 2026, season_length = 162
 
     # Now create the main application window
     root = tk.Tk()
+    root.state('zoomed')
 
     # Create main window
     try:
@@ -212,22 +222,55 @@ def main(load_seasons=[2023, 2024, 2025], new_season = 2026, season_length = 162
 
 if __name__ == "__main__":
     start_time = datetime.datetime.now()
-    main(load_seasons = [2023, 2024, 2025],
-         new_season = 2026,
-         season_length = 162,  # Default, will be overridden by startup dialog
-         series_length = 3,
-         rotation_len = 5,
-         season_chatty = True,
-         season_print_lineup_b = True,
-         season_print_box_score_b = True,
-         season_team_to_follow = 'MIL',  # Default, will be overridden by startup dialog
-         show_startup_dialog = True  # Set to False to skip dialog and use hardcoded values
-         )
+    
+    # Parse command-line arguments
+    parser = argparse.ArgumentParser(
+        description="Baseball Season Simulator UI",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+Examples:
+  python bbseason_ui.py                      # Run with defaults (follow MIL, 162 games)
+  python bbseason_ui.py --dialog            # Show startup dialog first
+  python bbseason_ui.py --team NYM --games 81  # Follow NYM, 81 games
+  python bbseason_ui.py --seasons 2024,2025  # Load stats from 2024 and 2025
+        """
+    )
+    parser.add_argument('--dialog', '-d', action='store_true',
+                       help='Show startup dialog for team and games selection')
+    parser.add_argument('--team', '-t', type=str, default='MIL',
+                       help='Team to follow (default: MIL)')
+    parser.add_argument('--games', '-g', type=int, default=162,
+                       help='Number of games to simulate (default: 162)')
+    parser.add_argument('--seasons', '-s', type=str, default='2023,2024,2025',
+                       help='Years to load stats from (default: 2023,2024,2025)')
+    parser.add_argument('--new-season', '-n', type=int, default=2026,
+                       help='Season to simulate (default: 2026)')
+    
+    args = parser.parse_args()
+    
+    # Parse seasons list
+    load_seasons = [int(y.strip()) for y in args.seasons.split(',')]
+    
+    # Validate games
+    if args.games < 1 or args.games > 162:
+        print("Error: Games must be between 1 and 162")
+        sys.exit(1)
+    
+    main(load_seasons=load_seasons,
+         new_season=args.new_season,
+         season_length=args.games,
+         series_length=3,
+         rotation_len=5,
+         season_chatty=True,
+         season_print_lineup_b=True,
+         season_print_box_score_b=True,
+         season_team_to_follow=args.team.upper(),
+         show_startup_dialog=args.dialog)
 
     # how long did that take?
     end_time = datetime.datetime.now()
     run_time = end_time - start_time
-    total_seconds = run_time.total_seconds()  # Get the total run time in seconds
+    total_seconds = run_time.total_seconds()
     minutes = int(total_seconds // 60)
     seconds = int(total_seconds % 60)
     print(f'Total run time: {minutes} minutes, {seconds} seconds')

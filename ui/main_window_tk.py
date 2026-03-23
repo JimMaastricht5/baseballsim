@@ -168,7 +168,11 @@ class SeasonMainWindow:
         league_notebook.add(self.injuries_widget.get_frame(), text="IL")
 
         # League Sub-tab 4: Admin (Player Management)
-        self.admin_widget = AdminWidget(league_notebook, self.controller.get_worker)
+        self.admin_widget = AdminWidget(
+            league_notebook,
+            self.controller.get_worker,
+            on_change_callback=self._on_admin_change
+        )
         league_notebook.add(self.admin_widget.get_frame(), text="Admin")
 
         # Tab 4: Team Tab with nested sub-tabs
@@ -241,7 +245,18 @@ class SeasonMainWindow:
     def start_season(self):
         """Start the season simulation."""
         import time
+        import tkinter as tk
+        from tkinter import messagebox
+
         selected_team = self.toolbar.get_selected_team()
+
+        messagebox.showinfo(
+            "Season Starting",
+            "The season will start in a PAUSED state.\n\n"
+            "Use this time to make roster moves, place players on the IL, "
+            "or make retirements in the Admin tab.\n\n"
+            "Press Resume when ready to begin simulation."
+        )
 
         # Track simulation start time
         self.simulation_start_time = time.time()
@@ -279,11 +294,13 @@ class SeasonMainWindow:
             self.root.after(2000, self._update_roster)
             self.root.after(2000, self._update_league_stats)
             self.root.after(2000, self._update_league_leaders)
-            self.root.after(2000, self.gm_assessment_widget.enable_button)
 
-            # Update UI state
-            self.toolbar.update_button_states(simulation_running=True, paused=False)
-            self.status_label.config(text=self._format_status_with_day("Starting simulation..."))
+            # Initialize schedule display for day 1 (season starts paused)
+            self.root.after(1500, self._init_schedule_display)
+
+            # Update UI state - season starts in paused state
+            self.toolbar.update_button_states(simulation_running=True, paused=True)
+            self.status_label.config(text=self._format_status_with_day("Season ready - Press Play to start"))
 
         if self.controller.start_season(selected_team, on_started):
             logger.info(f"Season started for team: {selected_team}")
@@ -441,8 +458,32 @@ class SeasonMainWindow:
             except Exception as e:
                 logger.error(f"Error handling error: {e}")
 
+            # Check pause state queue
+            try:
+                msg = signals.pause_state_queue.get_nowait()
+                self._on_pause_state(msg[1])
+            except queue.Empty:
+                pass
+            except Exception as e:
+                logger.error(f"Error handling pause_state: {e}")
+
         # Schedule next poll
         self.root.after(100, self._poll_queues)
+
+    def _init_schedule_display(self):
+        """Initialize schedule display when season starts in paused state."""
+        worker = self.controller.get_worker()
+        if worker and worker.season and worker.season.schedule:
+            # Set full season schedule
+            self.games_widget.set_season_schedule(worker.season.schedule)
+            # Show day 1 schedule
+            if len(worker.season.schedule) > 0:
+                day_1_games = worker.season.schedule[0]
+                schedule = [(m[0], m[1]) for m in day_1_games if 'OFF DAY' not in m]
+                self.games_widget.on_day_started(0, schedule)
+                # Update schedule widget
+                self.schedule_widget.update_schedule(0, worker.season.schedule)
+                logger.debug("Initialized schedule display for paused season")
 
     def _on_day_started(self, day_num: int, schedule_text: str):
         """Handle day_started message."""
@@ -588,6 +629,32 @@ class SeasonMainWindow:
         self.toolbar.update_button_states(simulation_running=False, paused=False)
         self.status_label.config(text=self._format_status_with_day("Error occurred"))
 
+    def _on_pause_state(self, state: str):
+        """Handle pause_state message."""
+        if state == "pausing":
+            self.status_label.config(text=self._format_status_with_day("Pausing - completing currently running games."))
+            self._disable_admin_and_assessment()
+        elif state == "paused":
+            self.status_label.config(text=self._format_status_with_day("Paused"))
+            self._enable_admin_and_assessment()
+        elif state == "running":
+            self.status_label.config(text=self._format_status_with_day("Simulating..."))
+            self._disable_admin_and_assessment()
+
+    def _disable_admin_and_assessment(self):
+        """Disable admin buttons and GM assessment when simulation is running or pausing."""
+        if hasattr(self, 'admin_widget') and self.admin_widget:
+            self.admin_widget.disable_buttons()
+        if hasattr(self, 'gm_assessment_widget') and self.gm_assessment_widget:
+            self.gm_assessment_widget.update_assessment_btn.config(state=tk.DISABLED)
+
+    def _enable_admin_and_assessment(self):
+        """Enable admin buttons and GM assessment when simulation is fully paused."""
+        if hasattr(self, 'admin_widget') and self.admin_widget:
+            self.admin_widget.enable_buttons()
+        if hasattr(self, 'gm_assessment_widget') and self.gm_assessment_widget:
+            self.gm_assessment_widget.update_assessment_btn.config(state=tk.NORMAL)
+
     def _on_play_by_play(self, play_data: dict):
         """Handle play_by_play message."""
         # During World Series, only show play-by-play from World Series teams
@@ -727,6 +794,57 @@ class SeasonMainWindow:
                 logger.debug(f"Populated injury team filter with {len(all_teams)} teams")
             except Exception as e:
                 logger.error(f"Error populating injury teams: {e}")
+
+    def _on_admin_change(self):
+        """Callback when admin makes player changes - refresh stats and IL widgets."""
+        self._update_league_stats()
+        self._update_league_leaders()
+        self._populate_injuries_teams()
+        self._refresh_injuries_widget()
+
+    def _refresh_injuries_widget(self):
+        """Refresh the IL widget with current injured players from baseball_data."""
+        worker = self.controller.get_worker()
+        if worker and worker.season:
+            try:
+                baseball_data = worker.season.baseball_data
+                injury_list = []
+
+                # Get batters on IL
+                batting_df = baseball_data.new_season_batting_data
+                if 'Injured Days' in batting_df.columns:
+                    injured_batters = batting_df[batting_df['Injured Days'] > 0]
+                    for idx, row in injured_batters.iterrows():
+                        pos = row.get('Pos', 'Unknown')
+                        if isinstance(pos, list):
+                            pos = pos[0] if pos else 'Unknown'
+                        injury_list.append({
+                            'player': row['Player'],
+                            'team': row['Team'],
+                            'position': str(pos).replace('[', '').replace(']', '').replace("'", '').strip(),
+                            'injury': row.get('Injury Description', 'Unknown'),
+                            'days_remaining': int(row.get('Injured Days', 0)),
+                            'status': 'IL'
+                        })
+
+                # Get pitchers on IL
+                pitching_df = baseball_data.new_season_pitching_data
+                if 'Injured Days' in pitching_df.columns:
+                    injured_pitchers = pitching_df[pitching_df['Injured Days'] > 0]
+                    for idx, row in injured_pitchers.iterrows():
+                        injury_list.append({
+                            'player': row['Player'],
+                            'team': row['Team'],
+                            'position': 'P',
+                            'injury': row.get('Injury Description', 'Unknown'),
+                            'days_remaining': int(row.get('Injured Days', 0)),
+                            'status': 'IL'
+                        })
+
+                self.injuries_widget.update_injuries(injury_list)
+                logger.debug(f"Refreshed IL widget with {len(injury_list)} injured players")
+            except Exception as e:
+                logger.error(f"Error refreshing injuries widget: {e}")
 
     def on_close(self):
         """Handle window close event."""

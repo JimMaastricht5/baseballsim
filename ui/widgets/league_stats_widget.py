@@ -291,13 +291,7 @@ class LeagueStatsWidget:
             # Get pitching data for all teams (current season)
             pitching_df = baseball_data.get_pitching_data(team_name=None, prior_season=False)
 
-            # Filter to players with at least some playing time
-            if 'AB' in batting_df.columns:
-                batting_df = batting_df[batting_df['AB'] > 0]
-            if 'IP' in pitching_df.columns:
-                pitching_df = pitching_df[pitching_df['IP'] > 0]
-
-            # Store full DataFrames
+            # Store full DataFrames (don't filter out 0 AB/IP - show all players at season start)
             self.batters_df_full = batting_df.copy()
             self.pitchers_df_full = pitching_df.copy()
 

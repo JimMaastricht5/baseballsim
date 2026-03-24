@@ -63,6 +63,10 @@ class SeasonSignals:
         self.world_series_completed_queue = queue.Queue()
         # Message format: (ws_data: dict) with keys: champion, season, series_result
 
+        # Pause state queue
+        self.pause_state_queue = queue.Queue()
+        # Message format: (pause_state: str) - "running", "pausing", "paused"
+
     def emit_day_started(self, day_number: int, schedule_text: str):
         """
         Emit day_started signal.
@@ -166,3 +170,12 @@ class SeasonSignals:
                 - series_result (dict): {team: wins, ...}
         """
         self.world_series_completed_queue.put(('world_series_completed', ws_data))
+
+    def emit_pause_state(self, state: str):
+        """
+        Emit pause_state signal.
+
+        Args:
+            state (str): One of "running", "pausing", "paused"
+        """
+        self.pause_state_queue.put(('pause_state', state))

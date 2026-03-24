@@ -90,7 +90,8 @@ class SimulationController:
             self.season_print_lineup_b,
             self.season_print_box_score_b,
             selected_team,
-            start_paused=True
+            start_paused=True,
+            obp_adjustment=obp_adjustment
         )
 
         # Start worker thread

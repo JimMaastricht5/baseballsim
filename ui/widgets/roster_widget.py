@@ -15,6 +15,47 @@ from bblogger import logger
 from ui.theme import (BG_PANEL, BG_ELEVATED, TEXT_PRIMARY, TEXT_SECONDARY,
                       TEXT_HEADING, ACCENT_GOLD, ROW_IL, ROW_DTD)
 
+LEAGUE_MIN_SALARY = 740000
+
+
+def estimate_years_remaining(age: int, salary: float, is_pitcher: bool = False) -> int:
+    """
+    Estimate contract years remaining based on age and salary.
+
+    Args:
+        age: Player age
+        salary: Annual salary
+        is_pitcher: True for pitchers
+
+    Returns:
+        Estimated years remaining (0-7)
+    """
+    if salary <= LEAGUE_MIN_SALARY * 1.2:
+        return 1
+    if age < 26:
+        if salary >= 20_000_000:
+            return 5
+        elif salary >= 10_000_000:
+            return 4
+        elif salary >= 5_000_000:
+            return 3
+        return 2
+    elif age < 33:
+        if salary >= 20_000_000:
+            return 5
+        elif salary >= 10_000_000:
+            return 4
+        elif salary >= 5_000_000:
+            return 3
+        return 2
+    elif age < 38:
+        if salary >= 15_000_000:
+            return 3
+        elif salary >= 5_000_000:
+            return 2
+        return 1
+    return 1
+
 
 class RosterWidget:
     """
@@ -177,10 +218,10 @@ class RosterWidget:
         """
         if is_batter:
             columns = ("Player", "Pos", "AB", "R", "H", "2B", "3B", "HR", "RBI", "BB", "K",
-                      "AVG", "OBP", "SLG", "OPS", "Condition", "Status")
+                      "AVG", "OBP", "SLG", "OPS", "Salary", "Years", "Condition", "Status")
         else:
             columns = ("Player", "G", "GS", "W", "L", "IP", "H", "R", "ER", "HR", "BB", "SO",
-                      "ERA", "WHIP", "SV", "Condition", "Status")
+                      "ERA", "WHIP", "SV", "Salary", "Years", "Condition", "Status")
 
         tree = ttk.Treeview(parent, columns=columns, show="headings", height=15)
 
@@ -198,12 +239,14 @@ class RosterWidget:
             elif col in ["Pos", "Status"]:
                 tree.column(col, width=70, anchor=tk.CENTER)
             elif col in ["AB", "R", "H", "2B", "3B", "HR", "RBI", "BB", "K", "G", "GS", "W", "L",
-                        "ER", "SV", "SO", "Condition"]:
+                        "ER", "SV", "SO", "Condition", "Years"]:
                 tree.column(col, width=45, anchor=tk.CENTER)
             elif col in ["AVG", "OBP", "SLG", "OPS", "ERA", "WHIP"]:
                 tree.column(col, width=55, anchor=tk.CENTER)
             elif col == "IP":
                 tree.column(col, width=50, anchor=tk.CENTER)
+            elif col == "Salary":
+                tree.column(col, width=65, anchor=tk.CENTER)
             else:
                 tree.column(col, width=50, anchor=tk.CENTER)
 
@@ -514,6 +557,12 @@ class RosterWidget:
                         pos = pos[0] if pos else 'Unknown'
                     pos = str(pos).replace('[', '').replace(']', '').replace("'", '').replace('"', '').strip()
 
+                    # Get salary and calculate years remaining
+                    salary = row.get('Salary', LEAGUE_MIN_SALARY)
+                    age = row.get('Age', 30)
+                    years_rem = estimate_years_remaining(age, salary, is_pitcher=False)
+                    salary_display = f"${salary/1e6:.1f}M" if salary else "-"
+
                     if mode == "difference":
                         # Format with +/- prefix for difference mode
                         values = (
@@ -532,6 +581,8 @@ class RosterWidget:
                             self._format_diff_value(row.get('OBP', 0), decimals=3),
                             self._format_diff_value(row.get('SLG', 0), decimals=3),
                             self._format_diff_value(row.get('OPS', 0), decimals=3),
+                            salary_display,
+                            years_rem,
                             condition_display,
                             row.get('Status', 'Healthy')
                         )
@@ -553,10 +604,18 @@ class RosterWidget:
                             f"{float(row.get('OBP', 0)):.3f}",
                             f"{float(row.get('SLG', 0)):.3f}",
                             f"{float(row.get('OPS', 0)):.3f}",
+                            salary_display,
+                            years_rem,
                             condition_display,
                             row.get('Status', 'Healthy')
                         )
                 else:
+                    # Get salary and calculate years remaining
+                    salary = row.get('Salary', LEAGUE_MIN_SALARY)
+                    age = row.get('Age', 30)
+                    years_rem = estimate_years_remaining(age, salary, is_pitcher=True)
+                    salary_display = f"${salary/1e6:.1f}M" if salary else "-"
+
                     if mode == "difference":
                         # Format with +/- prefix for difference mode
                         values = (
@@ -575,6 +634,8 @@ class RosterWidget:
                             self._format_diff_value(row.get('ERA', 0), decimals=2),
                             self._format_diff_value(row.get('WHIP', 0), decimals=2),
                             self._format_diff_value(row.get('SV', 0)),
+                            salary_display,
+                            years_rem,
                             condition_display,
                             row.get('Status', 'Healthy')
                         )
@@ -596,6 +657,8 @@ class RosterWidget:
                             f"{float(row.get('ERA', 0)):.2f}",
                             f"{float(row.get('WHIP', 0)):.2f}",
                             int(row.get('SV', 0)),
+                            salary_display,
+                            years_rem,
                             condition_display,
                             row.get('Status', 'Healthy')
                         )

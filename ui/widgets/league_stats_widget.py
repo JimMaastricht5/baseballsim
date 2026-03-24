@@ -17,6 +17,39 @@ from bbstats import calculate_stats_difference
 from ui.theme import (BG_PANEL, BG_ELEVATED, TEXT_PRIMARY, TEXT_SECONDARY,
                       TEXT_HEADING, ACCENT_GOLD)
 
+LEAGUE_MIN_SALARY = 740000
+
+
+def estimate_years_remaining(age: int, salary: float, is_pitcher: bool = False) -> int:
+    """
+    Estimate contract years remaining based on age and salary.
+    """
+    if salary <= LEAGUE_MIN_SALARY * 1.2:
+        return 1
+    if age < 26:
+        if salary >= 20_000_000:
+            return 5
+        elif salary >= 10_000_000:
+            return 4
+        elif salary >= 5_000_000:
+            return 3
+        return 2
+    elif age < 33:
+        if salary >= 20_000_000:
+            return 5
+        elif salary >= 10_000_000:
+            return 4
+        elif salary >= 5_000_000:
+            return 3
+        return 2
+    elif age < 38:
+        if salary >= 15_000_000:
+            return 3
+        elif salary >= 5_000_000:
+            return 2
+        return 1
+    return 1
+
 
 class LeagueStatsWidget:
     """
@@ -227,12 +260,12 @@ class LeagueStatsWidget:
         """
         if is_batter:
             columns = ("Player", "Team", "Pos", "AB", "R", "H", "2B", "3B", "HR", "RBI", "BB", "K",
-                      "AVG", "OBP", "SLG", "OPS")
+                      "AVG", "OBP", "SLG", "OPS", "Salary", "Years")
         else:
             columns = ("Player", "Team", "G", "GS", "W", "L", "IP", "H", "R", "ER", "HR", "BB", "SO",
-                      "ERA", "WHIP", "SV")
+                      "ERA", "WHIP", "SV", "Salary", "Years")
 
-        tree = ttk.Treeview(parent, columns=columns, show="headings", height=20)
+        tree = ttk.Treeview(parent, columns=columns, show="headings", height=17)
 
         # Initialize sort state for this tree
         tree_id = str(id(tree))
@@ -248,12 +281,14 @@ class LeagueStatsWidget:
             elif col in ["Team", "Pos"]:
                 tree.column(col, width=60, anchor=tk.CENTER)
             elif col in ["AB", "R", "H", "2B", "3B", "HR", "RBI", "BB", "K", "G", "GS", "W", "L",
-                        "ER", "SV", "SO"]:
+                        "ER", "SV", "SO", "Years"]:
                 tree.column(col, width=45, anchor=tk.CENTER)
             elif col in ["AVG", "OBP", "SLG", "OPS", "ERA", "WHIP"]:
                 tree.column(col, width=55, anchor=tk.CENTER)
             elif col == "IP":
                 tree.column(col, width=50, anchor=tk.CENTER)
+            elif col == "Salary":
+                tree.column(col, width=65, anchor=tk.CENTER)
             else:
                 tree.column(col, width=50, anchor=tk.CENTER)
 
@@ -261,7 +296,7 @@ class LeagueStatsWidget:
         scrollbar = ttk.Scrollbar(parent, orient=tk.VERTICAL, command=tree.yview)
         tree.configure(yscrollcommand=scrollbar.set)
         scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
-        tree.pack(fill=tk.BOTH, expand=True)
+        tree.pack(fill=tk.X, expand=False)
 
         # Bind click event to show historical stats
         tree.bind('<ButtonRelease-1>', lambda e, t=tree, b=is_batter: self._on_player_click(t, b))
@@ -433,6 +468,12 @@ class LeagueStatsWidget:
                         pos = pos[0] if pos else 'Unknown'
                     pos = str(pos).replace('[', '').replace(']', '').replace("'", '').replace('"', '').strip()
 
+                    # Get salary and calculate years remaining
+                    salary = row.get('Salary', LEAGUE_MIN_SALARY)
+                    age = row.get('Age', 30)
+                    years_rem = estimate_years_remaining(age, salary, is_pitcher=False)
+                    salary_display = f"${salary/1e6:.1f}M" if salary else "-"
+
                     if mode == "difference":
                         # Format with +/- prefix for difference mode
                         values = (
@@ -451,7 +492,9 @@ class LeagueStatsWidget:
                             self._format_diff_value(row.get('AVG', 0), decimals=3),
                             self._format_diff_value(row.get('OBP', 0), decimals=3),
                             self._format_diff_value(row.get('SLG', 0), decimals=3),
-                            self._format_diff_value(row.get('OPS', 0), decimals=3)
+                            self._format_diff_value(row.get('OPS', 0), decimals=3),
+                            salary_display,
+                            years_rem
                         )
                     else:
                         # Standard format for current stats
@@ -471,9 +514,17 @@ class LeagueStatsWidget:
                             f"{float(row.get('AVG', 0)):.3f}",
                             f"{float(row.get('OBP', 0)):.3f}",
                             f"{float(row.get('SLG', 0)):.3f}",
-                            f"{float(row.get('OPS', 0)):.3f}"
+                            f"{float(row.get('OPS', 0)):.3f}",
+                            salary_display,
+                            years_rem
                         )
                 else:
+                    # Get salary and calculate years remaining
+                    salary = row.get('Salary', LEAGUE_MIN_SALARY)
+                    age = row.get('Age', 30)
+                    years_rem = estimate_years_remaining(age, salary, is_pitcher=True)
+                    salary_display = f"${salary/1e6:.1f}M" if salary else "-"
+
                     if mode == "difference":
                         # Format with +/- prefix for difference mode
                         values = (
@@ -492,7 +543,9 @@ class LeagueStatsWidget:
                             self._format_diff_value(row.get('SO', 0)),
                             self._format_diff_value(row.get('ERA', 0), decimals=2),
                             self._format_diff_value(row.get('WHIP', 0), decimals=2),
-                            self._format_diff_value(row.get('SV', 0))
+                            self._format_diff_value(row.get('SV', 0)),
+                            salary_display,
+                            years_rem
                         )
                     else:
                         # Standard format for current stats
@@ -512,7 +565,9 @@ class LeagueStatsWidget:
                             int(row.get('SO', 0)),
                             f"{float(row.get('ERA', 0)):.2f}",
                             f"{float(row.get('WHIP', 0)):.2f}",
-                            int(row.get('SV', 0))
+                            int(row.get('SV', 0)),
+                            salary_display,
+                            years_rem
                         )
 
                 tree.insert("", tk.END, values=values)
@@ -927,8 +982,15 @@ class LeagueStatsWidget:
                 current_totals['G'] = df['G'].sum()
             columns = ["", "G", "GS", "W", "L", "IP", "H", "R", "ER", "HR", "BB", "SO", "ERA", "WHIP", "SV"]
 
-        # Create treeview for totals
-        totals_tree = ttk.Treeview(frame, columns=columns, show="headings", height=3)
+        # Create treeview for totals with scrollbar
+        totals_frame = tk.Frame(frame, bg=BG_PANEL)
+        totals_frame.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
+
+        totals_tree = ttk.Treeview(totals_frame, columns=columns, show="headings", height=3)
+
+        # Add vertical scrollbar for totals
+        totals_scroll = ttk.Scrollbar(totals_frame, orient=tk.VERTICAL, command=totals_tree.yview)
+        totals_tree.configure(yscrollcommand=totals_scroll.set)
 
         # Configure columns
         for col in columns:
@@ -941,6 +1003,10 @@ class LeagueStatsWidget:
                 totals_tree.column(col, width=50, anchor=tk.CENTER)
             else:
                 totals_tree.column(col, width=45, anchor=tk.CENTER)
+
+        # Pack tree and scrollbar
+        totals_tree.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        totals_scroll.pack(side=tk.RIGHT, fill=tk.Y)
 
         # Determine games played from W-L records (maximum games played across all teams)
         games_played = 0
@@ -1004,8 +1070,6 @@ class LeagueStatsWidget:
                 else:
                     values.append("")
             totals_tree.insert("", tk.END, values=tuple(values))
-
-        totals_tree.pack(fill=tk.BOTH, expand=False, padx=5, pady=5)
 
         # Right-click and Ctrl+C to copy rows
         totals_tree.bind('<Button-3>', lambda e, t=totals_tree: self._show_copy_menu(e, t))

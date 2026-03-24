@@ -22,7 +22,7 @@ Contact: JimMaastricht5@gmail.com
 """
 
 import tkinter as tk
-from tkinter import messagebox
+from tkinter import ttk, messagebox
 import datetime
 import argparse
 import sys
@@ -170,7 +170,16 @@ def main(load_seasons=None, new_season=2026, season_length=162, series_length=3,
     and starts the tkinter event loop.
 
     Args:
-        show_startup_dialog: If True, shows startup dialog to select team and games (default False)
+        load_seasons: List of seasons to load stats from (default [2023, 2024, 2025])
+        new_season: Season year to simulate (default 2026)
+        season_length: Number of games per team (default 162)
+        series_length: Number of games per series (default 3)
+        rotation_len: Pitcher rotation length (default 5)
+        season_chatty: Enable detailed output (default True)
+        season_print_lineup_b: Print lineups (default True)
+        season_print_box_score_b: Print box scores (default True)
+        season_team_to_follow: Team to follow (default 'MIL')
+        show_startup_dialog: Show startup dialog (default False)
     """
     if load_seasons is None:
         load_seasons = [2023, 2024, 2025]

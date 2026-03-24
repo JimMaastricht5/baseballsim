@@ -13,7 +13,7 @@ from tkinter import ttk, messagebox
 from typing import List, Dict, Any, Callable, Optional
 from bblogger import logger
 
-from ui.theme import BG_PANEL, BG_ELEVATED, TEXT_PRIMARY, TEXT_SECONDARY, ACCENT_GREEN
+from ui.theme import BG_PANEL, BG_ELEVATED, TEXT_PRIMARY, TEXT_SECONDARY, TEXT_HEADING, ACCENT_GREEN
 
 
 class AdminWidget:
@@ -48,7 +48,9 @@ class AdminWidget:
             self.frame,
             text="Player Management - Move, Retire, or Disable Players",
             font=("Arial", 11, "bold"),
-            pady=5
+            pady=5,
+            bg=BG_PANEL,
+            fg=TEXT_HEADING
         )
         admin_header.pack()
 
@@ -172,22 +174,25 @@ class AdminWidget:
         self.save_btn.pack(side=tk.LEFT, padx=5)
 
         # Disabled List (IL) section
-        il_frame = tk.LabelFrame(self.frame, text="Place Player on Disabled List", font=("Arial", 10, "bold"), padx=10, pady=5)
+        il_frame = tk.LabelFrame(self.frame, text="Place Player on Disabled List", font=("Arial", 10, "bold"),
+                                 padx=10, pady=5, bg=BG_PANEL, fg=TEXT_PRIMARY)
         il_frame.pack(fill=tk.X, padx=10, pady=(5, 0))
 
-        il_inner_frame = tk.Frame(il_frame)
+        il_inner_frame = tk.Frame(il_frame, bg=BG_PANEL)
         il_inner_frame.pack(fill=tk.X, pady=5)
 
-        tk.Label(il_inner_frame, text="Injury Days:", font=("Arial", 10)).pack(side=tk.LEFT, padx=5)
+        tk.Label(il_inner_frame, text="Injury Days:", font=("Arial", 10), bg=BG_PANEL, fg=TEXT_PRIMARY).pack(side=tk.LEFT, padx=5)
         self.il_days_var = tk.StringVar(value="30")
-        il_days_entry = tk.Entry(il_inner_frame, textvariable=self.il_days_var, width=8, font=("Arial", 10))
+        il_days_entry = tk.Entry(il_inner_frame, textvariable=self.il_days_var, width=8, font=("Arial", 10),
+                                  bg=BG_ELEVATED, fg=TEXT_PRIMARY, insertbackground=TEXT_PRIMARY)
         il_days_entry.pack(side=tk.LEFT, padx=5)
 
         il_hint_label = tk.Label(
             il_inner_frame,
             text="(Short: 5-14, Medium: 15-29, Long: 30+)",
             font=("Arial", 8),
-            fg="#888888"
+            fg=TEXT_SECONDARY,
+            bg=BG_PANEL
         )
         il_hint_label.pack(side=tk.LEFT, padx=5)
 

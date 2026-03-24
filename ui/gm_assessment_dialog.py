@@ -132,6 +132,7 @@ class GMAssessmentDialog:
 
         # Insert formatted assessment
         self._insert_header()
+        self._insert_total_salary(roster_values)
         self._insert_strategy(strategy)
         self._insert_top_players(roster_values)
         self._insert_trade_candidates(recommendations.get('trade_away', []))
@@ -158,6 +159,13 @@ class GMAssessmentDialog:
         self.text_widget.insert(tk.END, f"  Alpha: {strategy.alpha:.3f}\n")
         self.text_widget.insert(tk.END, f"  Win Pct: {strategy.win_pct:.3f}\n")
         self.text_widget.insert(tk.END, f"  Games Back: {strategy.games_back:.1f}\n")
+        self.text_widget.insert(tk.END, "\n")
+
+    def _insert_total_salary(self, roster_values):
+        """Insert total team salary section."""
+        all_players = roster_values.get('batters', []) + roster_values.get('pitchers', [])
+        total_salary = sum(player.salary for player in all_players if hasattr(player, 'salary'))
+        self.text_widget.insert(tk.END, f"TOTAL TEAM SALARY: ${total_salary/1e6:.1f}M\n", "header")
         self.text_widget.insert(tk.END, "\n")
 
     def _insert_top_players(self, roster_values):

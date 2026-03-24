@@ -36,7 +36,7 @@ class SeasonWorker(threading.Thread):
     def __init__(self, load_seasons=None, new_season=2026,
                 rotation_len=5, series_length=3, season_length=162, season_chatty=False,
                 season_print_lineup_b=False, season_print_box_score_b=False,
-                team_to_follow=None, start_paused=False):
+                team_to_follow=None, start_paused=False, obp_adjustment=0.0):
         """
         Initialize season worker with simulation parameters.
 
@@ -62,6 +62,7 @@ class SeasonWorker(threading.Thread):
         self.season_print_box_score_b = season_print_box_score_b
         self.only_nl_b = False
         self.start_paused = start_paused
+        self.obp_adjustment = obp_adjustment
 
         # Create signal emitter
         self.signals = SeasonSignals()

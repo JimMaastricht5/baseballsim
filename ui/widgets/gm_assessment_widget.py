@@ -116,6 +116,12 @@ class GMAssessmentWidget:
         self.gm_text.insert(tk.END, separator + "\n", "header")
         self.gm_text.insert(tk.END, "\n")
 
+        # Calculate total team salary
+        all_players = roster_values.get('batters', []) + roster_values.get('pitchers', [])
+        total_salary = sum(player.salary for player in all_players if hasattr(player, 'salary'))
+        self.gm_text.insert(tk.END, f"TOTAL TEAM SALARY: ${total_salary/1e6:.1f}M\n", "header")
+        self.gm_text.insert(tk.END, "\n")
+
         # Strategy
         self.gm_text.insert(tk.END, "TEAM STRATEGY:\n", "section")
         self.gm_text.insert(tk.END, f"  Stage: {strategy.stage}\n")
@@ -127,8 +133,6 @@ class GMAssessmentWidget:
         # Top 5 players
         self.gm_text.insert(tk.END, "TOP 5 MOST VALUABLE PLAYERS:\n", "section")
         self.gm_text.insert(tk.END, "(Value = weighted blend of current season + projected avg WAR)\n\n")
-
-        all_players = roster_values.get('batters', []) + roster_values.get('pitchers', [])
         all_players.sort(key=lambda x: x.total_value, reverse=True)
 
         if not all_players:

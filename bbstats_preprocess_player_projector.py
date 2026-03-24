@@ -58,8 +58,8 @@ class PlayerProjector:
 
         self.k_vals_pitcher = {
             'H': 2000,  # Hits allowed (BABIP) regresses heavily
-            'BB': 200,  # Walk rate
-            'SO': 200,  # K-rate stabilizes very fast for pitchers
+            'BB': 300,  # Walk rate
+            'SO': 150,  # K-rate stabilizes very fast for pitchers
             'ER': 300,  # Essential for preventing 0.00 ERA anomalies
             'default': 250
         }
@@ -291,8 +291,8 @@ class PlayerProjector:
         """
         num_years = len(history)
 
-        # Volume Logic
-        weights = np.array([3, 4, 5][-num_years:])
+        # Volume Logic: Aggressive recency weighting (6:3:1) to better project decline/rise
+        weights = np.array([1, 3, 6][-num_years:])
         raw_vol = np.sum(history['PA'].fillna(0).values * weights) / weights.sum()
         proj_vol = min(max(150, raw_vol), 700)
 
@@ -442,14 +442,12 @@ class PlayerProjector:
         career_vol = history[vol_col].sum()
         is_p = 'IP' in history.columns
 
-        # 1. DYNAMIC K-SCALING (The "Trust" Meter)
-        vol_trust_factor = np.clip(career_vol / 1500, 0, 1)
-        # Slides from 800 (Rookie) down to 20 (Veteran)
-        base_k = 800 * (1 - vol_trust_factor) + 20
+        # 1. DYNAMIC K-SCALING (The "Trust" Meter")
+        # Slides from 800 (Rookie, 0 PA) down to 0 (Elite Veteran, 3000+ PA)
+        vol_trust_factor = np.clip(career_vol / 3000, 0, 1)
+        base_k = 800 * (1 - vol_trust_factor)
         k_map = self.k_vals_pitcher if is_p else self.k_vals_batter
         k = k_map.get(stat_col, base_k)
-        if not is_p and career_vol > 1000:
-            k = k * 0.5
 
         # 2. THE TETHERED POWER LOGIC (Only for 2B, 3B, HR)
         # CRITICAL: We check vol_col == 'H' to ensure Hits (PA) never enters here.

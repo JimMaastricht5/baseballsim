@@ -13,6 +13,8 @@ from tkinter import ttk, messagebox
 from typing import List, Dict, Any, Callable, Optional
 from bblogger import logger
 
+from ui.theme import BG_PANEL, BG_ELEVATED, TEXT_PRIMARY, TEXT_SECONDARY, ACCENT_GREEN
+
 
 class AdminWidget:
     """
@@ -36,7 +38,7 @@ class AdminWidget:
             get_worker_callback: Callback function to get worker instance
             on_change_callback: Optional callback to call when player changes are made
         """
-        self.frame = tk.Frame(parent)
+        self.frame = tk.Frame(parent, bg=BG_PANEL)
         self.get_worker = get_worker_callback
         self.on_change_callback = on_change_callback
         self.admin_all_players = []  # Cached player list
@@ -51,16 +53,20 @@ class AdminWidget:
         admin_header.pack()
 
         # Search frame
-        search_frame = tk.Frame(self.frame)
+        search_frame = tk.Frame(self.frame, bg=BG_PANEL)
         search_frame.pack(fill=tk.X, padx=10, pady=5)
 
-        tk.Label(search_frame, text="Search:", font=("Arial", 10)).pack(side=tk.LEFT, padx=5)
+        tk.Label(search_frame, text="Search:", font=("Segoe UI", 10),
+                 bg=BG_PANEL, fg=TEXT_PRIMARY).pack(side=tk.LEFT, padx=5)
         self.admin_search_var = tk.StringVar()
         self.admin_search_var.trace('w', lambda *args: self._filter_players())
-        search_entry = tk.Entry(search_frame, textvariable=self.admin_search_var, width=30, font=("Arial", 10))
+        search_entry = tk.Entry(search_frame, textvariable=self.admin_search_var, width=30,
+                                font=("Segoe UI", 10), bg=BG_ELEVATED, fg=TEXT_PRIMARY,
+                                insertbackground=TEXT_PRIMARY, relief=tk.FLAT)
         search_entry.pack(side=tk.LEFT, padx=5)
 
-        tk.Label(search_frame, text="Team Filter:", font=("Arial", 10)).pack(side=tk.LEFT, padx=15)
+        tk.Label(search_frame, text="Team Filter:", font=("Segoe UI", 10),
+                 bg=BG_PANEL, fg=TEXT_PRIMARY).pack(side=tk.LEFT, padx=15)
         self.admin_team_filter_var = tk.StringVar(value="All Teams")
         self.admin_team_filter_var.trace('w', lambda *args: self._filter_players())
         self.admin_team_filter_combo = ttk.Combobox(
@@ -73,7 +79,7 @@ class AdminWidget:
         self.admin_team_filter_combo.pack(side=tk.LEFT, padx=5)
 
         # Player list frame with treeview
-        list_frame = tk.Frame(self.frame)
+        list_frame = tk.Frame(self.frame, bg=BG_PANEL)
         list_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=5)
 
         # Scrollbars
@@ -114,10 +120,11 @@ class AdminWidget:
         self.admin_players_tree.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
 
         # Action frame
-        action_frame = tk.Frame(self.frame)
+        action_frame = tk.Frame(self.frame, bg=BG_PANEL)
         action_frame.pack(fill=tk.X, padx=10, pady=10)
 
-        tk.Label(action_frame, text="Move selected player to:", font=("Arial", 10, "bold")).pack(side=tk.LEFT, padx=5)
+        tk.Label(action_frame, text="Move selected player to:", font=("Segoe UI", 10, "bold"),
+                 bg=BG_PANEL, fg=TEXT_PRIMARY).pack(side=tk.LEFT, padx=5)
         self.admin_dest_team_var = tk.StringVar()
         self.admin_dest_team_combo = ttk.Combobox(
             action_frame,
@@ -200,8 +207,8 @@ class AdminWidget:
         self.admin_status_label = tk.Label(
             self.frame,
             text="Ready. Select a player and destination team, then click 'Move Player'.",
-            font=("Arial", 9),
-            fg="#666666",
+            font=("Segoe UI", 9),
+            bg=BG_PANEL, fg=TEXT_SECONDARY,
             anchor=tk.W
         )
         self.admin_status_label.pack(fill=tk.X, padx=10, pady=5)
@@ -213,7 +220,8 @@ class AdminWidget:
         """
         worker = self.get_worker()
         if not worker or not worker.season:
-            self.admin_status_label.config(text="Start simulation to load players", fg="#ff6600")
+            self.admin_status_label.config(text="Start simulation to load players",
+                                           fg="#e0882d")
             return
 
         try:
@@ -259,7 +267,7 @@ class AdminWidget:
 
             self.admin_status_label.config(
                 text=f"Loaded {len(self.admin_all_players)} players. Select a player to move.",
-                fg="#006600"
+                fg="#56d364"
             )
             logger.info(f"Loaded {len(self.admin_all_players)} players for admin management")
 
@@ -267,7 +275,7 @@ class AdminWidget:
             logger.error(f"Error loading admin players: {e}")
             import traceback
             logger.error(traceback.format_exc())
-            self.admin_status_label.config(text=f"Error loading players: {e}", fg="#ff0000")
+            self.admin_status_label.config(text=f"Error loading players: {e}", fg="#ff6b6b")
 
     def enable_buttons(self):
         """Enable admin buttons when simulation is fully paused."""
@@ -329,7 +337,7 @@ class AdminWidget:
         if search_text or team_filter != "All Teams":
             self.admin_status_label.config(
                 text=f"Showing {len(filtered_players)} of {len(self.admin_all_players)} players",
-                fg="#666666"
+                fg=TEXT_SECONDARY
             )
 
     def move_player(self):
@@ -415,7 +423,7 @@ class AdminWidget:
 
             self.admin_status_label.config(
                 text=f"Moved {player_name} from {current_team} to {dest_team}. Click 'Save Changes' to persist.",
-                fg="#006600"
+                fg="#56d364"
             )
             logger.info(f"Moved player {hashcode} ({player_name}) from {current_team} to {dest_team}")
 
@@ -463,7 +471,7 @@ class AdminWidget:
 
             self.admin_status_label.config(
                 text="Changes saved successfully to CSV files.",
-                fg="#006600"
+                fg="#56d364"
             )
             logger.info("Admin player changes saved to CSV files")
 

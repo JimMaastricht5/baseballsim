@@ -8,9 +8,11 @@ Displays AI GM roster assessment for followed team.
 """
 
 import tkinter as tk
-from tkinter import scrolledtext
+from tkinter import scrolledtext, ttk
 from typing import Dict, Any, Callable
 from bblogger import logger
+
+from ui.theme import BG_PANEL, BG_WIDGET, TEXT_PRIMARY, TEXT_HEADING, ACCENT_BLUE
 
 
 class GMAssessmentWidget:
@@ -33,38 +35,40 @@ class GMAssessmentWidget:
             parent: Parent tkinter widget (notebook or frame)
             update_callback: Callback function when Update Assessment button clicked
         """
-        self.frame = tk.Frame(parent)
+        self.frame = tk.Frame(parent, bg=BG_PANEL)
         self.update_callback = update_callback
 
         # Header with button
-        gm_header_frame = tk.Frame(self.frame)
+        gm_header_frame = tk.Frame(self.frame, bg=BG_PANEL)
         gm_header_frame.pack(fill=tk.X, pady=5)
 
         self.gm_header_label = tk.Label(
             gm_header_frame, text="No GM Assessment Yet",
-            font=("Arial", 11, "bold")
+            font=("Segoe UI", 11, "bold"), bg=BG_PANEL, fg=TEXT_HEADING
         )
         self.gm_header_label.pack(side=tk.LEFT, padx=10)
 
         # Update Assessment button
-        self.update_assessment_btn = tk.Button(
-            gm_header_frame, text="Update Assessment", command=update_callback,
-            width=16, bg="blue", fg="white", font=("Arial", 10, "bold")
+        self.update_assessment_btn = ttk.Button(
+            gm_header_frame, text="Update Assessment",
+            command=update_callback, width=18, style="GM.TButton"
         )
         self.update_assessment_btn.pack(side=tk.RIGHT, padx=10)
         self.update_assessment_btn.config(state=tk.DISABLED)  # Initially disabled
 
         # ScrolledText for assessment history
         self.gm_text = scrolledtext.ScrolledText(
-            self.frame, wrap=tk.WORD, font=("Courier", 9), state=tk.DISABLED
+            self.frame, wrap=tk.WORD, font=("Consolas", 9), state=tk.DISABLED,
+            bg=BG_WIDGET, fg=TEXT_PRIMARY, insertbackground=TEXT_PRIMARY
         )
 
         # Configure text tags for formatting
-        self.gm_text.tag_configure("header", font=("Courier", 11, "bold"), foreground="#0044cc")
-        self.gm_text.tag_configure("section", font=("Courier", 10, "bold"), underline=True)
-        self.gm_text.tag_configure("value", foreground="#006600")
-        self.gm_text.tag_configure("warning", foreground="#cc6600")
-        self.gm_text.tag_configure("separator", foreground="#888888")
+        self.gm_text.tag_configure("header", font=("Consolas", 11, "bold"), foreground=ACCENT_BLUE)
+        self.gm_text.tag_configure("section", font=("Consolas", 10, "bold"), underline=True,
+                                   foreground="#79b8ff")
+        self.gm_text.tag_configure("value", foreground="#56d364")
+        self.gm_text.tag_configure("warning", foreground="#e0882d")
+        self.gm_text.tag_configure("separator", foreground="#30363d")
 
         self.gm_text.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
 

@@ -12,6 +12,8 @@ from tkinter import ttk, scrolledtext
 from typing import Dict, List, Tuple
 from bblogger import logger
 
+from ui.theme import BG_PANEL, BG_WIDGET, TEXT_PRIMARY, TEXT_SECONDARY, ACCENT_BLUE, ACCENT_GOLD
+
 
 class GamesPlayedWidget:
     """
@@ -30,16 +32,17 @@ class GamesPlayedWidget:
         Args:
             parent: Parent tkinter widget (notebook or frame)
         """
-        self.frame = tk.Frame(parent)
+        self.frame = tk.Frame(parent, bg=BG_PANEL)
 
         # Storage for play-by-play data by day
         self.pbp_by_day = {}  # Dict: {day_num: [(away, home, game_recap), ...]}
 
         # Control frame with day dropdown
-        pbp_control_frame = tk.Frame(self.frame)
+        pbp_control_frame = tk.Frame(self.frame, bg=BG_PANEL)
         pbp_control_frame.pack(fill=tk.X, padx=10, pady=5)
 
-        tk.Label(pbp_control_frame, text="Day:", font=("Arial", 10, "bold")).pack(side=tk.LEFT, padx=5)
+        tk.Label(pbp_control_frame, text="Day:", font=("Segoe UI", 10, "bold"),
+                 bg=BG_PANEL, fg=TEXT_PRIMARY).pack(side=tk.LEFT, padx=5)
         self.pbp_day_var = tk.StringVar(value="Select Day")
         self.pbp_day_combo = ttk.Combobox(
             pbp_control_frame,
@@ -55,22 +58,24 @@ class GamesPlayedWidget:
         self.pbp_info_label = tk.Label(
             pbp_control_frame,
             text="Select a day to view play-by-play for followed games",
-            font=("Arial", 9),
-            fg="#666666"
+            font=("Segoe UI", 9),
+            bg=BG_PANEL,
+            fg=TEXT_SECONDARY
         )
         self.pbp_info_label.pack(side=tk.LEFT, padx=20)
 
         # ScrolledText for play-by-play
         self.pbp_text = scrolledtext.ScrolledText(
-            self.frame, wrap=tk.WORD, font=("Courier", 9), state=tk.DISABLED
+            self.frame, wrap=tk.WORD, font=("Consolas", 9), state=tk.DISABLED,
+            bg=BG_WIDGET, fg=TEXT_PRIMARY, insertbackground=TEXT_PRIMARY
         )
 
         # Configure text tags for formatting
-        self.pbp_text.tag_configure("game_header", font=("Arial", 11, "bold"),
-                                   foreground="#1a3d6b", spacing1=10, spacing3=5)
-        self.pbp_text.tag_configure("play", font=("Courier", 9))
-        self.pbp_text.tag_configure("score_update", font=("Courier", 9, "bold"),
-                                   foreground="#006600")
+        self.pbp_text.tag_configure("game_header", font=("Segoe UI", 11, "bold"),
+                                   foreground=ACCENT_BLUE, spacing1=10, spacing3=5)
+        self.pbp_text.tag_configure("play", font=("Consolas", 9))
+        self.pbp_text.tag_configure("score_update", font=("Consolas", 9, "bold"),
+                                   foreground=ACCENT_GOLD)
 
         self.pbp_text.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
 

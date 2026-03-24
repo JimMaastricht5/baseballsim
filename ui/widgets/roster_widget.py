@@ -12,6 +12,9 @@ from tkinter import ttk
 import pandas as pd
 from bblogger import logger
 
+from ui.theme import (BG_PANEL, BG_ELEVATED, TEXT_PRIMARY, TEXT_SECONDARY,
+                      TEXT_HEADING, ACCENT_GOLD, ROW_IL, ROW_DTD)
+
 
 class RosterWidget:
     """
@@ -32,7 +35,7 @@ class RosterWidget:
             parent: Parent tkinter widget (notebook or frame)
             comparison_mode_var: StringVar for comparison mode ("current" or "difference")
         """
-        self.frame = tk.Frame(parent)
+        self.frame = tk.Frame(parent, bg=BG_PANEL)
         self.baseball_data = None  # Will be set in update_roster
 
         # Create our own comparison mode var if not provided
@@ -64,29 +67,36 @@ class RosterWidget:
         roster_notebook.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
 
         # Sub-section 1: Position Players
-        pos_players_frame = tk.Frame(roster_notebook)
+        pos_players_frame = tk.Frame(roster_notebook, bg=BG_PANEL)
         roster_notebook.add(pos_players_frame, text="Pos Players")
 
         # Add control panel with search, filters, and toggle button
-        batting_control_frame = tk.Frame(pos_players_frame)
+        batting_control_frame = tk.Frame(pos_players_frame, bg=BG_PANEL)
         batting_control_frame.pack(fill=tk.X, padx=5, pady=5)
 
         # Player search
-        tk.Label(batting_control_frame, text="Find Player:").pack(side=tk.LEFT, padx=(0, 5))
+        tk.Label(batting_control_frame, text="Find Player:", font=("Segoe UI", 10),
+                 bg=BG_PANEL, fg=TEXT_PRIMARY).pack(side=tk.LEFT, padx=(0, 5))
         self.batting_search_var.trace('w', lambda *args: self._apply_filter(is_batter=True))
-        batting_search_entry = tk.Entry(batting_control_frame, textvariable=self.batting_search_var, width=20)
+        batting_search_entry = tk.Entry(batting_control_frame, textvariable=self.batting_search_var, width=20,
+                                        font=("Segoe UI", 10), bg=BG_ELEVATED, fg=TEXT_PRIMARY,
+                                        insertbackground=TEXT_PRIMARY, relief=tk.FLAT)
         batting_search_entry.pack(side=tk.LEFT, padx=(0, 5))
 
         # Clear button
-        clear_btn = tk.Button(batting_control_frame, text="Clear Filters",
-                             command=lambda: self._clear_filter(is_batter=True))
+        clear_btn = ttk.Button(batting_control_frame, text="Clear Filters",
+                               command=lambda: self._clear_filter(is_batter=True),
+                               style="Nav.TButton")
         clear_btn.pack(side=tk.LEFT, padx=5)
 
         # Toggle button
-        tk.Label(batting_control_frame, text="  |  View:").pack(side=tk.LEFT, padx=(10, 5))
+        tk.Label(batting_control_frame, text="  |  View:", font=("Segoe UI", 10),
+                 bg=BG_PANEL, fg=TEXT_PRIMARY).pack(side=tk.LEFT, padx=(10, 5))
         self.batting_comparison_btn = tk.Button(batting_control_frame, text="Show Difference from 2025",
                                                command=self._toggle_comparison_mode,
-                                               bg="#e8f4f8", relief=tk.RAISED)
+                                               bg=BG_ELEVATED, fg=TEXT_PRIMARY,
+                                               activebackground=BG_PANEL, activeforeground=TEXT_PRIMARY,
+                                               relief=tk.RAISED, font=("Segoe UI", 9))
         self.batting_comparison_btn.pack(side=tk.LEFT, padx=5)
 
         self.pos_players_tree = self._create_roster_treeview(pos_players_frame, is_batter=True)
@@ -95,38 +105,46 @@ class RosterWidget:
         separator = ttk.Separator(pos_players_frame, orient=tk.HORIZONTAL)
         separator.pack(fill=tk.X, padx=5, pady=10)
 
-        totals_label = tk.Label(pos_players_frame, text="Team Batting Totals", font=("Arial", 11, "bold"))
+        totals_label = tk.Label(pos_players_frame, text="Team Batting Totals",
+                                font=("Segoe UI", 11, "bold"), bg=BG_PANEL, fg=TEXT_HEADING)
         totals_label.pack(padx=5, pady=(0, 5))
 
-        self.batting_totals_frame = tk.Frame(pos_players_frame, relief=tk.SUNKEN, borderwidth=1)
+        self.batting_totals_frame = tk.Frame(pos_players_frame, bg=BG_PANEL, relief=tk.FLAT, borderwidth=0)
         self.batting_totals_frame.pack(fill=tk.X, padx=5, pady=5)
 
         self.batting_totals_labels = {}  # Store label references for updating
 
         # Sub-section 2: Pitchers
-        pitchers_frame = tk.Frame(roster_notebook)
+        pitchers_frame = tk.Frame(roster_notebook, bg=BG_PANEL)
         roster_notebook.add(pitchers_frame, text="Pitchers")
 
         # Add control panel with search, filters, and toggle button
-        pitching_control_frame = tk.Frame(pitchers_frame)
+        pitching_control_frame = tk.Frame(pitchers_frame, bg=BG_PANEL)
         pitching_control_frame.pack(fill=tk.X, padx=5, pady=5)
 
         # Player search
-        tk.Label(pitching_control_frame, text="Find Player:").pack(side=tk.LEFT, padx=(0, 5))
+        tk.Label(pitching_control_frame, text="Find Player:", font=("Segoe UI", 10),
+                 bg=BG_PANEL, fg=TEXT_PRIMARY).pack(side=tk.LEFT, padx=(0, 5))
         self.pitching_search_var.trace('w', lambda *args: self._apply_filter(is_batter=False))
-        pitching_search_entry = tk.Entry(pitching_control_frame, textvariable=self.pitching_search_var, width=20)
+        pitching_search_entry = tk.Entry(pitching_control_frame, textvariable=self.pitching_search_var, width=20,
+                                         font=("Segoe UI", 10), bg=BG_ELEVATED, fg=TEXT_PRIMARY,
+                                         insertbackground=TEXT_PRIMARY, relief=tk.FLAT)
         pitching_search_entry.pack(side=tk.LEFT, padx=(0, 5))
 
         # Clear button
-        clear_btn = tk.Button(pitching_control_frame, text="Clear Filters",
-                             command=lambda: self._clear_filter(is_batter=False))
+        clear_btn = ttk.Button(pitching_control_frame, text="Clear Filters",
+                               command=lambda: self._clear_filter(is_batter=False),
+                               style="Nav.TButton")
         clear_btn.pack(side=tk.LEFT, padx=5)
 
         # Toggle button
-        tk.Label(pitching_control_frame, text="  |  View:").pack(side=tk.LEFT, padx=(10, 5))
+        tk.Label(pitching_control_frame, text="  |  View:", font=("Segoe UI", 10),
+                 bg=BG_PANEL, fg=TEXT_PRIMARY).pack(side=tk.LEFT, padx=(10, 5))
         self.pitching_comparison_btn = tk.Button(pitching_control_frame, text="Show Difference from 2025",
                                                 command=self._toggle_comparison_mode,
-                                                bg="#e8f4f8", relief=tk.RAISED)
+                                                bg=BG_ELEVATED, fg=TEXT_PRIMARY,
+                                                activebackground=BG_PANEL, activeforeground=TEXT_PRIMARY,
+                                                relief=tk.RAISED, font=("Segoe UI", 9))
         self.pitching_comparison_btn.pack(side=tk.LEFT, padx=5)
 
         self.pitchers_tree = self._create_roster_treeview(pitchers_frame, is_batter=False)
@@ -135,28 +153,16 @@ class RosterWidget:
         separator = ttk.Separator(pitchers_frame, orient=tk.HORIZONTAL)
         separator.pack(fill=tk.X, padx=5, pady=10)
 
-        totals_label = tk.Label(pitchers_frame, text="Team Pitching Totals", font=("Arial", 11, "bold"))
+        totals_label = tk.Label(pitchers_frame, text="Team Pitching Totals",
+                                font=("Segoe UI", 11, "bold"), bg=BG_PANEL, fg=TEXT_HEADING)
         totals_label.pack(padx=5, pady=(0, 5))
 
-        self.pitching_totals_frame = tk.Frame(pitchers_frame, relief=tk.SUNKEN, borderwidth=1)
+        self.pitching_totals_frame = tk.Frame(pitchers_frame, bg=BG_PANEL, relief=tk.FLAT, borderwidth=0)
         self.pitching_totals_frame.pack(fill=tk.X, padx=5, pady=5)
 
         self.pitching_totals_labels = {}  # Store label references for updating
 
-        # Add separator
-        separator = ttk.Separator(self.frame, orient=tk.HORIZONTAL)
-        separator.pack(fill=tk.X, padx=5, pady=5)
-
-        # Add historical stats section at the bottom
-        history_label = tk.Label(self.frame, text="Player Historical Performance (Click player to view)",
-                                font=("Arial", 10, "bold"))
-        history_label.pack(padx=5, pady=(0, 5))
-
-        # Create frame for historical stats treeview
-        history_frame = tk.Frame(self.frame)
-        history_frame.pack(fill=tk.BOTH, expand=False, padx=5, pady=5)
-
-        self.history_tree = self._create_history_treeview(history_frame)
+        # Historical stats are shown in a popup window when a player is clicked
 
     def _create_roster_treeview(self, parent: tk.Widget, is_batter: bool = True) -> ttk.Treeview:
         """
@@ -207,61 +213,159 @@ class RosterWidget:
         scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
         tree.pack(fill=tk.BOTH, expand=True)
 
-        # Configure tags for injury highlighting
-        tree.tag_configure("day_to_day", background="#fff4cc")  # Yellow for day-to-day (<10 days)
-        tree.tag_configure("injured", background="#ffcccc")  # Red for IL (>=10 days)
+        # Configure tags for injury highlighting (dark-theme colours)
+        tree.tag_configure("day_to_day", background=ROW_DTD)   # Dark amber for day-to-day (<10 days)
+        tree.tag_configure("injured", background=ROW_IL)        # Dark red for IL (>=10 days)
 
         # Bind click handler for player selection
         tree.bind('<<TreeviewSelect>>', lambda e: self._on_player_click(tree, is_batter))
 
+        # Bind right-click and Ctrl+C for clipboard copy
+        tree.bind('<Button-3>', lambda e, t=tree: self._show_copy_menu(e, t))
+        tree.bind('<Control-c>', lambda e, t=tree: self._copy_selected_rows(t))
+
         return tree
 
-    def _create_history_treeview(self, parent: tk.Widget) -> ttk.Treeview:
+    def _show_history_popup(self, player_name: str, historical_df, is_batter: bool,
+                            projected_row=None):
         """
-        Create Treeview for historical player stats.
+        Open a popup window showing player historical stats with projected row at top.
 
         Args:
-            parent: Parent widget
-
-        Returns:
-            ttk.Treeview: Configured treeview for historical data
+            player_name: Player name for window title
+            historical_df: DataFrame with historical stats
+            is_batter: True for batting columns, False for pitching columns
+            projected_row: Optional Series with projected new-season stats
         """
-        # Common columns for both batters and pitchers
-        columns = ("Season", "Team", "Age", "G")
+        popup = tk.Toplevel()
+        popup.title(f"{player_name} - Historical Stats")
+        popup.geometry("680x300")
+        popup.resizable(True, True)
+        popup.configure(bg=BG_PANEL)
 
-        tree = ttk.Treeview(parent, columns=columns, show="headings", height=5)
+        if is_batter:
+            columns = ("Season", "Team", "Age", "G", "AB", "R", "H", "HR", "RBI", "AVG", "OBP", "SLG", "OPS")
+        else:
+            columns = ("Season", "Team", "Age", "G", "GS", "IP", "W", "L", "ERA", "WHIP", "SO")
 
-        # Configure columns
+        tree_frame = tk.Frame(popup, bg=BG_PANEL)
+        tree_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=(10, 5))
+
+        scrollbar = ttk.Scrollbar(tree_frame, orient=tk.VERTICAL)
+        scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+
+        tree = ttk.Treeview(tree_frame, columns=columns, show="headings", height=8,
+                            yscrollcommand=scrollbar.set)
+        scrollbar.config(command=tree.yview)
+        tree.tag_configure("projected", foreground="#d4a017")
+
         for col in columns:
             tree.heading(col, text=col)
-            if col == "Season":
-                tree.column(col, width=70, anchor=tk.CENTER)
-            elif col == "Team":
+            if col in ["Season", "Team"]:
                 tree.column(col, width=60, anchor=tk.CENTER)
-            elif col in ["Age", "G"]:
+            elif col in ["Age", "G", "GS", "W", "L"]:
+                tree.column(col, width=40, anchor=tk.CENTER)
+            elif col in ["AB", "R", "H", "HR", "RBI", "SO"]:
+                tree.column(col, width=45, anchor=tk.CENTER)
+            elif col in ["AVG", "OBP", "SLG", "OPS", "ERA", "WHIP"]:
+                tree.column(col, width=55, anchor=tk.CENTER)
+            elif col == "IP":
                 tree.column(col, width=50, anchor=tk.CENTER)
             else:
-                tree.column(col, width=70, anchor=tk.CENTER)
+                tree.column(col, width=50, anchor=tk.CENTER)
 
-        # Add scrollbar
-        scrollbar = ttk.Scrollbar(parent, orient=tk.VERTICAL, command=tree.yview)
-        tree.configure(yscrollcommand=scrollbar.set)
-        scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
         tree.pack(fill=tk.BOTH, expand=True)
 
-        return tree
+        # Clipboard copy helpers for this popup
+        def _copy_history():
+            sel = tree.selection()
+            if not sel:
+                return
+            header = '\t'.join(columns)
+            rows = ['\t'.join(str(v) for v in tree.item(i, 'values')) for i in sel]
+            tree.clipboard_clear()
+            tree.clipboard_append(header + '\n' + '\n'.join(rows))
 
-    def update_roster(self, team: str, baseball_data):
+        def _show_history_copy_menu(event):
+            item = tree.identify_row(event.y)
+            if item:
+                tree.selection_set(item)
+            menu = tk.Menu(tree, tearoff=0)
+            menu.add_command(label="Copy Row", command=_copy_history)
+            try:
+                menu.tk_popup(event.x_root, event.y_root)
+            finally:
+                menu.grab_release()
+
+        tree.bind('<Button-3>', _show_history_copy_menu)
+        tree.bind('<Control-c>', lambda e: _copy_history())
+
+        # Insert projected row at top if available
+        if projected_row is not None:
+            try:
+                r = projected_row
+                if is_batter:
+                    avg_val = r.get('AVG', r.get('BA', 0))
+                    values = (
+                        "Projected", r.get('Team', ''), int(r.get('Age', 0)),
+                        int(r.get('G', 0)), int(r.get('AB', 0)), int(r.get('R', 0)),
+                        int(r.get('H', 0)), int(r.get('HR', 0)), int(r.get('RBI', 0)),
+                        f"{float(avg_val):.3f}", f"{float(r.get('OBP', 0)):.3f}",
+                        f"{float(r.get('SLG', 0)):.3f}", f"{float(r.get('OPS', 0)):.3f}"
+                    )
+                else:
+                    values = (
+                        "Projected", r.get('Team', ''), int(r.get('Age', 0)),
+                        int(r.get('G', 0)), int(r.get('GS', 0)),
+                        f"{float(r.get('IP', 0)):.1f}",
+                        int(r.get('W', 0)), int(r.get('L', 0)),
+                        f"{float(r.get('ERA', 0)):.2f}", f"{float(r.get('WHIP', 0)):.2f}",
+                        int(r.get('SO', 0))
+                    )
+                tree.insert("", tk.END, values=values, tags=("projected",))
+            except Exception as e:
+                logger.warning(f"Error inserting projected row: {e}")
+
+        for idx, row in historical_df.iterrows():
+            try:
+                if is_batter:
+                    values = (
+                        int(row.get('Season', 0)), row.get('Team', ''), int(row.get('Age', 0)),
+                        int(row.get('G', 0)), int(row.get('AB', 0)), int(row.get('R', 0)),
+                        int(row.get('H', 0)), int(row.get('HR', 0)), int(row.get('RBI', 0)),
+                        f"{float(row.get('AVG', 0)):.3f}", f"{float(row.get('OBP', 0)):.3f}",
+                        f"{float(row.get('SLG', 0)):.3f}", f"{float(row.get('OPS', 0)):.3f}"
+                    )
+                else:
+                    values = (
+                        int(row.get('Season', 0)), row.get('Team', ''), int(row.get('Age', 0)),
+                        int(row.get('G', 0)), int(row.get('GS', 0)),
+                        f"{float(row.get('IP', 0)):.1f}",
+                        int(row.get('W', 0)), int(row.get('L', 0)),
+                        f"{float(row.get('ERA', 0)):.2f}", f"{float(row.get('WHIP', 0)):.2f}",
+                        int(row.get('SO', 0))
+                    )
+                tree.insert("", tk.END, values=values)
+            except Exception as e:
+                logger.warning(f"Error inserting historical row: {e}")
+
+        ttk.Button(popup, text="Close", command=popup.destroy, width=10,
+                   style="Nav.TButton").pack(pady=5)
+        popup.focus_set()
+
+    def update_roster(self, team: str, baseball_data, team_win_loss: dict = None):
         """
         Fetch and display roster data for team.
 
         Args:
             team: Team abbreviation
             baseball_data: BaseballStats instance with get_batting_data/get_pitching_data methods
+            team_win_loss: Dictionary mapping team names to [wins, losses] for calculating actual games played
         """
         # Store reference to baseball_data for later use in click handlers
         self.baseball_data = baseball_data
         self.current_team = team  # Phase 5: Stats Enhancement - track current team
+        self.team_win_loss = team_win_loss  # Store for games played calculation
 
         try:
             # Get batting data (current season)
@@ -668,100 +772,21 @@ class RosterWidget:
             logger.warning("baseball_data not available for historical lookup")
             return
 
-        # Fetch historical data
+        # Fetch historical and projected data, then show in popup
         try:
             historical_df = self.baseball_data.get_player_historical_data(player_name, is_batter)
 
             if historical_df.empty:
                 logger.info(f"No historical data found for {player_name}")
-                # Clear the history tree
-                for item in self.history_tree.get_children():
-                    self.history_tree.delete(item)
                 return
 
-            # Update history tree with new data
-            self._update_history_tree(historical_df, is_batter)
+            projected_row = self.baseball_data.get_player_projected_data(player_name, is_batter)
+            self._show_history_popup(player_name, historical_df, is_batter, projected_row)
 
         except Exception as e:
             logger.error(f"Error fetching historical data for {player_name}: {e}")
             import traceback
             logger.error(traceback.format_exc())
-
-    def _update_history_tree(self, historical_df: pd.DataFrame, is_batter: bool):
-        """
-        Update the history tree with player's historical stats.
-
-        Args:
-            historical_df: DataFrame with historical stats
-            is_batter: True if batter, False if pitcher
-        """
-        # Clear existing data
-        for item in self.history_tree.get_children():
-            self.history_tree.delete(item)
-
-        # Define columns based on player type
-        if is_batter:
-            columns = ("Season", "Team", "Age", "G", "AB", "R", "H", "HR", "RBI", "AVG", "OBP", "SLG", "OPS")
-        else:
-            columns = ("Season", "Team", "Age", "G", "GS", "IP", "W", "L", "ERA", "WHIP", "SO")
-
-        # Reconfigure tree columns
-        self.history_tree['columns'] = columns
-        self.history_tree['show'] = 'headings'
-
-        # Configure column headings and widths
-        for col in columns:
-            self.history_tree.heading(col, text=col)
-            if col in ["Season", "Team"]:
-                self.history_tree.column(col, width=60, anchor=tk.CENTER)
-            elif col in ["Age", "G", "GS", "W", "L"]:
-                self.history_tree.column(col, width=40, anchor=tk.CENTER)
-            elif col in ["AB", "R", "H", "HR", "RBI", "SO"]:
-                self.history_tree.column(col, width=45, anchor=tk.CENTER)
-            elif col in ["AVG", "OBP", "SLG", "OPS", "ERA", "WHIP"]:
-                self.history_tree.column(col, width=55, anchor=tk.CENTER)
-            elif col == "IP":
-                self.history_tree.column(col, width=50, anchor=tk.CENTER)
-            else:
-                self.history_tree.column(col, width=50, anchor=tk.CENTER)
-
-        # Insert rows from historical data
-        for idx, row in historical_df.iterrows():
-            try:
-                if is_batter:
-                    values = (
-                        int(row.get('Season', 0)),
-                        row.get('Team', ''),
-                        int(row.get('Age', 0)),
-                        int(row.get('G', 0)),
-                        int(row.get('AB', 0)),
-                        int(row.get('R', 0)),
-                        int(row.get('H', 0)),
-                        int(row.get('HR', 0)),
-                        int(row.get('RBI', 0)),
-                        f"{float(row.get('AVG', 0)):.3f}",
-                        f"{float(row.get('OBP', 0)):.3f}",
-                        f"{float(row.get('SLG', 0)):.3f}",
-                        f"{float(row.get('OPS', 0)):.3f}"
-                    )
-                else:
-                    values = (
-                        int(row.get('Season', 0)),
-                        row.get('Team', ''),
-                        int(row.get('Age', 0)),
-                        int(row.get('G', 0)),
-                        int(row.get('GS', 0)),
-                        f"{float(row.get('IP', 0)):.1f}",
-                        int(row.get('W', 0)),
-                        int(row.get('L', 0)),
-                        f"{float(row.get('ERA', 0)):.2f}",
-                        f"{float(row.get('WHIP', 0)):.2f}",
-                        int(row.get('SO', 0))
-                    )
-
-                self.history_tree.insert("", tk.END, values=values)
-            except Exception as e:
-                logger.warning(f"Error inserting historical row: {e}")
 
     def _apply_filter(self, is_batter: bool = True):
         """Apply search filter to roster display."""
@@ -805,13 +830,17 @@ class RosterWidget:
         new_mode = "difference" if current_mode == "current" else "current"
         self.comparison_mode_var.set(new_mode)
 
-        # Update button appearance and text
+        # Update button appearance and text (dark-theme appropriate colours)
         if new_mode == "difference":
-            self.batting_comparison_btn.config(text="Show Current Stats", bg="#fff3cd", relief=tk.SUNKEN)
-            self.pitching_comparison_btn.config(text="Show Current Stats", bg="#fff3cd", relief=tk.SUNKEN)
+            self.batting_comparison_btn.config(text="Show Current Stats",
+                                               bg="#3d2d00", fg=ACCENT_GOLD, relief=tk.SUNKEN)
+            self.pitching_comparison_btn.config(text="Show Current Stats",
+                                                bg="#3d2d00", fg=ACCENT_GOLD, relief=tk.SUNKEN)
         else:
-            self.batting_comparison_btn.config(text="Show Difference from 2025", bg="#e8f4f8", relief=tk.RAISED)
-            self.pitching_comparison_btn.config(text="Show Difference from 2025", bg="#e8f4f8", relief=tk.RAISED)
+            self.batting_comparison_btn.config(text="Show Difference from 2025",
+                                               bg=BG_ELEVATED, fg=TEXT_PRIMARY, relief=tk.RAISED)
+            self.pitching_comparison_btn.config(text="Show Difference from 2025",
+                                                bg=BG_ELEVATED, fg=TEXT_PRIMARY, relief=tk.RAISED)
 
         # Refresh display
         self.refresh_display()
@@ -947,15 +976,16 @@ class RosterWidget:
             widget.destroy()
         labels_dict.clear()
 
-        # Get games played for this team
+        # Get games played for this team from W-L record
         games_played = 0
-        if hasattr(self.baseball_data, 'team_games_played'):
-            games_played = self.baseball_data.team_games_played.get(self.current_team, 0)
+        if self.team_win_loss and self.current_team in self.team_win_loss:
+            wins, losses = self.team_win_loss[self.current_team]
+            games_played = wins + losses
 
         # Add games played header
         if games_played > 0:
             header_label = tk.Label(frame, text=f"({games_played} games played)",
-                                   font=("Arial", 8, "italic"), fg="gray")
+                                   font=("Segoe UI", 8, "italic"), fg=TEXT_SECONDARY, bg=BG_PANEL)
             header_label.pack(pady=(2, 5))
 
         # Calculate current totals
@@ -1013,11 +1043,16 @@ class RosterWidget:
                 if col in current_totals.columns and col in prorated_totals.columns:
                     diff_totals[col] = current_totals[col].values[0] - prorated_totals[col].values[0]
 
+            # Create labels with game counts
+            current_label = f"2026 ({games_played} games)" if games_played > 0 else "Current"
+            if games_played >= 162:
+                season_label = f"2025 (prorated {games_played} games)"
+            else:
+                season_label = f"2025 (prorated {games_played} games)" if games_played > 0 else "2025 (Prorated)"
+
             # Insert three rows
-            # Determine label based on whether we have full season data
-            season_label = "2025 (Full Season)" if games_played >= 162 else "2025 (Prorated)"
             row_data = [
-                ("Current", current_totals, False),
+                (current_label, current_totals, False),
                 (season_label, prorated_totals, False),
                 ("Difference", diff_totals, True)
             ]
@@ -1032,7 +1067,8 @@ class RosterWidget:
                 totals_tree.insert("", tk.END, values=tuple(values))
         else:
             # No 2025 data or no games played, show current only
-            values = ["Current"]
+            current_label = f"2026 ({games_played} games)" if games_played > 0 else "Current"
+            values = [current_label]
             for col in columns[1:]:
                 if col in current_totals.columns:
                     values.append(self._format_total_value(current_totals[col].values[0], col, False))
@@ -1041,6 +1077,10 @@ class RosterWidget:
             totals_tree.insert("", tk.END, values=tuple(values))
 
         totals_tree.pack(fill=tk.BOTH, expand=False, padx=5, pady=5)
+
+        # Right-click and Ctrl+C to copy rows
+        totals_tree.bind('<Button-3>', lambda e, t=totals_tree: self._show_copy_menu(e, t))
+        totals_tree.bind('<Control-c>', lambda e, t=totals_tree: self._copy_selected_rows(t))
 
     def _format_total_value(self, value, col_name: str, is_difference: bool = False):
         """Format a total value for display."""
@@ -1061,6 +1101,29 @@ class RosterWidget:
         if is_difference and value > 0:
             return f"+{formatted}"
         return formatted
+
+    def _copy_selected_rows(self, tree: ttk.Treeview):
+        """Copy selected row(s) to clipboard as tab-separated values with column headers."""
+        selected = tree.selection()
+        if not selected:
+            return
+        columns = tree['columns']
+        header = '\t'.join(columns)
+        rows = ['\t'.join(str(v) for v in tree.item(item, 'values')) for item in selected]
+        tree.clipboard_clear()
+        tree.clipboard_append(header + '\n' + '\n'.join(rows))
+
+    def _show_copy_menu(self, event, tree: ttk.Treeview):
+        """Show right-click context menu with copy option."""
+        item = tree.identify_row(event.y)
+        if item:
+            tree.selection_set(item)
+        menu = tk.Menu(tree, tearoff=0)
+        menu.add_command(label="Copy Row", command=lambda: self._copy_selected_rows(tree))
+        try:
+            menu.tk_popup(event.x_root, event.y_root)
+        finally:
+            menu.grab_release()
 
     def get_frame(self) -> tk.Frame:
         """Get the main frame for adding to parent container."""

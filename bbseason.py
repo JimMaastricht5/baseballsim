@@ -94,6 +94,10 @@ class OutputCategory:
     WORLD_SERIES_START = 'world_series_start'
     WORLD_SERIES_END = 'world_series_end'
 
+    # Playoffs (full bracket rounds)
+    PLAYOFF_ROUND_START = 'playoff_round_start'
+    PLAYOFF_ROUND_END = 'playoff_round_end'
+
     # Progress
     SIM_PROGRESS = 'sim_progress'
 
@@ -174,6 +178,7 @@ class BaseballSeason:
                  load_batter_file: str = 'aggr-stats-pp-Batting.csv',
                  load_pitcher_file: str = 'aggr-stats-pp-Pitching.csv',
                  schedule: list = None, suppress_console_output: bool = False,
+                 obp_adjustment: float = None,
                  output_handler: Optional[OutputHandlerType] = None,
                  play_by_play_callback_factory: Optional[PlayByPlayCallbackFactory] = None) -> None:
         """
@@ -216,6 +221,7 @@ class BaseballSeason:
         self.print_box_score_b = season_print_box_score_b
         self.season_chatty = season_chatty
         self.team_to_follow = season_team_to_follow if season_team_to_follow is not None else []
+        self.obp_adjustment = obp_adjustment
         logger.debug("Initializing BaseballSeason with seasons: {}, new season: {}", load_seasons, new_season)
         self.baseball_data = bbstats.BaseballStats(load_seasons=self.load_seasons, new_season=new_season,
                                                    include_leagues=include_leagues, load_batter_file=load_batter_file,
@@ -549,9 +555,9 @@ class BaseballSeason:
 
         return games_back
 
-    def should_run_world_series(self) -> bool:
+    def should_run_playoffs(self) -> bool:
         """
-        Check if World Series should run after this season.
+        Check if playoffs should run after this season.
 
         Returns True if:
         - This is a full season (10+ games minimum for testing)
@@ -684,8 +690,8 @@ class BaseballSeason:
                 return
 
         # Calculate current Sim WAR values before assessments
-        # NOTE: calculate_sim_war() requires semaphore protection
-        with self.baseball_data.semaphore:
+        # NOTE: calculate_sim_war() requires lock protection
+        with self.baseball_data.thread_lock:
             self.baseball_data.calculate_sim_war()
 
         # Determine which teams to print
@@ -851,7 +857,8 @@ class BaseballSeason:
                                    rotation_len=self.rotation_len, print_lineup=self.print_lineup_b,
                                    chatty=self.season_chatty, print_box_score_b=self.print_box_score_b,
                                    team_to_follow=self.team_to_follow, interactive=self.interactive,
-                                   play_by_play_callback=pbp_callback)
+                                   play_by_play_callback=pbp_callback,
+                                   obp_adjustment=self.obp_adjustment)
                 score, inning, win_loss_list, game_recap = game.sim_game()
                 self.update_win_loss(away_team_name=match_up[0], home_team_name=match_up[1], win_loss=win_loss_list)
                 self.baseball_data.game_results_to_season(box_score_class=game.teams[AWAY].box_score)
@@ -900,7 +907,8 @@ class BaseballSeason:
                                    rotation_len=self.rotation_len, print_lineup=self.print_lineup_b,
                                    chatty=self.season_chatty, print_box_score_b=self.print_box_score_b,
                                    team_to_follow=self.team_to_follow, interactive=self.interactive,
-                                   play_by_play_callback=pbp_callback)
+                                   play_by_play_callback=pbp_callback,
+                                   obp_adjustment=self.obp_adjustment)
                 q = queue.Queue()
                 thread = threading.Thread(target=game.sim_game_threaded, args=(q,))
                 threads.append(thread)
@@ -950,91 +958,223 @@ class BaseballSeason:
         self.season_day_num = self.season_day_num + 1
         return
 
-    def run_world_series(self) -> None:
+    # def run_world_series(self) -> None:
+    #     """
+    #     Run World Series playoff between league champions.
+    #
+    #     Called after regular season ends. Creates a new BaseballSeason instance
+    #     with 2 teams and 7-game schedule, then runs full simulation.
+    #     Updates same season stats and declares champion.
+    #     """
+    #     import os
+    #     from bblogger import logger
+    #
+    #     # Check eligibility
+    #     if not self.should_run_world_playoffs():
+    #         return
+    #
+    #     # Get league winners
+    #     al_winner, nl_winner = self.get_league_winners()
+    #     if al_winner is None or nl_winner is None:
+    #         logger.warning("Cannot determine league winners for World Series")
+    #         return
+    #
+    #     # Print header
+    #     al_record = self.team_win_loss[al_winner]
+    #     nl_record = self.team_win_loss[nl_winner]
+    #     ws_header = f"\n\n{'='*80}\n"
+    #     ws_header += f"{self.new_season} WORLD SERIES\n"
+    #     ws_header += f"American League Champion: {self.team_city_dict[al_winner]} ({al_winner})\n"
+    #     ws_header += f"National League Champion: {self.team_city_dict[nl_winner]} ({nl_winner})\n"
+    #     ws_header += f"{al_winner}: {al_record[WIN]}-{al_record[LOSS]} vs {nl_winner}: {nl_record[WIN]}-{nl_record[LOSS]}\n"
+    #     ws_header += f"{'='*80}\n\n"
+    #     self.output_handler(
+    #         OutputCategory.WORLD_SERIES_START,
+    #         ws_header,
+    #         metadata={
+    #             'season': self.new_season,
+    #             'al_winner': al_winner,
+    #             'nl_winner': nl_winner,
+    #             'al_record': al_record,
+    #             'nl_record': nl_record
+    #         }
+    #     )
+    #
+    #     # Create World Series schedule and append onto exist schedule
+    #     ws_schedule = self.create_world_series_schedule(al_winner, nl_winner)
+    #     for ws_game in ws_schedule:
+    #         self.schedule.append(ws_game)
+    #
+    #     # Run World Series simulation
+    #     self.team_to_follow.append(al_winner)
+    #     self.team_to_follow.append(nl_winner)
+    #     self.print_box_score_b = True
+    #     self.season_chatty = True
+    #     while (self.season_day_num < len(self.schedule) and
+    #            self.team_win_loss[al_winner][WIN] - al_record[WIN] < 4 and
+    #            self.team_win_loss[nl_winner][WIN] - nl_record[WIN] < 4):
+    #         self.sim_next_day()
+    #
+    #     self.output_handler(OutputCategory.WORLD_SERIES_END, '\nCalculating final season statistics...\n', metadata=None)
+    #     self.baseball_data.update_season_stats()
+    #     self.output_handler(OutputCategory.WORLD_SERIES_END, f'\n\n****** End of {self.new_season} playoffs ******\n', metadata={'season': self.new_season})
+    #
+    #     # Declare champion
+    #     ws_al_wins = self.team_win_loss[al_winner][WIN] - al_record[WIN]
+    #     ws_nl_wins = self.team_win_loss[nl_winner][WIN] - nl_record[WIN]
+    #     ws_winner = al_winner if ws_al_wins > ws_nl_wins else nl_winner
+    #
+    #     ws_champion = f"\n\n{'='*80}\n"
+    #     ws_champion += f"{self.new_season} WORLD SERIES CHAMPION: {self.team_city_dict[ws_winner]} ({ws_winner})\n"
+    #     ws_champion += f"Series Result: {al_winner} {ws_al_wins}-{ws_nl_wins} {nl_winner}\n"
+    #     ws_champion += f"{'='*80}\n\n"
+    #     self.output_handler(
+    #         'world_series_end',
+    #         ws_champion,
+    #         metadata={
+    #             'season': self.new_season,
+    #             'winner': ws_winner,
+    #             'al_winner': al_winner,
+    #             'nl_winner': nl_winner,
+    #             'al_wins': ws_al_wins,
+    #             'nl_wins': ws_nl_wins
+    #         }
+    #     )
+    #
+    #     self.baseball_data.save_season_stats()
+    #     return
+
+    def get_playoff_seeds(self, league: str) -> List[str]:
         """
-        Run World Series playoff between league champions.
-
-        Called after regular season ends. Creates a new BaseballSeason instance
-        with 2 teams and 7-game schedule, then runs full simulation.
-        Updates same season stats and declares champion.
+        Calculates seeds 1-6 for a given league based on Division Winners and Wild Cards.
+        1-3: Division winners (ranked by record)
+        4-6: Next best records (Wild Cards)
         """
-        import os
-        from bblogger import logger
+        # Create a mapping of Team -> (W, L, Pct, Division)
+        team_data = self.baseball_data.batting_data[['Team', 'League', 'Division']].drop_duplicates()
+        league_teams = team_data[team_data['League'] == league].copy()
 
-        # Check eligibility
-        if not self.should_run_world_series():
-            return
+        records = []
+        for team in league_teams['Team'].values:
+            w, l = self.team_win_loss[team]
+            pct = w / (w + l) if (w + l) > 0 else 0
+            div = league_teams[league_teams['Team'] == team]['Division'].iloc[0]
+            records.append({'Team': team, 'W': w, 'L': l, 'Pct': pct, 'Division': div})
 
-        # Get league winners
-        al_winner, nl_winner = self.get_league_winners()
-        if al_winner is None or nl_winner is None:
-            logger.warning("Cannot determine league winners for World Series")
-            return
+        df = pd.DataFrame(records)
 
-        # Print header
-        al_record = self.team_win_loss[al_winner]
-        nl_record = self.team_win_loss[nl_winner]
-        ws_header = f"\n\n{'='*80}\n"
-        ws_header += f"{self.new_season} WORLD SERIES\n"
-        ws_header += f"American League Champion: {self.team_city_dict[al_winner]} ({al_winner})\n"
-        ws_header += f"National League Champion: {self.team_city_dict[nl_winner]} ({nl_winner})\n"
-        ws_header += f"{al_winner}: {al_record[WIN]}-{al_record[LOSS]} vs {nl_winner}: {nl_record[WIN]}-{nl_record[LOSS]}\n"
-        ws_header += f"{'='*80}\n\n"
-        self.output_handler(
-            OutputCategory.WORLD_SERIES_START,
-            ws_header,
-            metadata={
-                'season': self.new_season,
-                'al_winner': al_winner,
-                'nl_winner': nl_winner,
-                'al_record': al_record,
-                'nl_record': nl_record
-            }
-        )
+        # 1. Identify Division Winners
+        div_winners = df.sort_values(['W', 'Pct'], ascending=False).groupby('Division').head(1)
+        div_winners = div_winners.sort_values(['W', 'Pct'], ascending=False)
+        seeds_1_3 = div_winners['Team'].tolist()
 
-        # Create World Series schedule and append onto exist schedule
-        ws_schedule = self.create_world_series_schedule(al_winner, nl_winner)
-        for ws_game in ws_schedule:
-            self.schedule.append(ws_game)
+        # 2. Identify Wild Cards
+        remaining = df[~df['Team'].isin(seeds_1_3)]
+        wild_cards = remaining.sort_values(['W', 'Pct'], ascending=False).head(3)
+        seeds_4_6 = wild_cards['Team'].tolist()
 
-        # Run World Series simulation
-        self.team_to_follow.append(al_winner)
-        self.team_to_follow.append(nl_winner)
-        self.print_box_score_b = True
-        self.season_chatty = True
-        while (self.season_day_num < len(self.schedule) and
-               self.team_win_loss[al_winner][WIN] - al_record[WIN] < 4 and
-               self.team_win_loss[nl_winner][WIN] - nl_record[WIN] < 4):
+        return seeds_1_3 + seeds_4_6
+
+
+    def run_playoff_series(self, away: str, home: str, best_of: int, round_name: str) -> str:
+        """
+        Generic runner for a playoff series. Returns the winning team abbreviation.
+        """
+        needed_to_win = (best_of // 2) + 1
+        home_wins = 0
+        away_wins = 0
+
+        series_recap = f"\n--- {round_name}: {away} at {home} (Best of {best_of}) ---\n"
+        self.output_handler(OutputCategory.PLAYOFF_ROUND_START, series_recap)
+
+        # Track wins specifically for this series
+        start_wins = {home: self.team_win_loss[home][WIN], away: self.team_win_loss[away][WIN]}
+
+        # MLB Playoff Formats
+        # Best of 3: All games at Home (higher seed)
+        # Best of 5: 2-2-1
+        # Best of 7: 2-3-2
+
+        game_num = 1
+        while home_wins < needed_to_win and away_wins < needed_to_win:
+            # Determine home team for this specific game
+            if best_of == 3:
+                current_home, current_away = home, away
+            elif best_of == 5:
+                current_home, current_away = (home, away) if game_num in [1, 2, 5] else (away, home)
+            else:  # Best of 7
+                current_home, current_away = (home, away) if game_num in [1, 2, 6, 7] else (away, home)
+
+            # Schedule and sim the single game
+            self.schedule.append([[current_away, current_home]])
             self.sim_next_day()
 
-        self.output_handler(OutputCategory.WORLD_SERIES_END, '\nCalculating final season statistics...\n', metadata=None)
-        self.baseball_data.update_season_stats()
-        self.output_handler(OutputCategory.WORLD_SERIES_END, f'\n\n****** End of {self.new_season} playoffs ******\n', metadata={'season': self.new_season})
+            # Check who won the most recent game
+            home_wins = self.team_win_loss[home][WIN] - start_wins[home]
+            away_wins = self.team_win_loss[away][WIN] - start_wins[away]
+            game_num += 1
 
-        # Declare champion
-        ws_al_wins = self.team_win_loss[al_winner][WIN] - al_record[WIN]
-        ws_nl_wins = self.team_win_loss[nl_winner][WIN] - nl_record[WIN]
-        ws_winner = al_winner if ws_al_wins > ws_nl_wins else nl_winner
+        winner = home if home_wins > away_wins else away
+        self.output_handler(OutputCategory.PLAYOFF_ROUND_END,
+                            f"Result: {winner} wins series {max(home_wins, away_wins)}-{min(home_wins, away_wins)}\n")
+        return winner
 
-        ws_champion = f"\n\n{'='*80}\n"
-        ws_champion += f"{self.new_season} WORLD SERIES CHAMPION: {self.team_city_dict[ws_winner]} ({ws_winner})\n"
-        ws_champion += f"Series Result: {al_winner} {ws_al_wins}-{ws_nl_wins} {nl_winner}\n"
-        ws_champion += f"{'='*80}\n\n"
-        self.output_handler(
-            'world_series_end',
-            ws_champion,
-            metadata={
-                'season': self.new_season,
-                'winner': ws_winner,
-                'al_winner': al_winner,
-                'nl_winner': nl_winner,
-                'al_wins': ws_al_wins,
-                'nl_wins': ws_nl_wins
-            }
-        )
+    def run_playoffs(self):
+        """
+        Orchestrates the full MLB playoff bracket.
+        """
+        if self.season_length < 10: return  # Safety for short test seasons
 
-        self.baseball_data.save_season_stats()
-        return
+        self.output_handler(OutputCategory.PLAYOFF_ROUND_START, f"\n{'=' * 20} PLAYOFFS STARTING {'=' * 20}\n")
+
+        leagues = ['AL', 'NL']
+        league_champs = {}
+
+        for lg in leagues:
+            seeds = self.get_playoff_seeds(lg)
+            if len(seeds) < 6:
+                logger.warning(f"Not enough teams in {lg} to run full playoffs.")
+                continue
+
+            self.output_handler(OutputCategory.PLAYOFF_ROUND_START,
+                                f"\n{lg} Bracket: 1:{seeds[0]}, 2:{seeds[1]}, 3:{seeds[2]} | WC: 4:{seeds[3]}, 5:{seeds[4]}, 6:{seeds[5]}\n")
+
+            # 1. Wild Card Round (Best of 3)
+            # Seed 3 vs 6, Seed 4 vs 5
+            wc1_winner = self.run_playoff_series(seeds[5], seeds[2], 3, f"{lg} Wild Card A")
+            wc2_winner = self.run_playoff_series(seeds[4], seeds[3], 3, f"{lg} Wild Card B")
+
+            # 2. Division Series (Best of 5)
+            # Seed 1 plays winner of 4/5, Seed 2 plays winner of 3/6
+            ds1_winner = self.run_playoff_series(wc2_winner, seeds[0], 5, f"{lg}DS Series A")
+            ds2_winner = self.run_playoff_series(wc1_winner, seeds[1], 5, f"{lg}DS Series B")
+
+            # 3. League Championship Series (Best of 7)
+            # Seed 1/4/5 winner vs Seed 2/3/6 winner
+            # Higher seed hosts
+            lcs_home = ds1_winner if seeds.index(ds1_winner) < seeds.index(ds2_winner) else ds2_winner
+            lcs_away = ds2_winner if lcs_home == ds1_winner else ds1_winner
+
+            league_champs[lg] = self.run_playoff_series(lcs_away, lcs_home, 7, f"{lg}CS")
+
+        # 4. World Series
+        if 'AL' in league_champs and 'NL' in league_champs:
+            self.run_world_series_new(league_champs['AL'], league_champs['NL'])
+
+
+    def run_world_series_new(self, al_champ: str, nl_champ: str):
+        """
+        Modified World Series runner that integrates with the playoff flow.
+        """
+        self.output_handler(OutputCategory.WORLD_SERIES_START, f"\n{'*' * 20} WORLD SERIES {'*' * 20}\n")
+
+        # Determine home field via record
+        winner = self.run_playoff_series(al_champ, nl_champ, 7, "World Series")
+
+        ws_champion_msg = f"\n\n{'=' * 80}\n"
+        ws_champion_msg += f"{self.new_season} WORLD SERIES CHAMPION: {self.team_city_dict[winner]} ({winner})\n"
+        ws_champion_msg += f"{'=' * 80}\n\n"
+        self.output_handler(OutputCategory.WORLD_SERIES_END, ws_champion_msg)
 
     def sim_full_season(self) -> None:
         """
@@ -1052,8 +1192,7 @@ class BaseballSeason:
         self.sim_end()
 
         # Run World Series if this was a full regular season
-        self.run_world_series()
-
+        self.run_playoffs()
         return
 
 
@@ -1217,7 +1356,7 @@ if __name__ == '__main__':
 
     # handle a single full season of MLB
     if not fantasy:
-        my_team_to_follow = ['MIL','MIA']  # List of teams to follow, e.g., ['MIL', 'NYM'] for multiple
+        my_team_to_follow = ['MIL']  # List of teams to follow, e.g., ['MIL', 'NYM'] for multiple
         # my_team_to_follow = None  # or set to None for no followed teams
 
         # set a series schedule if you just want to simulate a playoff series or use the team_list param

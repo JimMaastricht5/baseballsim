@@ -1,8 +1,5 @@
 
 """
---- Copyright Notice ---
-Copyright (c) 2024 Jim Maastricht
-
 --- File Context and Purpose ---
 MLB player salary data loading and management.
 This module loads historical salary data from CSV files and merges it with player
@@ -52,30 +49,52 @@ def retrieve_salary(war_file_name, hashfunc, debug=False):
     except FileNotFoundError:
         return None
 
-    df = df.drop(["Pos'n", 'Unnamed: 4', 'Unnamed: 5', 'Unnamed: 6'], axis=1)
+    df = df.drop(['Unnamed: 4', 'Unnamed: 5', 'Unnamed: 6'], axis=1)
     df['Player'] = df['Player'].apply(lambda x: x.split(',')[1].lstrip().rstrip() + ' '
                                                 + x.split(',')[0].lstrip().rstrip())
     df = df.rename(columns={'Player': 'Player_S', df.columns[2]: 'Salary'})  # col 2 is 2024 -> salary
     df['Salary'] = df['Salary'].astype(str)
     df['Salary'] = df['Salary'].apply(lambda x: x.replace('$', '').replace(',', '').replace('nan', '0'))
-    df['Salary'] = df['Salary'].astype(int)
-    df = df.dropna(axis=1)
+    df = df.dropna(subset=['Salary'])
+    df['Salary'] = df['Salary'].astype(float).astype(int)
 
-    df['Hashcode'] = df['Player_S'].apply(hashfunc)
+    # 1. Define the hitter universe
+    hitter_positions = ['dh', '1b', '2b', '3b', 'ss', 'c', 'lf', 'rf', 'cf']
+    # 2. Use np.where to assign the role (Vectorized & Fast)
+    df['Role'] = np.where(df["Pos'n"].str.lower().isin(hitter_positions), 'Hitter', 'Pitcher')
+    df['Hashcode'] = df.apply(
+        lambda row: hashfunc(row['Player_S'], row['Role']),
+        axis=1
+    )
     df.drop(['Player_S'], axis=1, inplace=True)
     df = df.set_index('Hashcode')
     return df
 
+
 def fill_nan_salary(df, column_name, value=740000):
-    # replace with 2024 league min
-    df[column_name] = np.where((df[column_name] == 0) | df[column_name].isnull(), value, df[column_name])
+    # 1. Ensure the column is numeric (converts strings like "0" to 0 and "nan" to NaN)
+    df[column_name] = pd.to_numeric(df[column_name], errors='coerce')
+
+    # 2. Fill zeros and NaNs
+    # We use .fillna() for the NaNs and .replace() for the zeros
+    df[column_name] = df[column_name].replace(0, np.nan).fillna(value)
+
+    # 3. Cast back to int for clean output
+    df[column_name] = df[column_name].astype(int)
+
     return df
+
+def create_hash(name, role):
+    # This ensures "Will Smith_Hitter" and "Will Smith_Pitcher"
+    # generate two completely unique hex/integer values
+    combined_string = f"{name}_{role}"
+    return hashlib.md5(combined_string.encode()).hexdigest()
 
 
 if __name__ == '__main__':
     war_files = ['mlb-salaries-2000-24.csv']
     for wf in war_files:
-        df_sal = retrieve_salary(wf, lambda text: int(hashlib.sha256(text.encode('utf-8')).hexdigest()[:5], 16))
+        df_sal = retrieve_salary(wf, create_hash)
         print(df_sal.to_string())
         print(df_sal.shape)
 

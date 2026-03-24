@@ -12,6 +12,8 @@ from tkinter import ttk
 from typing import List, Dict, Any
 from bblogger import logger
 
+from ui.theme import BG_PANEL, TEXT_PRIMARY, TEXT_HEADING, ROW_IL, ROW_DTD
+
 
 class InjuriesWidget:
     """
@@ -31,7 +33,7 @@ class InjuriesWidget:
         Args:
             parent: Parent tkinter widget (notebook or frame)
         """
-        self.frame = tk.Frame(parent)
+        self.frame = tk.Frame(parent, bg=BG_PANEL)
 
         # Data caching for sorting/filtering
         self.injuries_data_cache = []
@@ -39,20 +41,21 @@ class InjuriesWidget:
         self.injuries_sort_reverse = False
 
         # Header with injury count
-        injuries_header_frame = tk.Frame(self.frame)
+        injuries_header_frame = tk.Frame(self.frame, bg=BG_PANEL)
         injuries_header_frame.pack(fill=tk.X, pady=5)
 
         self.injuries_header_label = tk.Label(
             injuries_header_frame, text="League IL Report",
-            font=("Arial", 11, "bold")
+            font=("Segoe UI", 11, "bold"), bg=BG_PANEL, fg=TEXT_HEADING
         )
         self.injuries_header_label.pack()
 
         # Control frame with team filter dropdown
-        injuries_control_frame = tk.Frame(self.frame)
+        injuries_control_frame = tk.Frame(self.frame, bg=BG_PANEL)
         injuries_control_frame.pack(fill=tk.X, padx=10, pady=5)
 
-        tk.Label(injuries_control_frame, text="Team:", font=("Arial", 10, "bold")).pack(side=tk.LEFT, padx=5)
+        tk.Label(injuries_control_frame, text="Team:", font=("Segoe UI", 10, "bold"),
+                 bg=BG_PANEL, fg=TEXT_PRIMARY).pack(side=tk.LEFT, padx=5)
         self.injuries_team_var = tk.StringVar(value="All Teams")
         self.injuries_team_combo = ttk.Combobox(
             injuries_control_frame,
@@ -65,7 +68,7 @@ class InjuriesWidget:
         self.injuries_team_combo.pack(side=tk.LEFT, padx=5)
 
         # Create Treeview for injuries
-        injuries_tree_frame = tk.Frame(self.frame)
+        injuries_tree_frame = tk.Frame(self.frame, bg=BG_PANEL)
         injuries_tree_frame.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
 
         injuries_scrollbar = ttk.Scrollbar(injuries_tree_frame, orient=tk.VERTICAL)
@@ -94,9 +97,9 @@ class InjuriesWidget:
         self.injuries_tree.column("injury", width=250, anchor=tk.W)
         self.injuries_tree.column("status", width=120, anchor=tk.CENTER)
 
-        # Tags for injury status
-        self.injuries_tree.tag_configure("IL", background="#ffcccc")  # Red for IL
-        self.injuries_tree.tag_configure("Day-to-Day", background="#fff4cc")  # Yellow for day-to-day
+        # Tags for injury status (dark-friendly colours)
+        self.injuries_tree.tag_configure("IL", background=ROW_IL)
+        self.injuries_tree.tag_configure("Day-to-Day", background=ROW_DTD)
 
         self.injuries_tree.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
 

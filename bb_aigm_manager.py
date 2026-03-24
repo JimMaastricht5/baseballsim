@@ -289,7 +289,7 @@ class PlayerValuation:
 
         return PlayerValue(
             player_name=player_name,
-            hashcode=int(hashcode),
+            hashcode=hashcode,
             total_value=total_value,
             immediate_value=immediate_value,
             future_value=future_value,
@@ -622,20 +622,22 @@ class AIGeneralManager:
         """
         roster_values = {'batters': [], 'pitchers': []}
 
-        # Value batters
-        team_batters = baseball_stats.new_season_batting_data[
-            baseball_stats.new_season_batting_data['Team'] == self.team_name
-        ]
+        # Value batters - snapshot under lock to avoid view/CoW issues with concurrent DF writes
+        with baseball_stats.thread_lock:
+            team_batters = baseball_stats.new_season_batting_data[
+                baseball_stats.new_season_batting_data['Team'] == self.team_name
+            ].copy()
 
         for idx, batter_row in team_batters.iterrows():
             value = self.valuator.calculate_player_value(batter_row, alpha, team_games_played,
                                                          is_pitcher=False, baseball_stats=baseball_stats)
             roster_values['batters'].append(value)
 
-        # Value pitchers
-        team_pitchers = baseball_stats.new_season_pitching_data[
-            baseball_stats.new_season_pitching_data['Team'] == self.team_name
-        ]
+        # Value pitchers - snapshot under lock
+        with baseball_stats.thread_lock:
+            team_pitchers = baseball_stats.new_season_pitching_data[
+                baseball_stats.new_season_pitching_data['Team'] == self.team_name
+            ].copy()
 
         for idx, pitcher_row in team_pitchers.iterrows():
             value = self.valuator.calculate_player_value(pitcher_row, alpha, team_games_played,
@@ -801,13 +803,14 @@ class AIGeneralManager:
         # Get team's games played for consistent valuation
         team_games_played = strategy.games_played if hasattr(strategy, 'games_played') else 150
 
-        # Pre-filter to exclude own team (much faster than checking in loop)
-        other_batters = baseball_stats.new_season_batting_data[
-            baseball_stats.new_season_batting_data['Team'] != self.team_name
-        ]
-        other_pitchers = baseball_stats.new_season_pitching_data[
-            baseball_stats.new_season_pitching_data['Team'] != self.team_name
-        ]
+        # Pre-filter to exclude own team - snapshot under lock to avoid view/CoW issues
+        with baseball_stats.thread_lock:
+            other_batters = baseball_stats.new_season_batting_data[
+                baseball_stats.new_season_batting_data['Team'] != self.team_name
+            ].copy()
+            other_pitchers = baseball_stats.new_season_pitching_data[
+                baseball_stats.new_season_pitching_data['Team'] != self.team_name
+            ].copy()
 
         if is_contender:
             # CONTENDERS: Look for veteran impact players (age-filtered before iteration)
@@ -983,8 +986,9 @@ class AIGeneralManager:
             team_record, games_back, games_played
         )
 
-        # Calculate final Sim WAR to get updated player values
-        baseball_stats.calculate_sim_war()
+        # calculate_sim_war() requires the caller to hold thread_lock (non-reentrant lock design)
+        with baseball_stats.thread_lock:
+            baseball_stats.calculate_sim_war()
 
         # Value all players with final season stats
         roster_values = self._value_roster(baseball_stats, strategy.alpha, games_played)

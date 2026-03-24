@@ -13,7 +13,7 @@ Key Features:
 - Loads both aggregated (career) and new season player statistics
 - Caches league-wide statistics for 2-3x performance improvement
 - Manages dynamic player state (condition, injuries, streaks)
-- Thread-safe stats updates via semaphore locking
+- Thread-safe stats updates via lock
 - Syncs condition and injury data between historical and new season stats
 - Calculates all derived baseball statistics (AVG, OBP, SLG, ERA, WHIP, etc.)
 
@@ -44,6 +44,12 @@ _LIST_PATTERN = re.compile(r"\[([^\]]+)\]")
 DYNAMIC_FIELDS = ['Condition', 'Injured Days', 'Injury Description',
                   'Injury_Perf_Adj', 'Injury_Rate_Adj', 'Streak_Adjustment']
 
+# Columns used when computing per-player stat differences (current vs historical)
+BATTER_DIFF_COUNT_COLS = ['AB', 'R', 'H', '2B', '3B', 'HR', 'RBI', 'BB', 'SO']
+BATTER_DIFF_RATE_COLS = ['AVG', 'OBP', 'SLG', 'OPS']
+PITCHER_DIFF_COUNT_COLS = ['G', 'GS', 'W', 'L', 'IP', 'H', 'R', 'ER', 'HR', 'BB', 'SO', 'SV']
+PITCHER_DIFF_RATE_COLS = ['ERA', 'WHIP']
+
 
 class BaseballStats:
     def __init__(self, load_seasons: List[int], new_season: int, include_leagues: list = None,
@@ -58,12 +64,15 @@ class BaseballStats:
         :param load_pitcher_file: file name of the pitching stats, year will be added as a prefix
         :param suppress_console_output: if True, suppress disabled list and hot/cold list console output
         """
+        # Add caches for 2025 historical data (Phase 1: Stats Enhancement)
+        self.historical_2025_batting = None  # Lazy-loaded cache
+        self.historical_2025_pitching = None  # Lazy-loaded cache
+        self.prorated_2025_cache = {}  # {team_name_games: (batting_df, pitching_df)}
+
         self.suppress_console_output = suppress_console_output
-        self.semaphore = threading.Semaphore(1)  # one thread can update games stats at a time
-        # PERFORMANCE: Create RNG instance once, reuse for ~29x speedup
-        self._rng_instance = np.random.default_rng()
+        self.thread_lock = threading.Lock()  # one thread can update games stats at a time
+        self._rng_instance = np.random.default_rng()  # PERFORMANCE: Create RNG instance once, reuse for ~29x speedup
         self.rnd = lambda: self._rng_instance.uniform(low=0.0, high=1.001)
-        # self.create_hash = lambda text: int(hashlib.sha256(text.encode('utf-8')).hexdigest()[:5], 16)
 
         self.numeric_bcols = ['G', 'AB', 'R', 'H', '2B', '3B', 'HR', 'RBI', 'SB', 'CS', 'BB', 'SO', 'SH', 'SF',
                               'HBP', 'Condition']  # these cols will get added to running season total
@@ -87,7 +96,10 @@ class BaseballStats:
         self.batting_data = None
         self.new_season_pitching_data = None
         self.new_season_batting_data = None
+        self.projected_batting_data = None   # Full-season projections (frozen at load time)
+        self.projected_pitching_data = None  # Full-season projections (frozen at load time)
         self.get_seasons(load_batter_file, load_pitcher_file)  # get existing data file
+        self._log_historical_baselines()  # log historical season totals for prior year for comparision and debugging
         self.get_all_team_names = lambda: self.batting_data.Team.unique()
         self.get_all_league_names = lambda: self.batting_data.League.unique()
         self.get_all_city_names = lambda: self.batting_data.City.unique()
@@ -139,16 +151,47 @@ class BaseballStats:
         self.league_pitching_totals = team_pitching_totals(self.pitching_data)
 
         # Cache additional league-wide statistics used in SimAB
-        batting_data_sum = self.batting_data[['H', 'BB', 'HBP']].sum()
-        self.league_batting_total_ob = batting_data_sum['H'] + batting_data_sum['BB'] + batting_data_sum['HBP']
-        self.league_pitching_total_ob = self.pitching_data[['H', 'BB']].sum().sum()
-        self.league_total_outs = self.batting_data['AB'].sum() - batting_data_sum.sum()
-        self.league_k_rate_per_ab = self.batting_data['SO'].sum() / self.league_total_outs
+        # batting_data_sum = self.batting_data[['H', 'BB', 'HBP']].sum()
+        # self.league_batting_total_ob = batting_data_sum['H'] + batting_data_sum['BB'] + batting_data_sum['HBP']
+        # self.league_pitching_total_ob = self.pitching_data[['H', 'BB']].sum().sum()
+        # self.league_total_outs = self.batting_data['AB'].sum() - batting_data_sum.sum()
+        # self.league_k_rate_per_ab = self.batting_data['SO'].sum() / self.league_total_outs
 
-        # Add caches for 2025 historical data (Phase 1: Stats Enhancement)
-        self.historical_2025_batting = None  # Lazy-loaded cache
-        self.historical_2025_pitching = None  # Lazy-loaded cache
-        self.prorated_2025_cache = {}  # {team_name_games: (batting_df, pitching_df)}
+        # Correct denominators ensure the Odds Ratio is comparing Apples to Apples
+        # --- 1. BATTER LEAGUE TOTALS (The Hitter Baseline) ---
+        b_totals = self.batting_data[['AB', 'H', 'BB', 'HBP', 'SO', 'SF', 'SH']].sum()
+
+        # Correct OBP events
+        self.league_batting_total_ob = b_totals['H'] + b_totals['BB'] + b_totals['HBP']
+
+        # Correct Plate Appearances (Denominator for Hitter-based rates)
+        # Correct Plate Appearances
+        self.league_pa_batting = b_totals['AB'] + b_totals['BB'] + b_totals['HBP'] + b_totals['SF'] + b_totals['SH']
+
+        # NEW: Explicitly set the baseline OBP for SimAB to use
+        self.league_batting_obp = self.league_batting_total_ob / self.league_pa_batting
+
+        # Correct Outs (Every out that isn't a K is a ball-in-play out)
+        self.league_total_outs = (b_totals['AB'] - b_totals['H']) + b_totals['SF'] + b_totals['SH']
+
+        # --- 2. PITCHER LEAGUE TOTALS (The Pitcher Baseline) ---
+        # We calculate BF (Batters Faced) as the equivalent of PA for pitchers
+        p_totals = self.pitching_data[['IP', 'H', 'BB', 'HBP', 'SO', 'HR']].sum()
+
+        # Convert IP (decimal) to actual Outs to avoid the "IP * 3" rounding error
+        # (IP.floor * 3) + (decimal_remainder * 10)
+        p_outs = (np.floor(p_totals['IP']) * 3) + (np.round(p_totals['IP'] % 1 * 10))
+
+        # Batters Faced (BF) = Outs + Hits + Walks + HBP
+        self.league_bf_pitching = p_outs + p_totals['H'] + p_totals['BB'] + p_totals['HBP']
+
+        # Total On-Base against Pitchers
+        self.league_pitching_total_ob = p_totals['H'] + p_totals['BB'] + p_totals['HBP']
+
+        # --- 3. CROSS-LEAGUE RATE NORMALIZATION ---
+        # This ensures SimAB's Odds Ratio is comparing Apples to Apples
+        # K-rate is most stable when calculated against Total Outs (Opportunities for an Out)
+        self.league_k_rate_per_ab = b_totals['SO'] / self.league_total_outs
 
         logger.debug("Cached league totals and statistics for performance optimization")
         return
@@ -162,11 +205,14 @@ class BaseballStats:
         # For pitching data, ensure R (runs) exists, default to ER if missing
         if 'ER' in df.columns and 'IP' in df.columns:  # This is pitching data
             if 'R' not in df.columns:
-                df['R'] = df['ER']
+                df['R'] = df['ER'].astype(float)
             else:
-                # If R exists but is 0 or NaN, fill with ER
+                # If R exists but is 0 or NaN, fill with ER, force to float first
+                df['R'] = df['R'].astype(float)
                 df['R'] = df['R'].fillna(df['ER'])
-                df.loc[df['R'] == 0, 'R'] = df.loc[df['R'] == 0, 'ER']
+                # replace zeros with ER values
+                mask = df['R'] == 0
+                df.loc[mask, 'R'] = df.loc[mask, 'ER']
         return df
 
     def get_batting_data(self, team_name: Optional[str] = None, prior_season: bool = True) -> DataFrame:
@@ -174,18 +220,26 @@ class BaseballStats:
         loads data for batters
         :param team_name: single team name is optional, alt is full league
         :param prior_season: is this data from a prior season or the current one?
-        :return: dataframe of seasons data
+        :return: dataframe of seasons data (always a copy - safe for concurrent access)
         """
-        if team_name is None:
-            df = self.batting_data if prior_season else self.new_season_batting_data
+        if prior_season:
+            # batting_data is static after load - no lock needed, but copy for consistency
+            if team_name is None:
+                df = self.batting_data.copy()
+            else:
+                with self.thread_lock:
+                    df_new = self.new_season_batting_data[
+                        self.new_season_batting_data['Team'] == team_name].copy()
+                df = self.batting_data[self.batting_data.index.isin(df_new.index)].copy()
         else:
-            df_new = self.new_season_batting_data[self.new_season_batting_data['Team'] == team_name]
-            df_cur = self.batting_data[self.batting_data.index.isin(df_new.index)]
-            df = df_cur if prior_season else df_new
+            # new_season_batting_data is mutated by game threads - snapshot under lock
+            with self.thread_lock:
+                if team_name is None:
+                    df = self.new_season_batting_data.copy()
+                else:
+                    df = self.new_season_batting_data[
+                        self.new_season_batting_data['Team'] == team_name].copy()
         logger.debug('Getting batting data for team: {}', team_name)
-        logger.debug('New season batting data sample:\n{}', self.new_season_batting_data.head(5).to_string())
-        logger.debug('Available teams: {}', self.new_season_batting_data['Team'].unique())
-        logger.debug('Retrieved batting data sample:\n{}', df.head(5).to_string())
         df = team_batting_stats(df, filter_stats=False)
         df = self.add_missing_cols(df)
 
@@ -196,14 +250,25 @@ class BaseballStats:
         loads data for pitchers
         :param team_name: single team name is optional, alt is full league
         :param prior_season: is this data from a prior season or the current one?
-        :return: df with seasons data
+        :return: df with seasons data (always a copy - safe for concurrent access)
         """
-        if team_name is None:
-            df = self.pitching_data if prior_season else self.new_season_pitching_data
+        if prior_season:
+            # pitching_data is static after load - no lock needed, but copy for consistency
+            if team_name is None:
+                df = self.pitching_data.copy()
+            else:
+                with self.thread_lock:
+                    df_new = self.new_season_pitching_data[
+                        self.new_season_pitching_data['Team'] == team_name].copy()
+                df = self.pitching_data[self.pitching_data.index.isin(df_new.index)].copy()
         else:
-            df_new = self.new_season_pitching_data[self.new_season_pitching_data['Team'] == team_name]
-            df_cur = self.pitching_data[self.pitching_data.index.isin(df_new.index)]
-            df = df_cur if prior_season else df_new
+            # new_season_pitching_data is mutated by game threads - snapshot under lock
+            with self.thread_lock:
+                if team_name is None:
+                    df = self.new_season_pitching_data.copy()
+                else:
+                    df = self.new_season_pitching_data[
+                        self.new_season_pitching_data['Team'] == team_name].copy()
         # Don't filter stats - include pitchers with 0 IP (important for roster display at season start)
         df = team_pitching_stats(df, filter_stats=False)
         df = self.add_missing_cols(df)
@@ -249,6 +314,32 @@ class BaseballStats:
             logger.error(f"Error retrieving historical data for {player_name}: {e}")
             return pd.DataFrame()  # Return empty DataFrame on error
 
+    def get_player_projected_data(self, player_name: str, is_batter: bool = True):
+        """
+        Get projected new-season stats for a specific player.
+
+        :param player_name: Name of the player
+        :param is_batter: True for batting data, False for pitching data
+        :return: Series with projected stats, or None if not found
+        """
+        try:
+            # batting_data/pitching_data hold the PlayerProjector output with projected
+            # counting stats intact; projected_batting_data zeros them for simulation tracking.
+            data = self.batting_data if is_batter else self.pitching_data
+            if data is None:
+                data = self.projected_batting_data if is_batter else self.projected_pitching_data
+            if data is None:
+                data = self.new_season_batting_data if is_batter else self.new_season_pitching_data
+            if data is None:
+                return None
+            player_rows = data[data['Player'] == player_name]
+            if player_rows.empty:
+                return None
+            return player_rows.iloc[0]
+        except Exception as e:
+            logger.error(f"Error retrieving projected data for {player_name}: {e}")
+            return None
+
     def _ensure_2025_historical_loaded(self):
         """Lazy load 2025 historical data if not already cached."""
         if self.historical_2025_batting is None:
@@ -279,60 +370,114 @@ class BaseballStats:
                 self.historical_2025_batting = pd.DataFrame()
                 self.historical_2025_pitching = pd.DataFrame()
 
+    def _log_historical_baselines(self) -> None:
+        """Logs league-wide totals from 2025 to compare against 2026 projections."""
+        self._ensure_2025_historical_loaded()
+
+        if not self.historical_2025_batting.empty:
+            # 1. Total Raw 2025 Data (Everyone in the file)
+            raw_ab = self.historical_2025_batting['AB'].sum()
+            raw_h = self.historical_2025_batting['H'].sum()
+            raw_hr = self.historical_2025_batting['HR'].sum()
+
+            # 2. Survival Data (Only players who made it into your 2026 Sim)
+            active_hashes = self.new_season_batting_data.index
+            survivor_df = self.historical_2025_batting[self.historical_2025_batting['Hashcode'].isin(active_hashes)]
+
+            surv_ab = survivor_df['AB'].sum()
+            surv_h = survivor_df['H'].sum()
+            surv_hr = survivor_df['HR'].sum()
+
+            # 3. Projected 2026 "True Talent" (What the Preprocessor generated)
+            proj_ab = self.batting_data['AB'].sum()
+            proj_hr = self.batting_data['HR'].sum()
+
+            logger.info("=== LEAGUE HISTORICAL BASELINE (2025) from bbstats _log_historical_baselines ===")
+            logger.info(f"RAW 2025 (Full File):  AB: {raw_ab:,} | H: {raw_h:,} | HR: {raw_hr:,}")
+            logger.info(f"SURVIVORS (2026 Rosters): AB: {surv_ab:,} | H: {surv_h:,} | HR: {surv_hr:,}")
+            logger.info(f"PROJECTED 2026 TOTALS:   AB: {proj_ab:,.0f} | HR: {proj_hr:,.0f}")
+
+            hr_diff = proj_hr - raw_hr
+            logger.info(f"TOTAL HR SURPLUS/DEFICIT: {hr_diff:+.0f} HRs")
+
+            if abs(hr_diff) > 200:
+                logger.warning("SIGNIFICANT HR DISCREPANCY DETECTED: Check preprocessor K-values or AB-gates.")
+
+        if not self.historical_2025_pitching.empty:
+            raw_ip = self.historical_2025_pitching['IP'].apply(lambda x: int(x) + (x % 1 * 10 / 3)).sum()
+            logger.info(f"RAW 2025 PITCHING IP: {raw_ip:,.1f}")
+        return
+
     def calculate_prorated_2025_stats(self, team_name: Optional[str] = None,
                                       current_games_played: Optional[int] = None) -> tuple:
-        # 1. Quick Validation & Auto-Calculation
-        if current_games_played is None:
-            # Fallback to mean games played if no specific team
-            current_games_played = int(np.mean(list(self.team_games_played.values()))) if self.team_games_played else 0
+        """
 
-        if current_games_played <= 0:
-            return (pd.DataFrame(), pd.DataFrame())
+        :param team_name:
+        :param current_games_played:
+        :return:
+        """
+        with self.thread_lock:  # prevent concurrent reads/writes
+            # 1. Quick Validation & Auto-Calculation
+            if current_games_played is None:
+                # Fallback to mean games played if no specific team
+                current_games_played = int(np.mean(list(self.team_games_played.values()))) if self.team_games_played else 0
 
-        # Cache check (unchanged)
-        cache_key = f"{team_name if team_name else 'LEAGUE'}_{current_games_played}"
-        if cache_key in self.prorated_2025_cache:
-            return self.prorated_2025_cache[cache_key]
+            if current_games_played <= 0:
+                return (pd.DataFrame(), pd.DataFrame())
 
-        self._ensure_2025_historical_loaded()
-        prorate_factor = current_games_played / 162.0
+            # Cache check (unchanged)
+            cache_key = f"{team_name if team_name else 'LEAGUE'}_{current_games_played}"
+            if cache_key in self.prorated_2025_cache:
+                return self.prorated_2025_cache[cache_key]
 
-        # 2. Vectorized Filtering
-        if team_name:
-            # TEAM VIEW: Only include players currently on this team's 2026 roster
-            mask_b = self.new_season_batting_data['Team'] == team_name
-            hashes_b = self.new_season_batting_data[mask_b].index
-            df_b = self.historical_2025_batting.loc[self.historical_2025_batting['Hashcode'].isin(hashes_b)].copy()
+            self._ensure_2025_historical_loaded()
+            prorate_factor = current_games_played / 162.0
 
-            mask_p = self.new_season_pitching_data['Team'] == team_name
-            hashes_p = self.new_season_pitching_data[mask_p].index
-            df_p = self.historical_2025_pitching.loc[self.historical_2025_pitching['Hashcode'].isin(hashes_p)].copy()
-        else:
-            # LEAGUE VIEW: Take everyone from 2025 to get the full 6,155 HR total
-            df_b = self.historical_2025_batting.copy()
-            df_p = self.historical_2025_pitching.copy()
+            # 2. Vectorized Filtering
+            if team_name:
+                # TEAM VIEW: Only include players currently on this team's 2026 roster
+                mask_b = self.new_season_batting_data['Team'] == team_name
+                hashes_b = self.new_season_batting_data[mask_b].index
+                df_b = self.historical_2025_batting.loc[self.historical_2025_batting['Hashcode'].isin(hashes_b)].copy()
 
-        # 3. Improved Batting Proration (Vectorized)
-        if not df_b.empty:
-            df_b = df_b.set_index('Hashcode')
-            bat_cols = ['G', 'AB', 'R', 'H', '2B', '3B', 'HR', 'RBI', 'SB', 'CS', 'BB', 'SO', 'SF', 'SH', 'HBP']
-            # Vectorized multiplication and rounding
-            df_b[bat_cols] = (df_b[bat_cols] * prorate_factor).round().astype(int)
-            df_b = team_batting_stats(df_b, filter_stats=False)
+                mask_p = self.new_season_pitching_data['Team'] == team_name
+                hashes_p = self.new_season_pitching_data[mask_p].index
+                df_p = self.historical_2025_pitching.loc[self.historical_2025_pitching['Hashcode'].isin(hashes_p)].copy()
+            else:
+                df_b = self.historical_2025_batting.copy()
+                df_p = self.historical_2025_pitching.copy()
 
-        # 4. Improved Pitching Proration (Base-3 IP logic)
-        if not df_p.empty:
-            df_p = df_p.set_index('Hashcode')
-            # Handle IP conversion: outs = (whole * 3) + remainder
-            total_outs = (df_p['IP'].astype(int) * 3) + ((df_p['IP'] % 1) * 10).round()
-            df_p['IP'] = ((total_outs * prorate_factor).round() / 3).apply(lambda x: int(x) + (round(x % 1 * 3) / 10))
+            # 3. Batting Proration (Vectorized)
+            if not df_b.empty:
+                # Aggregating by Hashcode captures all segments of a traded player's 2025 season
+                bat_cols = ['G', 'AB', 'R', 'H', '2B', '3B', 'HR', 'RBI', 'SB', 'CS', 'BB', 'SO', 'SF', 'SH', 'HBP']
+                df_b = df_b.groupby('Hashcode')[bat_cols].sum()
 
-            pitch_cols = ['G', 'H', 'R', 'ER', 'HR', 'BB', 'SO', 'W', 'L', 'SV', 'BS', 'HLD', 'GS', 'CG', 'SHO']
-            df_p[pitch_cols] = (df_p[pitch_cols] * prorate_factor).round().astype(int)
-            df_p = team_pitching_stats(df_p, filter_stats=False)
+                # Vectorized multiplication and rounding
+                df_b[bat_cols] = (df_b[bat_cols] * prorate_factor).round().astype(float)
+                df_b = team_batting_stats(df_b, filter_stats=False)
 
-        self.prorated_2025_cache[cache_key] = (df_b, df_p)
-        return df_b, df_p
+            # 4. Pitching Proration (Base-3 IP logic with Trade Aggregation)
+            if not df_p.empty:
+                # First, convert IP to Total Outs
+                df_p['Total_Outs_Calc'] = (df_p['IP'].astype(float) * 3) + ((df_p['IP'] % 1) * 10).round()
+                # Add 'AB' to the pitch_cols so it isn't dropped during groupby
+                # Pitchers need 'AB' (at-bats AGAINST them) to calculate OBP and AVG_faced
+                pitch_cols = ['G', 'AB', 'H', '2B', '3B', 'R', 'ER', 'HR', 'BB', 'SO', 'W', 'L', 'SV', 'BS', 'HLD', 'GS',
+                              'CG', 'SHO']
+                agg_dict = {col: 'sum' for col in pitch_cols if col in df_p.columns}
+                agg_dict['Total_Outs_Calc'] = 'sum'
+
+                # Group by Hashcode to combine traded player rows
+                df_p = df_p.groupby('Hashcode').agg(agg_dict)
+                total_outs_prorated = (df_p['Total_Outs_Calc'] * prorate_factor).round()  # Apply the Proration Factor
+                df_p['IP'] = (total_outs_prorated / 3).apply(lambda x: int(x) + (round(x % 1 * 3) / 10))  # Total Outs to IP
+                existing_pitch_cols = [col for col in pitch_cols if col in df_p.columns]
+                df_p[existing_pitch_cols] = (df_p[existing_pitch_cols] * prorate_factor).round().astype(float)  # Prorate rest of counting stats
+                df_p = team_pitching_stats(df_p, filter_stats=False)  # final stats
+
+            self.prorated_2025_cache[cache_key] = (df_b, df_p)
+            return df_b, df_p
 
     def get_seasons(self, batter_file: str, pitcher_file: str) -> None:
         """
@@ -352,12 +497,20 @@ class BaseballStats:
                     pd.read_csv(f'{seasons_str} {pitcher_file}', index_col='Hashcode'))
                 self.batting_data = self.add_missing_cols(
                     pd.read_csv(f'{seasons_str} {batter_file}', index_col='Hashcode'))
+                self.pitching_data.index = self.pitching_data.index.map(lambda x: int(str(x)))  # ensure hash is int
+                self.batting_data.index = self.batting_data.index.map(lambda x: int(str(x)))
 
             if self.new_season_pitching_data is None or self.new_season_batting_data is None:
                 self.new_season_pitching_data = self.add_missing_cols(pd.read_csv(str(self.new_season) +
                                                                                   f" {new_pitcher_file}", index_col='Hashcode'))
                 self.new_season_batting_data = self.add_missing_cols(pd.read_csv(str(self.new_season) +
                                                                                  f" {new_batter_file}", index_col='Hashcode'))
+                self.new_season_pitching_data.index = self.new_season_pitching_data.index.map(lambda x: int(str(x)))  # ensure is is treated as an int
+                self.new_season_batting_data.index = self.new_season_batting_data.index.map(lambda x: int(str(x)))
+
+                # Freeze a copy of the original projections before simulation accumulates actual stats
+                self.projected_pitching_data = self.new_season_pitching_data.copy()
+                self.projected_batting_data = self.new_season_batting_data.copy()
         except FileNotFoundError as e:
             logger.error("File not found in get_seasons(): {}", e)
             logger.error("bbstats.py, get_seasons(), file was not found.")
@@ -463,8 +616,13 @@ class BaseballStats:
         :param box_score_class: box score from game to add to season stats
         :return: None
         """
-        with self.semaphore:
+        with self.thread_lock:
+            # get_batter_game_stats() is called without TeamBoxScore's own lock here — intentional.
+            # This method is only called from the main thread after thread.join(), so the game thread
+            # has fully completed and game_batting_stats is frozen/stable. No concurrent access possible.
             batting_box_score = box_score_class.get_batter_game_stats()
+            # get_pitcher_game_stats() does acquire TeamBoxScore.lock, which is a different lock object
+            # from self.thread_lock — no deadlock risk.
             pitching_box_score = box_score_class.get_pitcher_game_stats()
 
             # VECTORIZED: Update all batters who played in the game at once (no loop!)
@@ -803,7 +961,7 @@ class BaseballStats:
         :param teams_to_follow: Optional list of team names to show hot/cold players for
         :return: None
         """
-        with self.semaphore:
+        with self.thread_lock:
             self.is_injured()
             self.update_streaks()  # Update streaks for active players only
             self.print_hot_cold_players(teams_to_follow)  # Print hot/cold players for followed teams
@@ -840,13 +998,16 @@ class BaseballStats:
         make thread safe, should only be called by season controller once
         :return: None
         """
-        with self.semaphore:
+        with self.thread_lock:
             logger.debug('Calculating team pitching stats...')
+            # self.new_season_pitching_data = \
+            #     team_pitching_stats(self.new_season_pitching_data[self.new_season_pitching_data['IP'] > 0].fillna(0))
             self.new_season_pitching_data = \
-                team_pitching_stats(self.new_season_pitching_data[self.new_season_pitching_data['IP'] > 0].fillna(0))
+                team_pitching_stats(self.new_season_pitching_data.fillna(0), filter_stats=False)
             logger.debug('Calculating team batting stats...')
-            self.new_season_batting_data = \
-                team_batting_stats(self.new_season_batting_data[self.new_season_batting_data['AB'] > 0].fillna(0))
+            # self.new_season_batting_data = \
+            #     team_batting_stats(self.new_season_batting_data[self.new_season_batting_data['AB'] > 0].fillna(0))
+            self.new_season_batting_data = team_batting_stats(self.new_season_batting_data.fillna(0),filter_stats=False)
             logger.debug('Updated season pitching stats:\n{}', self.new_season_pitching_data.to_string(justify="right"))
 
             # Note: Sim WAR is calculated only during AI GM assessments (not after every game)
@@ -876,13 +1037,12 @@ class BaseballStats:
 
        Results stored in 'Sim_WAR' column for both batting and pitching dataframes.
 
-       NOTE: This function should be called from within a semaphore-protected context.
-       It does NOT acquire its own semaphore to avoid deadlock.
+       NOTE: This function must be called from within a lock-protected context
+       (caller holds self.thread_lock). It does NOT acquire its own lock to avoid
+       deadlock on the non-reentrant threading.Lock().
 
        :return: None (modifies dataframes in place)
            """
-        # NOTE: No semaphore here - caller must hold it
-
         # 1. Determine common seasonal progress anchor
         # We use the max games played in the league to determine how far we are into the 162-game schedule
         max_games_played = max(self.new_season_batting_data['G'].max(), 1)
@@ -1402,54 +1562,112 @@ def team_batting_stats(df: DataFrame, filter_stats: bool=True) -> DataFrame:
     """
     # OPTIMIZED: Filter first (creates new df), or copy only if not filtering
     if filter_stats:
-        df = df[df['AB'] > 0]  # Boolean indexing creates a new dataframe
+        df = df[df['AB'] > 0]
     else:
-        df = df.copy()  # Copy only when not filtering to avoid modifying caller's data
+        df = df.copy()
 
     df['AVG'] = trunc_col(np.nan_to_num(np.divide(df['H'], df['AB']), nan=0.0, posinf=0.0), 3)
-    df['OBP'] = trunc_col(np.nan_to_num(np.divide(df['H'] + df['BB'] + df['HBP'], df['AB'] + df['BB'] + df['HBP']),
-                          nan=0.0, posinf=0.0), 3)
+
+    # FIX: Use a single, correct OBP calculation that includes SF.
+    denominator = df['AB'] + df['BB'] + df['HBP'] + df.get('SF', 0)
+    df['OBP'] = trunc_col(np.nan_to_num(np.divide(df['H'] + df['BB'] + df['HBP'], denominator),
+                                        nan=0.0, posinf=0.0), 3)
     df['SLG'] = trunc_col(np.nan_to_num(np.divide((df['H'] - df['2B'] - df['3B'] - df['HR']) + df['2B'] * 2 +
                           df['3B'] * 3 + df['HR'] * 4, df['AB']), nan=0.0, posinf=0.0), 3)
     df['OPS'] = trunc_col(np.nan_to_num(df['OBP'] + df['SLG'], nan=0.0, posinf=0.0), 3)
     return df
 
 
-def team_pitching_stats(df: DataFrame, filter_stats: bool=True) -> DataFrame:
+def team_pitching_stats(df: DataFrame, filter_stats: bool = True) -> DataFrame:
     """
-    build up pitcher stats.  Note initial values for some cols are 0. hbp is 0, 2b are 0, 3b are 0
-    :param df: data set to calc
-    :param filter_stats boolean that drops players with no stats
-    :return: df with new cols / updated cols
+    Calculates pitcher stats using precise Out-based denominators.
+
+    :param df: dataset to calculate
+    :param filter_stats: boolean that drops players with no stats
+    :return: df with new/updated columns
     """
-    # OPTIMIZED: Filter first (creates new df), or copy only if not filtering
     if filter_stats:
-        # For pitchers, only require IP > 0 (not AB, since most pitchers don't bat)
-        df = df[df['IP'] > 0]  # Boolean indexing creates a new dataframe
+        df = df[df['IP'] > 0].copy()
     else:
-        df = df.copy()  # Copy only when not filtering to avoid modifying caller's data
+        df = df.copy()
 
-    df['AB'] = trunc_col(df['AB'], 0)
-    df['IP'] = trunc_col(df['IP'], 2)
-    # Only calculate batting stats if pitcher has at-bats (NL pitchers, two-way players)
-    df['AVG'] = trunc_col(np.where(df['AB'] > 0, df['H'] / df['AB'], 0), 3)
-    df['OBP'] = trunc_col(np.where(df['AB'] + df['BB'] > 0, (df['H'] + df['BB']) / (df['AB'] + df['BB']), 0), 3)
+    # 1. CONVERT IP TO TOTAL OUTS (The real denominator)
+    # Correctly handles the .1 and .2 notation (6.1 -> 19, 6.2 -> 20)
+    total_outs = (np.floor(df['IP']) * 3) + (np.round(df['IP'] % 1 * 10))
 
-    # Calculate 'SLG' column (only for pitchers with at-bats)
-    slg_numerator = (df['H'] - df['2B'] - df['3B'] - df['HR']) + df['2B'] * 2 + df['3B'] * 3 + df['HR'] * 4
-    df['SLG'] = trunc_col(np.where(df['AB'] > 0, slg_numerator / df['AB'], 0), 3)
-    # Calculate 'OPS' column
-    df['OPS'] = trunc_col(df['OBP'] + df['SLG'], 3)
-    # Calculate 'WHIP' and 'ERA' columns
-    df['WHIP'] = trunc_col((df['BB'] + df['H']) / df['IP'], 3)
-    df['ERA'] = trunc_col((df['ER'] / df['IP']) * 9, 2)
-    df = fill_nan_with_value(df,'ERA', 0)
-    df = fill_nan_with_value(df, 'WHIP', 0)
-    df = fill_nan_with_value(df, 'AVG', 0)
-    df = fill_nan_with_value(df, 'OBP', 0)
-    df = fill_nan_with_value(df, 'SLG', 0)
-    df = fill_nan_with_value(df, 'OPS', 0)
+    # 2. CALCULATE BATTERS FACED (TBF)
+    # TBF = Outs + Hits + Walks + HBP (if exists)
+    hbp_val = df['HBP'] if 'HBP' in df.columns else 0
+    tbf = total_outs + df['H'] + df['BB'] + hbp_val
+
+    # 3. DERIVED RATE STATISTICS
+    # WHIP: (Walks + Hits) / IP
+    df['WHIP'] = trunc_col(np.nan_to_num((df['BB'] + df['H']) / df['IP'], nan=0.0, posinf=0.0), 3)
+
+    # ERA: (ER / Total_Outs) * 27
+    df['ERA'] = trunc_col(np.nan_to_num((df['ER'] / total_outs) * 27, nan=0.0, posinf=0.0), 2)
+
+    # OBP AGAINST: (H + BB + HBP) / TBF
+    # This is the crucial gate fix for SimAB
+    df['OBP'] = trunc_col(np.nan_to_num((df['H'] + df['BB'] + hbp_val) / tbf, nan=0.0, posinf=0.0), 3)
+
+    # AVG AGAINST: H / (Total Outs + Hits)
+    # This approximates H / AB (against)
+    denom_avg = total_outs + df['H']
+    df['AVG'] = trunc_col(np.nan_to_num(df['H'] / denom_avg, nan=0.0, posinf=0.0), 3)
+
+    # SLG AGAINST: Total Bases / AB (against)
+    doubles = df['2B'] if '2B' in df.columns else 0
+    triples = df['3B'] if '3B' in df.columns else 0
+    total_bases = (df['H'] - doubles - triples - df['HR']) + doubles * 2 + triples * 3 + df['HR'] * 4
+    df['SLG'] = trunc_col(np.nan_to_num(total_bases / denom_avg, nan=0.0, posinf=0.0), 3)
+
+    # OPS AGAINST: OBP + SLG
+    df['OPS'] = trunc_col(np.nan_to_num(df['OBP'] + df['SLG'], nan=0.0, posinf=0.0), 3)
+
+    # 4. CLEANUP
+    cols_to_fill = ['ERA', 'WHIP', 'AVG', 'OBP', 'SLG', 'OPS']
+    for col in cols_to_fill:
+        if col in df.columns:
+            df = fill_nan_with_value(df, col, 0)
+
     return df
+
+# def team_pitching_stats(df: DataFrame, filter_stats: bool=True) -> DataFrame:
+#     """
+#     build up pitcher stats.  Note initial values for some cols are 0. hbp is 0, 2b are 0, 3b are 0
+#     :param df: data set to calc
+#     :param filter_stats boolean that drops players with no stats
+#     :return: df with new cols / updated cols
+#     """
+#     # OPTIMIZED: Filter first (creates new df), or copy only if not filtering
+#     if filter_stats:
+#         # For pitchers, only require IP > 0 (not AB, since most pitchers don't bat)
+#         df = df[df['IP'] > 0]  # Boolean indexing creates a new dataframe
+#     else:
+#         df = df.copy()  # Copy only when not filtering to avoid modifying caller's data
+#
+#     df['AB'] = trunc_col(df['AB'], 0)
+#     df['IP'] = trunc_col(df['IP'], 2)
+#     # Only calculate batting stats if pitcher has at-bats (NL pitchers, two-way players)
+#     df['AVG'] = trunc_col(np.where(df['AB'] > 0, df['H'] / df['AB'], 0), 3)
+#     df['OBP'] = trunc_col(np.where(df['AB'] + df['BB'] > 0, (df['H'] + df['BB']) / (df['AB'] + df['BB']), 0), 3)
+#
+#     # Calculate 'SLG' column (only for pitchers with at-bats)
+#     slg_numerator = (df['H'] - df['2B'] - df['3B'] - df['HR']) + df['2B'] * 2 + df['3B'] * 3 + df['HR'] * 4
+#     df['SLG'] = trunc_col(np.where(df['AB'] > 0, slg_numerator / df['AB'], 0), 3)
+#     # Calculate 'OPS' column
+#     df['OPS'] = trunc_col(df['OBP'] + df['SLG'], 3)
+#     # Calculate 'WHIP' and 'ERA' columns
+#     df['WHIP'] = trunc_col((df['BB'] + df['H']) / df['IP'], 3)
+#     df['ERA'] = trunc_col((df['ER'] / df['IP']) * 9, 2)
+#     df = fill_nan_with_value(df,'ERA', 0)
+#     df = fill_nan_with_value(df, 'WHIP', 0)
+#     df = fill_nan_with_value(df, 'AVG', 0)
+#     df = fill_nan_with_value(df, 'OBP', 0)
+#     df = fill_nan_with_value(df, 'SLG', 0)
+#     df = fill_nan_with_value(df, 'OPS', 0)
+#     return df
 
 
 def team_batting_totals(batting_df: DataFrame) -> DataFrame:
@@ -1481,6 +1699,7 @@ def team_pitching_totals(pitching_df: DataFrame) -> DataFrame:
     if 'R' in pitching_df.columns:
         cols_to_sum.insert(cols_to_sum.index('ER'), 'R')  # Add R before ER
 
+    cols_to_sum = [col for col in cols_to_sum if col in pitching_df.columns]
     df = pitching_df[cols_to_sum].sum().astype(int)
     df = df.to_frame().T
     df = df.assign(G=np.max(pitching_df['G']))
@@ -1494,6 +1713,38 @@ def team_pitching_totals(pitching_df: DataFrame) -> DataFrame:
         df['Sim_WAR'] = pitching_df['Sim_WAR'].sum()
     df = team_pitching_stats(df, filter_stats=False)
     return df
+
+
+def calculate_stats_difference(current_df: DataFrame, hist_df: DataFrame, is_batter: bool) -> DataFrame:
+    """
+    Compute per-player difference between current season stats and a historical baseline.
+
+    For each player present in both DataFrames (matched on index), counting stats and rate
+    stats are subtracted (current - historical).  Players with no historical entry (rookies)
+    are left unchanged.
+
+    :param current_df: Current season stats DataFrame (indexed by Hashcode)
+    :param hist_df: Historical / prorated baseline DataFrame (indexed by Hashcode)
+    :param is_batter: True for batting data, False for pitching data
+    :return: Copy of current_df with difference values
+    """
+    if hist_df is None or hist_df.empty:
+        return current_df
+
+    count_cols = BATTER_DIFF_COUNT_COLS if is_batter else PITCHER_DIFF_COUNT_COLS
+    rate_cols = BATTER_DIFF_RATE_COLS if is_batter else PITCHER_DIFF_RATE_COLS
+    all_diff_cols = count_cols + rate_cols
+
+    diff_df = current_df.copy()
+    common_index = diff_df.index.intersection(hist_df.index)
+
+    for col in all_diff_cols:
+        if col in diff_df.columns and col in hist_df.columns:
+            diff_df.loc[common_index, col] = (
+                diff_df.loc[common_index, col] - hist_df.loc[common_index, col]
+            )
+
+    return diff_df
 
 
 def update_column_with_other_df(df1, col1, df2, col2):
@@ -1554,7 +1805,7 @@ if __name__ == '__main__':
                                   load_batter_file='aggr-stats-pp-Batting.csv',
                                   load_pitcher_file='aggr-stats-pp-Pitching.csv')
     # print(*baseball_data.pitching_data.columns)
-    # print(*baseball_data.batting_data.columns)
+    print(*baseball_data.batting_data.columns)
     print(baseball_data.get_all_team_names())
     print(baseball_data.get_all_team_city_names())
     # print(baseball_data.pitching_data.to_string())
@@ -1566,5 +1817,29 @@ if __name__ == '__main__':
         print(team)
         # print(baseball_data.get_pitching_data(team_name=team, prior_season=True).to_string())
     #     print(baseball_data.get_pitching_data(team_name=team, prior_season=False).to_string())
-        print(baseball_data.get_batting_data(team_name=team, prior_season=True).to_string())
-        print(baseball_data.get_batting_data(team_name=team, prior_season=False).to_string())
+    #     print(baseball_data.get_batting_data(team_name=team, prior_season=True).to_string())
+    #     print(baseball_data.get_batting_data(team_name=team, prior_season=False).to_string())
+
+    # print(baseball_data.get_batting_data(prior_season=True)['AB'].sum())
+
+    # Load the full 2025 historical file
+    # (assuming you've called _ensure_2025_historical_loaded)
+    hist_2025_sum = baseball_data.get_batting_data(prior_season=True)['AB'].sum()
+    print(hist_2025_sum)
+
+    # Get the list of players actually in your 2026 sim
+    active_2026_hashes = baseball_data.new_season_batting_data.index
+    active_2025_hashes = baseball_data.get_batting_data(prior_season=True).index
+    print(active_2025_hashes)
+
+    # Sum 2025 ABs ONLY for players who are in the 2026 sim
+    historical_2025_batting = baseball_data.get_batting_data(prior_season=True)
+    surviving_2025_sum = historical_2025_batting[historical_2025_batting.index.isin(active_2026_hashes)]['AB'].sum()
+
+    print(f"Total 2025 AB in File: {hist_2025_sum}")
+    print(f"2025 AB from players who kept their jobs in 2026: {surviving_2025_sum}")
+    print(f"Missing (Retired/Free Agent) AB: {hist_2025_sum - surviving_2025_sum}")
+
+    df_b, df_p = baseball_data.calculate_prorated_2025_stats(team_name=None, current_games_played=162)
+    print('*****')
+    print(df_b['AB'].sum())

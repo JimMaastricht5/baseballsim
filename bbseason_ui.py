@@ -22,7 +22,7 @@ Contact: JimMaastricht5@gmail.com
 """
 
 import tkinter as tk
-from tkinter import ttk, messagebox
+from tkinter import messagebox
 import datetime
 import argparse
 import sys
@@ -177,46 +177,22 @@ def main(load_seasons=None, new_season=2026, season_length=162, series_length=3,
     
     logger.info("Starting Baseball Season Simulator UI (tkinter)")
 
-    # Show startup dialog if requested
-    if show_startup_dialog:
-        try:
-            dialog = StartupDialog()
-            confirmed, selected_team, num_games = dialog.show()
-
-            if not confirmed:
-                logger.info("User cancelled season setup")
-                return
-
-            # Use dialog values
-            season_team_to_follow = selected_team
-            season_length = num_games
-            logger.info(f"User selected team: {selected_team}, games: {num_games}")
-        except Exception as e:
-            logger.error(f"Error in startup dialog: {e}")
-            messagebox.showerror("Error", f"Failed to show startup dialog: {e}")
-            return
-
-    # Now create the main application window
     root = tk.Tk()
     root.state('zoomed')
 
-    # Create main window
     try:
-        window = SeasonMainWindow(root, load_seasons, new_season, season_length, series_length, rotation_len,
-                                  season_chatty, season_print_lineup_b, season_print_box_score_b,
-                                  season_team_to_follow)
+        window = SeasonMainWindow(root, load_seasons, new_season, season_length, series_length,
+                                  rotation_len, season_chatty, season_print_lineup_b,
+                                  season_print_box_score_b, season_team_to_follow)
     except Exception as e:
         logger.error(f"Error creating main window: {e}")
         messagebox.showerror("Error", f"Failed to create main window: {e}")
         root.destroy()
         return
 
-    # Handle window close
     root.protocol("WM_DELETE_WINDOW", window.on_close)
 
     logger.info("Main window displayed, entering event loop")
-
-    # Start event loop
     root.mainloop()
 
 
@@ -267,11 +243,9 @@ Examples:
          season_team_to_follow=args.team.upper(),
          show_startup_dialog=args.dialog)
 
-    # how long did that take?
     end_time = datetime.datetime.now()
     run_time = end_time - start_time
     total_seconds = run_time.total_seconds()
     minutes = int(total_seconds // 60)
     seconds = int(total_seconds % 60)
     print(f'Total run time: {minutes} minutes, {seconds} seconds')
-

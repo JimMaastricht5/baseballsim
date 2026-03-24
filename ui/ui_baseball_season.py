@@ -215,8 +215,9 @@ class UIBaseballSeason(bbseason.BaseballSeason):
             if max_games > 150:
                 return
 
-        # Calculate current Sim WAR values before assessments
-        with self.baseball_data.semaphore:
+        # calculate_sim_war() requires caller to hold thread_lock (non-reentrant lock design;
+        # internal lock was removed to prevent deadlock — see bbstats.py docstring)
+        with self.baseball_data.thread_lock:
             self.baseball_data.calculate_sim_war()
 
         # Determine which teams to print (or in our case, emit)
@@ -289,24 +290,26 @@ class UIBaseballSeason(bbseason.BaseballSeason):
 
     def extract_standings(self) -> dict:
         """
-        Extract standings data from team_win_loss dictionary, separated by league.
-
-        Replicates the logic from print_standings() but returns data
-        instead of printing, with separate AL and NL standings.
+        Extract standings data from team_win_loss dictionary, separated by league and division.
 
         Returns:
-            dict: Standings data with keys:
-                - al (dict): AL standings with 'teams', 'wins', 'losses', 'pct', 'gb'
-                - nl (dict): NL standings with 'teams', 'wins', 'losses', 'pct', 'gb'
+            dict: Standings keyed by league ('al'/'nl'), then division ('East'/'Central'/'West'),
+                  each containing 'teams', 'wins', 'losses', 'pct', 'gb' lists sorted by GB.
         """
-        teaml, winl, lossl, leaguel = [], [], [], []
+        teaml, winl, lossl, leaguel, divisionl = [], [], [], [], []
 
-        # Get team-to-league mapping from baseball_data
+        # Get team-to-league and division mappings from baseball_data
         team_league_map = {}
-        if hasattr(self.baseball_data, 'batting_data') and 'League' in self.baseball_data.batting_data.columns:
-            # Create a mapping of team to league
-            team_league_df = self.baseball_data.batting_data[['Team', 'League']].drop_duplicates()
-            team_league_map = dict(zip(team_league_df['Team'], team_league_df['League']))
+        team_division_map = {}
+        if hasattr(self.baseball_data, 'batting_data'):
+            cols = self.baseball_data.batting_data.columns
+            if 'League' in cols and 'Division' in cols:
+                team_df = self.baseball_data.batting_data[['Team', 'League', 'Division']].drop_duplicates()
+                team_league_map = dict(zip(team_df['Team'], team_df['League']))
+                team_division_map = dict(zip(team_df['Team'], team_df['Division']))
+            elif 'League' in cols:
+                team_df = self.baseball_data.batting_data[['Team', 'League']].drop_duplicates()
+                team_league_map = dict(zip(team_df['Team'], team_df['League']))
 
         for team in self.team_win_loss:
             if team != 'OFF DAY':
@@ -314,53 +317,38 @@ class UIBaseballSeason(bbseason.BaseballSeason):
                 teaml.append(team)
                 winl.append(win_loss[0])
                 lossl.append(win_loss[1])
-                # Get league from mapping, default to 'AL' if not found
                 leaguel.append(team_league_map.get(team, 'AL'))
+                divisionl.append(team_division_map.get(team, 'East'))
 
-        # Create DataFrame and calculate stats
-        df = pd.DataFrame({'Team': teaml, 'W': winl, 'L': lossl, 'League': leaguel})
-        df['Pct'] = df['W'] / (df['W'] + df['L'])
-        df['Pct'] = df['Pct'].fillna(0.0)  # Handle 0-0 teams
+        df = pd.DataFrame({'Team': teaml, 'W': winl, 'L': lossl,
+                           'League': leaguel, 'Division': divisionl})
+        df['Pct'] = (df['W'] / (df['W'] + df['L'])).fillna(0.0)
 
-        # Separate by league and calculate GB separately
-        al_df = df[df['League'] == 'AL'].copy()
-        nl_df = df[df['League'] == 'NL'].copy()
+        def calculate_gb(group_df):
+            if len(group_df) == 0:
+                return group_df
+            group_df = group_df.sort_values(['W', 'L'], ascending=[False, True]).reset_index(drop=True)
+            max_wins = group_df['W'].iloc[0]
+            leader_losses = group_df['L'].iloc[0]
+            group_df['GB'] = ((max_wins - group_df['W']) + (group_df['L'] - leader_losses)) / 2.0
+            group_df['GB'] = group_df['GB'].apply(lambda x: '-' if x == 0 else f'{x:.1f}')
+            return group_df
 
-        def calculate_gb(league_df):
-            """Calculate games back for a league."""
-            if len(league_df) == 0:
-                return league_df
-
-            # Sort by wins descending, then losses ascending (tiebreaker)
-            league_df = league_df.sort_values(['W', 'L'], ascending=[False, True]).reset_index(drop=True)
-
-            # Calculate Games Back from league leader
-            max_wins = league_df['W'].iloc[0]
-            leader_losses = league_df['L'].iloc[0]
-            league_df['GB'] = ((max_wins - league_df['W']) + (league_df['L'] - leader_losses)) / 2.0
-            league_df['GB'] = league_df['GB'].apply(lambda x: '-' if x == 0 else f'{x:.1f}')
-
-            return league_df
-
-        al_df = calculate_gb(al_df)
-        nl_df = calculate_gb(nl_df)
-
-        return {
-            'al': {
-                'teams': al_df['Team'].tolist(),
-                'wins': al_df['W'].tolist(),
-                'losses': al_df['L'].tolist(),
-                'pct': al_df['Pct'].tolist(),
-                'gb': al_df['GB'].tolist()
-            },
-            'nl': {
-                'teams': nl_df['Team'].tolist(),
-                'wins': nl_df['W'].tolist(),
-                'losses': nl_df['L'].tolist(),
-                'pct': nl_df['Pct'].tolist(),
-                'gb': nl_df['GB'].tolist()
-            }
-        }
+        result = {}
+        for league in ('AL', 'NL'):
+            key = league.lower()
+            result[key] = {}
+            league_df = df[df['League'] == league]
+            for division in ('East', 'Central', 'West'):
+                div_df = calculate_gb(league_df[league_df['Division'] == division].copy())
+                result[key][division] = {
+                    'teams': div_df['Team'].tolist(),
+                    'wins': div_df['W'].tolist(),
+                    'losses': div_df['L'].tolist(),
+                    'pct': div_df['Pct'].tolist(),
+                    'gb': div_df['GB'].tolist()
+                }
+        return result
 
     def extract_injuries(self) -> list:
         """
@@ -449,6 +437,101 @@ class UIBaseballSeason(bbseason.BaseballSeason):
 
         return f"Day {day + 1}: " + ", ".join(schedule_lines)
 
+    def run_playoffs(self) -> None:
+        """
+        Override to run full playoff bracket with UI signal emissions.
+
+        Activates the Playoffs tab, adds all 12 playoff seeds to team_to_follow,
+        enables chatty mode, then delegates to the base class bracket logic
+        (Wild Card → DS → LCS → World Series).  Each game flows through
+        sim_next_day() which already emits game_completed/day_completed signals.
+        run_world_series_new() is also overridden to emit world_series_started /
+        world_series_completed when the finalists are known.
+        """
+        if not self.should_run_playoffs():
+            return
+
+        # Add all playoff seeds to team_to_follow for play-by-play output
+        for league in ('AL', 'NL'):
+            try:
+                seeds = self.get_playoff_seeds(league)
+                for team in seeds:
+                    if team not in self.team_to_follow:
+                        self.team_to_follow.append(team)
+            except Exception:
+                pass
+
+        self.print_box_score_b = True
+        self.print_lineup_b = True
+        self.season_chatty = True
+        self.ws_active = True
+
+        # Activate Playoffs tab and start routing games to the playoff widget
+        if hasattr(self, 'signals') and self.signals is not None:
+            if self.signals.main_window is not None:
+                self.signals.main_window.world_series_active = True
+                self.signals.main_window.world_series_teams = set(self.team_to_follow)
+                logger.info(f"Playoffs starting; routing {len(self.team_to_follow)} teams to playoff widget")
+
+            # Emit with playoff_mode=True — activates tab without setting WS matchup yet
+            self.signals.emit_world_series_started({
+                'al_winner': 'AL',
+                'nl_winner': 'NL',
+                'season': self.new_season,
+                'playoff_mode': True
+            })
+
+        # Run full bracket: Wild Card → DS → LCS → World Series
+        # (calls run_playoff_series() → sim_next_day() → existing game signals)
+        super().run_playoffs()
+
+        self.baseball_data.save_season_stats()
+
+    def run_world_series_new(self, al_champ: str, nl_champ: str) -> None:
+        """
+        Override to emit UI signals when the World Series finalists are known.
+
+        Called by run_playoffs() once LCS rounds complete.  Emits
+        world_series_started with actual team names (updates PlayoffWidget header),
+        then delegates to base class to run the series, then emits
+        world_series_completed with the champion.
+        """
+        al_record = self.team_win_loss[al_champ]
+        nl_record = self.team_win_loss[nl_champ]
+
+        # Update WS tracking state used by play-by-play game numbering
+        self.ws_al_winner = al_champ
+        self.ws_nl_winner = nl_champ
+        self.ws_al_start_wins = al_record[WIN]
+        self.ws_nl_start_wins = nl_record[WIN]
+
+        # Re-emit world_series_started with actual finalists to update widget header
+        if hasattr(self, 'signals') and self.signals is not None:
+            if self.signals.main_window is not None:
+                self.signals.main_window.world_series_teams = {al_champ, nl_champ}
+            self.signals.emit_world_series_started({
+                'al_winner': al_champ,
+                'nl_winner': nl_champ,
+                'season': self.new_season,
+                'al_record': al_record,
+                'nl_record': nl_record,
+                'playoff_mode': False
+            })
+
+        # Run the series (calls run_playoff_series() → sim_next_day() → game signals)
+        super().run_world_series_new(al_champ, nl_champ)
+
+        # Determine champion and emit completed signal
+        ws_al_wins = self.team_win_loss[al_champ][WIN] - al_record[WIN]
+        ws_nl_wins = self.team_win_loss[nl_champ][WIN] - nl_record[WIN]
+        ws_winner = al_champ if ws_al_wins > ws_nl_wins else nl_champ
+        if hasattr(self, 'signals') and self.signals is not None:
+            self.signals.emit_world_series_completed({
+                'champion': ws_winner,
+                'season': self.new_season,
+                'series_result': {al_champ: ws_al_wins, nl_champ: ws_nl_wins}
+            })
+
     def run_world_series(self) -> None:
         """
         Override to run World Series with UI signal emission.
@@ -460,7 +543,7 @@ class UIBaseballSeason(bbseason.BaseballSeason):
         from bblogger import logger
 
         # Check eligibility
-        if not self.should_run_world_series():
+        if not self.should_run_playoffs():
             return
 
         # Get league winners (use base class method for consistency)

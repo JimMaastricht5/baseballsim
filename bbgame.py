@@ -26,7 +26,6 @@ from pandas.core.series import Series
 from typing import List, Tuple, Optional
 import queue
 from bblogger import logger
-
 AWAY = 0
 HOME = 1
 
@@ -41,7 +40,8 @@ class Game:
                  load_batter_file: str = 'player-stats-Batters.csv',
                  load_pitcher_file: str = 'player-stats-Pitching.csv',
                  interactive: bool = False, show_bench: bool = False, debug: bool = False,
-                 play_by_play_callback=None) -> None:
+                 play_by_play_callback=None,
+                 obp_adjustment=None) -> None:
         """
         class manages the details of an individual game
         :param away_team_name: away team name is a 3 character all caps abbreviation
@@ -138,7 +138,7 @@ class Game:
         self.rng = lambda: np.random.default_rng().uniform(low=0.0, high=1.001)  # random generator between 0 and 1
         self.bases = bbbaserunners.Bases()
         self.outcomes = at_bat.OutCome()
-        self.at_bat = at_bat.SimAB(self.baseball_data)  # setup class
+        self.at_bat = at_bat.SimAB(self.baseball_data, obp_adjustment=obp_adjustment)  # setup class
         self.steal_multiplier = 1.7  # rate of steals per on base is not generating the desired result so increase it
         self.interactive = interactive  # is this game being controlled by a human or straight sim
         self.manager = None
@@ -431,10 +431,11 @@ class Game:
                                   bases_to_advance=self.outcomes.bases_to_advance,
                                   on_base_b=self.outcomes.on_base_b, outs=self.outs)
         self.outcomes.set_runs_score(self.bases.runs_scored)  # runs and rbis for batter and pitcher
-
-        self.teams[self.team_pitching()].box_score.pitching_result(cur_pitcher_index, self.outcomes, pitching.Condition)
+        self.teams[self.team_pitching()].box_score.pitching_result(cur_pitcher_index, self.outcomes,
+                                                                   pitching.Condition)
         self.teams[self.team_hitting()].box_score.batting_result(cur_batter_index, self.outcomes,
                                                                  self.bases.player_scored)
+
         if self.chatty:
             out_text = 'Out' if self.outs <= 1 else 'Outs'
             play_text = (f'Pitcher: {pitching.Player} against {self.team_names[self.team_hitting()]} '

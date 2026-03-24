@@ -53,7 +53,9 @@ class SimulationController:
         self.worker: Optional[SeasonWorker] = None
 
     def start_season(self, selected_team: str,
-                    on_started_callback: Optional[Callable] = None) -> bool:
+                    on_started_callback: Optional[Callable] = None,
+                    season_length: int = None,
+                    obp_adjustment: float = 0.0) -> bool:
         """
         Start the season simulation.
 
@@ -76,13 +78,14 @@ class SimulationController:
 
         logger.info(f"Starting season simulation, following team: {selected_team}")
 
-        # Create worker with simulation parameters
+        # Create worker with simulation parameters (use override if provided)
+        effective_season_length = season_length if season_length is not None else self.season_length
         self.worker = SeasonWorker(
             self.load_seasons,
             self.new_season,
             self.rotation_len,
             self.series_length,
-            self.season_length,
+            effective_season_length,
             self.season_chatty,
             self.season_print_lineup_b,
             self.season_print_box_score_b,
@@ -176,6 +179,19 @@ class SimulationController:
             bool: True if assessments ran successfully, False otherwise
         """
         if self.worker and self.worker.season:
+            # check_gm_assessments() must only be called from the UI thread when the worker is
+            # blocked at its pause point (_pause_event cleared = worker waiting, not mid-sim).
+            # If the worker is alive and _pause_event is set, it is actively running sim logic
+            # and a concurrent call would race on baseball_data.
+            if self.worker.is_alive() and self.worker._pause_event.is_set():
+                from tkinter import messagebox
+                messagebox.showwarning(
+                    "Pause Required",
+                    "Please pause the simulation before running GM assessments manually.")
+                if status_callback:
+                    status_callback("Pause simulation first to run GM assessments")
+                return False
+
             logger.info("Running forced GM assessments for all teams")
             try:
                 # Call check_gm_assessments with force=True

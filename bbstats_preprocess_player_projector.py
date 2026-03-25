@@ -57,7 +57,7 @@ class PlayerProjector:
         }
 
         self.k_vals_pitcher = {
-            'H': 2000,  # Hits allowed (BABIP) regresses heavily
+            'H': 2500,  # Hits allowed (BABIP) regresses heavily
             'BB': 300,  # Walk rate
             'SO': 150,  # K-rate stabilizes very fast for pitchers
             'ER': 300,  # Essential for preventing 0.00 ERA anomalies
@@ -123,43 +123,45 @@ class PlayerProjector:
         career_vol = player_history[vol_col].sum()
         age_2026 = int(player_history.iloc[-1]['Age']) + 1
 
-        # 1. STRATEGY SELECTION
+        # 1. STRATEGY SELECTION - Get player's raw rate
         if num_years == 1 and career_vol >= 300:
-            raw_rate = self._project_single_year_starter(player_history, stat_col, vol_col)
+            player_rate = self._project_single_year_starter(player_history, stat_col, vol_col)
         elif (career_vol / num_years) < 100 or num_years < 2:
-            raw_rate = self._regress_to_mean(player_history, stat_col, vol_col)
+            player_rate = self._regress_to_mean(player_history, stat_col, vol_col)
         elif self._is_consistent_trend(player_history, stat_col, vol_col) and num_years >= 2:
             trend_rate = self._linear_regression(player_history, stat_col, vol_col)
             w_avg_rate = self._weighted_career_average(player_history, stat_col, vol_col)
             if age_2026 <= 25:
-                # GROWTH FLOOR: young players project the higher of trend vs weighted avg
-                raw_rate = max(trend_rate, w_avg_rate)
+                player_rate = max(trend_rate, w_avg_rate)
             elif 27 <= age_2026 <= 32:
-                # PRIME FLOOR: don't let a declining trend extrapolate below the career
-                # weighted average - mild declines shouldn't be over-projected downward
-                raw_rate = max(trend_rate, w_avg_rate)
+                player_rate = max(trend_rate, w_avg_rate)
             else:
-                raw_rate = trend_rate
+                player_rate = trend_rate
         else:
-            raw_rate = self._weighted_career_average(player_history, stat_col, vol_col)
-            # PRIME ANCHOR: for established prime hitters (27-33) with no consistent trend,
-            # the most recent season acts as a soft floor - prevents a bounceback year from
-            # being washed out by poor earlier seasons (and vice versa for outlier good years)
+            player_rate = self._weighted_career_average(player_history, stat_col, vol_col)
             if 27 <= age_2026 <= 33 and career_vol >= 600 and stat_col in ['H', 'BB']:
                 recent_rate = player_history.iloc[-1][stat_col] / max(1, player_history.iloc[-1][vol_col])
-                raw_rate = max(raw_rate, recent_rate * 0.93)
+                player_rate = max(player_rate, recent_rate * 0.93)
 
-        # 2. AGING & TAX
+        # 2. Apply AGING to player's rate (before regression)
         trust = min(career_vol / self.gate, 1.0)
         multiplier = 1.0 + (self._get_aging_multiplier(age_2026, False) - 1.0) * trust
         if vol_col == 'H':
             multiplier = 1.0 + (multiplier - 1.0) * 0.5
+        player_rate = player_rate * multiplier
 
+        # 3. Apply UNPROVEN TAX to player's rate (before regression)
         unproven_factor = np.clip(1.0 - (career_vol / 500), 0, 1)
-        # REDUCED: from 0.12 to 0.04 (4%). 12% is a Deadball Era death sentence; 8% SO to 6% SO
         tax = 1.0 - (0.04 * unproven_factor) if stat_col != 'SO' else 1.0 + (0.06 * unproven_factor)
-        final_rate = float(np.clip(raw_rate * multiplier * tax, 0, 0.480))  # Realistic ceiling
-        return self._apply_sanity_caps(final_rate, stat_col, is_p=False, player_history=player_history)
+        player_rate = player_rate * tax
+
+        # 4. BAYESIAN REGRESSION - Now regress the adjusted player rate toward league avg
+        k = self.k_vals_batter.get(stat_col, self.k_vals_batter['default'])
+        lg_rate = self.lg_avgs.get(f"{stat_col}_per_{vol_col}", 
+                                    self.lg_avgs.get('H_per_AB', 0.258) if stat_col == 'H' and vol_col == 'AB' else 0.240)
+        final_rate = (player_rate * career_vol + k * lg_rate) / (career_vol + k)
+
+        return self._apply_sanity_caps(float(np.clip(final_rate, 0, 0.480)), stat_col, is_p=False, player_history=player_history)
 
     def _get_projection_pitcher(self, player_history: pd.DataFrame, stat_col: str, vol_col: str) -> float:
         """
@@ -191,60 +193,55 @@ class PlayerProjector:
         career_vol = player_history[vol_col].sum()
         age_2026 = int(player_history.iloc[-1]['Age']) + 1
 
-        # 1. STRATEGY SELECTION (Pitchers lean more on Weighted Averages to stabilize ERA)
+        # 1. STRATEGY SELECTION - Get player's raw rate
         if num_years < 2 or career_vol < 150:
-            raw_rate = self._regress_to_mean(player_history, stat_col, vol_col)
+            player_rate = self._regress_to_mean(player_history, stat_col, vol_col)
         else:
-            # For Pitchers, blend Trend with Weighted Average 50/50 to prevent death spirals
             trend_rate = self._linear_regression(player_history, stat_col, vol_col)
             w_avg_rate = self._weighted_career_average(player_history, stat_col, vol_col)
-            raw_rate = (trend_rate * 0.5) + (w_avg_rate * 0.5)
+            player_rate = (trend_rate * 0.5) + (w_avg_rate * 0.5)
 
-        # anchor OBP
-        if stat_col in ['H', 'BB']:
-            lg_target = self.lg_avgs.get(f"{stat_col}_per_{vol_col}", 0.240)
-
-            # Catch pitchers projecting >13% better than league average
-            # and pull 60% toward the mean to prevent unrealistic OBP suppression
-            if raw_rate < (lg_target * 0.87):
-                raw_rate = (raw_rate * 0.40) + (lg_target * 0.60)
-
-        # 2. AGING & TAX
-        # Get raw skill multiplier
+        # 2. Apply AGING to player's rate (before regression)
         raw_m = self._get_aging_multiplier(age_2026, True)
-
         if stat_col in ['H', 'BB', 'ER'] and raw_m < 1.0:
             if stat_col == 'BB':
-                # BLEND: Average of linear and inverse to prevent walk explosion
                 multiplier = ((1.0 + (1.0 - raw_m)) + (1.0 / raw_m)) / 2
             else:
                 multiplier = 1.0 / raw_m
         else:
             multiplier = raw_m
+        player_rate = player_rate * multiplier
 
+        # 3. Apply UNPROVEN TAX to player's rate (before regression)
         unproven_factor = np.clip(1.0 - (career_vol / 250), 0, 1)
-        tax = 1.0 + (0.07 * unproven_factor) if stat_col in ['H', 'BB', 'ER'] else 1.0 - (0.07 * unproven_factor)
-        final_rate = raw_rate * multiplier * tax
+        tax = 1.0 + (0.05 * unproven_factor) if stat_col in ['H', 'BB', 'ER'] else 1.0 - (0.05 * unproven_factor)
+        player_rate = player_rate * tax
 
-        # 3. ANTI-GHOST LOGIC (The Gravity Anchor)
+        # 4. OBP Anchor (before regression)
+        if stat_col in ['H', 'BB']:
+            lg_target = self.lg_avgs.get(f"{stat_col}_per_{vol_col}", 0.240)
+            if player_rate < (lg_target * 0.87):
+                player_rate = (player_rate * 0.40) + (lg_target * 0.60)
+
+        # 5. BAYESIAN REGRESSION - Now regress toward league avg
+        k = self.k_vals_pitcher.get(stat_col, self.k_vals_pitcher['default'])
+        lg_rate = self.lg_avgs.get(f"{stat_col}_per_{vol_col}", 0.240)
+        final_rate = (player_rate * career_vol + k * lg_rate) / (career_vol + k)
+
+        # 6. ANTI-GHOST LOGIC (The Gravity Anchor)
         # Instead of max(rate, 2.10), we pull outliers back toward a 'Great' baseline
         if stat_col == 'ER':
-            # 0.085 is roughly a 2.80 ERA. If they project better than that, pull them back.
             elite_anchor = 0.085
             if final_rate < elite_anchor:
-                # Gravity pulls them 50% of the way to a 3.50 ERA (0.108 rate)
                 gravity_well = 0.108
                 final_rate = (final_rate + gravity_well) / 2
 
-        # (Step 4) outlier brake
+        # (Step 7) outlier brake
         if stat_col == 'ER' and vol_col == 'IP_Dec':
             lg_er_per_ip = self.lg_avgs.get('ER_per_IP', 4.25) / 9
-            # If a player has < 150 career IP, don't let them be better than 90% of league average
-            # This keeps position players like Torrens from looking like Cy Young winners
             if career_vol < 150:
                 final_rate = max(final_rate, lg_er_per_ip * 0.9)
             else:
-                # For established guys, allow them to be elite (up to 40% of league average)
                 final_rate = max(final_rate, lg_er_per_ip * 0.4)
 
         return self._apply_sanity_caps(float(final_rate), stat_col, is_p=True, player_history=player_history)

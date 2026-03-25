@@ -345,6 +345,8 @@ class BaseballStatsPreProcess:
             # Without these, the projector falls back to 0.240 for BB_per_PA,
             # which inflates all pitcher walk rates by ~2x.
             if total_pa:
+                lg_avgs['H_per_BIP'] = qualified['H'].sum() / (
+                            qualified['PA'] - qualified['SO'] - qualified['BB']).clip(lower=1).sum()
                 lg_avgs['H_per_PA'] = qualified['H'].sum() / total_pa
                 lg_avgs['BB_per_PA'] = qualified['BB'].sum() / total_pa
                 lg_avgs['SO_per_PA'] = qualified['SO'].sum() / total_pa

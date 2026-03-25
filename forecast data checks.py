@@ -109,6 +109,12 @@ def diagnose_h_surplus():
     hitter_delta = (b_26_h_rate - b_25_h_rate) * 1000
     pitcher_delta = (p_26_h_rate - p_25_h_rate) * 1000
 
+    # Add after existing rate calculations
+    p_25['BIP'] = p_25['PA'] - p_25['SO'] - p_25['BB']
+    p_26_bip = df_p_proj['PA'] - df_p_proj['SO'] - df_p_proj['BB']
+    bip_25_rate = p_25['H'].sum() / p_25['BIP'].sum()
+    bip_26_rate = df_p_proj['H'].sum() / p_26_bip.sum()
+
     print("\n" + "=" * 90)
     print(f"{'HIT INFLATION DIAGNOSTIC (Rates per 1000 PA)':^90}")
     print("=" * 90)
@@ -189,6 +195,32 @@ def deep_dive_pitching_outliers():
               ['Player', 'PA', 'H_Gain', 'K_Loss']
           ].head(10).to_string(index=False))
 
+def diagnose_bi_vs_pa_leakage():
+    """Compare the actual denominators being used in projection vs historical."""
+    df_b_hist = pd.read_csv(B_HIST_FILE)
+    df_p_hist = pd.read_csv(P_HIST_FILE)
+    df_p_proj = pd.read_csv(P_PROJ_FILE)
+
+    # Pitcher BIP analysis - this is the key!
+    p_25 = df_p_hist[df_p_hist['Season'] == 2025].copy()
+
+    # Historical: calculate actual BIP for 2025
+    p_25['BIP'] = p_25['PA'] - p_25['SO'] - p_25['BB']
+    p_25_h_bip = p_25['H'].sum() / p_25['BIP'].sum()  # Historical H/BIP
+
+    # Projected: calculate what the projection assumes
+    df_p_proj['BIP'] = df_p_proj['PA'] - df_p_proj['SO'] - df_p_proj['BB']
+    proj_h_bip = df_p_proj['H'].sum() / df_p_proj['BIP'].sum()  # Proj H/BIP
+
+    print("\n" + "=" * 90)
+    print(f"{'BIP LEAKAGE DIAGNOSTIC (The Real Problem)':^90}")
+    print("=" * 90)
+    print(f"2025 Historical H/BIP: {p_25_h_bip:.4f}")
+    print(f"2026 Projected H/BIP:  {proj_h_bip:.4f}")
+    print(f"BIP Delta:            {(proj_h_bip - p_25_h_bip) * 1000:.1f} points")
+    print("-" * 90)
+    print("If negative, the projection is suppressing BABIP too aggressively.")
+    print("Fix: Increase k_val for 'H' in pitcher k_vals (currently 2000).")
 
 if __name__ == "__main__":
     check_batting_integrity()
@@ -196,3 +228,4 @@ if __name__ == "__main__":
     diagnose_h_surplus()
     identify_pitching_outliers()
     deep_dive_pitching_outliers()
+    diagnose_bi_vs_pa_leakage()

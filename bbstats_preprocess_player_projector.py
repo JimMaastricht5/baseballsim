@@ -470,6 +470,8 @@ class PlayerProjector:
             # CRITICAL: If calculating BA (H/AB), don't fallback to a PA rate (0.10)
             if stat_col == 'H' and vol_col == 'AB':
                 lg_rate = self.lg_avgs.get('H_per_AB', 0.258)
+            elif stat_col == 'H' and vol_col == 'BIP':
+                lg_rate = self.lg_avgs.get('H_per_BIP', 0.306)
             else:
                 lg_rate = self.lg_avgs.get(f"{stat_col}_per_PA", 0.10)
 

@@ -190,8 +190,8 @@ class BaseballStats:
 
         # --- 3. CROSS-LEAGUE RATE NORMALIZATION ---
         # This ensures SimAB's Odds Ratio is comparing Apples to Apples
-        # K-rate is most stable when calculated against Total Outs (Opportunities for an Out)
-        self.league_k_rate_per_ab = b_totals['SO'] / self.league_total_outs
+        # K-rate uses PA (Plate Appearances) to match the at-bat formula denominators
+        self.league_k_rate_per_ab = b_totals['SO'] / self.league_pa_batting
 
         logger.debug("Cached league totals and statistics for performance optimization")
         return

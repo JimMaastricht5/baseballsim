@@ -17,19 +17,26 @@ def check_batting_integrity():
     # Calculate Rates for each baseline
     df_proj['BA'] = df_proj['H'] / df_proj['AB'].replace(0, 1)
     df_proj['BB_Rate'] = df_proj['BB'] / df_proj['PA'].replace(0, 1)
+    df_proj['SO_Rate'] = df_proj['SO'] / df_proj['PA'].replace(0, 1)
     df_proj['OBP'] = (df_proj['H'] + df_proj['BB'] + df_proj.get('HBP', 0)) / df_proj['PA'].replace(0, 1)
 
     # 2023-2025 Historical (blend baseline)
     lg_ba_23_25 = df_23_25['H'].sum() / df_23_25['AB'].sum()
     lg_obp_23_25 = (df_23_25['H'] + df_23_25['BB']).sum() / df_23_25['PA'].sum()
+    lg_bb_23_25 = df_23_25['BB'].sum() / df_23_25['PA'].sum()
+    lg_so_23_25 = df_23_25['SO'].sum() / df_23_25['PA'].sum()
     
     # 2025 Historical
     lg_ba_25 = df_25['H'].sum() / df_25['AB'].sum()
     lg_obp_25 = (df_25['H'] + df_25['BB']).sum() / df_25['PA'].sum()
+    lg_bb_25 = df_25['BB'].sum() / df_25['PA'].sum()
+    lg_so_25 = df_25['SO'].sum() / df_25['PA'].sum()
 
     # 2026 Projected
     lg_ba = df_proj['H'].sum() / df_proj['AB'].sum()
     lg_obp = (df_proj['H'] + df_proj['BB']).sum() / df_proj['PA'].sum()
+    lg_bb = df_proj['BB'].sum() / df_proj['PA'].sum()
+    lg_so = df_proj['SO'].sum() / df_proj['PA'].sum()
 
     print("=" * 90)
     print(f"{'HITTER INTEGRITY CHECK: PROJECTION vs HISTORICAL BASELINES':^90}")
@@ -37,14 +44,21 @@ def check_batting_integrity():
     print(f"                            2023-2025 Hist    2025 Hist    2026 Proj")
     print(f"League AVG:                 {lg_ba_23_25:.3f}         {lg_ba_25:.3f}       {lg_ba:.3f}")
     print(f"League OBP:                 {lg_obp_23_25:.3f}         {lg_obp_25:.3f}       {lg_obp:.3f}")
-    print(f"OBP Spread (OBP - AVG):     {lg_obp_23_25 - lg_ba_23_25:.3f}         {lg_obp_25 - lg_ba_25:.3f}       {lg_obp - lg_ba:.3f}")
+    print(f"BB Rate (BB/PA):            {lg_bb_23_25:.3f}         {lg_bb_25:.3f}       {lg_bb:.3f}")
+    print(f"SO Rate (SO/PA):            {lg_so_23_25:.3f}         {lg_so_25:.3f}       {lg_so:.3f}")
+    print(f"OBP Spread (OBP - AVG):    {lg_obp_23_25 - lg_ba_23_25:.3f}         {lg_obp_25 - lg_ba_25:.3f}       {lg_obp - lg_ba:.3f}")
     print("-" * 90)
     
     # Delta checks
-    proj_vs_blend = lg_obp - lg_obp_23_25
-    proj_vs_25 = lg_obp - lg_obp_25
-    print(f"2026 Proj vs 2023-2025 Blend: {proj_vs_blend:+.3f} OBP")
-    print(f"2026 Proj vs 2025 Only:       {proj_vs_25:+.3f} OBP")
+    proj_vs_blend_obp = lg_obp - lg_obp_23_25
+    proj_vs_25_obp = lg_obp - lg_obp_25
+    proj_vs_blend_bb = lg_bb - lg_bb_23_25
+    proj_vs_25_bb = lg_bb - lg_bb_25
+    proj_vs_blend_so = lg_so - lg_so_23_25
+    proj_vs_25_so = lg_so - lg_so_25
+    
+    print(f"2026 Proj vs 2023-2025 Blend: OBP {proj_vs_blend_obp:+.3f} | BB {proj_vs_blend_bb:+.3f} | SO {proj_vs_blend_so:+.3f}")
+    print(f"2026 Proj vs 2025 Only:       OBP {proj_vs_25_obp:+.3f} | BB {proj_vs_25_bb:+.3f} | SO {proj_vs_25_so:+.3f}")
     print("-" * 90)
 
     # Spotlights
@@ -78,21 +92,25 @@ def check_pitching_integrity():
     # We care about Hits and Walks allowed (The OBP drivers)
     df_proj['H_PA'] = df_proj['H'] / df_proj['PA'].replace(0, 1)
     df_proj['BB_PA'] = df_proj['BB'] / df_proj['PA'].replace(0, 1)
+    df_proj['SO_PA'] = df_proj['SO'] / df_proj['PA'].replace(0, 1)
     df_proj['OBP_Against'] = (df_proj['H'] + df_proj['BB']) / df_proj['PA'].replace(0, 1)
 
     # 2023-2025 Baseline
     lg_h_pa_23_25 = df_23_25['H'].sum() / df_23_25['PA'].sum()
     lg_bb_pa_23_25 = df_23_25['BB'].sum() / df_23_25['PA'].sum()
+    lg_so_pa_23_25 = df_23_25['SO'].sum() / df_23_25['PA'].sum()
     lg_obpa_23_25 = lg_h_pa_23_25 + lg_bb_pa_23_25
     
     # 2025 Baseline
     lg_h_pa_25 = df_25['H'].sum() / df_25['PA'].sum()
     lg_bb_pa_25 = df_25['BB'].sum() / df_25['PA'].sum()
+    lg_so_pa_25 = df_25['SO'].sum() / df_25['PA'].sum()
     lg_obpa_25 = lg_h_pa_25 + lg_bb_pa_25
 
     # 2026 Projected
     lg_h_pa = df_proj['H'].sum() / df_proj['PA'].sum()
     lg_bb_pa = df_proj['BB'].sum() / df_proj['PA'].sum()
+    lg_so_pa = df_proj['SO'].sum() / df_proj['PA'].sum()
     lg_obpa = lg_h_pa + lg_bb_pa
 
     print("\n" + "=" * 90)
@@ -101,14 +119,20 @@ def check_pitching_integrity():
     print(f"                            2023-2025 Hist    2025 Hist    2026 Proj")
     print(f"League Hits/PA:            {lg_h_pa_23_25:.3f}         {lg_h_pa_25:.3f}       {lg_h_pa:.3f}")
     print(f"League Walks/PA:            {lg_bb_pa_23_25:.3f}         {lg_bb_pa_25:.3f}       {lg_bb_pa:.3f}")
+    print(f"League K/PA:               {lg_so_pa_23_25:.3f}         {lg_so_pa_25:.3f}       {lg_so_pa:.3f}")
     print(f"OBP Against:               {lg_obpa_23_25:.3f}         {lg_obpa_25:.3f}       {lg_obpa:.3f}")
     print("-" * 90)
     
     # Delta checks
-    proj_vs_blend = lg_obpa - lg_obpa_23_25
-    proj_vs_25 = lg_obpa - lg_obpa_25
-    print(f"2026 Proj vs 2023-2025 Blend: {proj_vs_blend:+.3f} OBP Against")
-    print(f"2026 Proj vs 2025 Only:       {proj_vs_25:+.3f} OBP Against")
+    proj_vs_blend_obpa = lg_obpa - lg_obpa_23_25
+    proj_vs_25_obpa = lg_obpa - lg_obpa_25
+    proj_vs_blend_h = lg_h_pa - lg_h_pa_23_25
+    proj_vs_25_h = lg_h_pa - lg_h_pa_25
+    proj_vs_blend_so = lg_so_pa - lg_so_pa_23_25
+    proj_vs_25_so = lg_so_pa - lg_so_pa_25
+    
+    print(f"2026 Proj vs 2023-2025 Blend: OBP {proj_vs_blend_obpa:+.3f} | H {proj_vs_blend_h:+.3f} | K {proj_vs_blend_so:+.3f}")
+    print(f"2026 Proj vs 2025 Only:       OBP {proj_vs_25_obpa:+.3f} | H {proj_vs_25_h:+.3f} | K {proj_vs_25_so:+.3f}")
     print("-" * 90)
 
     # Outlier detection for P

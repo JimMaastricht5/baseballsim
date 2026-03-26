@@ -12,25 +12,39 @@ def check_batting_integrity():
     df_proj = pd.read_csv(B_PROJ_FILE)
     df_hist = pd.read_csv(B_HIST_FILE)
     df_25 = df_hist[df_hist['Season'] == 2025].copy()
+    df_23_25 = df_hist[df_hist['Season'].isin([2023, 2024, 2025])].copy()
 
-    # Calculate Rates
+    # Calculate Rates for each baseline
     df_proj['BA'] = df_proj['H'] / df_proj['AB'].replace(0, 1)
     df_proj['BB_Rate'] = df_proj['BB'] / df_proj['PA'].replace(0, 1)
     df_proj['OBP'] = (df_proj['H'] + df_proj['BB'] + df_proj.get('HBP', 0)) / df_proj['PA'].replace(0, 1)
 
-    print("=" * 90)
-    print(f"{'HITTER INTEGRITY CHECK: THE OBP SINKHOLE':^90}")
-    print("=" * 90)
+    # 2023-2025 Historical (blend baseline)
+    lg_ba_23_25 = df_23_25['H'].sum() / df_23_25['AB'].sum()
+    lg_obp_23_25 = (df_23_25['H'] + df_23_25['BB']).sum() / df_23_25['PA'].sum()
+    
+    # 2025 Historical
+    lg_ba_25 = df_25['H'].sum() / df_25['AB'].sum()
+    lg_obp_25 = (df_25['H'] + df_25['BB']).sum() / df_25['PA'].sum()
 
+    # 2026 Projected
     lg_ba = df_proj['H'].sum() / df_proj['AB'].sum()
     lg_obp = (df_proj['H'] + df_proj['BB']).sum() / df_proj['PA'].sum()
-    lg_bb_rate = df_proj['BB'].sum() / df_proj['PA'].sum()
 
-    print(f"League AVG: {lg_ba:.3f} | League OBP: {lg_obp:.3f} | League BB-Rate: {lg_bb_rate:.3f}")
-    print(f"OBP Spread (OBP - AVG): {lg_obp - lg_ba:.3f} (Target: .070+)")
-
-    if lg_obp < .310:
-        print(f"!!! CRITICAL: League OBP is COLD ({lg_obp:.3f}). Increase H and BB weights in Preprocessor.")
+    print("=" * 90)
+    print(f"{'HITTER INTEGRITY CHECK: PROJECTION vs HISTORICAL BASELINES':^90}")
+    print("=" * 90)
+    print(f"                            2023-2025 Hist    2025 Hist    2026 Proj")
+    print(f"League AVG:                 {lg_ba_23_25:.3f}         {lg_ba_25:.3f}       {lg_ba:.3f}")
+    print(f"League OBP:                 {lg_obp_23_25:.3f}         {lg_obp_25:.3f}       {lg_obp:.3f}")
+    print(f"OBP Spread (OBP - AVG):     {lg_obp_23_25 - lg_ba_23_25:.3f}         {lg_obp_25 - lg_ba_25:.3f}       {lg_obp - lg_ba:.3f}")
+    print("-" * 90)
+    
+    # Delta checks
+    proj_vs_blend = lg_obp - lg_obp_23_25
+    proj_vs_25 = lg_obp - lg_obp_25
+    print(f"2026 Proj vs 2023-2025 Blend: {proj_vs_blend:+.3f} OBP")
+    print(f"2026 Proj vs 2025 Only:       {proj_vs_25:+.3f} OBP")
     print("-" * 90)
 
     # Spotlights
@@ -59,24 +73,42 @@ def check_pitching_integrity():
     df_proj = pd.read_csv(P_PROJ_FILE)
     df_hist = pd.read_csv(P_HIST_FILE)
     df_25 = df_hist[df_hist['Season'] == 2025].copy()
+    df_23_25 = df_hist[df_hist['Season'].isin([2023, 2024, 2025])].copy()
 
     # We care about Hits and Walks allowed (The OBP drivers)
     df_proj['H_PA'] = df_proj['H'] / df_proj['PA'].replace(0, 1)
     df_proj['BB_PA'] = df_proj['BB'] / df_proj['PA'].replace(0, 1)
     df_proj['OBP_Against'] = (df_proj['H'] + df_proj['BB']) / df_proj['PA'].replace(0, 1)
 
-    print("\n" + "=" * 90)
-    print(f"{'PITCHER INTEGRITY CHECK: THE PITCHER DOMINANCE LEAK':^90}")
-    print("=" * 90)
+    # 2023-2025 Baseline
+    lg_h_pa_23_25 = df_23_25['H'].sum() / df_23_25['PA'].sum()
+    lg_bb_pa_23_25 = df_23_25['BB'].sum() / df_23_25['PA'].sum()
+    lg_obpa_23_25 = lg_h_pa_23_25 + lg_bb_pa_23_25
+    
+    # 2025 Baseline
+    lg_h_pa_25 = df_25['H'].sum() / df_25['PA'].sum()
+    lg_bb_pa_25 = df_25['BB'].sum() / df_25['PA'].sum()
+    lg_obpa_25 = lg_h_pa_25 + lg_bb_pa_25
 
+    # 2026 Projected
     lg_h_pa = df_proj['H'].sum() / df_proj['PA'].sum()
     lg_bb_pa = df_proj['BB'].sum() / df_proj['PA'].sum()
     lg_obpa = lg_h_pa + lg_bb_pa
 
-    print(f"League Hits/PA: {lg_h_pa:.3f} | League Walks/PA: {lg_bb_pa:.3f} | OBP Against: {lg_obpa:.3f}")
-
-    if lg_obpa < .300:
-        print(f"!!! WARNING: Pitchers are too dominant. Hits/PA should be closer to .240.")
+    print("\n" + "=" * 90)
+    print(f"{'PITCHER INTEGRITY CHECK: PROJECTION vs HISTORICAL BASELINES':^90}")
+    print("=" * 90)
+    print(f"                            2023-2025 Hist    2025 Hist    2026 Proj")
+    print(f"League Hits/PA:            {lg_h_pa_23_25:.3f}         {lg_h_pa_25:.3f}       {lg_h_pa:.3f}")
+    print(f"League Walks/PA:            {lg_bb_pa_23_25:.3f}         {lg_bb_pa_25:.3f}       {lg_bb_pa:.3f}")
+    print(f"OBP Against:               {lg_obpa_23_25:.3f}         {lg_obpa_25:.3f}       {lg_obpa:.3f}")
+    print("-" * 90)
+    
+    # Delta checks
+    proj_vs_blend = lg_obpa - lg_obpa_23_25
+    proj_vs_25 = lg_obpa - lg_obpa_25
+    print(f"2026 Proj vs 2023-2025 Blend: {proj_vs_blend:+.3f} OBP Against")
+    print(f"2026 Proj vs 2025 Only:       {proj_vs_25:+.3f} OBP Against")
     print("-" * 90)
 
     # Outlier detection for P
@@ -93,45 +125,38 @@ def diagnose_h_surplus():
     df_p_proj = pd.read_csv(P_PROJ_FILE)
     df_p_hist = pd.read_csv(P_HIST_FILE)
 
-    # Filter for 2025 (The Baseline)
+    # Filter for baselines
     b_25 = df_b_hist[df_b_hist['Season'] == 2025]
+    b_23_25 = df_b_hist[df_b_hist['Season'].isin([2023, 2024, 2025])]
     p_25 = df_p_hist[df_p_hist['Season'] == 2025]
+    p_23_25 = df_p_hist[df_p_hist['Season'].isin([2023, 2024, 2025])]
 
-    # Calculate Aggregate H/PA (The true "Hit Density" metric)
-    # Using PA as the denominator for both avoids AB vs BF confusion
+    # Calculate Aggregate H/PA for each baseline
     b_25_h_rate = b_25['H'].sum() / b_25['PA'].sum()
+    b_23_25_h_rate = b_23_25['H'].sum() / b_23_25['PA'].sum()
     b_26_h_rate = df_b_proj['H'].sum() / df_b_proj['PA'].sum()
 
     p_25_h_rate = p_25['H'].sum() / p_25['PA'].sum()
+    p_23_25_h_rate = p_23_25['H'].sum() / p_23_25['PA'].sum()
     p_26_h_rate = df_p_proj['H'].sum() / df_p_proj['PA'].sum()
 
-    # Calculate Deltas (Points of H/PA)
-    hitter_delta = (b_26_h_rate - b_25_h_rate) * 1000
-    pitcher_delta = (p_26_h_rate - p_25_h_rate) * 1000
-
-    # Add after existing rate calculations
-    p_25['BIP'] = p_25['PA'] - p_25['SO'] - p_25['BB']
-    p_26_bip = df_p_proj['PA'] - df_p_proj['SO'] - df_p_proj['BB']
-    bip_25_rate = p_25['H'].sum() / p_25['BIP'].sum()
-    bip_26_rate = df_p_proj['H'].sum() / p_26_bip.sum()
-
     print("\n" + "=" * 90)
-    print(f"{'HIT INFLATION DIAGNOSTIC (Rates per 1000 PA)':^90}")
+    print(f"{'HIT INFLATION DIAGNOSTIC: PROJECTION vs BASELINES':^90}")
     print("=" * 90)
-
-    results = pd.DataFrame({
-        '2025 Hist Rate': [b_25_h_rate, p_25_h_rate],
-        '2026 Proj Rate': [b_26_h_rate, p_26_h_rate],
-        'Delta (Points)': [hitter_delta, pitcher_delta]
-    }, index=['Hitters (H/PA)', 'Pitchers (H_Allowed/PA)'])
-
-    print(results.round(4))
+    print(f"                            2023-2025 Hist    2025 Hist    2026 Proj")
+    print(f"Hitters (H/PA):            {b_23_25_h_rate:.4f}       {b_25_h_rate:.4f}     {b_26_h_rate:.4f}")
+    print(f"Pitchers (H_Allowed/PA):   {p_23_25_h_rate:.4f}       {p_25_h_rate:.4f}     {p_26_h_rate:.4f}")
     print("-" * 90)
-
-    if hitter_delta > pitcher_delta:
-        print(f"PROBABLE CULPRIT: HITTERS. They are projected for {hitter_delta:.1f} more hits per 1000 PA than 2025.")
-    else:
-        print(f"PROBABLE CULPRIT: PITCHERS. They are allowing {pitcher_delta:.1f} more hits per 1000 PA than 2025.")
+    
+    # Delta checks
+    h_vs_blend = (b_26_h_rate - b_23_25_h_rate) * 1000
+    h_vs_25 = (b_26_h_rate - b_25_h_rate) * 1000
+    p_vs_blend = (p_26_h_rate - p_23_25_h_rate) * 1000
+    p_vs_25 = (p_26_h_rate - p_25_h_rate) * 1000
+    
+    print(f"2026 Proj vs 2023-2025 Blend: Hitters {h_vs_blend:+.1f} pts | Pitchers {p_vs_blend:+.1f} pts")
+    print(f"2026 Proj vs 2025 Only:       Hitters {h_vs_25:+.1f} pts | Pitchers {p_vs_25:+.1f} pts")
+    print("-" * 90)
 
 
 def identify_pitching_outliers(min_pa=50):
@@ -201,26 +226,35 @@ def diagnose_bi_vs_pa_leakage():
     df_p_hist = pd.read_csv(P_HIST_FILE)
     df_p_proj = pd.read_csv(P_PROJ_FILE)
 
-    # Pitcher BIP analysis - this is the key!
+    # Pitcher BIP analysis
     p_25 = df_p_hist[df_p_hist['Season'] == 2025].copy()
+    p_23_25 = df_p_hist[df_p_hist['Season'].isin([2023, 2024, 2025])].copy()
 
     # Historical: calculate actual BIP for 2025
     p_25['BIP'] = p_25['PA'] - p_25['SO'] - p_25['BB']
     p_25_h_bip = p_25['H'].sum() / p_25['BIP'].sum()  # Historical H/BIP
+
+    # Historical: calculate actual BIP for 2023-2025
+    p_23_25['BIP'] = p_23_25['PA'] - p_23_25['SO'] - p_23_25['BB']
+    p_23_25_h_bip = p_23_25['H'].sum() / p_23_25['BIP'].sum()
 
     # Projected: calculate what the projection assumes
     df_p_proj['BIP'] = df_p_proj['PA'] - df_p_proj['SO'] - df_p_proj['BB']
     proj_h_bip = df_p_proj['H'].sum() / df_p_proj['BIP'].sum()  # Proj H/BIP
 
     print("\n" + "=" * 90)
-    print(f"{'BIP LEAKAGE DIAGNOSTIC (The Real Problem)':^90}")
+    print(f"{'BIP LEAKAGE DIAGNOSTIC (BABIP Comparison)':^90}")
     print("=" * 90)
-    print(f"2025 Historical H/BIP: {p_25_h_bip:.4f}")
-    print(f"2026 Projected H/BIP:  {proj_h_bip:.4f}")
-    print(f"BIP Delta:            {(proj_h_bip - p_25_h_bip) * 1000:.1f} points")
+    print(f"                            2023-2025 Hist    2025 Hist    2026 Proj")
+    print(f"Historical H/BIP:          {p_23_25_h_bip:.4f}         {p_25_h_bip:.4f}       {proj_h_bip:.4f}")
     print("-" * 90)
-    print("If negative, the projection is suppressing BABIP too aggressively.")
-    print("Fix: Increase k_val for 'H' in pitcher k_vals (currently 2000).")
+    
+    # Delta checks
+    bip_vs_blend = (proj_h_bip - p_23_25_h_bip) * 1000
+    bip_vs_25 = (proj_h_bip - p_25_h_bip) * 1000
+    print(f"2026 Proj vs 2023-2025 Blend: {bip_vs_blend:+.1f} points")
+    print(f"2026 Proj vs 2025 Only:       {bip_vs_25:+.1f} points")
+    print("-" * 90)
 
 if __name__ == "__main__":
     check_batting_integrity()

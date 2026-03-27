@@ -280,6 +280,62 @@ def diagnose_bi_vs_pa_leakage():
     print(f"2026 Proj vs 2025 Only:       {bip_vs_25:+.1f} points")
     print("-" * 90)
 
+def diagnose_power_inflation():
+    """Compare 2026 projections vs 2025 actual for power metrics (2B, 3B, HR -> SLG)."""
+    df_proj = pd.read_csv(B_PROJ_FILE)
+    df_hist = pd.read_csv(B_HIST_FILE)
+    df_25 = df_hist[df_hist['Season'] == 2025].copy()
+
+    df_proj['1B'] = df_proj['H'] - df_proj['2B'].fillna(0) - df_proj['3B'].fillna(0) - df_proj['HR'].fillna(0)
+    df_25['1B'] = df_25['H'] - df_25['2B'].fillna(0) - df_25['3B'].fillna(0) - df_25['HR'].fillna(0)
+
+    df_proj['SLG'] = (df_proj['1B'] + 2*df_proj['2B'].fillna(0) + 3*df_proj['3B'].fillna(0) + 4*df_proj['HR'].fillna(0)) / df_proj['AB'].replace(0, 1)
+    df_25['SLG'] = (df_25['1B'] + 2*df_25['2B'].fillna(0) + 3*df_25['3B'].fillna(0) + 4*df_25['HR'].fillna(0)) / df_25['AB'].replace(0, 1)
+
+    lg_1b_25 = df_25['1B'].sum() / df_25['AB'].sum()
+    lg_2b_25 = df_25['2B'].sum() / df_25['AB'].sum()
+    lg_3b_25 = df_25['3B'].sum() / df_25['AB'].sum()
+    lg_hr_25 = df_25['HR'].sum() / df_25['AB'].sum()
+    lg_slg_25 = df_25['SLG'].mean()
+
+    lg_1b_26 = df_proj['1B'].sum() / df_proj['AB'].sum()
+    lg_2b_26 = df_proj['2B'].sum() / df_proj['AB'].sum()
+    lg_3b_26 = df_proj['3B'].sum() / df_proj['AB'].sum()
+    lg_hr_26 = df_proj['HR'].sum() / df_proj['AB'].sum()
+    lg_slg_26 = df_proj['SLG'].mean()
+
+    print("\n" + "=" * 90)
+    print(f"{'POWER INFLATION DIAGNOSTIC: 2B, 3B, HR -> SLG':^90}")
+    print("=" * 90)
+    print(f"                            2025 Actual    2026 Proj    Delta")
+    print(f"Singles/AB:                {lg_1b_25:.4f}       {lg_1b_26:.4f}    {lg_1b_26-lg_1b_25:+.4f}")
+    print(f"Doubles/AB (2B):           {lg_2b_25:.4f}       {lg_2b_26:.4f}    {lg_2b_26-lg_2b_25:+.4f}")
+    print(f"Triples/AB (3B):           {lg_3b_25:.4f}       {lg_3b_26:.4f}    {lg_3b_26-lg_3b_25:+.4f}")
+    print(f"Home Runs/AB (HR):         {lg_hr_25:.4f}       {lg_hr_26:.4f}    {lg_hr_26-lg_hr_25:+.4f}")
+    print(f"League SLG (avg):          {lg_slg_25:.4f}       {lg_slg_26:.4f}    {lg_slg_26-lg_slg_25:+.4f}")
+    print("-" * 90)
+
+    slg_delta = (lg_slg_26 - lg_slg_25) * 1000
+    print(f"SLG Delta: {slg_delta:+.0f} points (target: ~0)")
+    if abs(slg_delta) > 30:
+        print("WARNING: Significant SLG inflation detected!")
+    print("-" * 90)
+
+    merged = pd.merge(
+        df_proj[['Player', 'AB', '1B', '2B', '3B', 'HR', 'SLG']],
+        df_25[['Player', '1B', '2B', '3B', 'HR', 'SLG']],
+        on='Player', suffixes=('_26', '_25')
+    )
+    merged = merged[merged['AB'] >= 100]
+    merged['SLG_Delta'] = merged['SLG_26'] - merged['SLG_25']
+    merged['HR_Delta'] = (merged['HR_26'] / merged['AB'].replace(0, 1)) - (merged['HR_25'] / merged['AB'].replace(0, 1))
+    merged['2B_Delta'] = (merged['2B_26'] / merged['AB'].replace(0, 1)) - (merged['2B_25'] / merged['AB'].replace(0, 1))
+
+    print("\nTop 10 SLG Inflation Drivers (2026 Proj - 2025 Actual):")
+    print(merged.nlargest(10, 'SLG_Delta')[['Player', 'AB', 'SLG_25', 'SLG_26', 'SLG_Delta', 'HR_Delta', '2B_Delta']].to_string(index=False))
+    print("-" * 90)
+
+
 if __name__ == "__main__":
     check_batting_integrity()
     check_pitching_integrity()
@@ -287,3 +343,4 @@ if __name__ == "__main__":
     identify_pitching_outliers()
     deep_dive_pitching_outliers()
     diagnose_bi_vs_pa_leakage()
+    diagnose_power_inflation()

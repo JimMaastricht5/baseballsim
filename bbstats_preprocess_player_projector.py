@@ -221,7 +221,7 @@ class PlayerProjector:
         if stat_col in ['H', 'BB']:
             lg_target = self.lg_avgs.get(f"{stat_col}_per_{vol_col}", 0.240)
             if player_rate < (lg_target * 0.87):
-                player_rate = (player_rate * 0.40) + (lg_target * 0.60)
+                player_rate = (player_rate * 0.70) + (lg_target * 0.30)
 
         # 5. BAYESIAN REGRESSION - Now regress toward league avg
         k = self.k_vals_pitcher.get(stat_col, self.k_vals_pitcher['default'])
@@ -414,52 +414,100 @@ class PlayerProjector:
         lg_rate = self.lg_avgs.get(f"{stat_col}_per_{vol_col}", 0.10)
         return (actual_rate * 0.80) + (lg_rate * 0.20)
 
+    # def _regress_to_mean(self, history: pd.DataFrame, stat_col: str, vol_col: str) -> float:
+    #     """
+    #     Bayesian regression to the league mean for low-sample or unproven players.
+    #
+    #     Uses a dynamic K-value that slides from 800 (rookie, 0 PA) down to 20
+    #     (veteran, 1500+ PA) to control how strongly the league mean is weighted.
+    #     Stat-specific K overrides from k_vals_batter / k_vals_pitcher are applied
+    #     on top of the volume-scaled base.
+    #
+    #     For extra-base hits (2B, 3B, HR) when vol_col == 'H', the XBH/H ratio is
+    #     regressed against the league XBH/H ratio rather than the raw rate, keeping
+    #     power stats tethered to hit totals instead of plate appearances.
+    #
+    #     Formula (standard): (career_total + K * lg_rate) / (career_vol + K)
+    #     Formula (XBH):      (career_total + K * lg_ratio) / (career_H + K)
+    #
+    #     :param history: Player's historical season DataFrame.
+    #     :param stat_col: Stat column to regress (e.g. 'H', 'BB', '2B').
+    #     :param vol_col: Volume denominator column (e.g. 'PA', 'AB', 'H').
+    #     :return: Bayesian-regressed per-vol rate.
+    #     """
+    #     career_total = history[stat_col].sum()
+    #     career_vol = history[vol_col].sum()
+    #     is_p = 'IP' in history.columns
+    #
+    #     # 1. DYNAMIC K-SCALING (The "Trust" Meter")
+    #     # Slides from 800 (Rookie, 0 PA) down to 0 (Elite Veteran, 3000+ PA)
+    #     vol_trust_factor = np.clip(career_vol / 3000, 0, 1)
+    #     base_k = 800 * (1 - vol_trust_factor)
+    #     k_map = self.k_vals_pitcher if is_p else self.k_vals_batter
+    #     k = k_map.get(stat_col, base_k)
+    #
+    #     # 2. THE TETHERED POWER LOGIC (Only for 2B, 3B, HR)
+    #     # CRITICAL: We check vol_col == 'H' to ensure Hits (PA) never enters here.
+    #     if stat_col in ['2B', '3B', 'HR'] and not is_p and vol_col == 'H':
+    #         # 1. Get the player's career ratio (e.g., HR per Hit)
+    #         career_h = history['H'].sum()
+    #         player_ratio = career_total / max(1, career_h)
+    #
+    #         # 2. Get the League Mean ratio
+    #         # Check for the direct ratio first (e.g., 'HR_per_H')
+    #         lg_ratio = self.lg_avgs.get(f"{stat_col}_per_{vol_col}")
+    #         if lg_ratio is None:
+    #             # Fallback to the old calculation if the direct ratio is missing
+    #             lg_h_pa = self.lg_avgs.get('H_per_PA', 0.245)
+    #             lg_stat_pa = self.lg_avgs.get(f"{stat_col}_per_PA", 0.040)
+    #             lg_ratio = lg_stat_pa / lg_h_pa
+    #
+    #         # 3. Trust the player's unique profile (Lower K for ratios)
+    #         # This keeps Arraez as a slap hitter and Raleigh as a slugger
+    #         k_ratio = 50
+    #         reg_ratio = (career_total + k_ratio * lg_ratio) / (career_h + k_ratio)
+    #         return float(reg_ratio)
+    #
+    #     # 3. STANDARD ANCHOR (H, BB, SO)
+    #     lg_rate = self.lg_avgs.get(f"{stat_col}_per_{vol_col}")
+    #     if lg_rate is None:
+    #         # CRITICAL: If calculating BA (H/AB), don't fallback to a PA rate (0.10)
+    #         if stat_col == 'H' and vol_col == 'AB':
+    #             lg_rate = self.lg_avgs.get('H_per_AB', 0.258)
+    #         elif stat_col == 'H' and vol_col == 'BIP':
+    #             lg_rate = self.lg_avgs.get('H_per_BIP', 0.306)
+    #         else:
+    #             lg_rate = self.lg_avgs.get(f"{stat_col}_per_PA", 0.10)
+    #
+    #     if career_vol + k == 0:
+    #         return lg_rate
+    #
+    #     return (career_total + k * lg_rate) / (career_vol + k)
     def _regress_to_mean(self, history: pd.DataFrame, stat_col: str, vol_col: str) -> float:
-        """
-        Bayesian regression to the league mean for low-sample or unproven players.
-
-        Uses a dynamic K-value that slides from 800 (rookie, 0 PA) down to 20
-        (veteran, 1500+ PA) to control how strongly the league mean is weighted.
-        Stat-specific K overrides from k_vals_batter / k_vals_pitcher are applied
-        on top of the volume-scaled base.
-
-        For extra-base hits (2B, 3B, HR) when vol_col == 'H', the XBH/H ratio is
-        regressed against the league XBH/H ratio rather than the raw rate, keeping
-        power stats tethered to hit totals instead of plate appearances.
-
-        Formula (standard): (career_total + K * lg_rate) / (career_vol + K)
-        Formula (XBH):      (career_total + K * lg_ratio) / (career_H + K)
-
-        :param history: Player's historical season DataFrame.
-        :param stat_col: Stat column to regress (e.g. 'H', 'BB', '2B').
-        :param vol_col: Volume denominator column (e.g. 'PA', 'AB', 'H').
-        :return: Bayesian-regressed per-vol rate.
-        """
         career_total = history[stat_col].sum()
         career_vol = history[vol_col].sum()
         is_p = 'IP' in history.columns
 
-        # 1. DYNAMIC K-SCALING (The "Trust" Meter")
-        # Slides from 800 (Rookie, 0 PA) down to 0 (Elite Veteran, 3000+ PA)
+        # 1. DYNAMIC K-SCALING
         vol_trust_factor = np.clip(career_vol / 3000, 0, 1)
         base_k = 800 * (1 - vol_trust_factor)
         k_map = self.k_vals_pitcher if is_p else self.k_vals_batter
         k = k_map.get(stat_col, base_k)
 
-        # 2. THE TETHERED POWER LOGIC (Only for 2B, 3B, HR)
-        # CRITICAL: We check vol_col == 'H' to ensure Hits (PA) never enters here.
+        # 2. THE TETHERED POWER LOGIC (Fixing the Ratio Leak)
         if stat_col in ['2B', '3B', 'HR'] and not is_p and vol_col == 'H':
-            # 1. Get the player's career ratio (e.g., HR per Hit)
             career_h = history['H'].sum()
-            player_ratio = career_total / max(1, career_h)
 
-            # 2. Get the League Mean ratio
-            lg_h_pa = self.lg_avgs.get('H_per_PA', 0.245)
-            lg_stat_pa = self.lg_avgs.get(f"{stat_col}_per_PA", 0.040)  # Target ~25 HRs for avg
-            lg_ratio = lg_stat_pa / lg_h_pa
+            # PRIORITIZE: Look for the direct ratio in lg_avgs first (e.g., 'HR_per_H')
+            lg_ratio = self.lg_avgs.get(f"{stat_col}_per_{vol_col}")
 
-            # 3. Trust the player's unique profile (Lower K for ratios)
-            # This keeps Arraez as a slap hitter and Raleigh as a slugger
+            # FALLBACK: Only use if the direct key is missing
+            # Fallbacks are expressed as target % per hit (e.g., 3B = 1.5% of hits = 0.015)
+            if lg_ratio is None:
+                fallbacks = {'HR': 0.14, '2B': 0.19, '3B': 0.015}
+                lg_ratio = fallbacks.get(stat_col, 0.10)
+
+            # Use a tighter K for ratios to preserve player uniqueness
             k_ratio = 50
             reg_ratio = (career_total + k_ratio * lg_ratio) / (career_h + k_ratio)
             return float(reg_ratio)
@@ -467,7 +515,6 @@ class PlayerProjector:
         # 3. STANDARD ANCHOR (H, BB, SO)
         lg_rate = self.lg_avgs.get(f"{stat_col}_per_{vol_col}")
         if lg_rate is None:
-            # CRITICAL: If calculating BA (H/AB), don't fallback to a PA rate (0.10)
             if stat_col == 'H' and vol_col == 'AB':
                 lg_rate = self.lg_avgs.get('H_per_AB', 0.258)
             elif stat_col == 'H' and vol_col == 'BIP':
@@ -552,7 +599,7 @@ class PlayerProjector:
         """
         Return a parabolic performance multiplier for the given age.
 
-        Hitters: parabolic growth to ~27 (peak ~1.06 at age 22), flat prime
+        Hitters: parabolic growth to ~27 (peak ~1.02 at age 22), flat prime
         1.02 from 25-30, mild decline 0.99 at 31-34, accelerating thereafter.
         Pitchers: slower development to ~28 (peak ~1.04), flat prime 1.01 from
         27-30, then quadratic decline (steeper after 34). Result is clipped
@@ -566,10 +613,10 @@ class PlayerProjector:
             # --- HITTER CURVE ---
             if age <= 24:
                 # High growth phase
-                m = -0.0025 * (age - 27) ** 2 + 1.06
+                m = -0.0025 * (age - 27) ** 2 + 1.02
             elif age <= 30:
                 # The Prime
-                m = 1.02
+                m = 1.00
             elif age <= 34:
                 m = 0.99
             else:
@@ -579,10 +626,10 @@ class PlayerProjector:
             # --- PITCHER CURVE ---
             if age <= 26:
                 # Gradual development
-                m = -0.0015 * (age - 28) ** 2 + 1.04
+                m = -0.0015 * (age - 28) ** 2 + 1.02
             elif age <= 30:
                 # Peak stability
-                m = 1.01
+                m = 1.00
             else:
                 # Late-career decline (slightly more punishing after 34)
                 decay_factor = 0.0035 if age < 34 else 0.005

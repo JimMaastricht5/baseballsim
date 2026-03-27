@@ -121,6 +121,9 @@ class SimAB:
         self.league_batting_Total_2B = self.league_batting_totals_df.at[0, '2B']
         self.league_Total_outs = self.baseball_data.league_total_outs
         self.league_K_rate_per_AB = self.baseball_data.league_k_rate_per_ab
+        # League 2B/3B rates per OBP (used as pitcher baseline in odds ratio)
+        self.league_2b_pitcher_rate = self.baseball_data.league_2b_rate
+        self.league_3b_pitcher_rate = self.baseball_data.league_3b_rate
         self.league_GB = .429  # ground ball rate for season
         self.league_GB_FC = .10  # GB FC occur 10 out of 100 times ball in play
         self.league_FB = .372  # fly ball rate for season
@@ -224,8 +227,8 @@ class SimAB:
         league_3b_rate = self.league_batting_Total_3B / self.league_batting_Total_OB
         batter_3b_rate = (self.batting['3B'] / self.batting.Total_OB) if self.batting.Total_OB > 0 else league_3b_rate
 
-        # do not have league pitching total for 3b so push it to zero and make it a neutral factor
-        return self.rng() < self.odds_ratio(hitter_stat=batter_3b_rate, pitcher_stat=.016,
+        # Use calculated league rate instead of hardcoded value
+        return self.rng() < self.odds_ratio(hitter_stat=batter_3b_rate, pitcher_stat=self.league_3b_pitcher_rate,
                                             league_stat=league_3b_rate, stat_type='3B')
 
     def double(self) -> Union[bool, bool_]:
@@ -237,8 +240,8 @@ class SimAB:
         league_2b_rate = (self.league_batting_Total_2B + self.DBL_adjustment) / self.league_batting_Total_OB
         batter_2b_rate = ((self.batting['2B'] + self.DBL_adjustment) / self.batting.Total_OB) if self.batting.Total_OB > 0 else league_2b_rate
 
-        # do not have league pitching total for 2b so push it to zero and make it a neutral factor
-        return self.rng() < self.odds_ratio(hitter_stat=batter_2b_rate, pitcher_stat=.200,
+        # Use calculated league rate instead of hardcoded value
+        return self.rng() < self.odds_ratio(hitter_stat=batter_2b_rate, pitcher_stat=self.league_2b_pitcher_rate,
                                             league_stat=league_2b_rate, stat_type='2B')
 
     def k(self) -> bool:

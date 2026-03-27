@@ -176,3 +176,19 @@ class ToolbarWidget:
         self.next_day_btn.config(state=tk.NORMAL if simulation_running else tk.DISABLED)
         self.next_series_btn.config(state=tk.NORMAL if simulation_running else tk.DISABLED)
         self.next_week_btn.config(state=tk.NORMAL if simulation_running else tk.DISABLED)
+
+        # When paused, highlight resume/next buttons in green
+        if paused and simulation_running:
+            self.resume_btn.config(style="NavPaused.TButton")
+            self.next_day_btn.config(style="NavPaused.TButton")
+            self.next_series_btn.config(style="NavPaused.TButton")
+        else:
+            self.resume_btn.config(style="Nav.TButton")
+            self.next_day_btn.config(style="Nav.TButton")
+            self.next_series_btn.config(style="Nav.TButton")
+
+    def reset_step_button_colors(self):
+        """Reset step button colors after user presses one of them."""
+        self.resume_btn.config(style="Nav.TButton")
+        self.next_day_btn.config(style="Nav.TButton")
+        self.next_series_btn.config(style="Nav.TButton")

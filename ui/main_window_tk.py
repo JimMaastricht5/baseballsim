@@ -317,15 +317,15 @@ class SeasonMainWindow:
     def next_day(self):
         """Advance exactly one day, then pause."""
         if self.controller.next_day():
-            # Keep paused state - simulation will auto-pause after stepping
-            self.toolbar.update_button_states(simulation_running=True, paused=True)
+            # Reset button colors after pressing
+            self.toolbar.reset_step_button_colors()
             self.status_label.config(text=self._format_status_with_day("Advancing one day..."))
 
     def next_series(self):
         """Advance exactly three days (one series), then pause."""
         if self.controller.next_series():
-            # Simulation will auto-pause after stepping through all 3 days
-            self.toolbar.update_button_states(simulation_running=True, paused=True)
+            # Reset button colors after pressing
+            self.toolbar.reset_step_button_colors()
             self.status_label.config(text=self._format_status_with_day("Advancing 3 days (series)..."))
 
     def next_week(self):

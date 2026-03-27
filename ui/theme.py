@@ -129,6 +129,14 @@ def setup_dark_theme(root: tk.Tk) -> None:
         background=[('active', '#2d333b'), ('disabled', BG_PANEL)],
         foreground=[('disabled', TEXT_SECONDARY)])
 
+    # Style for navigation buttons when simulation is paused (green)
+    style.configure("NavPaused.TButton",
+        background=ACCENT_GREEN, foreground=TEXT_HEADING,
+        font=('Segoe UI', 10), relief='flat', padding=[8, 4])
+    style.map("NavPaused.TButton",
+        background=[('active', '#3bb54a'), ('disabled', BG_PANEL)],
+        foreground=[('disabled', TEXT_SECONDARY)])
+
     style.configure("GM.TButton",
         background=ACCENT_BLUE, foreground=TEXT_HEADING,
         font=('Segoe UI', 10, 'bold'), relief='flat', padding=[8, 4])

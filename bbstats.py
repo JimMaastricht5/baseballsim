@@ -193,6 +193,11 @@ class BaseballStats:
         # K-rate uses PA (Plate Appearances) to match the at-bat formula denominators
         self.league_k_rate_per_ab = b_totals['SO'] / self.league_pa_batting
 
+        # League 2B and 3B rates per OBP event (used for pitcher stats in at_bat.py)
+        # These replace hardcoded values that were causing 2B/3B inflation
+        self.league_2b_rate = self.league_batting_totals.at[0, '2B'] / self.league_batting_total_ob
+        self.league_3b_rate = self.league_batting_totals.at[0, '3B'] / self.league_batting_total_ob
+
         logger.debug("Cached league totals and statistics for performance optimization")
         return
 
@@ -453,9 +458,23 @@ class BaseballStats:
                 bat_cols = ['G', 'AB', 'R', 'H', '2B', '3B', 'HR', 'RBI', 'SB', 'CS', 'BB', 'SO', 'SF', 'SH', 'HBP']
                 df_b = df_b.groupby('Hashcode')[bat_cols].sum()
 
-                # Vectorized multiplication and rounding
-                df_b[bat_cols] = (df_b[bat_cols] * prorate_factor).round().astype(float)
+                # Keep as floats for accurate comparison - only round when displaying
+                df_b[bat_cols] = df_b[bat_cols] * prorate_factor
+                
+                # Calculate rate stats from FULL 2025 season (not prorated) for accurate comparison
+                # First get the full season totals
+                full_bat_cols = ['G', 'AB', 'R', 'H', '2B', '3B', 'HR', 'RBI', 'SB', 'CS', 'BB', 'SO', 'SF', 'SH', 'HBP']
+                df_b_full = df_b.copy()
+                df_b_full[full_bat_cols] = df_b_full[full_bat_cols] / prorate_factor  # undo proration to get full season
+                df_b_full = team_batting_stats(df_b_full, filter_stats=False)
+                
+                # Now apply proration to counting stats but keep original 2025 rate stats
                 df_b = team_batting_stats(df_b, filter_stats=False)
+                # Use the actual 2025 rate stats, not recalculated from prorated counts
+                df_b['AVG'] = df_b_full['AVG']
+                df_b['OBP'] = df_b_full['OBP']
+                df_b['SLG'] = df_b_full['SLG']
+                df_b['OPS'] = df_b_full['OPS']
 
             # 4. Pitching Proration (Base-3 IP logic with Trade Aggregation)
             if not df_p.empty:
@@ -470,11 +489,23 @@ class BaseballStats:
 
                 # Group by Hashcode to combine traded player rows
                 df_p = df_p.groupby('Hashcode').agg(agg_dict)
-                total_outs_prorated = (df_p['Total_Outs_Calc'] * prorate_factor).round()  # Apply the Proration Factor
+                
+                # Calculate rate stats from FULL 2025 season (not prorated) for accurate comparison
+                df_p_full = df_p.copy()
+                df_p_full['IP'] = df_p_full['Total_Outs_Calc'].apply(lambda x: int(x) + (round(x % 1 * 3) / 10)) / prorate_factor
+                df_p_full[pitch_cols] = df_p_full[pitch_cols] / prorate_factor  # undo proration
+                df_p_full = team_pitching_stats(df_p_full, filter_stats=False)
+                
+                # Keep as floats for accurate comparison
+                total_outs_prorated = df_p['Total_Outs_Calc'] * prorate_factor
                 df_p['IP'] = (total_outs_prorated / 3).apply(lambda x: int(x) + (round(x % 1 * 3) / 10))  # Total Outs to IP
                 existing_pitch_cols = [col for col in pitch_cols if col in df_p.columns]
-                df_p[existing_pitch_cols] = (df_p[existing_pitch_cols] * prorate_factor).round().astype(float)  # Prorate rest of counting stats
-                df_p = team_pitching_stats(df_p, filter_stats=False)  # final stats
+                df_p[existing_pitch_cols] = df_p[existing_pitch_cols] * prorate_factor  # Prorate without rounding
+                df_p = team_pitching_stats(df_p, filter_stats=False)
+                
+                # Use the actual 2025 rate stats, not recalculated from prorated counts
+                df_p['ERA'] = df_p_full['ERA']
+                df_p['WHIP'] = df_p_full['WHIP']
 
             self.prorated_2025_cache[cache_key] = (df_b, df_p)
             return df_b, df_p

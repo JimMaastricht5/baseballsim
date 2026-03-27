@@ -363,7 +363,7 @@ class BaseballStatsPreProcess:
             total_pa = max(1, qualified['AB'].sum() + qualified['BB'].sum() +
                            qualified.get('HBP', 0).sum() + qualified.get('SF', 0).sum())
             total_ab = max(1, qualified['AB'].sum())
-
+            total_h = max(1, qualified['H'].sum())  # Use Hits as the denominator for 2b, 3b, and HR
             return {
                 'H_per_PA': qualified['H'].sum() / total_pa,
                 # H_per_AB is the true batting average baseline used by Bayesian regression
@@ -371,13 +371,17 @@ class BaseballStatsPreProcess:
                 # H_per_PA (~0.225) instead of the correct H/AB (~0.248), slightly deflating
                 # batting average projections for low-sample batters.
                 'H_per_AB': qualified['H'].sum() / total_ab,
-                'HR_per_PA': qualified['HR'].sum() / total_pa,
-                '2B_per_PA': qualified['2B'].sum() / total_pa,
-                '3B_per_PA': qualified['3B'].sum() / total_pa,
+                # 'HR_per_PA': qualified['HR'].sum() / total_pa,
+                # '2B_per_PA': qualified['2B'].sum() / total_pa,
+                # '3B_per_PA': qualified['3B'].sum() / total_pa,
                 'BB_per_PA': qualified['BB'].sum() / total_pa,
                 'SO_per_PA': qualified['SO'].sum() / total_pa,
                 'R_per_PA': qualified['R'].sum() / total_pa,
-                'RBI_per_PA': qualified['RBI'].sum() / total_pa
+                'RBI_per_PA': qualified['RBI'].sum() / total_pa,
+                # Calculate these per Hit (H) to match the Projector's logic
+                '2B_per_H': qualified['2B'].sum() / total_h,
+                '3B_per_H': qualified['3B'].sum() / total_h,
+                'HR_per_H': qualified['HR'].sum() / total_h,
             }
 
     def de_dup_df(self, df: DataFrame, key_name: str, dup_column_names: str,

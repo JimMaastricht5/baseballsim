@@ -17,17 +17,273 @@ Contact: JimMaastricht5@gmail.com
 """
 import bbstats
 import bbteam
+import pandas as pd
 import at_bat
 import numpy as np
 import random
 import bbbaserunners
 import datetime
 from pandas.core.series import Series
-from typing import List, Tuple, Optional
+from typing import List, Tuple, Optional, Dict, Any, ClassVar
+from pydantic import BaseModel, Field
 import queue
 from bblogger import logger
 AWAY = 0
 HOME = 1
+
+
+class BattingStats(BaseModel):
+    """Individual batting statistics for a player."""
+    G: float = 0
+    AB: float = 0
+    R: float = 0
+    H: float = 0
+    D: float = 0  # 2B
+    T: float = 0  # 3B
+    HR: float = 0
+    RBI: float = 0
+    SB: float = 0
+    CS: float = 0
+    BB: float = 0
+    SO: float = 0
+    SH: float = 0
+    SF: float = 0
+    HBP: float = 0
+
+    @property
+    def AVG(self) -> float:
+        return self.H / self.AB if self.AB > 0 else 0.0
+
+    @property
+    def OBP(self) -> float:
+        denom = self.AB + self.BB + self.HBP + self.SF
+        return (self.H + self.BB + self.HBP) / denom if denom > 0 else 0.0
+
+    @property
+    def SLG(self) -> float:
+        singles = self.H - self.D - self.T - self.HR
+        tb = singles + self.D * 2 + self.T * 3 + self.HR * 4
+        return tb / self.AB if self.AB > 0 else 0.0
+
+    @property
+    def OPS(self) -> float:
+        return self.OBP + self.SLG
+
+
+class PitchingStats(BaseModel):
+    """Individual pitching statistics for a player."""
+    G: float = 0
+    GS: float = 0
+    CG: float = 0
+    SHO: float = 0
+    IP: float = 0
+    H: float = 0
+    D: float = 0  # 2B
+    T: float = 0  # 3B
+    ER: float = 0
+    SO: float = 0
+    BB: float = 0
+    HR: float = 0
+    W: float = 0
+    L: float = 0
+    SV: float = 0
+    BS: float = 0
+    HLD: float = 0
+
+    @property
+    def ERA(self) -> float:
+        if self.IP == 0:
+            return 0.0
+        outs = int(self.IP) * 3 + round((self.IP % 1) * 10) / 3
+        return (self.ER / outs) * 27 if outs > 0 else 0.0
+
+    @property
+    def WHIP(self) -> float:
+        return (self.BB + self.H) / self.IP if self.IP > 0 else 0.0
+
+
+class PlayerBattingEntry(BaseModel):
+    """A player in the batting lineup."""
+    hashcode: str
+    name: str
+    position: str
+    age: int
+    team: str
+    stats: BattingStats = Field(default_factory=BattingStats)
+
+
+class PlayerPitchingEntry(BaseModel):
+    """A pitcher in the game."""
+    hashcode: str
+    name: str
+    age: int
+    team: str
+    stats: PitchingStats = Field(default_factory=PitchingStats)
+
+
+class TeamLineup(BaseModel):
+    """Complete team lineup (batters and pitcher)."""
+    team: str
+    league: str = ""
+    batters: List[PlayerBattingEntry] = Field(default_factory=list)
+    starting_pitcher: Optional[PlayerPitchingEntry] = None
+    relief_pitchers: List[PlayerPitchingEntry] = Field(default_factory=list)
+
+
+class PlayResult(BaseModel):
+    """Result of a single at-bat."""
+    
+    batter_hash: str
+    batter_name: str
+    pitcher_hash: str
+    pitcher_name: str
+    result: str  # Single letter result code
+    outs_after: int = 0
+    runners_on_base: str = ""  # e.g., "1st", "1st and 2nd", etc.
+    runs_scored: List[str] = Field(default_factory=list)  # Names of players who scored
+    runners_affected: List[str] = Field(default_factory=list)  # e.g., ["1st", "3rd"]
+    play_description: str = ""  # Human-readable description
+    is_pitching_change: bool = False
+    new_pitcher_hash: Optional[str] = None
+    new_pitcher_name: Optional[str] = None
+    is_steal_attempt: bool = False
+    stolen_base: Optional[str] = None
+    caught_stealing: bool = False
+    
+    # Valid outcome codes for reference
+    OUTCOME_CHOICES: ClassVar[List[str]] = [
+        'H', '2B', '3B', 'HR', 'SO', 'BB', 'IBB', 'HBP', 'SF', 'SH', 'GO', 'AO', 'FO', 'LO', 'PO',
+        'DP', 'TP', 'SB', 'CS', 'PK', 'E', 'NR', 'NP'
+    ]
+
+
+class InningHalf(BaseModel):
+    """Half of an inning (top or bottom)."""
+    batting_team: str
+    pitching_team: str
+    plays: List[PlayResult] = Field(default_factory=list)
+    runs_scored: int = 0
+
+
+class InningScore(BaseModel):
+    """Score for a single inning."""
+    inning: int
+    away_runs: int = 0
+    home_runs: int = 0
+
+
+class TeamBoxScore(BaseModel):
+    """Team box score with batters and pitchers."""
+    team: str
+    batters: List[PlayerBattingEntry] = Field(default_factory=list)
+    pitchers: List[PlayerPitchingEntry] = Field(default_factory=list)
+    totals_batting: Optional[BattingStats] = None
+    totals_pitching: Optional[PitchingStats] = None
+    total_hits: int = 0
+    total_errors: int = 0
+
+
+class GameRecap(BaseModel):
+    """
+    Structured representation of a complete baseball game.
+    
+    This model provides a typed, structured representation of all game data
+    that can be used by the UI or other consumers. It replaces the monolithic
+    string-based game_recap with typed data structures.
+    """
+    game_id: Optional[str] = None
+    away_team: str
+    home_team: str
+    final_score: Tuple[int, int] = (0, 0)
+    final_inning: int = 9
+    is_extra_innings: bool = False
+    
+    # Lineups
+    away_lineup: Optional[TeamLineup] = None
+    home_lineup: Optional[TeamLineup] = None
+    
+    # Inning-by-inning data
+    innings: List[Dict[str, InningHalf]] = Field(default_factory=list)
+    inning_scores: List[InningScore] = Field(default_factory=list)
+    
+    # Box scores
+    away_box_score: Optional[TeamBoxScore] = None
+    home_box_score: Optional[TeamBoxScore] = None
+    
+    # Win/Loss records
+    winning_pitcher: Optional[str] = None
+    losing_pitcher: Optional[str] = None
+    save_pitcher: Optional[str] = None
+    
+    # Metadata
+    played_date: Optional[str] = None
+    game_number_in_series: int = 1
+    
+    def to_legacy_string(self) -> str:
+        """
+        Generate the legacy string format for backward compatibility.
+        This allows gradual migration from string-based to structured data.
+        """
+        lines = []
+        
+        # Header
+        lines.append(f"▼ {self.away_team} @ {self.home_team} ▼\n")
+        
+        # Lineups
+        if self.away_lineup:
+            lines.append(f"Starting lineup for the {self.away_team} ({self.away_lineup.league}):\n")
+            # Add lineup table...
+            
+        if self.home_lineup:
+            lines.append(f"\nStarting lineup for the {self.home_team} ({self.home_lineup.league}):\n")
+            # Add lineup table...
+        
+        # Play-by-play
+        for i, inning_data in enumerate(self.innings):
+            inning_num = i + 1
+            for half, half_data in inning_data.items():
+                if half == "top":
+                    lines.append(f"\nStarting the top of inning {inning_num}.")
+                else:
+                    lines.append(f"\nStarting the bottom of inning {inning_num}.")
+                    
+                for play in half_data.plays:
+                    lines.append(f"\tPitcher: {play.pitcher_name} against {play.batter_name} - {play.result}, {play.outs_after} Out" + 
+                               ("s" if play.outs_after != 1 else ""))
+                    
+                    if play.runners_affected:
+                        runner_str = ", ".join([f"Runner on {r}" for r in play.runners_affected])
+                        lines.append(f"\t{runner_str}")
+                    
+                    if play.runs_scored:
+                        scored_str = ", ".join(play.runs_scored)
+                        lines.append(f"\tScored {len(play.runs_scored)} run(s)!  ({scored_str})")
+                    
+                    if play.is_pitching_change and play.new_pitcher_name:
+                        lines.append(f"\tManager has made the call to the bull pen.  Pitching change....")
+                        lines.append(f"\t{play.new_pitcher_name} has entered the game for {half_data.batting_team}")
+                    
+                    if play.is_steal_attempt and play.stolen_base:
+                        action = "stole" if not play.caught_stealing else "caught stealing"
+                        lines.append(f"\t{play.batter_name} {action} {play.stolen_base}!")
+                
+                lines.append(f"\nCompleted {'top' if half == 'top' else 'bottom'} half of inning {inning_num}")
+                lines.append(f"The score is {self.away_team} {self.final_score[0]} to {self.home_team} {self.final_score[1]}")
+        
+        # Box scores
+        if self.away_box_score:
+            lines.append("\n")
+            # Add box score tables...
+            
+        if self.home_box_score:
+            # Add box score tables...
+            pass
+        
+        # Final score table
+        lines.append(f"\nFinal")
+        # Add score table...
+        
+        return "\n".join(lines)
 
 
 class Game:
@@ -143,6 +399,20 @@ class Game:
         self.interactive = interactive  # is this game being controlled by a human or straight sim
         self.manager = None
         self.play_by_play_callback = play_by_play_callback  # callback for real-time play-by-play updates
+        
+        # Structured game data (Pydantic models)
+        self.structured_game = GameRecap(
+            away_team=self.team_names[AWAY],
+            home_team=self.team_names[HOME],
+            away_lineup=None,
+            home_lineup=None,
+            innings=[],
+            inning_scores=[],
+            away_box_score=None,
+            home_box_score=None
+        )
+        self.current_inning_plays: Dict[str, InningHalf] = {"top": InningHalf(batting_team=self.team_names[HOME], pitching_team=self.team_names[AWAY]), 
+                                                              "bottom": InningHalf(batting_team=self.team_names[AWAY], pitching_team=self.team_names[HOME])}
         return
 
     def team_pitching(self) -> int:
@@ -573,6 +843,189 @@ class Game:
         self.end_game()
         return self.total_score, self.inning, self.win_loss, self.game_recap
 
+    def sim_game_structured(self) -> Tuple[List[int], List[int], List[List[int]], str, GameRecap]:
+        """
+        Simulate an entire game and return both legacy string and structured data.
+        
+        :return: tuple of (total_score, inning_scores, win_loss, legacy_string, structured_game)
+        """
+        while self.is_game_end() is False:
+            self.sim_half_inning()
+        self.end_game()
+        
+        # Build structured game recap
+        self._build_structured_game_recap()
+        
+        return self.total_score, self.inning, self.win_loss, self.game_recap, self.structured_game
+
+    def _build_structured_game_recap(self) -> GameRecap:
+        """
+        Build the structured GameRecap from accumulated game data.
+        Call this at the end of the game before returning.
+        """
+        # Update final score
+        self.structured_game.final_score = (self.total_score[AWAY], self.total_score[HOME])
+        
+        # Update inning scores
+        self.structured_game.inning_scores = []
+        for i in range(1, len(self.inning_score)):
+            if i < len(self.inning_score):
+                inning = self.inning_score[i]
+                self.structured_game.inning_scores.append(InningScore(
+                    inning=i,
+                    away_runs=inning[AWAY] if isinstance(inning[AWAY], int) else 0,
+                    home_runs=inning[HOME] if isinstance(inning[HOME], int) else 0
+                ))
+        
+        # Check for extra innings
+        self.structured_game.is_extra_innings = len(self.structured_game.inning_scores) > 9
+        self.structured_game.final_inning = len(self.structured_game.inning_scores)
+        
+        # Build lineups from team DataFrames
+        self.structured_game.away_lineup = self._build_team_lineup(self.teams[AWAY])
+        self.structured_game.home_lineup = self._build_team_lineup(self.teams[HOME])
+        
+        # Build box scores from team box_score objects
+        self.structured_game.away_box_score = self._build_team_box_score(self.teams[AWAY], AWAY)
+        self.structured_game.home_box_score = self._build_team_box_score(self.teams[HOME], HOME)
+        
+        return self.structured_game
+
+    def _build_team_lineup(self, team: bbteam.Team) -> TeamLineup:
+        """Build a structured TeamLineup from the team's lineup DataFrame."""
+        lineup = TeamLineup(team=team.team_name)
+        
+        # Get batting lineup from gameplay_lineup_df
+        if hasattr(team, 'gameplay_lineup_df') and team.gameplay_lineup_df is not None:
+            lineup_df = team.gameplay_lineup_df
+            # Handle both DataFrame and Series
+            if isinstance(lineup_df, pd.DataFrame):
+                for idx, row in lineup_df.iterrows():
+                    player_entry = PlayerBattingEntry(
+                        hashcode=str(idx),
+                        name=row.get('Player', 'Unknown'),
+                        position=str(row.get('Pos', '')),
+                        age=int(row.get('Age', 0)) if pd.notna(row.get('Age')) else 0,
+                        team=team.team_name,
+                        stats=BattingStats()
+                    )
+                    lineup.batters.append(player_entry)
+            elif isinstance(lineup_df, pd.Series):
+                player_entry = PlayerBattingEntry(
+                    hashcode=str(lineup_df.name),
+                    name=lineup_df.get('Player', 'Unknown'),
+                    position=str(lineup_df.get('Pos', '')),
+                    age=int(lineup_df.get('Age', 0)) if pd.notna(lineup_df.get('Age')) else 0,
+                    team=team.team_name,
+                    stats=BattingStats()
+                )
+                lineup.batters.append(player_entry)
+        
+        # Get starting pitcher from gameplay_pitching_df
+        if hasattr(team, 'gameplay_pitching_df') and team.gameplay_pitching_df is not None:
+            pitch_df = team.gameplay_pitching_df
+            if isinstance(pitch_df, pd.DataFrame):
+                for idx, row in pitch_df.iterrows():
+                    if row.get('GS', 0) > 0:  # Starting pitcher
+                        pitcher_entry = PlayerPitchingEntry(
+                            hashcode=str(idx),
+                            name=row.get('Player', 'Unknown'),
+                            age=int(row.get('Age', 0)) if pd.notna(row.get('Age')) else 0,
+                            team=team.team_name,
+                            stats=PitchingStats()
+                        )
+                        lineup.starting_pitcher = pitcher_entry
+                        break
+            elif isinstance(pitch_df, pd.Series):
+                if pitch_df.get('GS', 0) > 0:  # Starting pitcher
+                    pitcher_entry = PlayerPitchingEntry(
+                        hashcode=str(pitch_df.name),
+                        name=pitch_df.get('Player', 'Unknown'),
+                        age=int(pitch_df.get('Age', 0)) if pd.notna(pitch_df.get('Age')) else 0,
+                        team=team.team_name,
+                        stats=PitchingStats()
+                    )
+                    lineup.starting_pitcher = pitcher_entry
+        
+        return lineup
+
+    def _build_team_box_score(self, team: bbteam.Team, team_idx: int) -> TeamBoxScore:
+        """Build a structured TeamBoxScore from the team's box_score object."""
+        box = team.box_score
+        
+        # Build batter entries
+        batters = []
+        if box.box_batting is not None and not box.box_batting.empty:
+            for idx, row in box.box_batting.iterrows():
+                if idx == 'Totals':
+                    continue
+                player_entry = PlayerBattingEntry(
+                    hashcode=str(idx),
+                    name=row.get('Player', 'Unknown'),
+                    position=row.get('Pos', ''),
+                    age=int(row.get('Age', 0)),
+                    team=team.team_name,
+                    stats=BattingStats(
+                        G=float(row.get('G', 0)),
+                        AB=float(row.get('AB', 0)),
+                        R=float(row.get('R', 0)),
+                        H=float(row.get('H', 0)),
+                        D=float(row.get('2B', 0)),
+                        T=float(row.get('3B', 0)),
+                        HR=float(row.get('HR', 0)),
+                        RBI=float(row.get('RBI', 0)),
+                        SB=float(row.get('SB', 0)),
+                        CS=float(row.get('CS', 0)),
+                        BB=float(row.get('BB', 0)),
+                        SO=float(row.get('SO', 0)),
+                        SH=float(row.get('SH', 0)),
+                        SF=float(row.get('SF', 0)),
+                        HBP=float(row.get('HBP', 0))
+                    )
+                )
+                batters.append(player_entry)
+        
+        # Build pitcher entries
+        pitchers = []
+        if box.box_pitching is not None and not box.box_pitching.empty:
+            for idx, row in box.box_pitching.iterrows():
+                if idx == 'Totals':
+                    continue
+                player_entry = PlayerPitchingEntry(
+                    hashcode=str(idx),
+                    name=row.get('Player', 'Unknown'),
+                    age=int(row.get('Age', 0)),
+                    team=team.team_name,
+                    stats=PitchingStats(
+                        G=float(row.get('G', 0)),
+                        GS=float(row.get('GS', 0)),
+                        CG=float(row.get('CG', 0)),
+                        SHO=float(row.get('SHO', 0)),
+                        IP=float(row.get('IP', 0)),
+                        H=float(row.get('H', 0)),
+                        D=float(row.get('2B', 0)),
+                        T=float(row.get('3B', 0)),
+                        ER=float(row.get('ER', 0)),
+                        SO=float(row.get('SO', 0)),
+                        BB=float(row.get('BB', 0)),
+                        HR=float(row.get('HR', 0)),
+                        W=float(row.get('W', 0)),
+                        L=float(row.get('L', 0)),
+                        SV=float(row.get('SV', 0)),
+                        BS=float(row.get('BS', 0)),
+                        HLD=float(row.get('HLD', 0))
+                    )
+                )
+                pitchers.append(player_entry)
+        
+        return TeamBoxScore(
+            team=team.team_name,
+            batters=batters,
+            pitchers=pitchers,
+            total_hits=box.total_hits,
+            total_errors=box.total_errors
+        )
+
     def sim_game_threaded(self, q: queue) -> None:
         """
         handles input and output using the queue for multi-threading
@@ -606,8 +1059,8 @@ if __name__ == '__main__':
     for sim_game_num in range(1, sims + 1):
         print(f'Game number {sim_game_num}: from bbgame.py sims {sims}')
         game = Game(home_team_name=home_team, away_team_name=away_team,
-                    chatty=False, print_lineup=True,
-                    print_box_score_b=False,
+                    chatty=True, print_lineup=True,
+                    print_box_score_b=True,
                     load_seasons=[2023, 2024, 2025], new_season=2026,
                     # load_batter_file='random-aggr-stats-pp-Batting.csv',
                     # load_pitcher_file='random-aggr-stats-pp-Pitching.csv',
@@ -618,8 +1071,51 @@ if __name__ == '__main__':
                     # , starting_pitchers=[MIL_starter, BOS_starter]
                     # , starting_lineups=[MIL_lineup, None]
                     )
-        score, inning, win_loss, game_recap_str = game.sim_game()
+        
+        # Use the new structured format
+        score, inning, win_loss, game_recap_str, structured_game = game.sim_game_structured()
+        
+        # Print legacy format (for comparison)
+        print("=" * 80)
+        print("LEGACY STRING FORMAT:")
+        print("=" * 80)
         print(game_recap_str)
+        
+        # Print structured format (new)
+        print("\n" + "=" * 80)
+        print("STRUCTURED FORMAT (Pydantic):")
+        print("=" * 80)
+        print(f"Game: {structured_game.away_team} @ {structured_game.home_team}")
+        print(f"Final Score: {structured_game.away_team} {structured_game.final_score[0]} - {structured_game.home_team} {structured_game.final_score[1]}")
+        print(f"Innings: {structured_game.final_inning}" + (" (Extra Innings)" if structured_game.is_extra_innings else ""))
+        print(f"\nInning Scores:")
+        for inn in structured_game.inning_scores:
+            print(f"  Inning {inn.inning}: {structured_game.away_team} {inn.away_runs} - {structured_game.home_team} {inn.home_runs}")
+        
+        print(f"\nAway Team ({structured_game.away_team}) Box Score:")
+        if structured_game.away_box_score:
+            print(f"  Total Hits: {structured_game.away_box_score.total_hits}")
+            print(f"  Batters: {len(structured_game.away_box_score.batters)}")
+            print(f"  Pitchers: {len(structured_game.away_box_score.pitchers)}")
+        
+        print(f"\nHome Team ({structured_game.home_team}) Box Score:")
+        if structured_game.home_box_score:
+            print(f"  Total Hits: {structured_game.home_box_score.total_hits}")
+            print(f"  Batters: {len(structured_game.home_box_score.batters)}")
+            print(f"  Pitchers: {len(structured_game.home_box_score.pitchers)}")
+        
+        # Show sample batter stats
+        print(f"\nSample Batting Entry (first batter):")
+        if structured_game.away_box_score and structured_game.away_box_score.batters:
+            batter = structured_game.away_box_score.batters[0]
+            print(f"  Name: {batter.name}")
+            print(f"  Position: {batter.position}")
+            print(f"  AB: {batter.stats.AB}, H: {batter.stats.H}, HR: {batter.stats.HR}, RBI: {batter.stats.RBI}")
+            print(f"  AVG: {batter.stats.AVG:.3f}, OBP: {batter.stats.OBP:.3f}, SLG: {batter.stats.SLG:.3f}, OPS: {batter.stats.OPS:.3f}")
+        
+        print(f"\nStructured game model (JSON):")
+        print(structured_game.model_dump_json(indent=2)[:2000] + "..." if len(structured_game.model_dump_json()) > 2000 else structured_game.model_dump_json(indent=2))
+        
         season_win_loss[0] = list(np.add(np.array(season_win_loss[0]), np.array(win_loss[0])))
         season_win_loss[1] = list(np.add(np.array(season_win_loss[1]), np.array(win_loss[1])))
         score_total[0] = score_total[0] + score[0]
@@ -633,7 +1129,7 @@ if __name__ == '__main__':
         #     team0_season_df['Team'] = game.teams[AWAY].box_score.box_batting['Team']
         #     team0_season_df['Pos'] = game.teams[AWAY].box_score.box_batting['Pos']
     #     print('')
-        print(f'{away_team} season : {season_win_loss[0][0]} W and {season_win_loss[0][1]} L')
+        print(f'\n{away_team} season : {season_win_loss[0][0]} W and {season_win_loss[0][1]} L')
         print(f'{home_team} season : {season_win_loss[1][0]} W and {season_win_loss[1][1]} L')
     print(f'away team scored {score_total[0]} for an average of {score_total[0]/sims}')
     print(f'home team scored {score_total[1]} for an average of {score_total[1] / sims}')

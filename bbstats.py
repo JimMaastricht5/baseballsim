@@ -493,7 +493,8 @@ class BaseballStats:
                 # Calculate rate stats from FULL 2025 season (not prorated) for accurate comparison
                 df_p_full = df_p.copy()
                 df_p_full['IP'] = df_p_full['Total_Outs_Calc'].apply(lambda x: int(x) + (round(x % 1 * 3) / 10)) / prorate_factor
-                df_p_full[pitch_cols] = df_p_full[pitch_cols] / prorate_factor  # undo proration
+                existing_pitch_cols_full = [col for col in pitch_cols if col in df_p_full.columns]
+                df_p_full[existing_pitch_cols_full] = df_p_full[existing_pitch_cols_full] / prorate_factor  # undo proration
                 df_p_full = team_pitching_stats(df_p_full, filter_stats=False)
                 
                 # Keep as floats for accurate comparison

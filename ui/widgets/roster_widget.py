@@ -935,6 +935,8 @@ class RosterWidget:
         self.team_pitching_2025 = pitching_2025
 
         logger.debug(f"Loaded 2025 team data for {team_name}: {len(batting_2025)} batters, {len(pitching_2025)} pitchers")
+        if not batting_2025.empty:
+            logger.debug(f"  Batting 2025 index sample: {list(batting_2025.index[:3])}")
 
     def _calculate_difference_df(self, current_df: pd.DataFrame, is_batter: bool) -> pd.DataFrame:
         """
@@ -947,20 +949,20 @@ class RosterWidget:
         Returns:
             DataFrame with difference values
         """
-        # Load 2025 data if not cached
+        # Load 2025 data if not cached (always recalculate to get correct proration)
         if self.current_team and self.baseball_data:
             if hasattr(self.baseball_data, 'team_games_played'):
                 games_played = self.baseball_data.team_games_played.get(self.current_team, 0)
                 if games_played > 0:
-                    if is_batter and self.team_batting_2025 is None:
-                        self._load_team_2025_data(self.current_team, games_played)
-                    elif not is_batter and self.team_pitching_2025 is None:
-                        self._load_team_2025_data(self.current_team, games_played)
+                    # Always reload to get correct prorated values for current games_played
+                    self._load_team_2025_data(self.current_team, games_played)
 
         hist_df = self.team_batting_2025 if is_batter else self.team_pitching_2025
 
         if hist_df is None or hist_df.empty:
             logger.warning(f"No 2025 historical data available for {self.current_team}")
+            logger.warning(f"  - current_df index sample: {list(current_df.index[:3]) if not current_df.empty else 'empty'}")
+            logger.warning(f"  - hist_df index sample: {list(hist_df.index[:3]) if hist_df is not None and not hist_df.empty else 'empty'}")
             return current_df
 
         diff_df = current_df.copy()

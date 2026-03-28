@@ -892,11 +892,19 @@ class LeagueStatsWidget:
         if self.baseball_data is None:
             return
 
+        # Determine games played from W-L records (same logic as _update_totals_display)
+        games_played = 0
+        if self.team_win_loss:
+            games_played = max(
+                (wins + losses for team, (wins, losses) in self.team_win_loss.items() if team != 'OFF DAY'),
+                default=0
+            )
+
         # Calculate prorated 2025 stats for league-wide view (no team filter)
         self.batters_df_2025, self.pitchers_df_2025 = \
-            self.baseball_data.calculate_prorated_2025_stats(team_name=None, current_games_played=None)
+            self.baseball_data.calculate_prorated_2025_stats(team_name=None, current_games_played=games_played if games_played > 0 else None)
 
-        logger.debug(f"Loaded 2025 league data: {len(self.batters_df_2025)} batters, {len(self.pitchers_df_2025)} pitchers")
+        logger.info(f"Loaded 2025 league data: {len(self.batters_df_2025)} batters, {len(self.pitchers_df_2025)} pitchers (games_played={games_played})")
 
     def _calculate_difference_df(self, current_df: pd.DataFrame, is_batter: bool) -> pd.DataFrame:
         """
@@ -909,11 +917,8 @@ class LeagueStatsWidget:
         Returns:
             DataFrame with difference values
         """
-        # Load 2025 data if not cached
-        if is_batter and self.batters_df_2025 is None:
-            self._load_2025_data()
-        elif not is_batter and self.pitchers_df_2025 is None:
-            self._load_2025_data()
+        # Always reload to get correct proration for current games_played
+        self._load_2025_data()
 
         hist_df = self.batters_df_2025 if is_batter else self.pitchers_df_2025
 

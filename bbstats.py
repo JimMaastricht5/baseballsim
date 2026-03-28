@@ -428,6 +428,7 @@ class BaseballStats:
                 current_games_played = int(np.mean(list(self.team_games_played.values()))) if self.team_games_played else 0
 
             if current_games_played <= 0:
+                logger.debug(f"calculate_prorated_2025_stats: games_played={current_games_played}, returning empty")
                 return (pd.DataFrame(), pd.DataFrame())
 
             # Cache check (unchanged)
@@ -443,14 +444,17 @@ class BaseballStats:
                 # TEAM VIEW: Only include players currently on this team's 2026 roster
                 mask_b = self.new_season_batting_data['Team'] == team_name
                 hashes_b = self.new_season_batting_data[mask_b].index
-                df_b = self.historical_2025_batting.loc[self.historical_2025_batting['Hashcode'].isin(hashes_b)].copy()
+                logger.debug(f"calculate_prorated_2025_stats: team={team_name}, games={current_games_played}, hashes count={len(hashes_b)}")
+                df_b = self.historical_2025_batting[self.historical_2025_batting['Hashcode'].isin(hashes_b)].copy()
 
                 mask_p = self.new_season_pitching_data['Team'] == team_name
                 hashes_p = self.new_season_pitching_data[mask_p].index
-                df_p = self.historical_2025_pitching.loc[self.historical_2025_pitching['Hashcode'].isin(hashes_p)].copy()
+                df_p = self.historical_2025_pitching[self.historical_2025_pitching['Hashcode'].isin(hashes_p)].copy()
             else:
                 df_b = self.historical_2025_batting.copy()
                 df_p = self.historical_2025_pitching.copy()
+            
+            logger.debug(f"calculate_prorated_2025_stats: df_b shape before groupby: {df_b.shape if not df_b.empty else 'empty'}")
 
             # 3. Batting Proration (Vectorized)
             if not df_b.empty:
@@ -1768,12 +1772,22 @@ def calculate_stats_difference(current_df: DataFrame, hist_df: DataFrame, is_bat
     all_diff_cols = count_cols + rate_cols
 
     diff_df = current_df.copy()
-    common_index = diff_df.index.intersection(hist_df.index)
+    
+    # Convert indices to strings for proper comparison (hashcodes may be int or str)
+    current_index_str = diff_df.index.astype(str)
+    hist_index_str = hist_df.index.astype(str)
+    common_index = current_index_str.intersection(hist_index_str)
+    
+    # Map back to original integer indices for the difference calculation
+    index_mapping = dict(zip(current_index_str, diff_df.index))
+    common_index_original = [index_mapping[idx] for idx in common_index]
+    
+    logger.info(f"calculate_stats_difference: current_df rows={len(current_df)}, hist_df rows={len(hist_df)}, common_index size={len(common_index)}")
 
     for col in all_diff_cols:
         if col in diff_df.columns and col in hist_df.columns:
-            diff_df.loc[common_index, col] = (
-                diff_df.loc[common_index, col] - hist_df.loc[common_index, col]
+            diff_df.loc[common_index_original, col] = (
+                diff_df.loc[common_index_original, col] - hist_df.loc[common_index, col].values
             )
 
     return diff_df

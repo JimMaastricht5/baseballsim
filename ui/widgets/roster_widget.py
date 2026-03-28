@@ -935,8 +935,6 @@ class RosterWidget:
         self.team_pitching_2025 = pitching_2025
 
         logger.debug(f"Loaded 2025 team data for {team_name}: {len(batting_2025)} batters, {len(pitching_2025)} pitchers")
-        if not batting_2025.empty:
-            logger.debug(f"  Batting 2025 index sample: {list(batting_2025.index[:3])}")
 
     def _calculate_difference_df(self, current_df: pd.DataFrame, is_batter: bool) -> pd.DataFrame:
         """
@@ -961,16 +959,19 @@ class RosterWidget:
 
         if hist_df is None or hist_df.empty:
             logger.warning(f"No 2025 historical data available for {self.current_team}")
-            logger.warning(f"  - current_df index sample: {list(current_df.index[:3]) if not current_df.empty else 'empty'}")
-            logger.warning(f"  - hist_df index sample: {list(hist_df.index[:3]) if hist_df is not None and not hist_df.empty else 'empty'}")
             return current_df
 
         diff_df = current_df.copy()
 
+        # Convert indices to strings for proper comparison (hashcodes may be int or str)
+        hist_index_str = set(hist_df.index.astype(str))
+
         # Join on Hashcode (index)
         for idx in diff_df.index:
-            if idx in hist_df.index:
-                hist_row = hist_df.loc[idx]
+            idx_str = str(idx)
+            if idx_str in hist_index_str:
+                # Find the matching row in hist_df
+                hist_row = hist_df.loc[hist_df.index[hist_df.index.astype(str) == idx_str]].iloc[0]
 
                 # Counting stats: absolute difference
                 if is_batter:

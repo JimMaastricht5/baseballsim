@@ -428,7 +428,6 @@ class BaseballStats:
                 current_games_played = int(np.mean(list(self.team_games_played.values()))) if self.team_games_played else 0
 
             if current_games_played <= 0:
-                logger.debug(f"calculate_prorated_2025_stats: games_played={current_games_played}, returning empty")
                 return (pd.DataFrame(), pd.DataFrame())
 
             # Cache check (unchanged)
@@ -443,18 +442,15 @@ class BaseballStats:
             if team_name:
                 # TEAM VIEW: Only include players currently on this team's 2026 roster
                 mask_b = self.new_season_batting_data['Team'] == team_name
-                hashes_b = self.new_season_batting_data[mask_b].index
-                logger.debug(f"calculate_prorated_2025_stats: team={team_name}, games={current_games_played}, hashes count={len(hashes_b)}")
-                df_b = self.historical_2025_batting[self.historical_2025_batting['Hashcode'].isin(hashes_b)].copy()
+                hashes_b = self.new_season_batting_data[mask_b].index.astype(str)
+                df_b = self.historical_2025_batting[self.historical_2025_batting['Hashcode'].astype(str).isin(hashes_b)].copy()
 
                 mask_p = self.new_season_pitching_data['Team'] == team_name
-                hashes_p = self.new_season_pitching_data[mask_p].index
-                df_p = self.historical_2025_pitching[self.historical_2025_pitching['Hashcode'].isin(hashes_p)].copy()
+                hashes_p = self.new_season_pitching_data[mask_p].index.astype(str)
+                df_p = self.historical_2025_pitching[self.historical_2025_pitching['Hashcode'].astype(str).isin(hashes_p)].copy()
             else:
                 df_b = self.historical_2025_batting.copy()
                 df_p = self.historical_2025_pitching.copy()
-            
-            logger.debug(f"calculate_prorated_2025_stats: df_b shape before groupby: {df_b.shape if not df_b.empty else 'empty'}")
 
             # 3. Batting Proration (Vectorized)
             if not df_b.empty:
@@ -1781,13 +1777,13 @@ def calculate_stats_difference(current_df: DataFrame, hist_df: DataFrame, is_bat
     # Map back to original integer indices for the difference calculation
     index_mapping = dict(zip(current_index_str, diff_df.index))
     common_index_original = [index_mapping[idx] for idx in common_index]
-    
-    logger.info(f"calculate_stats_difference: current_df rows={len(current_df)}, hist_df rows={len(hist_df)}, common_index size={len(common_index)}")
 
     for col in all_diff_cols:
         if col in diff_df.columns and col in hist_df.columns:
+            # Convert column to float to avoid dtype incompatibility warnings
+            diff_df[col] = diff_df[col].astype(float)
             diff_df.loc[common_index_original, col] = (
-                diff_df.loc[common_index_original, col] - hist_df.loc[common_index, col].values
+                diff_df.loc[common_index_original, col] - hist_df.loc[common_index, col].values.astype(float)
             )
 
     return diff_df

@@ -983,12 +983,14 @@ class RosterWidget:
 
                 for col in count_cols:
                     if col in diff_df.columns and col in hist_row.index:
-                        diff_df.at[idx, col] = diff_df.at[idx, col] - hist_row[col]
+                        diff_df[col] = diff_df[col].astype(float)
+                        diff_df.at[idx, col] = float(diff_df.at[idx, col]) - float(hist_row[col])
 
                 # Rate stats: difference
                 for col in rate_cols:
                     if col in diff_df.columns and col in hist_row.index:
-                        diff_df.at[idx, col] = diff_df.at[idx, col] - hist_row[col]
+                        diff_df[col] = diff_df[col].astype(float)
+                        diff_df.at[idx, col] = float(diff_df.at[idx, col]) - float(hist_row[col])
 
         return diff_df
 

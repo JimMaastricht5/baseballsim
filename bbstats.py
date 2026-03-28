@@ -384,10 +384,12 @@ class BaseballStats:
             raw_ab = self.historical_2025_batting['AB'].sum()
             raw_h = self.historical_2025_batting['H'].sum()
             raw_hr = self.historical_2025_batting['HR'].sum()
+            raw_hr_rate = raw_hr / raw_ab if raw_ab > 0 else 0
+            raw_h_per_hr = raw_h / raw_hr if raw_hr > 0 else 0
 
             # 2. Survival Data (Only players who made it into your 2026 Sim)
-            active_hashes = self.new_season_batting_data.index
-            survivor_df = self.historical_2025_batting[self.historical_2025_batting['Hashcode'].isin(active_hashes)]
+            active_hashes = self.new_season_batting_data.index.astype(str)
+            survivor_df = self.historical_2025_batting[self.historical_2025_batting['Hashcode'].astype(str).isin(active_hashes)]
 
             surv_ab = survivor_df['AB'].sum()
             surv_h = survivor_df['H'].sum()
@@ -396,17 +398,19 @@ class BaseballStats:
             # 3. Projected 2026 "True Talent" (What the Preprocessor generated)
             proj_ab = self.batting_data['AB'].sum()
             proj_hr = self.batting_data['HR'].sum()
+            proj_hr_rate = proj_hr / proj_ab if proj_ab > 0 else 0
 
             logger.info("=== LEAGUE HISTORICAL BASELINE (2025) from bbstats _log_historical_baselines ===")
-            logger.info(f"RAW 2025 (Full File):  AB: {raw_ab:,} | H: {raw_h:,} | HR: {raw_hr:,}")
+            logger.info(f"RAW 2025 (Full File):  AB: {raw_ab:,} | H: {raw_h:,} | HR: {raw_hr:,} | HR/AB: {raw_hr_rate:.4f} | H/HR: {raw_h_per_hr:.1f}")
             logger.info(f"SURVIVORS (2026 Rosters): AB: {surv_ab:,} | H: {surv_h:,} | HR: {surv_hr:,}")
-            logger.info(f"PROJECTED 2026 TOTALS:   AB: {proj_ab:,.0f} | HR: {proj_hr:,.0f}")
+            logger.info(f"PROJECTED 2026 TOTALS:   AB: {proj_ab:,.0f} | HR: {proj_hr:,.0f} | HR/AB: {proj_hr_rate:.4f}")
 
-            hr_diff = proj_hr - raw_hr
-            logger.info(f"TOTAL HR SURPLUS/DEFICIT: {hr_diff:+.0f} HRs")
+            # Compare HR rates instead of raw counts
+            hr_rate_diff = proj_hr_rate - raw_hr_rate
+            logger.info(f"HR/AB RATE DIFFERENCE: {hr_rate_diff:+.4f} ({hr_rate_diff/raw_hr_rate*100:+.1f}%)")
 
-            if abs(hr_diff) > 200:
-                logger.warning("SIGNIFICANT HR DISCREPANCY DETECTED: Check preprocessor K-values or AB-gates.")
+            if abs(hr_rate_diff) > 0.005:  # More than 0.5% difference in HR rate
+                logger.warning(f"SIGNIFICANT HR RATE DISCREPANCY: {hr_rate_diff:+.4f}. Check preprocessor K-values or AB-gates.")
 
         if not self.historical_2025_pitching.empty:
             raw_ip = self.historical_2025_pitching['IP'].apply(lambda x: int(x) + (x % 1 * 10 / 3)).sum()

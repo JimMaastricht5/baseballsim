@@ -25,9 +25,14 @@ ACCENT_GOLD = "#d4a017"  # Followed team, day-header text
 ACCENT_GREEN = "#2ea043"  # Start Season button
 ACCENT_ORANGE = "#e0882d"  # Pause button
 
+# ── Status indicator colours ────────────────────────────────────────────────
+STATUS_RUNNING = "#2ea043"  # Green - simulation running
+STATUS_PAUSED = "#e0882d"  # Orange - simulation paused
+STATUS_STOPPED = "#adbac7"  # Gray - not running
+
 # ── Text colours ──────────────────────────────────────────────────────────────
 TEXT_PRIMARY = "#e6edf3"  # Main readable text
-TEXT_SECONDARY = "#8b949e"  # Subdued labels, qualifiers
+TEXT_SECONDARY = "#adbac7"  # Subdued labels, qualifiers (improved contrast)
 TEXT_HEADING = "#ffffff"  # Section headings (STANDINGS, RESULTS…)
 
 # ── Row colours ───────────────────────────────────────────────────────────────

@@ -11,7 +11,13 @@ import tkinter as tk
 from tkinter import ttk, messagebox
 import queue
 
-from ui.theme import setup_dark_theme, BG_DARK, TEXT_PRIMARY
+from ui.theme import (
+    setup_dark_theme,
+    BG_DARK,
+    TEXT_PRIMARY,
+    TEXT_SECONDARY,
+    ACCENT_BLUE,
+)
 from ui.widgets import (
     ToolbarWidget,
     StandingsWidget,
@@ -117,12 +123,70 @@ class SeasonMainWindow:
         # Start queue polling
         self._poll_queues()
 
+        # Setup keyboard shortcuts
+        self._setup_keyboard_shortcuts()
+
         logger.info("Main window initialized with modular widgets")
 
     # Menu bar removed - using in-tab toggle buttons instead (Phase 3 revision)
     # def _create_menu_bar(self):
     # def _on_comparison_mode_change(self):
     # def _show_comparison_help(self):
+
+    def _setup_keyboard_shortcuts(self):
+        """Setup keyboard shortcuts for the application."""
+        self.root.bind("<Control-s>", lambda e: self.start_season())
+        self.root.bind("<Control-p>", lambda e: self._toggle_pause())
+        self.root.bind("<space>", lambda e: self._on_space_pressed())
+        self.root.bind("<Control-Right>", lambda e: self.next_series())
+        self.root.bind("<Control-Up>", lambda e: self.next_week())
+        self.root.bind("<F1>", lambda e: self._show_help())
+
+    def _toggle_pause(self):
+        """Toggle between pause and resume based on current state."""
+        if self.controller.is_paused():
+            self.resume_season()
+        else:
+            self.pause_season()
+
+    def _on_space_pressed(self):
+        """Handle spacebar - advance one day if paused."""
+        if self.controller.is_paused():
+            self.next_day()
+
+    def _show_help(self):
+        """Show keyboard shortcuts help dialog."""
+        from tkinter import messagebox
+
+        help_text = """Keyboard Shortcuts:
+
+Ctrl+S - Start Season
+Ctrl+P - Pause/Resume Toggle
+Space  - Next Day (when paused)
+Ctrl+→ - Next Series (3 days)
+Ctrl+↑ - Next Week (7 days)
+F1     - Show this help"""
+        messagebox.showinfo("Keyboard Shortcuts", help_text)
+
+    def _on_team_selected_from_standings(self, team: str, set_followed: bool = False):
+        """
+        Handle team selection from standings context menu.
+
+        Args:
+            team: Team abbreviation to switch to
+            set_followed: If True, also set this team as the followed team
+        """
+        if set_followed:
+            self.season_team_to_follow = team
+            self.toolbar.set_team(team)
+            self.standings.set_followed_team(team)
+
+        # Switch to the team tab
+        for i in range(self.notebook.index("end")):
+            tab_text = self.notebook.tab(i, "text")
+            if tab_text == team:
+                self.notebook.select(i)
+                break
 
     def _create_toolbar(self):
         """Create toolbar with control buttons."""
@@ -147,7 +211,9 @@ class SeasonMainWindow:
         paned_window.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
 
         # Left panel: Standings widget
-        self.standings = StandingsWidget(paned_window)
+        self.standings = StandingsWidget(
+            paned_window, self._on_team_selected_from_standings
+        )
         paned_window.add(self.standings.get_frame(), minsize=300)
 
         # Right panel: Notebook with tabs
@@ -227,8 +293,32 @@ class SeasonMainWindow:
 
     def _create_status_bar(self):
         """Create status bar frame with day counter, progress bar, and status message."""
+        from ui.theme import STATUS_RUNNING, STATUS_PAUSED, STATUS_STOPPED
+
         status_frame = tk.Frame(self.root, relief=tk.SUNKEN, bd=1, bg=BG_DARK)
         status_frame.pack(side=tk.BOTTOM, fill=tk.X)
+
+        # Status indicator (colored dot)
+        self.status_indicator_canvas = tk.Canvas(
+            status_frame, width=12, height=12, bg=BG_DARK, highlightthickness=0
+        )
+        self.status_indicator_canvas.pack(side=tk.LEFT, padx=(10, 5))
+        self.status_dot = self.status_indicator_canvas.create_oval(
+            2, 2, 10, 10, fill=STATUS_STOPPED, outline=""
+        )
+        self._update_status_indicator("stopped")
+
+        # Phase indicator label
+        self.phase_label = tk.Label(
+            status_frame,
+            text="Ready",
+            font=("Segoe UI", 10, "bold"),
+            anchor=tk.W,
+            bg=BG_DARK,
+            fg=ACCENT_BLUE,
+            width=18,
+        )
+        self.phase_label.pack(side=tk.LEFT, padx=(0, 10))
 
         # Day counter label
         self.day_label = tk.Label(
@@ -258,6 +348,18 @@ class SeasonMainWindow:
         )
         self.progress_label.pack(side=tk.LEFT, padx=5)
 
+        # Estimated time remaining
+        self.eta_label = tk.Label(
+            status_frame,
+            text="",
+            font=("Segoe UI", 9),
+            anchor=tk.W,
+            bg=BG_DARK,
+            fg=TEXT_SECONDARY,
+            width=15,
+        )
+        self.eta_label.pack(side=tk.LEFT, padx=5)
+
         # Status message
         self.status_label = tk.Label(
             status_frame,
@@ -268,6 +370,56 @@ class SeasonMainWindow:
             fg=TEXT_PRIMARY,
         )
         self.status_label.pack(side=tk.LEFT, padx=10, fill=tk.X, expand=True)
+
+    def _update_status_indicator(self, state: str):
+        """Update the status indicator dot color.
+
+        Args:
+            state: 'running' (green), 'paused' (orange), or 'stopped' (gray)
+        """
+        from ui.theme import STATUS_RUNNING, STATUS_PAUSED, STATUS_STOPPED
+
+        color = (
+            STATUS_RUNNING
+            if state == "running"
+            else STATUS_PAUSED
+            if state == "paused"
+            else STATUS_STOPPED
+        )
+        self.status_indicator_canvas.itemconfig(self.status_dot, fill=color)
+
+    def _update_phase(self, phase: str):
+        """Update the phase indicator.
+
+        Args:
+            phase: 'Ready', 'Regular Season', 'Playoffs', 'World Series', or 'Complete'
+        """
+        self.phase_label.config(text=phase)
+
+    def _update_eta(self, elapsed_seconds: float, progress: float):
+        """Update estimated time remaining display.
+
+        Args:
+            elapsed_seconds: Time elapsed so far
+            progress: Progress percentage (0-1)
+        """
+        if progress <= 0:
+            self.eta_label.config(text="")
+            return
+
+        estimated_total = elapsed_seconds / progress
+        remaining = estimated_total - elapsed_seconds
+
+        if remaining < 60:
+            eta_text = f"ETA: {int(remaining)}s"
+        elif remaining < 3600:
+            eta_text = f"ETA: {int(remaining // 60)}m {int(remaining % 60)}s"
+        else:
+            eta_text = (
+                f"ETA: {int(remaining // 3600)}h {int((remaining % 3600) // 60)}m"
+            )
+
+        self.eta_label.config(text=eta_text)
 
     # =================================================================
     # SIMULATION CONTROL METHODS
@@ -361,6 +513,8 @@ class SeasonMainWindow:
 
             # Update UI state - season starts in paused state
             self.toolbar.update_button_states(simulation_running=True, paused=True)
+            self._update_status_indicator("paused")
+            self._update_phase("Regular Season")
             self.status_label.config(
                 text=self._format_status_with_day("Season ready - Press Play to start")
             )
@@ -387,6 +541,7 @@ class SeasonMainWindow:
         """Pause the simulation."""
         if self.controller.pause_season():
             self.toolbar.update_button_states(simulation_running=True, paused=True)
+            self._update_status_indicator("paused")
             self.status_label.config(
                 text=self._format_status_with_day("Simulation paused")
             )
@@ -395,6 +550,7 @@ class SeasonMainWindow:
         """Resume the simulation from paused state."""
         if self.controller.resume_season():
             self.toolbar.update_button_states(simulation_running=True, paused=False)
+            self._update_status_indicator("running")
             self.status_label.config(
                 text=self._format_status_with_day("Simulation resumed")
             )
@@ -606,6 +762,14 @@ class SeasonMainWindow:
         self.progress_label.config(text=f"{progress_pct}%")
         self.day_label.config(text=f"Day: {day_num + 1} / {self.season_length}")
 
+        # Update ETA
+        if self.simulation_start_time is not None and day_num > 0:
+            import time
+
+            elapsed = time.time() - self.simulation_start_time
+            progress = (day_num + 1) / self.season_length
+            self._update_eta(elapsed, progress)
+
     def _on_game_completed(self, game_data: dict):
         """Handle game_completed message."""
         logger.debug(
@@ -688,7 +852,8 @@ class SeasonMainWindow:
         """Handle season_complete message (regular season ended, playoffs will run automatically)."""
         logger.debug("Regular season completed, playoffs will run automatically")
         # No user prompt - playoffs run automatically now
-        # This handler just logs that the regular season is complete
+        # Update phase indicator
+        self._update_phase("Playoffs")
 
     def _on_simulation_complete(self):
         """Handle simulation_complete message."""
@@ -696,6 +861,8 @@ class SeasonMainWindow:
 
         logger.info("Season simulation completed")
         self.toolbar.update_button_states(simulation_running=False, paused=False)
+        self._update_status_indicator("stopped")
+        self._update_phase("Complete")
 
         # Calculate elapsed time
         elapsed_time_str = ""
@@ -715,6 +882,7 @@ class SeasonMainWindow:
         self.status_label.config(
             text=self._format_status_with_day(f"Season complete!{elapsed_time_str}")
         )
+        self.eta_label.config(text="")
         messagebox.showinfo(
             "Season Complete",
             f"The season simulation has completed successfully.{elapsed_time_str}",
@@ -737,9 +905,11 @@ class SeasonMainWindow:
             )
             self._disable_admin_and_assessment()
         elif state == "paused":
+            self._update_status_indicator("paused")
             self.status_label.config(text=self._format_status_with_day("Paused"))
             self._enable_admin_and_assessment()
         elif state == "running":
+            self._update_status_indicator("running")
             self.status_label.config(text=self._format_status_with_day("Simulating..."))
             self._disable_admin_and_assessment()
 
@@ -823,6 +993,9 @@ class SeasonMainWindow:
         # Update playoff widget
         if hasattr(self, "playoff_widget"):
             self.playoff_widget.world_series_started(ws_data)
+
+        # Update phase indicator
+        self._update_phase("World Series")
 
     def _on_world_series_completed(self, ws_data: dict):
         """Handle world_series_completed message."""

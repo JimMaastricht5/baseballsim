@@ -21,9 +21,38 @@ from ui.theme import (
     TEXT_SECONDARY,
     TEXT_HEADING,
     ACCENT_GOLD,
+    STREAK_HOT,
+    STREAK_COLD,
+    STREAK_NORMAL,
 )
 
 LEAGUE_MIN_SALARY = 740000
+
+
+def get_streak_indicator(streak_value) -> tuple:
+    """
+    Generate streak indicator text and color based on streak value.
+
+    Args:
+        streak_value: The Streak_Adjustment value (float from -0.10 to 0.10)
+
+    Returns:
+        Tuple of (display_text, color)
+    """
+    if pd.isna(streak_value):
+        return ("-", STREAK_NORMAL)
+
+    try:
+        streak = float(streak_value)
+    except (ValueError, TypeError):
+        return ("-", STREAK_NORMAL)
+
+    if streak >= 0.025:
+        return ("▲", STREAK_HOT)
+    elif streak <= -0.025:
+        return ("▼", STREAK_COLD)
+    else:
+        return ("-", STREAK_NORMAL)
 
 
 def estimate_years_remaining(age: int, salary: float, is_pitcher: bool = False) -> int:
@@ -380,6 +409,7 @@ class LeagueStatsWidget:
                 "OPS",
                 "Salary",
                 "Years",
+                "Str",
             )
         else:
             columns = (
@@ -401,6 +431,7 @@ class LeagueStatsWidget:
                 "SV",
                 "Salary",
                 "Years",
+                "Str",
             )
 
         tree = ttk.Treeview(parent, columns=columns, show="headings", height=17)
@@ -450,6 +481,8 @@ class LeagueStatsWidget:
                 tree.column(col, width=50, anchor=tk.CENTER)
             elif col == "Salary":
                 tree.column(col, width=65, anchor=tk.CENTER)
+            elif col == "Str":
+                tree.column(col, width=30, anchor=tk.CENTER)
             else:
                 tree.column(col, width=50, anchor=tk.CENTER)
 
@@ -458,6 +491,11 @@ class LeagueStatsWidget:
         tree.configure(yscrollcommand=scrollbar.set)
         scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
         tree.pack(fill=tk.X, expand=False)
+
+        # Configure tags for streak highlighting
+        tree.tag_configure("streak_hot", foreground=STREAK_HOT)
+        tree.tag_configure("streak_cold", foreground=STREAK_COLD)
+        tree.tag_configure("streak_normal", foreground=STREAK_NORMAL)
 
         # Bind double-click to open history popup (single click just highlights)
         tree.bind(
@@ -670,6 +708,9 @@ class LeagueStatsWidget:
 
                     if mode == "difference":
                         # Format with +/- prefix for difference mode
+                        streak_text, _ = get_streak_indicator(
+                            row.get("Streak_Adjustment")
+                        )
                         values = (
                             row.get("Player", "Unknown"),
                             row.get("Team", ""),
@@ -689,9 +730,13 @@ class LeagueStatsWidget:
                             self._format_diff_value(row.get("OPS", 0), decimals=3),
                             salary_display,
                             years_rem,
+                            streak_text,
                         )
                     else:
                         # Standard format for current stats
+                        streak_text, _ = get_streak_indicator(
+                            row.get("Streak_Adjustment")
+                        )
                         values = (
                             row.get("Player", "Unknown"),
                             row.get("Team", ""),
@@ -711,6 +756,7 @@ class LeagueStatsWidget:
                             f"{float(row.get('OPS', 0)):.3f}",
                             salary_display,
                             years_rem,
+                            streak_text,
                         )
                 else:
                     # Get salary and calculate years remaining
@@ -721,6 +767,9 @@ class LeagueStatsWidget:
 
                     if mode == "difference":
                         # Format with +/- prefix for difference mode
+                        streak_text, _ = get_streak_indicator(
+                            row.get("Streak_Adjustment")
+                        )
                         values = (
                             row.get("Player", "Unknown"),
                             row.get("Team", ""),
@@ -740,9 +789,13 @@ class LeagueStatsWidget:
                             self._format_diff_value(row.get("SV", 0)),
                             salary_display,
                             years_rem,
+                            streak_text,
                         )
                     else:
                         # Standard format for current stats
+                        streak_text, _ = get_streak_indicator(
+                            row.get("Streak_Adjustment")
+                        )
                         values = (
                             row.get("Player", "Unknown"),
                             row.get("Team", ""),
@@ -762,9 +815,23 @@ class LeagueStatsWidget:
                             int(row.get("SV", 0)),
                             salary_display,
                             years_rem,
+                            streak_text,
                         )
 
-                tree.insert("", tk.END, values=values)
+                # Determine streak tag
+                streak_value = row.get("Streak_Adjustment")
+                streak_tag = ()
+                if streak_value is not None:
+                    try:
+                        streak = float(streak_value)
+                        if streak >= 0.025:
+                            streak_tag = ("streak_hot",)
+                        elif streak <= -0.025:
+                            streak_tag = ("streak_cold",)
+                    except (ValueError, TypeError):
+                        pass
+
+                tree.insert("", tk.END, values=values, tags=streak_tag)
             except Exception as e:
                 logger.warning(
                     f"Error inserting stats row for {row.get('Player', 'Unknown')}: {e}"

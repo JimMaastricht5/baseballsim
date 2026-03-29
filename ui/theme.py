@@ -42,6 +42,11 @@ ROW_SELECTED = "#1f3b5e"
 ROW_FOLLOWED = "#2a3f1c"  # Subtle green tint for followed team row
 FG_FOLLOWED = "#d4a017"  # Gold text for followed team
 
+# ── Streak indicator colours ────────────────────────────────────────────────
+STREAK_HOT = "#2ea043"  # Green - hot streak
+STREAK_COLD = "#f85149"  # Red - cold streak
+STREAK_NORMAL = "#8b949e"  # Gray - normal
+
 # ── Misc ──────────────────────────────────────────────────────────────────────
 BORDER = "#30363d"  # Frame borders, separators
 

@@ -21,9 +21,38 @@ from ui.theme import (
     ACCENT_GOLD,
     ROW_IL,
     ROW_DTD,
+    STREAK_HOT,
+    STREAK_COLD,
+    STREAK_NORMAL,
 )
 
 LEAGUE_MIN_SALARY = 740000
+
+
+def get_streak_indicator(streak_value) -> tuple:
+    """
+    Generate streak indicator text and color based on streak value.
+
+    Args:
+        streak_value: The Streak_Adjustment value (float from -0.10 to 0.10)
+
+    Returns:
+        Tuple of (display_text, color)
+    """
+    if pd.isna(streak_value):
+        return ("-", STREAK_NORMAL)
+
+    try:
+        streak = float(streak_value)
+    except (ValueError, TypeError):
+        return ("-", STREAK_NORMAL)
+
+    if streak >= 0.025:
+        return ("▲", STREAK_HOT)
+    elif streak <= -0.025:
+        return ("▼", STREAK_COLD)
+    else:
+        return ("-", STREAK_NORMAL)
 
 
 def estimate_years_remaining(age: int, salary: float, is_pitcher: bool = False) -> int:
@@ -321,6 +350,7 @@ class RosterWidget:
                 "Years",
                 "Condition",
                 "Status",
+                "Str",
             )
         else:
             columns = (
@@ -343,6 +373,7 @@ class RosterWidget:
                 "Years",
                 "Condition",
                 "Status",
+                "Str",
             )
 
         tree = ttk.Treeview(parent, columns=columns, show="headings", height=15)
@@ -393,6 +424,8 @@ class RosterWidget:
                 tree.column(col, width=50, anchor=tk.CENTER)
             elif col == "Salary":
                 tree.column(col, width=65, anchor=tk.CENTER)
+            elif col == "Str":
+                tree.column(col, width=30, anchor=tk.CENTER)
             else:
                 tree.column(col, width=50, anchor=tk.CENTER)
 
@@ -407,6 +440,11 @@ class RosterWidget:
             "day_to_day", background=ROW_DTD
         )  # Dark amber for day-to-day (<10 days)
         tree.tag_configure("injured", background=ROW_IL)  # Dark red for IL (>=10 days)
+
+        # Configure tags for streak highlighting
+        tree.tag_configure("streak_hot", foreground=STREAK_HOT)
+        tree.tag_configure("streak_cold", foreground=STREAK_COLD)
+        tree.tag_configure("streak_normal", foreground=STREAK_NORMAL)
 
         # Bind double-click to open history popup (single click just highlights)
         tree.bind("<Double-Button-1>", lambda e: self._on_player_click(tree, is_batter))
@@ -820,6 +858,9 @@ class RosterWidget:
 
                     if mode == "difference":
                         # Format with +/- prefix for difference mode
+                        streak_text, _ = get_streak_indicator(
+                            row.get("Streak_Adjustment")
+                        )
                         values = (
                             row.get("Player", "Unknown"),
                             pos,
@@ -840,9 +881,13 @@ class RosterWidget:
                             years_rem,
                             condition_display,
                             row.get("Status", "Healthy"),
+                            streak_text,
                         )
                     else:
                         # Standard format for current stats
+                        streak_text, _ = get_streak_indicator(
+                            row.get("Streak_Adjustment")
+                        )
                         values = (
                             row.get("Player", "Unknown"),
                             pos,
@@ -863,6 +908,7 @@ class RosterWidget:
                             years_rem,
                             condition_display,
                             row.get("Status", "Healthy"),
+                            streak_text,
                         )
                 else:
                     # Get salary and calculate years remaining
@@ -873,6 +919,9 @@ class RosterWidget:
 
                     if mode == "difference":
                         # Format with +/- prefix for difference mode
+                        streak_text, _ = get_streak_indicator(
+                            row.get("Streak_Adjustment")
+                        )
                         values = (
                             row.get("Player", "Unknown"),
                             self._format_diff_value(row.get("G", 0)),
@@ -893,9 +942,13 @@ class RosterWidget:
                             years_rem,
                             condition_display,
                             row.get("Status", "Healthy"),
+                            streak_text,
                         )
                     else:
                         # Standard format for current stats
+                        streak_text, _ = get_streak_indicator(
+                            row.get("Streak_Adjustment")
+                        )
                         values = (
                             row.get("Player", "Unknown"),
                             int(row.get("G", 0)),
@@ -916,6 +969,7 @@ class RosterWidget:
                             years_rem,
                             condition_display,
                             row.get("Status", "Healthy"),
+                            streak_text,
                         )
 
                 # Determine injury tag based on Injured Days
@@ -925,6 +979,25 @@ class RosterWidget:
                         tags = ("day_to_day",)
                     else:
                         tags = ("injured",)
+
+                # Determine streak tag
+                streak_value = row.get("Streak_Adjustment")
+                streak_tag = ()
+                if streak_value is not None:
+                    try:
+                        streak = float(streak_value)
+                        if streak >= 0.025:
+                            streak_tag = ("streak_hot",)
+                        elif streak <= -0.025:
+                            streak_tag = ("streak_cold",)
+                    except (ValueError, TypeError):
+                        pass
+
+                # Combine tags
+                if tags and streak_tag:
+                    tags = tags + streak_tag
+                elif streak_tag:
+                    tags = streak_tag
 
                 tree.insert("", tk.END, values=values, tags=tags)
             except Exception as e:

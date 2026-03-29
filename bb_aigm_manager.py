@@ -191,8 +191,8 @@ class GMStrategy:
         # Determine strategic stage
         stage = self._determine_stage(alpha, win_pct, games_back)
 
-        logger.info(f"Strategy calculation: W-L={wins}-{losses} ({win_pct:.3f}), "
-                   f"GB={games_back:.1f}, G={games_played}, alpha={alpha:.3f}, Stage={stage}")
+        # logger.info(f"Strategy calculation: W-L={wins}-{losses} ({win_pct:.3f}), "
+        #            f"GB={games_back:.1f}, G={games_played}, alpha={alpha:.3f}, Stage={stage}")
 
         return TeamStrategy(
             alpha=alpha,
@@ -542,7 +542,7 @@ class AIGeneralManager:
         self.trade_value_threshold = 2.0  # Consider trading if value exceeds this
         self.promotion_threshold = 1.0  # Promote prospects if projected above this
 
-        logger.info(f"Initialized AI GM for {team_name}, assessing every {assessment_frequency} games")
+        # logger.info(f"Initialized AI GM for {team_name}, assessing every {assessment_frequency} games")
 
     def should_assess(self, games_played: int) -> bool:
         """
@@ -573,10 +573,10 @@ class AIGeneralManager:
         Returns:
             Dictionary with assessment results and recommendations
         """
-        logger.info(f"\n{'='*60}")
-        logger.info(f"AI GM Assessment: {self.team_name} after {games_played} games")
-        logger.info(f"Record: {team_record[0]}-{team_record[1]}, GB: {games_back:.1f}")
-        logger.info(f"{'='*60}")
+        # logger.info(f"\n{'='*60}")
+        # logger.info(f"AI GM Assessment: {self.team_name} after {games_played} games")
+        # logger.info(f"Record: {team_record[0]}-{team_record[1]}, GB: {games_back:.1f}")
+        # logger.info(f"{'='*60}")
 
         # Update last assessment
         self.last_assessment_game = games_played
@@ -586,8 +586,8 @@ class AIGeneralManager:
             team_record, games_back, games_played
         )
 
-        logger.info(f"Strategy: {strategy.stage} (alpha={strategy.alpha:.3f})")
-        logger.info(f"Win Pct: {strategy.win_pct:.3f}, Games Back: {strategy.games_back:.1f}")
+        # logger.info(f"Strategy: {strategy.stage} (alpha={strategy.alpha:.3f})")
+        # logger.info(f"Win Pct: {strategy.win_pct:.3f}, Games Back: {strategy.games_back:.1f}")
 
         # Step 2: Value all players on roster
         roster_values = self._value_roster(baseball_stats, strategy.alpha, games_played)

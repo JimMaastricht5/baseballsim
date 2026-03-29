@@ -57,10 +57,12 @@ class UIBaseballSeason(bbseason.BaseballSeason):
         output_handler = self._create_signal_output_handler(signals)
         # Create play-by-play callback factory for game-level real-time updates
         play_by_play_factory = self._create_play_by_play_callback
-        super().__init__(*args,
-                         output_handler=output_handler,
-                         play_by_play_callback_factory=play_by_play_factory,
-                         **kwargs)
+        super().__init__(
+            *args,
+            output_handler=output_handler,
+            play_by_play_callback_factory=play_by_play_factory,
+            **kwargs,
+        )
         self.signals = signals
         # Track World Series state for play-by-play game numbering
         self.ws_active = False
@@ -84,6 +86,7 @@ class UIBaseballSeason(bbseason.BaseballSeason):
         Returns:
             callable: Output handler function
         """
+
         def handler(category: str, text: str, metadata: Optional[dict] = None):
             """Handle output by emitting appropriate signals."""
             # Most categories are suppressed for UI (no console output needed)
@@ -99,7 +102,10 @@ class UIBaseballSeason(bbseason.BaseballSeason):
             # Only log important events
             if category in (OutputCategory.SEASON_START, OutputCategory.SEASON_END):
                 logger.info(f"Season event: {text.strip()}")
-            elif category in (OutputCategory.WORLD_SERIES_START, OutputCategory.WORLD_SERIES_END):
+            elif category in (
+                OutputCategory.WORLD_SERIES_START,
+                OutputCategory.WORLD_SERIES_END,
+            ):
                 logger.info(f"World Series event: {text.strip()}")
 
             # Suppress all console output - UI handles display
@@ -107,7 +113,9 @@ class UIBaseballSeason(bbseason.BaseballSeason):
 
         return handler
 
-    def _create_play_by_play_callback(self, away_team: str, home_team: str, day_num: int):
+    def _create_play_by_play_callback(
+        self, away_team: str, home_team: str, day_num: int
+    ):
         """
         Create a callback function for emitting play-by-play during game simulation.
 
@@ -119,30 +127,48 @@ class UIBaseballSeason(bbseason.BaseballSeason):
         Returns:
             callable: Callback function that accepts text string
         """
+
         def callback(text: str):
-            logger.debug(f"Callback invoked for {away_team} @ {home_team}, team_to_follow={self.team_to_follow}")
+            logger.debug(
+                f"Callback invoked for {away_team} @ {home_team}, team_to_follow={self.team_to_follow}"
+            )
             # Only emit if this involves a followed team
-            if not self.team_to_follow or any(team in self.team_to_follow for team in [away_team, home_team]):
+            if not self.team_to_follow or any(
+                team in self.team_to_follow for team in [away_team, home_team]
+            ):
                 logger.debug(f"Emitting play-by-play for {away_team} @ {home_team}")
 
                 # Calculate World Series game number if WS is active
                 ws_game_num = None
                 if self.ws_active and self.ws_al_winner and self.ws_nl_winner:
                     # Total games completed = total new wins by both teams
-                    al_wins = self.team_win_loss[self.ws_al_winner][WIN] - self.ws_al_start_wins
-                    nl_wins = self.team_win_loss[self.ws_nl_winner][WIN] - self.ws_nl_start_wins
-                    ws_game_num = al_wins + nl_wins + 1  # +1 for current game in progress
-                    logger.info(f"World Series game {ws_game_num}: {self.ws_al_winner} {al_wins}, {self.ws_nl_winner} {nl_wins}")
+                    al_wins = (
+                        self.team_win_loss[self.ws_al_winner][WIN]
+                        - self.ws_al_start_wins
+                    )
+                    nl_wins = (
+                        self.team_win_loss[self.ws_nl_winner][WIN]
+                        - self.ws_nl_start_wins
+                    )
+                    ws_game_num = (
+                        al_wins + nl_wins + 1
+                    )  # +1 for current game in progress
+                    logger.info(
+                        f"World Series game {ws_game_num}: {self.ws_al_winner} {al_wins}, {self.ws_nl_winner} {nl_wins}"
+                    )
 
-                self.signals.emit_play_by_play({
-                    'away_team': away_team,
-                    'home_team': home_team,
-                    'text': text,
-                    'day_num': day_num,
-                    'ws_game_num': ws_game_num  # None for regular season, 1-7 for World Series
-                })
+                self.signals.emit_play_by_play(
+                    {
+                        "away_team": away_team,
+                        "home_team": home_team,
+                        "text": text,
+                        "day_num": day_num,
+                        "ws_game_num": ws_game_num,  # None for regular season, 1-7 for World Series
+                    }
+                )
             else:
                 logger.info(f"Skipping play-by-play - teams not in follow list")
+
         return callback
 
     def _process_and_print_game_results(self, game_results: List[tuple]) -> None:
@@ -154,50 +180,77 @@ class UIBaseballSeason(bbseason.BaseballSeason):
         - day_completed signal with batch of non-followed games and standings
 
         Args:
-            game_results: List of tuples (match_up, score, game_recap, away_box_score, home_box_score)
+            game_results: List of tuples (match_up, score, game_recap, away_box_score, home_box_score, structured_game)
         """
         compact_summaries = []
 
-        for match_up, score, game_recap, away_box_score, home_box_score in game_results:
+        for result in game_results:
+            # Handle both old format (5 elements) and new format (6 elements with structured_game)
+            if len(result) == 6:
+                (
+                    match_up,
+                    score,
+                    game_recap,
+                    away_box_score,
+                    home_box_score,
+                    structured_game,
+                ) = result
+            else:
+                match_up, score, game_recap, away_box_score, home_box_score = result
+                structured_game = None
+
             # Check if this was a followed game
             # Empty team_to_follow means follow ALL games (used for World Series)
-            is_followed = (not self.team_to_follow) or any(team in self.team_to_follow for team in match_up)
+            is_followed = (not self.team_to_follow) or any(
+                team in self.team_to_follow for team in match_up
+            )
 
             # Build game data dict
             game_data = {
-                'away_team': match_up[0],
-                'home_team': match_up[1],
-                'away_r': score[0],
-                'home_r': score[1],
-                'away_h': away_box_score.total_hits,
-                'home_h': home_box_score.total_hits,
-                'away_e': away_box_score.total_errors,
-                'home_e': home_box_score.total_errors,
-                'game_recap': game_recap if is_followed else '',  # Full recap for followed games (display in Play-by-Play tab)
-                'day_num': self.season_day_num if is_followed else None  # Use instance variable
+                "away_team": match_up[0],
+                "home_team": match_up[1],
+                "away_r": score[0],
+                "home_r": score[1],
+                "away_h": away_box_score.total_hits,
+                "home_h": home_box_score.total_hits,
+                "away_e": away_box_score.total_errors,
+                "home_e": home_box_score.total_errors,
+                "game_recap": game_recap
+                if is_followed
+                else "",  # Full recap for followed games
+                "day_num": self.season_day_num
+                if is_followed
+                else None,  # Use instance variable
+                "structured_game": structured_game,  # Structured game data for formatted display
             }
 
             if is_followed:
                 # Emit immediately for followed teams
                 self.signals.emit_game_completed(game_data)
-                logger.debug(f"Emitted game_completed for {match_up[0]} @ {match_up[1]}")
+                logger.debug(
+                    f"Emitted game_completed for {match_up[0]} @ {match_up[1]}"
+                )
             else:
                 # Collect for batch emission
-                compact_summaries.append({
-                    'away_team': match_up[0],
-                    'home_team': match_up[1],
-                    'away_r': score[0],
-                    'home_r': score[1],
-                    'away_h': away_box_score.total_hits,
-                    'home_h': home_box_score.total_hits,
-                    'away_e': away_box_score.total_errors,
-                    'home_e': home_box_score.total_errors
-                })
+                compact_summaries.append(
+                    {
+                        "away_team": match_up[0],
+                        "home_team": match_up[1],
+                        "away_r": score[0],
+                        "home_r": score[1],
+                        "away_h": away_box_score.total_hits,
+                        "home_h": home_box_score.total_hits,
+                        "away_e": away_box_score.total_errors,
+                        "home_e": home_box_score.total_errors,
+                    }
+                )
 
         # Emit batch update with standings
         standings_data = self.extract_standings()
         self.signals.emit_day_completed(compact_summaries, standings_data)
-        logger.debug(f"Emitted day_completed with {len(compact_summaries)} games and standings")
+        logger.debug(
+            f"Emitted day_completed with {len(compact_summaries)} games and standings"
+        )
 
     def check_gm_assessments(self, force: bool = False) -> None:
         """
@@ -239,24 +292,26 @@ class UIBaseballSeason(bbseason.BaseballSeason):
                 should_report = teams_to_print is None or team_name in teams_to_print
 
                 # Run GM assessment (with should_print=False to suppress console output)
-                logger.info(f"Running GM assessment for {team_name} after {games_played} games")
+                logger.info(
+                    f"Running GM assessment for {team_name} after {games_played} games"
+                )
                 assessment = gm.assess_roster(
                     baseball_stats=self.baseball_data,
                     team_record=(wins, losses),
                     games_back=games_back,
                     games_played=games_played,
-                    should_print=False  # Suppress console output
+                    should_print=False,  # Suppress console output
                 )
 
                 # Emit signal if this is a followed team
                 if should_report:
                     assessment_data = {
-                        'team': team_name,
-                        'games_played': games_played,
-                        'wins': wins,
-                        'losses': losses,
-                        'games_back': games_back,
-                        'assessment': assessment
+                        "team": team_name,
+                        "games_played": games_played,
+                        "wins": wins,
+                        "losses": losses,
+                        "games_back": games_back,
+                        "assessment": assessment,
                     }
                     self.signals.emit_gm_assessment_ready(assessment_data)
                     logger.info(f"Emitted gm_assessment_ready for {team_name}")
@@ -280,7 +335,7 @@ class UIBaseballSeason(bbseason.BaseballSeason):
         super().sim_day_threaded(season_day_num)
 
         # UI-specific: During World Series, wait for play-by-play to finish before showing box scores
-        if self.ws_active and hasattr(self, 'signals') and self.signals is not None:
+        if self.ws_active and hasattr(self, "signals") and self.signals is not None:
             self._wait_for_play_by_play_to_finish()
 
         # UI-specific: Extract and emit injury update
@@ -301,52 +356,71 @@ class UIBaseballSeason(bbseason.BaseballSeason):
         # Get team-to-league and division mappings from baseball_data
         team_league_map = {}
         team_division_map = {}
-        if hasattr(self.baseball_data, 'batting_data'):
+        if hasattr(self.baseball_data, "batting_data"):
             cols = self.baseball_data.batting_data.columns
-            if 'League' in cols and 'Division' in cols:
-                team_df = self.baseball_data.batting_data[['Team', 'League', 'Division']].drop_duplicates()
-                team_league_map = dict(zip(team_df['Team'], team_df['League']))
-                team_division_map = dict(zip(team_df['Team'], team_df['Division']))
-            elif 'League' in cols:
-                team_df = self.baseball_data.batting_data[['Team', 'League']].drop_duplicates()
-                team_league_map = dict(zip(team_df['Team'], team_df['League']))
+            if "League" in cols and "Division" in cols:
+                team_df = self.baseball_data.batting_data[
+                    ["Team", "League", "Division"]
+                ].drop_duplicates()
+                team_league_map = dict(zip(team_df["Team"], team_df["League"]))
+                team_division_map = dict(zip(team_df["Team"], team_df["Division"]))
+            elif "League" in cols:
+                team_df = self.baseball_data.batting_data[
+                    ["Team", "League"]
+                ].drop_duplicates()
+                team_league_map = dict(zip(team_df["Team"], team_df["League"]))
 
         for team in self.team_win_loss:
-            if team != 'OFF DAY':
+            if team != "OFF DAY":
                 win_loss = self.team_win_loss[team]
                 teaml.append(team)
                 winl.append(win_loss[0])
                 lossl.append(win_loss[1])
-                leaguel.append(team_league_map.get(team, 'AL'))
-                divisionl.append(team_division_map.get(team, 'East'))
+                leaguel.append(team_league_map.get(team, "AL"))
+                divisionl.append(team_division_map.get(team, "East"))
 
-        df = pd.DataFrame({'Team': teaml, 'W': winl, 'L': lossl,
-                           'League': leaguel, 'Division': divisionl})
-        df['Pct'] = (df['W'] / (df['W'] + df['L'])).fillna(0.0)
+        df = pd.DataFrame(
+            {
+                "Team": teaml,
+                "W": winl,
+                "L": lossl,
+                "League": leaguel,
+                "Division": divisionl,
+            }
+        )
+        df["Pct"] = (df["W"] / (df["W"] + df["L"])).fillna(0.0)
 
         def calculate_gb(group_df):
             if len(group_df) == 0:
                 return group_df
-            group_df = group_df.sort_values(['W', 'L'], ascending=[False, True]).reset_index(drop=True)
-            max_wins = group_df['W'].iloc[0]
-            leader_losses = group_df['L'].iloc[0]
-            group_df['GB'] = ((max_wins - group_df['W']) + (group_df['L'] - leader_losses)) / 2.0
-            group_df['GB'] = group_df['GB'].apply(lambda x: '-' if x == 0 else f'{x:.1f}')
+            group_df = group_df.sort_values(
+                ["W", "L"], ascending=[False, True]
+            ).reset_index(drop=True)
+            max_wins = group_df["W"].iloc[0]
+            leader_losses = group_df["L"].iloc[0]
+            group_df["GB"] = (
+                (max_wins - group_df["W"]) + (group_df["L"] - leader_losses)
+            ) / 2.0
+            group_df["GB"] = group_df["GB"].apply(
+                lambda x: "-" if x == 0 else f"{x:.1f}"
+            )
             return group_df
 
         result = {}
-        for league in ('AL', 'NL'):
+        for league in ("AL", "NL"):
             key = league.lower()
             result[key] = {}
-            league_df = df[df['League'] == league]
-            for division in ('East', 'Central', 'West'):
-                div_df = calculate_gb(league_df[league_df['Division'] == division].copy())
+            league_df = df[df["League"] == league]
+            for division in ("East", "Central", "West"):
+                div_df = calculate_gb(
+                    league_df[league_df["Division"] == division].copy()
+                )
                 result[key][division] = {
-                    'teams': div_df['Team'].tolist(),
-                    'wins': div_df['W'].tolist(),
-                    'losses': div_df['L'].tolist(),
-                    'pct': div_df['Pct'].tolist(),
-                    'gb': div_df['GB'].tolist()
+                    "teams": div_df["Team"].tolist(),
+                    "wins": div_df["W"].tolist(),
+                    "losses": div_df["L"].tolist(),
+                    "pct": div_df["Pct"].tolist(),
+                    "gb": div_df["GB"].tolist(),
                 }
         return result
 
@@ -371,38 +445,42 @@ class UIBaseballSeason(bbseason.BaseballSeason):
         # Check batters
         try:
             injured_batters = self.baseball_data.new_season_batting_data[
-                self.baseball_data.new_season_batting_data['Injured Days'] > 0
+                self.baseball_data.new_season_batting_data["Injured Days"] > 0
             ]
 
             for idx, row in injured_batters.iterrows():
-                days = int(row['Injured Days'])
-                injuries.append({
-                    'player': row['Player'],
-                    'team': row['Team'],
-                    'position': row.get('Pos', 'Unknown'),
-                    'injury': row.get('Injury Description', 'Undisclosed'),
-                    'days_remaining': days,
-                    'status': 'IL' if days >= 10 else 'Day-to-Day'
-                })
+                days = int(row["Injured Days"])
+                injuries.append(
+                    {
+                        "player": row["Player"],
+                        "team": row["Team"],
+                        "position": row.get("Pos", "Unknown"),
+                        "injury": row.get("Injury Description", "Undisclosed"),
+                        "days_remaining": days,
+                        "status": "IL" if days >= 10 else "Day-to-Day",
+                    }
+                )
         except Exception as e:
             logger.warning(f"Error extracting batter injuries: {e}")
 
         # Check pitchers
         try:
             injured_pitchers = self.baseball_data.new_season_pitching_data[
-                self.baseball_data.new_season_pitching_data['Injured Days'] > 0
+                self.baseball_data.new_season_pitching_data["Injured Days"] > 0
             ]
 
             for idx, row in injured_pitchers.iterrows():
-                days = int(row['Injured Days'])
-                injuries.append({
-                    'player': row['Player'],
-                    'team': row['Team'],
-                    'position': 'P',
-                    'injury': row.get('Injury Description', 'Undisclosed'),
-                    'days_remaining': days,
-                    'status': 'IL' if days >= 10 else 'Day-to-Day'
-                })
+                days = int(row["Injured Days"])
+                injuries.append(
+                    {
+                        "player": row["Player"],
+                        "team": row["Team"],
+                        "position": "P",
+                        "injury": row.get("Injury Description", "Undisclosed"),
+                        "days_remaining": days,
+                        "status": "IL" if days >= 10 else "Day-to-Day",
+                    }
+                )
         except Exception as e:
             logger.warning(f"Error extracting pitcher injuries: {e}")
 
@@ -429,8 +507,8 @@ class UIBaseballSeason(bbseason.BaseballSeason):
         schedule_lines = []
 
         for match_up in todays_games:
-            if 'OFF DAY' in match_up:
-                off_team = match_up[0] if match_up[0] != 'OFF DAY' else match_up[1]
+            if "OFF DAY" in match_up:
+                off_team = match_up[0] if match_up[0] != "OFF DAY" else match_up[1]
                 schedule_lines.append(f"{off_team} has an OFF DAY")
             else:
                 schedule_lines.append(f"{match_up[0]} @ {match_up[1]}")
@@ -452,7 +530,7 @@ class UIBaseballSeason(bbseason.BaseballSeason):
             return
 
         # Add all playoff seeds to team_to_follow for play-by-play output
-        for league in ('AL', 'NL'):
+        for league in ("AL", "NL"):
             try:
                 seeds = self.get_playoff_seeds(league)
                 for team in seeds:
@@ -467,19 +545,23 @@ class UIBaseballSeason(bbseason.BaseballSeason):
         self.ws_active = True
 
         # Activate Playoffs tab and start routing games to the playoff widget
-        if hasattr(self, 'signals') and self.signals is not None:
+        if hasattr(self, "signals") and self.signals is not None:
             if self.signals.main_window is not None:
                 self.signals.main_window.world_series_active = True
                 self.signals.main_window.world_series_teams = set(self.team_to_follow)
-                logger.info(f"Playoffs starting; routing {len(self.team_to_follow)} teams to playoff widget")
+                logger.info(
+                    f"Playoffs starting; routing {len(self.team_to_follow)} teams to playoff widget"
+                )
 
             # Emit with playoff_mode=True — activates tab without setting WS matchup yet
-            self.signals.emit_world_series_started({
-                'al_winner': 'AL',
-                'nl_winner': 'NL',
-                'season': self.new_season,
-                'playoff_mode': True
-            })
+            self.signals.emit_world_series_started(
+                {
+                    "al_winner": "AL",
+                    "nl_winner": "NL",
+                    "season": self.new_season,
+                    "playoff_mode": True,
+                }
+            )
 
         # Run full bracket: Wild Card → DS → LCS → World Series
         # (calls run_playoff_series() → sim_next_day() → existing game signals)
@@ -506,17 +588,19 @@ class UIBaseballSeason(bbseason.BaseballSeason):
         self.ws_nl_start_wins = nl_record[WIN]
 
         # Re-emit world_series_started with actual finalists to update widget header
-        if hasattr(self, 'signals') and self.signals is not None:
+        if hasattr(self, "signals") and self.signals is not None:
             if self.signals.main_window is not None:
                 self.signals.main_window.world_series_teams = {al_champ, nl_champ}
-            self.signals.emit_world_series_started({
-                'al_winner': al_champ,
-                'nl_winner': nl_champ,
-                'season': self.new_season,
-                'al_record': al_record,
-                'nl_record': nl_record,
-                'playoff_mode': False
-            })
+            self.signals.emit_world_series_started(
+                {
+                    "al_winner": al_champ,
+                    "nl_winner": nl_champ,
+                    "season": self.new_season,
+                    "al_record": al_record,
+                    "nl_record": nl_record,
+                    "playoff_mode": False,
+                }
+            )
 
         # Run the series (calls run_playoff_series() → sim_next_day() → game signals)
         super().run_world_series_new(al_champ, nl_champ)
@@ -525,12 +609,14 @@ class UIBaseballSeason(bbseason.BaseballSeason):
         ws_al_wins = self.team_win_loss[al_champ][WIN] - al_record[WIN]
         ws_nl_wins = self.team_win_loss[nl_champ][WIN] - nl_record[WIN]
         ws_winner = al_champ if ws_al_wins > ws_nl_wins else nl_champ
-        if hasattr(self, 'signals') and self.signals is not None:
-            self.signals.emit_world_series_completed({
-                'champion': ws_winner,
-                'season': self.new_season,
-                'series_result': {al_champ: ws_al_wins, nl_champ: ws_nl_wins}
-            })
+        if hasattr(self, "signals") and self.signals is not None:
+            self.signals.emit_world_series_completed(
+                {
+                    "champion": ws_winner,
+                    "season": self.new_season,
+                    "series_result": {al_champ: ws_al_wins, nl_champ: ws_nl_wins},
+                }
+            )
 
     def run_world_series(self) -> None:
         """
@@ -559,20 +645,24 @@ class UIBaseballSeason(bbseason.BaseballSeason):
         # Emit world_series_started signal
         # IMPORTANT: Also set world_series_active flag IMMEDIATELY to avoid timing issues
         # with queued signals being processed after games complete
-        if hasattr(self, 'signals') and self.signals is not None:
+        if hasattr(self, "signals") and self.signals is not None:
             # Set world_series_active synchronously BEFORE emitting signal
             if self.signals.main_window is not None:
                 self.signals.main_window.world_series_active = True
                 self.signals.main_window.world_series_teams = {al_winner, nl_winner}
-                logger.info(f"Set world_series_active=True synchronously for {al_winner} vs {nl_winner}")
+                logger.info(
+                    f"Set world_series_active=True synchronously for {al_winner} vs {nl_winner}"
+                )
 
-            self.signals.emit_world_series_started({
-                'al_winner': al_winner,
-                'nl_winner': nl_winner,
-                'season': self.new_season,
-                'al_record': self.team_win_loss[al_winner],
-                'nl_record': self.team_win_loss[nl_winner]
-            })
+            self.signals.emit_world_series_started(
+                {
+                    "al_winner": al_winner,
+                    "nl_winner": nl_winner,
+                    "season": self.new_season,
+                    "al_record": self.team_win_loss[al_winner],
+                    "nl_record": self.team_win_loss[nl_winner],
+                }
+            )
 
         # Create World Series schedule and append to existing schedule (matches base bbseason.py:788-790)
         ws_schedule = self.create_world_series_schedule(al_winner, nl_winner)
@@ -592,13 +682,19 @@ class UIBaseballSeason(bbseason.BaseballSeason):
         self.ws_nl_winner = nl_winner
         self.ws_al_start_wins = al_record[WIN]
         self.ws_nl_start_wins = nl_record[WIN]
-        logger.info(f"World Series settings: season_chatty={self.season_chatty}, team_to_follow={self.team_to_follow}")
-        logger.info(f"World Series tracking: AL {al_winner} starts at {al_record[WIN]} wins, NL {nl_winner} starts at {nl_record[WIN]} wins")
+        logger.info(
+            f"World Series settings: season_chatty={self.season_chatty}, team_to_follow={self.team_to_follow}"
+        )
+        logger.info(
+            f"World Series tracking: AL {al_winner} starts at {al_record[WIN]} wins, NL {nl_winner} starts at {nl_record[WIN]} wins"
+        )
 
         # Run World Series simulation (matches base bbseason.py:797-800)
-        while (self.season_day_num < len(self.schedule) and
-               self.team_win_loss[al_winner][WIN] - al_record[WIN] < 4 and
-               self.team_win_loss[nl_winner][WIN] - nl_record[WIN] < 4):
+        while (
+            self.season_day_num < len(self.schedule)
+            and self.team_win_loss[al_winner][WIN] - al_record[WIN] < 4
+            and self.team_win_loss[nl_winner][WIN] - nl_record[WIN] < 4
+        ):
             logger.info(f"Simulating World Series day {self.season_day_num + 1}")
             self.sim_next_day()
             # Note: play-by-play queue draining now happens inside sim_day_threaded()
@@ -612,15 +708,14 @@ class UIBaseballSeason(bbseason.BaseballSeason):
         ws_winner = al_winner if ws_al_wins > ws_nl_wins else nl_winner
 
         # Emit world_series_completed signal (UI-specific addition)
-        if hasattr(self, 'signals') and self.signals is not None:
-            self.signals.emit_world_series_completed({
-                'champion': ws_winner,
-                'season': self.new_season,
-                'series_result': {
-                    al_winner: ws_al_wins,
-                    nl_winner: ws_nl_wins
+        if hasattr(self, "signals") and self.signals is not None:
+            self.signals.emit_world_series_completed(
+                {
+                    "champion": ws_winner,
+                    "season": self.new_season,
+                    "series_result": {al_winner: ws_al_wins, nl_winner: ws_nl_wins},
                 }
-            })
+            )
 
         # Save season stats (matches base bbseason.py:816)
         self.baseball_data.save_season_stats()
@@ -644,8 +739,12 @@ class UIBaseballSeason(bbseason.BaseballSeason):
             if queue_size == 0:
                 logger.info("Play-by-play queue is empty, continuing to next game")
                 return
-            logger.debug(f"Waiting for play-by-play queue to drain ({queue_size} items remaining)")
+            logger.debug(
+                f"Waiting for play-by-play queue to drain ({queue_size} items remaining)"
+            )
             time.sleep(0.1)  # Sleep 100ms between checks
 
-        logger.warning(f"Timeout waiting for play-by-play queue to drain (still {queue_obj.qsize()} items)")
+        logger.warning(
+            f"Timeout waiting for play-by-play queue to drain (still {queue_obj.qsize()} items)"
+        )
         return

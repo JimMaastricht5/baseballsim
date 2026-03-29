@@ -38,6 +38,7 @@ class Bases:
         player_scored: Dictionary of players who scored this at-bat
         runs_scored: Number of runs scored in current at-bat
     """
+
     def __init__(self) -> None:
         """Initialize empty bases with no runners."""
         self.baserunners = None
@@ -47,7 +48,9 @@ class Bases:
         self.runs_scored = 0
         return
 
-    def handle_runners(self, score_book_cd: str, bases_to_advance: int, on_base_b: bool, outs: int) -> None:
+    def handle_runners(
+        self, score_book_cd: str, bases_to_advance: int, on_base_b: bool, outs: int
+    ) -> None:
         """
         Process runner advancement based on at-bat outcome.
 
@@ -66,25 +69,36 @@ class Bases:
         """
         if outs >= 3:
             return
-        if score_book_cd in ['BB', 'HBP']:
-            bases_to_advance = self.walk_or_hbp(bases_to_advance)  # set to 1 if bases loaded, else move runners indivly
-        elif score_book_cd in ['SF']:
-            bases_to_advance = self.tag_up(outs)  # move runner from third and set other runners to hold w/ 0
-        elif score_book_cd in ['DP', 'GB FC', 'GB']:
+        if score_book_cd in ["BB", "HBP"]:
+            bases_to_advance = self.walk_or_hbp(
+                bases_to_advance
+            )  # set to 1 if bases loaded, else move runners indivly
+        elif score_book_cd in ["SF"]:
+            bases_to_advance = self.tag_up(
+                outs
+            )  # move runner from third and set other runners to hold w/ 0
+        elif score_book_cd in ["DP", "GB FC", "GB"]:
             bases_to_advance = self.ground_out(score_book_cd)
-        elif on_base_b and score_book_cd not in ['BB', 'HR', '3B'] and outs == 2:  # 2 out base hit or 2b gets xta base
-            self.push_a_runner(1, 2)  # push all runners one base before the std 1 base adv.  adds rbi and runs
+        elif (
+            on_base_b and score_book_cd not in ["BB", "HR", "3B"] and outs == 2
+        ):  # 2 out base hit or 2b gets xta base
+            self.push_a_runner(
+                1, 2
+            )  # push all runners one base before the std 1 base adv.  adds rbi and runs
 
         self.player_scored = {}
-        self.baserunners = list(np.roll(self.baserunners, bases_to_advance))  # advance runners
-        self.runs_scored = np.count_nonzero(self.baserunners[-4:])  # 0 ab 1, 2, 3 are bases. 4-7 run crossed home=len 4
+        self.baserunners = list(
+            np.roll(self.baserunners, bases_to_advance)
+        )  # advance runners
+        self.runs_scored = np.count_nonzero(
+            self.baserunners[-4:]
+        )  # 0 ab 1, 2, 3 are bases. 4-7 run crossed home=len 4
         for player_num in self.baserunners[-4:]:  # get player ids that scored
             # Check if player_num is '0' or 0 (Empty Base) before looking up name
-            if str(player_num) != '0' and player_num in self.baserunners_names:
+            if str(player_num) != "0" and player_num in self.baserunners_names:
                 if len(self.baserunners_names[player_num]) > 0:
                     self.player_scored[player_num] = self.baserunners_names[player_num]
         self.baserunners[-4] = 0  # send the runners that score back to the dug out
-        # self.baserunners = [baserunner if i <= 3 else 0 for i, baserunner in enumerate(self.baserunners)]  #resetbases
         self.baserunners[4:] = [0] * 4  # reset based without list comprehension
         return
 
@@ -98,16 +112,16 @@ class Bases:
         Returns:
             int: Number of bases to advance remaining runners (always 1)
         """
-        if score_book_cd in ['GB']:  # batter is out
+        if score_book_cd in ["GB"]:  # batter is out
             self.remove_runner(0)
-        elif score_book_cd in ['DP']:  # runner at first is out and batter are out
+        elif score_book_cd in ["DP"]:  # runner at first is out and batter are out
             self.remove_runner(0)
             self.remove_runner(1)
-        elif score_book_cd in ['GB FC']:  # runner at first is out
+        elif score_book_cd in ["GB FC"]:  # runner at first is out
             self.remove_runner(1)
         return 1  # advance remaining runners and batter on an GB FC one base
 
-    def new_ab(self, batter_num: int = 1, player_name: str = '') -> None:
+    def new_ab(self, batter_num: int = 1, player_name: str = "") -> None:
         """
         Start a new at-bat by placing the batter at position 0.
 
@@ -119,16 +133,17 @@ class Bases:
             ValueError: If batter_num is 0 (reserved for empty positions)
         """
         self.add_runner_to_base(0, batter_num, player_name)
-        # self.baserunners[0] = batter_num  # put a player ab
-        # self.baserunners_names[batter_num] = player_name  # add player name to lookup table
         if batter_num == 0:
-            print(self.baserunners_names)
-            raise ValueError('bbbaserunners.py, new_ab, zero value baserunner index.  must be non-zero')
+            raise ValueError(
+                "bbbaserunners.py, new_ab, zero value baserunner index.  must be non-zero"
+            )
         self.player_scored = {}  # key to not double counting runs
         self.runs_scored = 0
         return
 
-    def add_runner_to_base(self, base_num: int, batter_num: int, player_name: str = '') -> None:
+    def add_runner_to_base(
+        self, base_num: int, batter_num: int, player_name: str = ""
+    ) -> None:
         """
         Place a runner at a specific base position.
 
@@ -138,8 +153,10 @@ class Bases:
             player_name: Optional player name for tracking
         """
         self.baserunners[base_num] = batter_num
-        if player_name != '':
-            self.baserunners_names[batter_num] = player_name  # add name to look up table
+        if player_name != "":
+            self.baserunners_names[batter_num] = (
+                player_name  # add name to look up table
+            )
         return
 
     def clear_bases(self) -> None:
@@ -154,7 +171,7 @@ class Bases:
         # 0 indicates an empty base
         self.baserunners = [0, 0, 0, 0, 0, 0, 0, 0]
         self.baserunners_names.clear()  # ={} doesn't need to be cleared, but just to be safe every half inning
-        self.baserunners_names[0] = ''
+        self.baserunners_names[0] = ""
         self.player_scored = {}
         return
 
@@ -170,10 +187,10 @@ class Bases:
         if isinstance(bases, list):
             for base in bases:
                 self.baserunners[base] = 0
-                self.baserunners_names[base] = ''
+                self.baserunners_names[base] = ""
         else:
             self.baserunners[bases] = 0
-            self.baserunners_names[bases] = ''
+            self.baserunners_names[bases] = ""
         return
 
     def is_runner_on_base_num(self, base_num: int) -> Union[bool, bool_]:
@@ -195,8 +212,11 @@ class Bases:
         Returns:
             bool: True if runner on 1st with 2nd and 3rd empty
         """
-        return self.is_runner_on_base_num(1) and \
-                not self.is_runner_on_base_num(2) and not self.is_runner_on_base_num(3)
+        return (
+            self.is_runner_on_base_num(1)
+            and not self.is_runner_on_base_num(2)
+            and not self.is_runner_on_base_num(3)
+        )
 
     def get_runner_key(self, base_num: int) -> int32:
         """
@@ -224,10 +244,12 @@ class Bases:
             int: 0 (no base advancement for remaining runners)
         """
         if outs >= 3:
-            return
+            return 0  # insurance check
         self.runs_scored += 1  # give batter an RBI
         self.move_a_runner(3, 4)  # move runner from 3 to 4
-        self.move_a_runner(2, 3)  # move runner from 2 to 3rd if there is a runner on second
+        self.move_a_runner(
+            2, 3
+        )  # move runner from 2 to 3rd if there is a runner on second
         self.remove_runner(0)  # batter is out
         return 0  # bases to advance
 
@@ -275,7 +297,9 @@ class Bases:
             int: Actual bases to advance (0 if bases not loaded, original value if loaded)
         """
         # default is move all runners on base, that works unless there is a hole
-        if self.count_runners() < 3 and self.count_runners() != 0:  # not loaded or empty
+        if (
+            self.count_runners() < 3 and self.count_runners() != 0
+        ):  # not loaded or empty
             # bases are not loaded so move runners up a base when forced
             self.push_a_runner(0, 1)  # move the ab player to 1st base
             bases_to_move_all_runners = 0
@@ -288,7 +312,9 @@ class Bases:
         Returns:
             int: Number of runners on 1st, 2nd, and 3rd bases
         """
-        return np.count_nonzero(self.baserunners[1:3+1])  # add the number of people on base 1st, 2b, and 3rd
+        return np.count_nonzero(
+            self.baserunners[1 : 3 + 1]
+        )  # add the number of people on base 1st, 2b, and 3rd
 
     def describe_runners(self) -> str:
         """
@@ -297,15 +323,29 @@ class Bases:
         Returns:
             str: Description like "Runner on 1st" or "Runners on 1st, 3rd" or empty string if bases empty
         """
-        desc = ''
-        base_names = ['AB', '1st', '2nd', '3rd', 'home', 'scored', 'scored', 'scored']  # leave this for sort order
+        desc = ""
+        base_names = [
+            "AB",
+            "1st",
+            "2nd",
+            "3rd",
+            "home",
+            "scored",
+            "scored",
+            "scored",
+        ]  # leave this for sort order
         base_names_zip = set(zip(base_names, self.baserunners))
         # Change base_name_zip[1] > 0 to str(base_name_zip[1]) != '0'
         base_names_with_runners = list(
-            filter(lambda base_name_zip: str(base_name_zip[1]) != '0' and base_name_zip[0] != 'AB'
-                                         and base_name_zip[0] != 'home', base_names_zip))
+            filter(
+                lambda base_name_zip: str(base_name_zip[1]) != "0"
+                and base_name_zip[0] != "AB"
+                and base_name_zip[0] != "home",
+                base_names_zip,
+            )
+        )
         base_names_with_runners.sort()
         for base_name in base_names_with_runners:
-            desc = base_name[0] if desc == '' else desc + ', ' + base_name[0]
-        prefix = 'Runner on ' if self.count_runners() == 1 else 'Runners on '
+            desc = base_name[0] if desc == "" else desc + ", " + base_name[0]
+        prefix = "Runner on " if self.count_runners() == 1 else "Runners on "
         return desc if self.count_runners() == 0 else prefix + desc

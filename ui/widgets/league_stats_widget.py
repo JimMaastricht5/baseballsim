@@ -1085,7 +1085,7 @@ class LeagueStatsWidget:
         """
         popup = tk.Toplevel()
         popup.title(f"{player_name} - Historical Stats")
-        popup.geometry("680x300")
+        popup.geometry("1100x350")
         popup.resizable(True, True)
         popup.configure(bg=BG_PANEL)
 
@@ -1098,8 +1098,12 @@ class LeagueStatsWidget:
                 "AB",
                 "R",
                 "H",
+                "2B",
+                "3B",
                 "HR",
                 "RBI",
+                "BB",
+                "K",
                 "AVG",
                 "OBP",
                 "SLG",
@@ -1115,9 +1119,14 @@ class LeagueStatsWidget:
                 "IP",
                 "W",
                 "L",
+                "H",
+                "R",
+                "ER",
+                "HR",
+                "BB",
+                "SO",
                 "ERA",
                 "WHIP",
-                "SO",
             )
 
         tree_frame = tk.Frame(popup, bg=BG_PANEL)
@@ -1191,8 +1200,12 @@ class LeagueStatsWidget:
                         int(r.get("AB", 0)),
                         int(r.get("R", 0)),
                         int(r.get("H", 0)),
+                        int(r.get("2B", 0)),
+                        int(r.get("3B", 0)),
                         int(r.get("HR", 0)),
                         int(r.get("RBI", 0)),
+                        int(r.get("BB", 0)),
+                        int(r.get("SO", 0)),
                         f"{float(avg_val):.3f}",
                         f"{float(r.get('OBP', 0)):.3f}",
                         f"{float(r.get('SLG', 0)):.3f}",
@@ -1208,9 +1221,14 @@ class LeagueStatsWidget:
                         f"{float(r.get('IP', 0)):.1f}",
                         int(r.get("W", 0)),
                         int(r.get("L", 0)),
+                        int(r.get("H", 0)),
+                        int(r.get("R", 0)),
+                        int(r.get("ER", 0)),
+                        int(r.get("HR", 0)),
+                        int(r.get("BB", 0)),
+                        int(r.get("SO", 0)),
                         f"{float(r.get('ERA', 0)):.2f}",
                         f"{float(r.get('WHIP', 0)):.2f}",
-                        int(r.get("SO", 0)),
                     )
                 tree.insert("", tk.END, values=values, tags=("projected",))
             except Exception as e:
@@ -1227,8 +1245,12 @@ class LeagueStatsWidget:
                         int(row.get("AB", 0)),
                         int(row.get("R", 0)),
                         int(row.get("H", 0)),
+                        int(row.get("2B", 0)),
+                        int(row.get("3B", 0)),
                         int(row.get("HR", 0)),
                         int(row.get("RBI", 0)),
+                        int(row.get("BB", 0)),
+                        int(row.get("SO", 0)),
                         f"{float(row.get('AVG', 0)):.3f}",
                         f"{float(row.get('OBP', 0)):.3f}",
                         f"{float(row.get('SLG', 0)):.3f}",
@@ -1244,9 +1266,14 @@ class LeagueStatsWidget:
                         f"{float(row.get('IP', 0)):.1f}",
                         int(row.get("W", 0)),
                         int(row.get("L", 0)),
+                        int(row.get("H", 0)),
+                        int(row.get("R", 0)),
+                        int(row.get("ER", 0)),
+                        int(row.get("HR", 0)),
+                        int(row.get("BB", 0)),
+                        int(row.get("SO", 0)),
                         f"{float(row.get('ERA', 0)):.2f}",
                         f"{float(row.get('WHIP', 0)):.2f}",
-                        int(row.get("SO", 0)),
                     )
                 tree.insert("", tk.END, values=values)
             except Exception as e:

@@ -50,7 +50,7 @@ class PlayerProjector:
             "H": 40,  # Slightly raised: reduces over-regression for mid-sample batters
             "2B": 80,  # Respect doubles
             "3B": 200,  # Triples are high-variance/luck-based
-            "HR": 15,  # Further reduced from 25 to boost HR projections (league under-projected by 9%)
+            "HR": 25,  # Increased to better target 2025 HR/AB rate (0.0346) when projecting HR/AB directly
             "BB": 50,  # Plate discipline is fairly stable
             "SO": 100,  # Reduced from 400: SO stabilizes quickly (~60 PA), was over-compressing
             "HBP": 500,  # Extremely high: Don't project many HBPs for rookies
@@ -60,7 +60,7 @@ class PlayerProjector:
         self.k_vals_pitcher = {
             "H": 2500,  # Hits allowed (BABIP) regresses heavily
             "BB": 300,  # Walk rate
-            "SO": 150,  # K-rate stabilizes very fast for pitchers
+            "SO": 100,  # Reduced from 150: matches batter k for SO, stabilizes quickly
             "ER": 300,  # Essential for preventing 0.00 ERA anomalies
             "default": 250,
         }
@@ -195,6 +195,7 @@ class PlayerProjector:
             stat_col,
             is_p=False,
             player_history=player_history,
+            vol_col=vol_col,
         )
 
     def _get_projection_pitcher(
@@ -229,6 +230,8 @@ class PlayerProjector:
         career_vol = player_history[vol_col].sum()
         age_2026 = int(player_history.iloc[-1]["Age"]) + 1
 
+        is_proven = num_years >= 3 and career_vol >= 1000
+
         # 1. STRATEGY SELECTION - Get player's raw rate
         if num_years < 2 or career_vol < 150:
             player_rate = self._regress_to_mean(player_history, stat_col, vol_col)
@@ -237,7 +240,10 @@ class PlayerProjector:
             w_avg_rate = self._weighted_career_average(
                 player_history, stat_col, vol_col
             )
-            player_rate = (trend_rate * 0.5) + (w_avg_rate * 0.5)
+            if stat_col == "SO" and is_proven:
+                player_rate = w_avg_rate
+            else:
+                player_rate = (trend_rate * 0.5) + (w_avg_rate * 0.5)
 
         # 2. Apply AGING to player's rate (before regression)
         raw_m = self._get_aging_multiplier(age_2026, True)
@@ -246,6 +252,8 @@ class PlayerProjector:
                 multiplier = ((1.0 + (1.0 - raw_m)) + (1.0 / raw_m)) / 2
             else:
                 multiplier = 1.0 / raw_m
+        elif stat_col == "SO" and is_proven:
+            multiplier = 1.0
         else:
             multiplier = raw_m
         player_rate = player_rate * multiplier
@@ -287,7 +295,11 @@ class PlayerProjector:
                 final_rate = max(final_rate, lg_er_per_ip * 0.4)
 
         return self._apply_sanity_caps(
-            float(final_rate), stat_col, is_p=True, player_history=player_history
+            float(final_rate),
+            stat_col,
+            is_p=True,
+            player_history=player_history,
+            vol_col=vol_col,
         )
 
     def _project_single_player(
@@ -359,11 +371,16 @@ class PlayerProjector:
         proj_ba = self._get_projection_batter(history, "H", "AB")
         result["H"] = result["AB"] * proj_ba
 
-        # C. Tether Power to the NEW Hit total
+        # C. Tether Extra-Base Hits to the NEW Hit total
         proj_h_count = max(0.1, result["H"])
-        for stat in ["2B", "3B", "HR"]:
+        for stat in ["2B", "3B"]:
             ratio = self._get_projection_batter(history, stat, "H")
             result[stat] = proj_h_count * ratio
+
+        # D. Project HR directly as HR/AB (not HR/H) to target correct 2025 HR/AB rate
+        # This fixes the ~9% under-projection issue caused by HR/H regression
+        proj_hr_ab = self._get_projection_batter(history, "HR", "AB")
+        result["HR"] = result["AB"] * proj_hr_ab
 
         result["AVG"] = result["H"] / max(1, result["AB"])
         result["OBP"] = (result["H"] + result["BB"]) / proj_vol
@@ -393,57 +410,66 @@ class PlayerProjector:
         history["IP_Dec"] = history["IP"].apply(lambda x: int(x) + (x % 1) * 3.333)
         history["BIP"] = (history["PA"] - history["SO"] - history["BB"]).clip(lower=1)
 
-        # 2. VOLUME LOGIC (BF/PA Target)
-        is_workhorse = (history["PA"] > 750).sum() >= 2
-        raw_vol = history["PA"].iloc[-1]
-        # Workhorses get a higher cap/floor to ensure the rotation stays full
+        # 2. PROJECT IP DIRECTLY (workhorse-aware)
+        # This gives us better control over workload than deriving from PA
+        is_workhorse = num_years >= 2 and history["IP"].iloc[-1] >= 150
+        ip_per_year = self._get_projection_pitcher(history, "IP", "Season")
         if is_workhorse:
-            proj_vol = max(700, min(raw_vol, 850))
+            raw_ip = history["IP_Dec"].iloc[-1]
+            proj_ip_true = max(
+                150, min(raw_ip * 1.02, 210)
+            )  # Workhorses project higher
         else:
-            proj_vol = max(75, min(raw_vol, 650))
+            raw_ip = history["IP_Dec"].iloc[-1]
+            proj_ip_true = max(50, min(raw_ip, 170))
 
         # 3. INITIALIZE RESULT
         result = history.iloc[-1].to_dict()
-        result["PA"] = proj_vol
+        result["IP"] = proj_ip_true
+        result["IP_True"] = proj_ip_true
         result["Years_Included"] = history["Season"].tolist()
         result["Projection_Method"] = "Trend" if num_years >= 2 else "Regressed"
 
-        # 4. PROJECT PERIPHERALS (Rates per Batter Faced)
-        # These use PA as the denominator and are relatively stable
-        # determine non contact outcomes first
-        result["BB"] = self._get_projection_pitcher(history, "BB", "PA") * proj_vol
-        result["SO"] = self._get_projection_pitcher(history, "SO", "PA") * proj_vol
+        # 4. PROJECT BB (rate per IP - using box-score IP to match league averages)
+        bb_per_ip = self._get_projection_pitcher(history, "BB", "IP")
+        result["BB"] = bb_per_ip * result["IP"]
 
-        # calculate balls in play projection, then project hits based on BIP only BABIP
-        proj_bip = proj_vol - result["BB"] - result["SO"]
-        result["H"] = self._get_projection_pitcher(history, "H", "BIP") * proj_bip
+        # 5. PROJECT SO BASED ON IP TO MAINTAIN K/IP RATIO
+        so_per_ip = self._get_projection_pitcher(history, "SO", "IP")
+        result["SO"] = so_per_ip * result["IP"]
 
-        # 5. DERIVE OUTS AND IP
-        # In baseball, PA - Hits - Walks - (HBP/SF) = Outs.
-        # We'll use a simplified (PA - H - BB) to find the 2026 Outs.
-        proj_outs = max(1, proj_vol - (result["H"] + result["BB"]))
-        proj_ip_true = proj_outs / 3
+        # 6. PROJECT HR (rate per IP for consistency with other rates)
+        hr_per_ip = self._get_projection_pitcher(history, "HR", "IP")
+        result["HR"] = hr_per_ip * result["IP"]
 
-        # 6. PROJECT EARNED RUNS (The Unit Correction)
-        # We project the rate of ER per INNING (not per 9 innings).
-        # 'IP_Dec' ensures we aren't dividing by 200.1 when we mean 200.33.
-        er_per_inning = self._get_projection_pitcher(history, "ER", "IP_Dec")
+        # 7. PROJECT PA DIRECTLY
+        # Use PA as the volume base - more stable than deriving from IP
+        pa_per_ip = self._get_projection_pitcher(history, "PA", "IP")
+        result["PA"] = pa_per_ip * result["IP"]
 
-        # Apply a SOFT floor (1.50 ERA equivalent) rather than the 1.91 hard floor
-        # lg_era (4.25) / 9 = 0.472 runs per inning. 0.472 * 0.35 = 0.165 (1.48 ERA)
-        lg_er_per_ip = self.lg_avgs.get("ER_per_IP", 4.25) / 9
-        er_per_inning = max(er_per_inning, lg_er_per_ip * 0.35)
+        # 8. PROJECT H USING H/PA RATE (more stable than H/IP)
+        h_per_pa = self._get_projection_pitcher(history, "H", "PA")
+        result["H"] = h_per_pa * result["PA"]
 
-        result["ER"] = er_per_inning * proj_ip_true
+        # 9. CALCULATE OUTS FOR DISPLAY
+        proj_outs = result["IP"] * 3
 
-        # 7. FINAL DISPLAY FORMATTING
-        # Convert IP back to box score format (e.g., 187.1)
-        result["IP"] = (proj_outs // 3) + ((proj_outs % 3) / 10)
-        result["IP_True"] = proj_ip_true
+        # 10. PROJECT EARNED RUNS
+        # League average stores ERA*9, so divide by 9 to get ER/IP
+        lg_era_per_ip = self.lg_avgs.get("ER_per_IP", 4.25) / 9
+        er_per_ip = self._get_projection_pitcher(history, "ER", "IP")
+        er_per_ip = max(er_per_ip, lg_era_per_ip * 0.35)
+
+        result["ER"] = (
+            er_per_ip * result["IP"] / 9
+        )  # Divide by 9 because lg_avgs stores ERA*9
+
+        # 10. FINAL DISPLAY FORMATTING
+        result["IP_True"] = result["IP"]  # Keep true decimal for internal use
 
         # Recalculate rates for the CSV output
-        result["ERA"] = (result["ER"] * 9) / proj_ip_true
-        result["WHIP"] = (result["H"] + result["BB"]) / proj_ip_true
+        result["ERA"] = (result["ER"] * 9) / result["IP"]
+        result["WHIP"] = (result["H"] + result["BB"]) / result["IP"]
 
         # Calculate AB (Hits + Outs)
         result["AB"] = result["H"] + proj_outs
@@ -542,11 +568,15 @@ class PlayerProjector:
         career_vol = history[vol_col].sum()
         is_p = "IP" in history.columns
 
-        # 1. DYNAMIC K-SCALING
+        # 1. DYNAMIC K-SCALING: k = base_dynamic_k + stat_specific_k
+        # base_dynamic_k: 800 for rookies (0 vol), 0 for veterans (3000+ vol)
+        # stat_specific_k: minimum regression strength for that stat
+        # Result: rookies get heavy regression, veterans get stat-specific k
         vol_trust_factor = np.clip(career_vol / 3000, 0, 1)
         base_k = 800 * (1 - vol_trust_factor)
         k_map = self.k_vals_pitcher if is_p else self.k_vals_batter
-        k = k_map.get(stat_col, base_k)
+        stat_k = k_map.get(stat_col, k_map.get("default", 150))
+        k = base_k + stat_k
 
         # 2. THE TETHERED POWER LOGIC (Fixing the Ratio Leak)
         if stat_col in ["2B", "3B", "HR"] and not is_p and vol_col == "H":
@@ -562,7 +592,9 @@ class PlayerProjector:
                 lg_ratio = fallbacks.get(stat_col, 0.10)
 
             # Use a tighter K for ratios to preserve player uniqueness
-            k_ratio = 15  # Reduced from 25 to boost HR projections
+            k_ratio = (
+                10  # Reduced from 15 to boost HR projections and capture breakouts
+            )
             reg_ratio = (career_total + k_ratio * lg_ratio) / (career_h + k_ratio)
             return float(reg_ratio)
 
@@ -620,7 +652,13 @@ class PlayerProjector:
 
         # 3. TIGHTEN SLOPES:
         # Don't let unproven players (like Abraham Toro) jump too many points in a single year.
-        max_slope = 0.035 if (stat_col in ["HR", "2B", "H"] and is_proven) else 0.012
+        # HR gets more slope allowance (0.020) since power stabilizes faster than avg
+        if stat_col == "HR":
+            max_slope = 0.035 if is_proven else 0.020
+        elif stat_col in ["2B", "H"]:
+            max_slope = 0.035 if is_proven else 0.012
+        else:
+            max_slope = 0.012
         original_slope = slope
         slope = np.clip(slope, -max_slope, max_slope)
         slope_was_clipped = abs(slope - original_slope) > 0.001
@@ -773,7 +811,9 @@ class PlayerProjector:
         diffs = np.diff(rates)
         return all(d >= 0 for d in diffs) or all(d <= 0 for d in diffs)
 
-    def _apply_sanity_caps(self, rate, stat_col, is_p, player_history=None):
+    def _apply_sanity_caps(
+        self, rate, stat_col, is_p, player_history=None, vol_col=None
+    ):
         """
         Clamp a projected per-vol rate to physically realistic bounds.
 
@@ -781,13 +821,14 @@ class PlayerProjector:
         An ISO-based identity gate also caps HR/H at 4% for slap hitters
         (career ISO < 0.100).
 
-        Pitcher bounds: SO/PA floor of 8.0% (~3.0 K/9), BB/PA cap of 13.0%
-        (~4.8 BB/9), H/PA cap of 33.0%.
+        Pitcher bounds: SO/IP floor of 0.10 (~3.0 K/9), BB/IP cap of 0.60
+        (~5.4 BB/9 which is still very high), H/IP cap of 1.00 (~9.0 H/9).
 
         :param rate: Projected per-vol rate to clamp.
         :param stat_col: Stat column name used to look up the cap.
         :param is_p: True for pitcher stats, False for batter stats.
         :param player_history: Optional batter history for ISO-gate calculation.
+        :param vol_col: Volume column used (PA, AB, IP, BIP, etc.) - determines which caps apply.
         :return: Rate after applying any relevant cap or floor.
         """
         if not is_p:
@@ -812,14 +853,21 @@ class PlayerProjector:
                     rate = min(rate, 0.040)  # Cap HR/H ratio at 4%
         else:
             # --- PITCHER CAPS ---
+            # Skip BB cap for IP-based rates - 0.130 BB/PA doesn't translate to IP rates
+            # BB/IP of 0.357 is ~3.2 BB/9 which is perfectly normal
             if stat_col == "SO":
-                rate = max(rate, 0.080)  # Floor (~3.0 K/9)
-            if stat_col == "BB":
-                # 0.130 BB/PA is a very wild season (~4.8 BB/9).
-                # Cap it here to prevent the .169 league-wide disaster.
+                if vol_col == "IP":
+                    rate = max(rate, 0.100)  # Floor ~3.0 K/9 for IP-based rates
+                else:
+                    rate = max(rate, 0.080)  # Floor for PA-based rates
+            if stat_col == "BB" and vol_col != "IP":
+                # Only apply BB cap for non-IP volumes (e.g., BB/PA)
                 rate = min(rate, 0.130)
             if stat_col == "H":
-                rate = min(rate, 0.330)
+                if vol_col == "IP":
+                    rate = min(rate, 1.000)  # Cap ~9.0 H/9 for IP-based rates
+                else:
+                    rate = min(rate, 0.330)  # Cap for PA-based rates
 
         return rate
 

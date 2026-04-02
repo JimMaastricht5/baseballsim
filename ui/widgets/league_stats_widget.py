@@ -490,7 +490,7 @@ class LeagueStatsWidget:
         scrollbar = ttk.Scrollbar(parent, orient=tk.VERTICAL, command=tree.yview)
         tree.configure(yscrollcommand=scrollbar.set)
         scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
-        tree.pack(fill=tk.X, expand=False)
+        tree.pack(fill=tk.BOTH, expand=True)
 
         # Configure tags for streak highlighting
         tree.tag_configure("streak_hot", foreground=STREAK_HOT)
@@ -601,11 +601,11 @@ class LeagueStatsWidget:
                 df, sort_state["column"], sort_state["ascending"], is_batter
             )
         else:
-            # Default sort: OPS for batters, ERA for pitchers
+            # Default sort: OPS for batters, IP descending for pitchers
             if is_batter and "OPS" in df.columns:
                 df = df.sort_values("OPS", ascending=False)
-            elif not is_batter and "ERA" in df.columns:
-                df = df.sort_values("ERA", ascending=True)
+            elif not is_batter and "IP" in df.columns:
+                df = df.sort_values("IP", ascending=False)
 
         # Store filtered DataFrame
         if is_batter:

@@ -264,22 +264,27 @@ F1     - Show this help"""
         self.notebook.add(team_tab_frame, text=self.season_team_to_follow)
 
         # Create inner notebook for team sub-tabs
-        team_notebook = ttk.Notebook(team_tab_frame)
-        team_notebook.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
+        self.team_notebook = ttk.Notebook(team_tab_frame)
+        self.team_notebook.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
+        self.team_notebook.bind("<<NotebookTabChanged>>", self._on_team_tab_changed)
 
         # Team Sub-tab 1: Roster
-        self.roster_widget = RosterWidget(team_notebook, self.comparison_mode)
-        team_notebook.add(self.roster_widget.get_frame(), text="Roster")
+        self.roster_widget = RosterWidget(self.team_notebook, self.comparison_mode)
+        self.team_notebook.add(self.roster_widget.get_frame(), text="Roster")
 
         # Team Sub-tab 2: Games Played
-        self.games_played_widget = GamesPlayedWidget(team_notebook)
-        team_notebook.add(self.games_played_widget.get_frame(), text="Games Played")
+        self.games_played_widget = GamesPlayedWidget(self.team_notebook)
+        self.team_notebook.add(
+            self.games_played_widget.get_frame(), text="Games Played"
+        )
 
         # Team Sub-tab 3: GM Assessment
         self.gm_assessment_widget = GMAssessmentWidget(
-            team_notebook, self.run_gm_assessments
+            self.team_notebook, self.run_gm_assessments
         )
-        team_notebook.add(self.gm_assessment_widget.get_frame(), text="GM Assessment")
+        self.team_notebook.add(
+            self.gm_assessment_widget.get_frame(), text="GM Assessment"
+        )
 
         # Tab 5: Playoffs (after Team tab)
         self.playoff_widget = PlayoffWidget(self.notebook)
@@ -395,6 +400,31 @@ F1     - Show this help"""
             phase: 'Ready', 'Regular Season', 'Playoffs', 'World Series', or 'Complete'
         """
         self.phase_label.config(text=phase)
+
+    def _on_team_tab_changed(self, event=None):
+        """Handle team sub-tab changes. Auto-select highest day in Games Played tab."""
+        try:
+            selected_index = self.team_notebook.index(self.team_notebook.select())
+            if selected_index == 1:  # Games Played tab (index 1)
+                self._select_highest_day_in_games_played()
+        except Exception as e:
+            logger.debug(f"Error in team tab change handler: {e}")
+
+    def _select_highest_day_in_games_played(self):
+        """Select the highest available day in the Games Played dropdown."""
+        try:
+            widget = self.games_played_widget
+            if hasattr(widget, "pbp_day_combo"):
+                values = widget.pbp_day_combo["values"]
+                if values and len(values) > 1:
+                    # Get the last non-"Select Day" value (highest day number)
+                    for day_value in reversed(values):
+                        if day_value != "Select Day":
+                            widget.pbp_day_var.set(day_value)
+                            widget.pbp_day_combo.event_generate("<<ComboboxSelected>>")
+                            break
+        except Exception as e:
+            logger.debug(f"Error selecting highest day: {e}")
 
     def _update_eta(self, elapsed_seconds: float, progress: float):
         """Update estimated time remaining display.

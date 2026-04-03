@@ -386,11 +386,11 @@ class TeamBoxScore:
         and generates team total rows for display.
         """
         with self.lock:
-            self.game_batting_stats = (
-                self.box_batting.copy()
+            self.game_batting_stats = self.box_batting.copy(
+                deep=True
             )  # make a copy w/o totals for season accumulations
-            self.game_pitching_stats = (
-                self.box_pitching.copy()
+            self.game_pitching_stats = self.box_pitching.copy(
+                deep=True
             )  # make a copy w/o totals for season accumulations
             self.box_batting_totals = bbstats.team_batting_totals(self.box_batting)
             self.box_pitching_totals = bbstats.team_pitching_totals(self.box_pitching)

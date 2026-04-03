@@ -102,6 +102,66 @@ class ScrollableFrame(ttk.Frame):
         self.canvas.yview_moveto(0.0)
 
 
+class CollapsibleSection:
+    """A collapsible section with a clickable header."""
+
+    def __init__(self, parent, title: str, default_expanded: bool = True):
+        self.parent = parent
+        self.title = title
+        self.expanded = default_expanded
+        self.content_frame = None
+
+        # Header frame
+        self.header_frame = tk.Frame(parent, bg=BG_WIDGET, cursor="hand2")
+        self.header_frame.pack(fill=tk.X, padx=5, pady=(10, 0))
+
+        # Caret label (clickable)
+        self.caret = tk.Label(
+            self.header_frame,
+            text="▼" if self.expanded else "▶",
+            font=("Segoe UI", 10, "bold"),
+            bg=BG_WIDGET,
+            fg=ACCENT_BLUE,
+            width=2,
+            cursor="hand2",
+        )
+        self.caret.pack(side=tk.LEFT, padx=(10, 5))
+        self.caret.bind("<Button-1>", self.toggle)
+
+        # Title label (clickable)
+        self.title_label = tk.Label(
+            self.header_frame,
+            text=title,
+            font=("Segoe UI", 12, "bold"),
+            bg=BG_WIDGET,
+            fg=ACCENT_BLUE,
+            anchor="w",
+            cursor="hand2",
+        )
+        self.title_label.pack(side=tk.LEFT, fill=tk.X, expand=True)
+        self.title_label.bind("<Button-1>", self.toggle)
+
+        # Content frame (hidden if collapsed)
+        self.frame = tk.Frame(parent, bg=BG_WIDGET)
+
+        if not self.expanded:
+            self.frame.pack_forget()
+
+    def toggle(self, event=None):
+        """Toggle the expanded/collapsed state."""
+        self.expanded = not self.expanded
+        self.caret.config(text="▼" if self.expanded else "▶")
+
+        if self.expanded:
+            self.frame.pack(fill=tk.X, padx=5, pady=(0, 5))
+        else:
+            self.frame.pack_forget()
+
+    def is_expanded(self) -> bool:
+        """Return whether section is expanded."""
+        return self.expanded
+
+
 class GamesPlayedWidget:
     """
     Games Played widget showing formatted game summaries for followed team.
@@ -420,7 +480,7 @@ class GamesPlayedWidget:
 
     def _display_structured_game(self, structured_game):
         """
-        Display a game using structured data with Treeview grids.
+        Display a game using structured data with Treeview grids and collapsible sections.
 
         Args:
             structured_game: GameRecap Pydantic object
@@ -449,20 +509,42 @@ class GamesPlayedWidget:
             style="ScoreSummary.TLabel",
         ).pack(anchor=tk.W, padx=10, pady=(0, 5))
 
-        # Inning scores
+        # Inning scores (always expanded by default)
         self._display_inning_scores(structured_game, away, home)
 
-        # Batting box scores
-        self._display_batting_box_scores(structured_game)
+        # Box Score: Away Team (collapsed by default)
+        # away_box_score contains away team batting AND pitching
+        away_section = CollapsibleSection(
+            self.scrollable_frame.scrollable_frame,
+            f"Box Score: {away}",
+            default_expanded=False,
+        )
+        self._display_away_team_box_score(
+            away_section.frame,
+            away,
+            structured_game.away_box_score,
+        )
 
-        # Pitching box scores
-        self._display_pitching_box_scores(structured_game)
+        # Box Score: Home Team (collapsed by default)
+        # home_box_score contains home team batting AND pitching
+        home_section = CollapsibleSection(
+            self.scrollable_frame.scrollable_frame,
+            f"Box Score: {home}",
+            default_expanded=False,
+        )
+        self._display_home_team_box_score(
+            home_section.frame,
+            home,
+            structured_game.home_box_score,
+        )
 
-        # Pitcher decisions
-        self._display_pitcher_decisions(structured_game)
-
-        # Play-by-play
-        self._display_play_by_play(structured_game)
+        # Play-by-play (expanded by default)
+        pbp_section = CollapsibleSection(
+            self.scrollable_frame.scrollable_frame,
+            "Play-By-Play",
+            default_expanded=True,
+        )
+        self._display_play_by_play_in_section(pbp_section.frame, structured_game)
 
     def _display_inning_scores(self, structured_game, away, home):
         """Display score by inning using Treeview."""
@@ -475,28 +557,14 @@ class GamesPlayedWidget:
             style="SectionHeader.TLabel",
         ).pack(anchor=tk.W, padx=10, pady=(10, 0))
 
-        # Calculate columns needed
         num_innings = len(structured_game.inning_scores)
-        base_cols = min(9, num_innings)
 
-        # Create inning labels
-        inning_labels = [f"{i}" for i in range(1, base_cols + 1)]
-        total_labels = ["R", "H", "E"]
+        # All innings + R, H, E columns
+        columns = ["col_" + str(i) for i in range(1, num_innings + 1)] + ["R", "H", "E"]
 
-        # For extra innings, need second table
-        if num_innings > 9:
-            extra_innings = num_innings - 9
-            inning_labels2 = [f"{i}" for i in range(10, num_innings + 1)]
-        else:
-            inning_labels2 = None
-
-        # First table (innings 1-9 or fewer)
-        columns1 = ["col_" + str(i) for i in range(1, base_cols + 1)] + ["R", "H", "E"]
-
-        team_width = 55
-        inning_width = 30
-        rh_width = 38
-        total_width = team_width + num_innings * inning_width + 3 * rh_width
+        team_width = 50
+        inning_width = 25
+        rh_width = 30
 
         tree_frame = tk.Frame(
             self.scrollable_frame.scrollable_frame, bg=BG_WIDGET, height=55
@@ -505,7 +573,7 @@ class GamesPlayedWidget:
 
         tree = ttk.Treeview(
             tree_frame,
-            columns=columns1,
+            columns=columns,
             show="tree headings",
             style="InningScore.Treeview",
             height=2,
@@ -514,25 +582,26 @@ class GamesPlayedWidget:
         tree.column("#0", width=team_width, anchor=tk.W)
         tree.heading("#0", text="")
 
-        for i, col in enumerate(columns1):
-            if i < len(inning_labels):
+        # Set column headings
+        for i, col in enumerate(columns):
+            if i < num_innings:
                 tree.column(col, width=inning_width, anchor=tk.CENTER)
-                tree.heading(col, text=inning_labels[i])
-            elif i == len(inning_labels):
+                tree.heading(col, text=str(i + 1))
+            elif i == num_innings:
                 tree.column(col, width=rh_width, anchor=tk.CENTER)
                 tree.heading(col, text="R")
-            elif i == len(inning_labels) + 1:
+            elif i == num_innings + 1:
                 tree.column(col, width=rh_width, anchor=tk.CENTER)
                 tree.heading(col, text="H")
             else:
                 tree.column(col, width=rh_width, anchor=tk.CENTER)
                 tree.heading(col, text="E")
 
-        tree.pack(anchor=tk.W)
+        tree.pack(side=tk.LEFT, anchor=tk.W)
 
         # Add away team row
         away_values = [away]
-        for inn in structured_game.inning_scores[:base_cols]:
+        for inn in structured_game.inning_scores:
             away_values.append(str(inn.away_runs))
         if structured_game.away_box_score:
             away_values.extend(
@@ -548,7 +617,7 @@ class GamesPlayedWidget:
 
         # Add home team row
         home_values = [home]
-        for inn in structured_game.inning_scores[:base_cols]:
+        for inn in structured_game.inning_scores:
             home_values.append(str(inn.home_runs))
         if structured_game.home_box_score:
             home_values.extend(
@@ -561,45 +630,6 @@ class GamesPlayedWidget:
         else:
             home_values.extend(["", "", ""])
         tree.insert("", tk.END, values=home_values, tags=("home",))
-
-        # Second table for extra innings
-        if inning_labels2:
-            ttk.Label(
-                self.scrollable_frame.scrollable_frame,
-                text=f"INNING SCORES (10-{num_innings})",
-                style="SectionHeader.TLabel",
-            ).pack(anchor=tk.W, padx=10, pady=(10, 0))
-
-            columns2 = ["col_" + str(i) for i in range(10, num_innings + 1)]
-
-            tree_frame2 = tk.Frame(
-                self.scrollable_frame.scrollable_frame, bg=BG_WIDGET, height=55
-            )
-            tree_frame2.pack(anchor=tk.W, padx=10, pady=5)
-
-            tree2 = ttk.Treeview(
-                tree_frame2,
-                columns=columns2,
-                show="tree headings",
-                style="InningScore.Treeview",
-                height=2,
-            )
-
-            tree2.column("#0", width=50, anchor=tk.W)
-            tree2.heading("#0", text="")
-            for i, col in enumerate(columns2):
-                tree2.column(col, width=inning_width, anchor=tk.CENTER)
-                tree2.heading(col, text=inning_labels2[i])
-            tree2.pack(anchor=tk.W)
-
-            # Add rows for extra innings
-            away_vals2 = [""]
-            home_vals2 = [""]
-            for inn in structured_game.inning_scores[9:]:
-                away_vals2.append(str(inn.away_runs))
-                home_vals2.append(str(inn.home_runs))
-            tree2.insert("", tk.END, values=away_vals2, tags=("away",))
-            tree2.insert("", tk.END, values=home_vals2, tags=("home",))
 
     def _display_batting_box_scores(self, structured_game):
         """Display batting box scores using Treeview grids."""
@@ -863,21 +893,303 @@ class GamesPlayedWidget:
             style="PitcherDecision.TLabel",
         ).pack(anchor=tk.W, padx=10)
 
-    def _display_play_by_play(self, structured_game):
-        """Display play-by-play from structured innings data."""
-        ttk.Label(
-            self.scrollable_frame.scrollable_frame,
-            text="PLAY-BY-PLAY",
-            style="SectionHeader.TLabel",
-        ).pack(anchor=tk.W, padx=10, pady=(15, 0))
+    def _display_away_team_box_score(self, parent_frame, team, box_score):
+        """Display away team batting and pitching inside a collapsible section."""
+        # Batting sub-section
+        batting_label = tk.Label(
+            parent_frame,
+            text="  Batting",
+            font=("Segoe UI", 10, "bold"),
+            bg=BG_WIDGET,
+            fg=ACCENT_BLUE,
+            anchor="w",
+        )
+        batting_label.pack(anchor=tk.W, padx=20, pady=(5, 0))
+        self._display_team_batting_in_section(parent_frame, team, box_score)
 
+        # Pitching sub-section
+        pitching_label = tk.Label(
+            parent_frame,
+            text="  Pitching",
+            font=("Segoe UI", 10, "bold"),
+            bg=BG_WIDGET,
+            fg=ACCENT_BLUE,
+            anchor="w",
+        )
+        pitching_label.pack(anchor=tk.W, padx=20, pady=(10, 5))
+        self._display_team_pitching_in_section(parent_frame, team, box_score)
+
+    def _display_home_team_box_score(self, parent_frame, team, box_score):
+        """Display home team batting and pitching inside a collapsible section."""
+        # Batting sub-section
+        batting_label = tk.Label(
+            parent_frame,
+            text="  Batting",
+            font=("Segoe UI", 10, "bold"),
+            bg=BG_WIDGET,
+            fg=ACCENT_BLUE,
+            anchor="w",
+        )
+        batting_label.pack(anchor=tk.W, padx=20, pady=(5, 0))
+        self._display_team_batting_in_section(parent_frame, team, box_score)
+
+        # Pitching sub-section
+        pitching_label = tk.Label(
+            parent_frame,
+            text="  Pitching",
+            font=("Segoe UI", 10, "bold"),
+            bg=BG_WIDGET,
+            fg=ACCENT_BLUE,
+            anchor="w",
+        )
+        pitching_label.pack(anchor=tk.W, padx=20, pady=(10, 5))
+        self._display_team_pitching_in_section(parent_frame, team, box_score)
+
+    def _display_batting_box_scores_in_section(self, parent_frame, structured_game):
+        """Display batting box scores inside a collapsible section frame."""
+        away_bs = structured_game.away_box_score
+        home_bs = structured_game.home_box_score
+
+        if not away_bs and not home_bs:
+            ttk.Label(
+                parent_frame,
+                text="  No batting data available",
+                style="PlayItem.TLabel",
+            ).pack(anchor=tk.W, padx=10)
+            return
+
+        self._display_team_batting_in_section(
+            parent_frame, structured_game.away_team, away_bs
+        )
+        self._display_team_batting_in_section(
+            parent_frame, structured_game.home_team, home_bs
+        )
+
+    def _display_team_batting_in_section(self, parent_frame, team, box_score):
+        """Display batting box score for one team inside a section."""
+        ttk.Label(
+            parent_frame,
+            text=f"  {team}",
+            style="TeamHeader.TLabel",
+        ).pack(anchor=tk.W, padx=10)
+
+        name_width = 145
+        stat_width = 42
+        columns = ["Player", "Pos", "AB", "R", "H", "2B", "3B", "HR", "RBI", "BB", "K"]
+        headings = columns
+
+        if not box_score or not box_score.batters:
+            num_rows = 1
+        else:
+            num_rows = len(box_score.batters)
+            if box_score.totals_batting:
+                num_rows += 1
+
+        frame_height = num_rows * 20 + 10
+
+        tree_frame = tk.Frame(parent_frame, bg=BG_WIDGET, height=frame_height)
+        tree_frame.pack(anchor=tk.W, padx=10, pady=2)
+
+        tree = ttk.Treeview(
+            tree_frame,
+            columns=columns,
+            show="headings",
+            style="BoxScore.Treeview",
+            height=num_rows,
+        )
+
+        tree.column("#0", width=0, stretch=False)
+        for i, col in enumerate(columns):
+            if i == 0:
+                tree.column(col, width=name_width, anchor=tk.W)
+            elif i == 1:
+                tree.column(col, width=50, anchor=tk.CENTER)
+            else:
+                tree.column(col, width=stat_width, anchor=tk.CENTER)
+            tree.heading(col, text=headings[i])
+
+        tree.pack(anchor=tk.W)
+
+        if not box_score:
+            tree.insert("", tk.END, values=["No data"] + [""] * len(columns))
+            return
+
+        for idx, batter in enumerate(box_score.batters):
+            stats = batter.stats
+            name = batter.name[:24] if len(batter.name) > 24 else batter.name
+            position = getattr(batter, "position", getattr(batter, "pos", ""))
+            values = [
+                name,
+                position,
+                int(stats.AB),
+                int(stats.R),
+                int(stats.H),
+                int(stats.D),
+                int(stats.T),
+                int(stats.HR),
+                int(stats.RBI),
+                int(getattr(stats, "BB", 0)),
+                int(getattr(stats, "SO", 0)),
+            ]
+            tree.insert(
+                "", tk.END, values=values, tags=("alt",) if idx % 2 == 1 else ()
+            )
+
+        if box_score.totals_batting:
+            totals = box_score.totals_batting
+            totals_values = [
+                "TOTALS",
+                "",
+                int(totals.AB),
+                int(totals.R),
+                int(totals.H),
+                int(totals.D),
+                int(totals.T),
+                int(totals.HR),
+                int(totals.RBI),
+                int(getattr(totals, "BB", 0)),
+                int(getattr(totals, "SO", 0)),
+            ]
+            tree.insert("", tk.END, values=totals_values, tags=("totals",))
+
+        tree.tag_configure("alt", background=BG_WIDGET_ALT)
+        tree.tag_configure("totals", background="#2a2a3a", foreground=ACCENT_GOLD)
+
+    def _display_pitching_box_scores_in_section(self, parent_frame, structured_game):
+        """Display pitching box scores inside a collapsible section frame."""
+        away_bs = structured_game.away_box_score
+        home_bs = structured_game.home_box_score
+
+        if not away_bs and not home_bs:
+            ttk.Label(
+                parent_frame,
+                text="  No pitching data available",
+                style="PlayItem.TLabel",
+            ).pack(anchor=tk.W, padx=10)
+            return
+
+        self._display_team_pitching_in_section(
+            parent_frame, structured_game.away_team, away_bs
+        )
+        self._display_team_pitching_in_section(
+            parent_frame, structured_game.home_team, home_bs
+        )
+
+    def _display_team_pitching_in_section(self, parent_frame, team, box_score):
+        """Display pitching box score for one team inside a section."""
+        ttk.Label(
+            parent_frame,
+            text=f"  {team}",
+            style="TeamHeader.TLabel",
+        ).pack(anchor=tk.W, padx=10)
+
+        name_width = 145
+        stat_width = 36
+        columns = ["Pitcher", "IP", "H", "ER", "SO", "BB", "HR", "W", "L", "HLD", "SV"]
+        headings = columns
+
+        if not box_score or not box_score.pitchers:
+            num_rows = 1
+        else:
+            num_rows = len(box_score.pitchers)
+
+        tree_frame = tk.Frame(parent_frame, bg=BG_WIDGET)
+        tree_frame.pack(anchor=tk.W, padx=10, pady=2)
+
+        tree = ttk.Treeview(
+            tree_frame,
+            columns=columns,
+            show="headings",
+            style="BoxScore.Treeview",
+            height=num_rows,
+        )
+
+        tree.column("#0", width=0, stretch=False)
+        for i, col in enumerate(columns):
+            if i == 0:
+                tree.column(col, width=name_width, anchor=tk.W)
+            else:
+                tree.column(col, width=stat_width, anchor=tk.CENTER)
+            tree.heading(col, text=headings[i])
+
+        tree.pack(anchor=tk.W)
+
+        if not box_score or not box_score.pitchers:
+            tree.insert("", tk.END, values=["No data"] + [""] * len(columns))
+            return
+
+        for idx, pitcher in enumerate(box_score.pitchers):
+            stats = pitcher.stats
+            name = pitcher.name[:24] if len(pitcher.name) > 24 else pitcher.name
+            values = [
+                name,
+                f"{stats.IP:.1f}",
+                int(stats.H),
+                int(stats.ER),
+                int(stats.SO),
+                int(stats.BB),
+                int(stats.HR),
+                int(stats.W),
+                int(stats.L),
+                int(getattr(stats, "HLD", 0)),
+                int(getattr(stats, "SV", 0)),
+            ]
+            tree.insert(
+                "", tk.END, values=values, tags=("alt",) if idx % 2 == 1 else ()
+            )
+
+        tree.tag_configure("alt", background=BG_WIDGET_ALT)
+
+    def _display_pitcher_decisions_in_section(self, parent_frame, structured_game):
+        """Display pitcher decisions inside a collapsible section frame."""
+        decisions = []
+        if structured_game.winning_pitcher:
+            decisions.append(f"W: {structured_game.winning_pitcher}")
+        if structured_game.losing_pitcher:
+            decisions.append(f"L: {structured_game.losing_pitcher}")
+
+        away_bs = structured_game.away_box_score
+        home_bs = structured_game.home_box_score
+
+        hld_pitchers = []
+        sv_pitchers = []
+
+        for box_score in [away_bs, home_bs]:
+            if box_score and box_score.pitchers:
+                for pitcher in box_score.pitchers:
+                    stats = pitcher.stats
+                    if getattr(stats, "Hld", 0) > 0:
+                        hld_pitchers.append(pitcher.name)
+                    if getattr(stats, "Sv", 0) > 0:
+                        sv_pitchers.append(pitcher.name)
+
+        for name in hld_pitchers:
+            decisions.append(f"HLD: {name}")
+        for name in sv_pitchers:
+            decisions.append(f"SV: {name}")
+
+        decision_text = "   ".join(decisions) if decisions else "No decision recorded"
+
+        ttk.Label(
+            parent_frame,
+            text=f"  {decision_text}",
+            style="PitcherDecision.TLabel",
+        ).pack(anchor=tk.W, padx=10)
+
+    def _display_play_by_play_in_section(self, parent_frame, structured_game):
+        """Display play-by-play inside a collapsible section frame."""
         if not structured_game.innings:
             ttk.Label(
-                self.scrollable_frame.scrollable_frame,
+                parent_frame,
                 text="  No play-by-play data available",
                 style="PlayItem.TLabel",
-            ).pack(anchor=tk.W)
+            ).pack(anchor=tk.W, padx=10)
             return
+
+        away = structured_game.away_team
+        home = structured_game.home_team
+        away_runs = 0
+        home_runs = 0
 
         for i, inning_data in enumerate(structured_game.innings):
             inning_num = i + 1
@@ -888,7 +1200,7 @@ class GamesPlayedWidget:
 
                 half_label = "Top" if half == "top" else "Bot"
                 ttk.Label(
-                    self.scrollable_frame.scrollable_frame,
+                    parent_frame,
                     text=f"  {half_label} {inning_num}:",
                     style="PlayHeader.TLabel",
                 ).pack(anchor=tk.W)
@@ -896,10 +1208,32 @@ class GamesPlayedWidget:
                 for play in half_data.plays:
                     if play.play_description:
                         ttk.Label(
-                            self.scrollable_frame.scrollable_frame,
+                            parent_frame,
                             text=f"    {play.play_description}",
                             style="PlayItem.TLabel",
                         ).pack(anchor=tk.W)
+
+                    # Track runs scored (runs_scored is a list of player names)
+                    runs = getattr(play, "runs_scored", []) or []
+                    num_runs = len(runs) if isinstance(runs, list) else runs
+                    if half == "top":
+                        away_runs += num_runs
+                    else:
+                        home_runs += num_runs
+
+                # Show score at end of half inning
+                ttk.Label(
+                    parent_frame,
+                    text=f"    === {away} {away_runs}, {home} {home_runs} ===",
+                    font=("Segoe UI", 9, "bold"),
+                    foreground=ACCENT_GOLD,
+                ).pack(anchor=tk.W)
+
+    def _display_play_by_play(self, structured_game):
+        """Display play-by-play from structured innings data with scores at end of each half inning."""
+        self._display_play_by_play_in_section(
+            self.scrollable_frame.scrollable_frame, structured_game
+        )
 
     def _display_text_recap(self, away: str, home: str, game_recap: str):
         """Display game recap as plain text (fallback when no structured data)."""

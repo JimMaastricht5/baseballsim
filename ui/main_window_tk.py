@@ -433,13 +433,58 @@ F1     - Show this help"""
 
         selected_team = self.toolbar.get_selected_team()
 
-        messagebox.showinfo(
-            "Season Starting",
-            "The season will start in a PAUSED state.\n\n"
-            "Use this time to make roster moves, place players on the IL, "
+        # Create countdown dialog
+        countdown_dialog = tk.Toplevel(self.root)
+        countdown_dialog.title("Season Starting")
+        countdown_dialog.geometry("400x200")
+        countdown_dialog.resizable(False, False)
+        countdown_dialog.transient(self.root)
+        countdown_dialog.grab_set()
+
+        # Center the dialog
+        countdown_dialog.update_idletasks()
+        x = self.root.winfo_x() + (self.root.winfo_width() // 2) - 200
+        y = self.root.winfo_y() + (self.root.winfo_height() // 2) - 100
+        countdown_dialog.geometry(f"+{x}+{y}")
+
+        # Content
+        info_label = tk.Label(
+            countdown_dialog,
+            text="Season will start in PAUSED state.\n\n"
+            "Use this time to make roster moves, place players on IL,\n"
             "or make retirements in the Admin tab.\n\n"
-            "Press Resume when ready to begin simulation.",
+            "Press Pause if you need more time to make changes.",
+            font=("Arial", 10),
+            justify="center",
         )
+        info_label.pack(pady=(20, 10))
+
+        countdown_label = tk.Label(
+            countdown_dialog, text="5", font=("Arial", 48, "bold"), fg="#0066cc"
+        )
+        countdown_label.pack(pady=10)
+
+        skip_button = tk.Button(
+            countdown_dialog,
+            text="Start Now",
+            command=countdown_dialog.destroy,
+            width=12,
+            font=("Arial", 10, "bold"),
+        )
+        skip_button.pack(pady=(5, 20))
+
+        # Countdown logic
+        def update_countdown(seconds):
+            if seconds > 0:
+                countdown_label.config(text=str(seconds))
+                countdown_dialog.after(1000, update_countdown, seconds - 1)
+            else:
+                countdown_dialog.destroy()
+
+        countdown_dialog.after(1000, update_countdown, 4)
+
+        # Wait for dialog to close
+        self.root.wait_window(countdown_dialog)
 
         # Track simulation start time
         self.simulation_start_time = time.time()

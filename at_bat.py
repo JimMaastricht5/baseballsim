@@ -542,52 +542,48 @@ class SimAB:
 
             outcomes.set_score_book_cd("FO")  # fall back if no option is selected
         else:
-            # 3. OUT RESOLUTION (Strikeouts vs. BIP)
-            lg_k_rate = self.baseball_data.league_k_rate_per_ab
+            # 3. OUT RESOLUTION - Use weighted selection with odds ratio for K
 
-            # Protection against division by zero for K logic
-            if lg_k_rate > 0:
-                k_mult = (
-                    (batting.SO / pa_batter) / lg_k_rate
-                    + (pitching.SO / pa_pitcher) / lg_k_rate
-                ) / 2
-            else:
-                k_mult = 1.0
+            lg_k = self.league_K_rate_per_AB
+            lg_bip = 1 - lg_k
 
-            # Probability of K given that an OUT has already occurred
-            # We clip prob_out to 0.001 to prevent division errors
-            prob_out = max(1 - (batting.Total_OB / pa_batter), 0.001)
+            batter_k_rate = batting["SO"] / pa_batter if pa_batter > 0 else lg_k
+            pitcher_k_rate = pitching["SO"] / pa_pitcher if pa_pitcher > 0 else lg_k
 
-            if self.rng() < (lg_k_rate * k_mult / prob_out):
-                outcomes.set_score_book_cd("SO")
-            else:
-                outcomes.set_score_book_cd(
-                    self.gb_fo_lo(outs, runner_on_first, runner_on_third)
-                )
+            # K uses odds ratio since we have batter/pitcher specific rates
+            k_prob = self.odds_ratio(
+                batter_k_rate, pitcher_k_rate, lg_k, stat_type="SO"
+            )
+
+            # BIP breakdown using league rates (no batter/pitcher specific data)
+            gb_prob = lg_bip * self.league_GB
+            fb_prob = lg_bip * self.league_FB
+            lo_prob = lg_bip * self.league_LD
+
+            weights = {
+                "SO": k_prob,
+                "GB": gb_prob,
+                "FB": fb_prob,
+                "LO": lo_prob,
+            }
+
+            total_w = sum(weights.values())
+            roll = self.rng() * total_w
+
+            running_total = 0
+            for event, weight in weights.items():
+                running_total += weight
+                if roll <= running_total:
+                    if event == "SO":
+                        outcomes.set_score_book_cd("SO")
+                    else:
+                        outcomes.set_score_book_cd(
+                            self.gb_fo_lo(outs, runner_on_first, runner_on_third)
+                        )
+                    return
+
+            outcomes.set_score_book_cd("FO")
         return
-
-        # self.pitching = pitching
-        # self.batting = batting
-        # outcomes.reset()
-        # if self.onbase(lineup_def_war):
-        #     if self.bb():
-        #         outcomes.set_score_book_cd('BB')
-        #     elif self.hr():
-        #         outcomes.set_score_book_cd('HR')
-        #     elif self.triple():
-        #         outcomes.set_score_book_cd('3B')
-        #     elif self.double():
-        #         outcomes.set_score_book_cd('2B')
-        #     elif self.hbp():
-        #         outcomes.set_score_book_cd('HBP')
-        #     else:
-        #         outcomes.set_score_book_cd('H')
-        # else:  # handle outs
-        #     if self.k():
-        #         outcomes.set_score_book_cd('SO')
-        #     else:
-        #         outcomes.set_score_book_cd(self.gb_fo_lo(outs, runner_on_first, runner_on_third))
-        # return
 
     def odds_ratio(
         self,
@@ -737,6 +733,14 @@ class MockBaseballStats:
         # Dataframes expected by SimAB initialization
         self.league_batting_totals = custom_team_batting_totals(self.batting_data)
         self.league_pitching_totals = self.league_batting_totals
+
+        # Rates needed for BIP breakdown
+        self.league_2b_rate = (
+            self.league_batting_totals.at[0, "2B"] / self.league_batting_total_ob
+        )
+        self.league_3b_rate = (
+            self.league_batting_totals.at[0, "3B"] / self.league_batting_total_ob
+        )
 
 
 # =================================================================

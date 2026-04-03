@@ -433,58 +433,89 @@ F1     - Show this help"""
 
         selected_team = self.toolbar.get_selected_team()
 
+        # Track if user wants to start paused
+        user_paused = {"value": False}
+        countdown_finished = {"value": False}
+
         # Create countdown dialog
         countdown_dialog = tk.Toplevel(self.root)
         countdown_dialog.title("Season Starting")
-        countdown_dialog.geometry("400x200")
+        countdown_dialog.geometry("450x220")
         countdown_dialog.resizable(False, False)
         countdown_dialog.transient(self.root)
         countdown_dialog.grab_set()
 
         # Center the dialog
         countdown_dialog.update_idletasks()
-        x = self.root.winfo_x() + (self.root.winfo_width() // 2) - 200
-        y = self.root.winfo_y() + (self.root.winfo_height() // 2) - 100
+        x = self.root.winfo_x() + (self.root.winfo_width() // 2) - 225
+        y = self.root.winfo_y() + (self.root.winfo_height() // 2) - 110
         countdown_dialog.geometry(f"+{x}+{y}")
 
         # Content
         info_label = tk.Label(
             countdown_dialog,
-            text="Season will start in PAUSED state.\n\n"
-            "Use this time to make roster moves, place players on IL,\n"
-            "or make retirements in the Admin tab.\n\n"
-            "Press Pause if you need more time to make changes.",
+            text="Simulation will start automatically in:\n\n"
+            "Click PAUSE below if you need time to make roster moves,\n"
+            "place players on IL, or make retirements in the Admin tab.",
             font=("Arial", 10),
             justify="center",
         )
-        info_label.pack(pady=(20, 10))
+        info_label.pack(pady=(15, 5))
 
         countdown_label = tk.Label(
             countdown_dialog, text="5", font=("Arial", 48, "bold"), fg="#0066cc"
         )
-        countdown_label.pack(pady=10)
+        countdown_label.pack(pady=5)
 
-        skip_button = tk.Button(
-            countdown_dialog,
+        button_frame = tk.Frame(countdown_dialog)
+        button_frame.pack(pady=(5, 15))
+
+        # Pause button - stops countdown and starts simulation paused
+        def on_pause_click():
+            user_paused["value"] = True
+            countdown_dialog.destroy()
+
+        pause_button = tk.Button(
+            button_frame,
+            text="PAUSE",
+            command=on_pause_click,
+            width=10,
+            font=("Arial", 10, "bold"),
+            bg="#e5534b",
+            fg="white",
+        )
+        pause_button.pack(side=tk.LEFT, padx=10)
+
+        # Start Now button - immediately starts simulation running
+        start_now_button = tk.Button(
+            button_frame,
             text="Start Now",
             command=countdown_dialog.destroy,
-            width=12,
+            width=10,
             font=("Arial", 10, "bold"),
         )
-        skip_button.pack(pady=(5, 20))
+        start_now_button.pack(side=tk.LEFT, padx=10)
 
         # Countdown logic
         def update_countdown(seconds):
+            if user_paused["value"]:
+                countdown_label.config(text="PAUSED", fg="#e5534b")
+                countdown_dialog.after(500, update_countdown, 0)
+                return
             if seconds > 0:
-                countdown_label.config(text=str(seconds))
+                countdown_label.config(text=str(seconds), fg="#0066cc")
                 countdown_dialog.after(1000, update_countdown, seconds - 1)
             else:
+                countdown_finished["value"] = True
                 countdown_dialog.destroy()
 
         countdown_dialog.after(1000, update_countdown, 4)
 
         # Wait for dialog to close
         self.root.wait_window(countdown_dialog)
+
+        # Determine if we should start paused
+        should_start_paused = user_paused["value"] or not countdown_finished["value"]
 
         # Track simulation start time
         self.simulation_start_time = time.time()
@@ -553,16 +584,28 @@ F1     - Show this help"""
             self.root.after(2000, self._update_league_stats)
             self.root.after(2000, self._update_league_leaders)
 
-            # Initialize schedule display for day 1 (season starts paused)
+            # Initialize schedule display for day 1
             self.root.after(1500, self._init_schedule_display)
 
-            # Update UI state - season starts in paused state
-            self.toolbar.update_button_states(simulation_running=True, paused=True)
-            self._update_status_indicator("paused")
-            self._update_phase("Regular Season")
-            self.status_label.config(
-                text=self._format_status_with_day("Season ready - Press Play to start")
-            )
+            # Update UI state based on whether we started paused
+            if should_start_paused:
+                # User clicked pause or dialog closed before countdown - start paused
+                self.toolbar.update_button_states(simulation_running=True, paused=True)
+                self._update_status_indicator("paused")
+                self._update_phase("Regular Season")
+                self.status_label.config(
+                    text=self._format_status_with_day(
+                        "Season ready - Press Play to start"
+                    )
+                )
+            else:
+                # Simulation started running automatically
+                self.toolbar.update_button_states(simulation_running=True, paused=False)
+                self._update_status_indicator("running")
+                self._update_phase("Regular Season")
+                self.status_label.config(
+                    text=self._format_status_with_day("Simulation running...")
+                )
 
         num_games = self.toolbar.get_num_games()
         obp_adjustment = self.toolbar.get_obp_adjustment()
@@ -576,10 +619,11 @@ F1     - Show this help"""
             selected_team,
             on_started,
             season_length=num_games,
+            start_paused=should_start_paused,
             obp_adjustment=obp_adjustment,
         ):
             logger.info(
-                f"Season started for team: {selected_team}, games: {num_games}, OBP adjustment: {obp_adjustment}"
+                f"Season started for team: {selected_team}, games: {num_games}, start_paused: {should_start_paused}, OBP adjustment: {obp_adjustment}"
             )
 
     def pause_season(self):

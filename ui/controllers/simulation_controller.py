@@ -25,9 +25,17 @@ class SimulationController:
     - Coordinate initialization callbacks
     """
 
-    def __init__(self, load_seasons: list, new_season: int, rotation_len: int,
-                 series_length: int, season_length: int, season_chatty: bool,
-                 season_print_lineup_b: bool, season_print_box_score_b: bool):
+    def __init__(
+        self,
+        load_seasons: list,
+        new_season: int,
+        rotation_len: int,
+        series_length: int,
+        season_length: int,
+        season_chatty: bool,
+        season_print_lineup_b: bool,
+        season_print_box_score_b: bool,
+    ):
         """
         Initialize simulation controller.
 
@@ -52,34 +60,43 @@ class SimulationController:
 
         self.worker: Optional[SeasonWorker] = None
 
-    def start_season(self, selected_team: str,
-                    on_started_callback: Optional[Callable] = None,
-                    season_length: int = None,
-                    obp_adjustment: float = 0.0) -> bool:
+    def start_season(
+        self,
+        selected_team: str,
+        on_started_callback: Optional[Callable] = None,
+        season_length: int = None,
+        start_paused: bool = True,
+        obp_adjustment: float = 0.0,
+    ) -> bool:
         """
         Start the season simulation.
 
         Args:
             selected_team: Team abbreviation to follow
             on_started_callback: Optional callback after worker starts
+            start_paused: Whether to start in paused state (default True)
 
         Returns:
             bool: True if started successfully, False otherwise
         """
         if self.worker and self.worker.is_alive():
-            messagebox.showwarning("Already Running",
-                                   "A season simulation is already running.")
+            messagebox.showwarning(
+                "Already Running", "A season simulation is already running."
+            )
             return False
 
         if not selected_team:
-            messagebox.showwarning("No Team Selected",
-                                   "Please select a team to follow before starting.")
+            messagebox.showwarning(
+                "No Team Selected", "Please select a team to follow before starting."
+            )
             return False
 
         logger.info(f"Starting season simulation, following team: {selected_team}")
 
         # Create worker with simulation parameters (use override if provided)
-        effective_season_length = season_length if season_length is not None else self.season_length
+        effective_season_length = (
+            season_length if season_length is not None else self.season_length
+        )
         self.worker = SeasonWorker(
             self.load_seasons,
             self.new_season,
@@ -90,8 +107,8 @@ class SimulationController:
             self.season_print_lineup_b,
             self.season_print_box_score_b,
             selected_team,
-            start_paused=True,
-            obp_adjustment=obp_adjustment
+            start_paused=start_paused,
+            obp_adjustment=obp_adjustment,
         )
 
         # Start worker thread
@@ -169,7 +186,9 @@ class SimulationController:
             return True
         return False
 
-    def run_gm_assessments(self, status_callback: Optional[Callable[[str], None]] = None) -> bool:
+    def run_gm_assessments(
+        self, status_callback: Optional[Callable[[str], None]] = None
+    ) -> bool:
         """
         Force all teams to run GM assessments immediately.
 
@@ -186,9 +205,11 @@ class SimulationController:
             # and a concurrent call would race on baseball_data.
             if self.worker.is_alive() and self.worker._pause_event.is_set():
                 from tkinter import messagebox
+
                 messagebox.showwarning(
                     "Pause Required",
-                    "Please pause the simulation before running GM assessments manually.")
+                    "Please pause the simulation before running GM assessments manually.",
+                )
                 if status_callback:
                     status_callback("Pause simulation first to run GM assessments")
                 return False
@@ -205,7 +226,9 @@ class SimulationController:
                 messagebox.showerror("Error", f"Failed to run GM assessments: {e}")
                 return False
         else:
-            messagebox.showwarning("Warning", "Simulation must be started before running GM assessments.")
+            messagebox.showwarning(
+                "Warning", "Simulation must be started before running GM assessments."
+            )
             return False
 
     def get_worker(self) -> Optional[SeasonWorker]:

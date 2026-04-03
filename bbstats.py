@@ -669,8 +669,15 @@ class BaseballStats:
             raw_ab = self.historical_2025_batting["AB"].sum()
             raw_h = self.historical_2025_batting["H"].sum()
             raw_hr = self.historical_2025_batting["HR"].sum()
+            raw_so = self.historical_2025_batting.get("SO", pd.Series([0])).sum()
+            raw_bb = self.historical_2025_batting["BB"].sum()
+            raw_hbp = self.historical_2025_batting.get("HBP", pd.Series([0])).sum()
+            raw_sf = self.historical_2025_batting.get("SF", pd.Series([0])).sum()
+            raw_pa = raw_ab + raw_bb + raw_hbp + raw_sf
             raw_hr_rate = raw_hr / raw_ab if raw_ab > 0 else 0
             raw_h_per_hr = raw_h / raw_hr if raw_hr > 0 else 0
+            raw_k_rate = raw_so / raw_ab if raw_ab > 0 else 0
+            raw_bb_rate = raw_bb / raw_pa if raw_pa > 0 else 0
 
             # 2. Survival Data (Only players who made it into your 2026 Sim)
             active_hashes = self.new_season_batting_data.index.astype(str)
@@ -681,20 +688,34 @@ class BaseballStats:
             surv_ab = survivor_df["AB"].sum()
             surv_h = survivor_df["H"].sum()
             surv_hr = survivor_df["HR"].sum()
+            surv_so = survivor_df.get("SO", pd.Series([0])).sum()
+            surv_bb = survivor_df["BB"].sum()
+            surv_hbp = survivor_df.get("HBP", pd.Series([0])).sum()
+            surv_sf = survivor_df.get("SF", pd.Series([0])).sum()
+            surv_pa = surv_ab + surv_bb + surv_hbp + surv_sf
+            surv_k_rate = surv_so / surv_ab if surv_ab > 0 else 0
+            surv_bb_rate = surv_bb / surv_pa if surv_pa > 0 else 0
 
             # 3. Projected 2026 "True Talent" (What the Preprocessor generated)
             proj_ab = self.batting_data["AB"].sum()
             proj_hr = self.batting_data["HR"].sum()
             proj_hr_rate = proj_hr / proj_ab if proj_ab > 0 else 0
+            proj_so = self.batting_data.get("SO", pd.Series([0])).sum()
+            proj_bb = self.batting_data["BB"].sum()
+            proj_hbp = self.batting_data.get("HBP", pd.Series([0])).sum()
+            proj_sf = self.batting_data.get("SF", pd.Series([0])).sum()
+            proj_pa = proj_ab + proj_bb + proj_hbp + proj_sf
+            proj_k_rate = proj_so / proj_ab if proj_ab > 0 else 0
+            proj_bb_rate = proj_bb / proj_pa if proj_pa > 0 else 0
 
             logger.info(
                 "=== LEAGUE HISTORICAL BASELINE (2025) from bbstats _log_historical_baselines ==="
             )
             logger.info(
-                f"RAW 2025 (Full File):  AB: {raw_ab:,} | H: {raw_h:,} | HR: {raw_hr:,} | HR/AB: {raw_hr_rate:.4f} | H/HR: {raw_h_per_hr:.1f}"
+                f"RAW 2025 (Full File):  AB: {raw_ab:,} | H: {raw_h:,} | HR: {raw_hr:,} | K: {raw_so:,} | BB: {raw_bb:,} | K%: {raw_k_rate:.3f} | BB%: {raw_bb_rate:.3f}"
             )
             logger.info(
-                f"SURVIVORS (2026 Rosters): AB: {surv_ab:,} | H: {surv_h:,} | HR: {surv_hr:,}"
+                f"SURVIVORS (2026 Rosters): AB: {surv_ab:,} | H: {surv_h:,} | HR: {surv_hr:,} | K%: {surv_k_rate:.3f} | BB%: {surv_bb_rate:.3f}"
             )
             logger.info(
                 f"PROJECTED 2026 TOTALS:   AB: {proj_ab:,.0f} | HR: {proj_hr:,.0f} | HR/AB: {proj_hr_rate:.4f}"

@@ -1,1 +1,1 @@
-*.csv merge=keepTheirs
+*.csv merge=ours

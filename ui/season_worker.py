@@ -33,10 +33,20 @@ class SeasonWorker(threading.Thread):
         _pause_event (threading.Event): Event for waiting when paused
     """
 
-    def __init__(self, load_seasons=None, new_season=2026,
-                rotation_len=5, series_length=3, season_length=162, season_chatty=False,
-                season_print_lineup_b=False, season_print_box_score_b=False,
-                team_to_follow=None, start_paused=False, obp_adjustment=0.0):
+    def __init__(
+        self,
+        load_seasons=None,
+        new_season=2026,
+        rotation_len=5,
+        series_length=3,
+        season_length=162,
+        season_chatty=False,
+        season_print_lineup_b=False,
+        season_print_box_score_b=False,
+        team_to_follow=None,
+        start_paused=False,
+        obp_adjustment=0.0,
+    ):
         """
         Initialize season worker with simulation parameters.
 
@@ -52,7 +62,9 @@ class SeasonWorker(threading.Thread):
         # Store simulation parameters
         self.load_seasons = load_seasons or [2023, 2024, 2025]
         self.new_season = new_season
-        self.team_to_follow = team_to_follow or 'MIL'  # Single string, defaults to 'MIL'
+        self.team_to_follow = (
+            team_to_follow or "MIL"
+        )  # Single string, defaults to 'MIL'
         self.random_data = False
         self.rotation_len = rotation_len
         self.series_length = series_length
@@ -106,16 +118,18 @@ class SeasonWorker(threading.Thread):
                 season_length=self.num_games,
                 series_length=self.series_length,  # Standard 3-game series
                 rotation_len=self.rotation_len,
-                include_leagues=None if not self.only_nl_b else ['NL'],
+                include_leagues=None if not self.only_nl_b else ["NL"],
                 season_print_lineup_b=self.season_print_lineup_b,  # Suppress console output
                 season_print_box_score_b=self.season_print_box_score_b,  # Suppress console output
                 season_chatty=self.season_chatty,  # Suppress verbose output
-                season_team_to_follow=[self.team_to_follow],  # Convert single string to single-element list
-                load_batter_file='aggr-stats-pp-Batting.csv',
-                load_pitcher_file='aggr-stats-pp-Pitching.csv',
+                season_team_to_follow=[
+                    self.team_to_follow
+                ],  # Convert single string to single-element list
+                load_batter_file="player-projected-stats-pp-Batting.csv",
+                load_pitcher_file="player-projected-stats-pp-Pitching.csv",
                 schedule=None,  # Let it generate schedule
                 suppress_console_output=True,  # Suppress disabled list and hot/cold list prints for UI
-                obp_adjustment=self.obp_adjustment
+                obp_adjustment=self.obp_adjustment,
             )
 
             # Call sim_start for initialization
@@ -172,7 +186,9 @@ class SeasonWorker(threading.Thread):
                         logger.info("Running playoffs")
                         self.season.run_playoffs()
                 else:
-                    logger.info("World Series not eligible (single league or short season)")
+                    logger.info(
+                        "World Series not eligible (single league or short season)"
+                    )
 
                 # Emit final simulation complete
                 self.signals.emit_simulation_complete()
@@ -181,6 +197,7 @@ class SeasonWorker(threading.Thread):
             error_msg = f"Error in season simulation: {str(e)}"
             logger.error(error_msg)
             import traceback
+
             logger.error(traceback.format_exc())
             self.signals.emit_error(error_msg)
 

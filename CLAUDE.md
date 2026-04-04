@@ -10,7 +10,7 @@ This is a baseball simulation built with Python, using NumPy and Pandas for stat
 
 ### Data Flow
 1. **Data Acquisition** (`download_stats.py`) - Downloads stats from RotoWire using Selenium
-2. **Preprocessing** (`bbstats_preprocess.py`) - Cleans data, calculates stats, creates aggregated/historical files
+2. **Preprocessing** (`bbplayer_projections.py`) - Cleans data, calculates stats, creates player-projected/historical files
 3. **Stats Management** (`bbstats.py`) - Loads preprocessed data, manages league statistics, tracks injuries/fatigue
 4. **Simulation Engine** - Three layers:
    - **Season** (`bbseason.py`) - Schedule, standings, multi-threaded game execution
@@ -32,13 +32,14 @@ This is a baseball simulation built with Python, using NumPy and Pandas for stat
   - Thread-safe game stats updates (uses semaphore)
   - Calculates derived stats (AVG, OBP, SLG, ERA, WHIP, etc.)
 
-- **bbstats_preprocess.py** - Data preparation
-  - Creates two file types:
-    - **Aggregated** (`aggr-stats-pp-*.csv`) - Career totals for game simulation
-    - **Historical** (`historical-*.csv`) - Year-by-year data with `Player_Season_Key`
+- **bbplayer_projections.py** - Data preparation
+  - Creates three file types:
+    - **Player Projected** (`{seasons} player-projected-stats-pp-*.csv`) - Age-adjusted projections for simulation (one row per player)
+    - **Historical** (`{seasons} historical-*.csv`) - Year-by-year data with `Player_Season_Key`
+    - **New Season Placeholder** (`{new_season} New-Season-stats-pp-*.csv`) - Empty template for accumulating sim data during season
   - Handles age-adjusted performance projection for new seasons
   - Supports random data generation for testing
-  - See HISTORICAL_DATA_IMPLEMENTATION.md for details
+  - See PROJECTION_FLOW.md for detailed projection logic
 
 - **bbgame.py** - Game simulation
   - `Game` class manages full game flow
@@ -107,14 +108,14 @@ Launches Pygame window with visual game simulation.
 
 ### Data Preprocessing
 ```bash
-venv_bb314.2/Scripts/python.exe bbstats_preprocess.py
+venv_bb314.2/Scripts/python.exe bbplayer_projections.py
 ```
 Run after downloading stats or to regenerate aggregated/historical files. Creates:
-- `{seasons} aggr-stats-pp-Batting.csv` - For simulation
-- `{seasons} aggr-stats-pp-Pitching.csv` - For simulation
+- `{seasons} player-projected-stats-pp-Batting.csv` - For simulation
+- `{seasons} player-projected-stats-pp-Pitching.csv` - For simulation
 - `{seasons} historical-Batting.csv` - Year-by-year analysis
 - `{seasons} historical-Pitching.csv` - Year-by-year analysis
-- `{new_season} New-Season-stats-pp-*.csv` - Age-projected stats
+- `{new_season} New-Season-stats-pp-*.csv` - Empty placeholder for accumulating sim data during season
 
 ### Downloading Stats
 ```bash
@@ -135,17 +136,17 @@ venv_bb314.2/Scripts/python.exe -c "import pstats; p = pstats.Stats('profile.sta
 - `{year} player-stats-Pitching.csv` - Downloaded from RotoWire
 
 ### Preprocessed Files (Used by Simulator)
-- `{seasons} aggr-stats-pp-Batting.csv` - Career totals, indexed by Hashcode
-- `{seasons} aggr-stats-pp-Pitching.csv` - Career totals, indexed by Hashcode
+- `{seasons} player-projected-stats-pp-Batting.csv` - Career totals, indexed by Hashcode
+- `{seasons} player-projected-stats-pp-Pitching.csv` - Career totals, indexed by Hashcode
 - `{seasons} historical-Batting.csv` - Year-by-year, indexed by Player_Season_Key
 - `{seasons} historical-Pitching.csv` - Year-by-year, indexed by Player_Season_Key
-- `{new_season} New-Season-stats-pp-*.csv` - Age-adjusted projections
+- `{new_season} New-Season-stats-pp-*.csv` - Empty placeholder for accumulating sim data during season
 
 ### Configuration
 All simulations use `load_batter_file` and `load_pitcher_file` parameters:
-- Default: `'aggr-stats-pp-Batting.csv'` and `'aggr-stats-pp-Pitching.csv'`
+- Default: `'player-projected-stats-pp-Batting.csv'` and `'player-projected-stats-pp-Pitching.csv'`
 - For random data: prefix with `'random-'`
-- Year prefixes added automatically (e.g., `'2023 2024 2025 aggr-stats-pp-Batting.csv'`)
+- Year prefixes added automatically (e.g., `'2023 2024 2025 player-projected-stats-pp-Batting.csv'`)
 
 ## Environment
 

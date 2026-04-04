@@ -77,8 +77,8 @@ class BaseballStats:
         load_seasons: List[int],
         new_season: int,
         include_leagues: list = None,
-        load_batter_file: str = "aggr-stats-pp-Batting.csv",
-        load_pitcher_file: str = "aggr-stats-pp-Pitching.csv",
+        load_batter_file: str = "player-projected-stats-pp-Batting.csv",
+        load_pitcher_file: str = "player-projected-stats-pp-Pitching.csv",
         suppress_console_output: bool = False,
     ) -> None:
         """
@@ -925,9 +925,9 @@ class BaseballStats:
         :param pitcher_file: pitcher file name
         :return: None
         """
-        # New season files don't have 'aggr-' prefix, so remove it if present
-        new_pitcher_file = "New-Season-" + pitcher_file.replace("aggr-", "")
-        new_batter_file = "New-Season-" + batter_file.replace("aggr-", "")
+        # New season files don't have 'player-projected-' prefix, so remove it if present
+        new_pitcher_file = "New-Season-" + pitcher_file.replace("player-projected-", "")
+        new_batter_file = "New-Season-" + batter_file.replace("player-projected-", "")
         seasons_str = " ".join(str(season) for season in self.load_seasons)
         try:
             if (
@@ -990,7 +990,7 @@ class BaseballStats:
                 new_batter_file,
             )
             logger.error(
-                "Correct spelling or try running bbstats_preprocess.py to setup the data"
+                "Correct spelling or try running bbplayer_projections.py to setup the data"
             )
             exit(1)  # stop the program
 
@@ -2717,8 +2717,8 @@ if __name__ == "__main__":
         load_seasons=[2023, 2024, 2025],
         new_season=2026,
         include_leagues=["AL", "NL"],
-        load_batter_file="aggr-stats-pp-Batting.csv",
-        load_pitcher_file="aggr-stats-pp-Pitching.csv",
+        load_batter_file="player-projected-stats-pp-Batting.csv",
+        load_pitcher_file="player-projected-stats-pp-Pitching.csv",
     )
     # print(*baseball_data.pitching_data.columns)
     print(*baseball_data.batting_data.columns)

@@ -192,8 +192,8 @@ class BaseballSeason:
         season_print_box_score_b: bool = False,
         season_chatty: bool = False,
         season_team_to_follow: Optional[List[str]] = None,
-        load_batter_file: str = "aggr-stats-pp-Batting.csv",
-        load_pitcher_file: str = "aggr-stats-pp-Pitching.csv",
+        load_batter_file: str = "player-projected-stats-pp-Batting.csv",
+        load_pitcher_file: str = "player-projected-stats-pp-Pitching.csv",
         schedule: list = None,
         suppress_console_output: bool = False,
         obp_adjustment: float = None,
@@ -1648,8 +1648,8 @@ if __name__ == "__main__":
             season_print_lineup_b=False,
             season_print_box_score_b=False,
             season_team_to_follow=my_team_to_follow,
-            load_batter_file="aggr-stats-pp-Batting.csv",
-            load_pitcher_file="aggr-stats-pp-Pitching.csv",
+            load_batter_file="player-projected-stats-pp-Batting.csv",
+            load_pitcher_file="player-projected-stats-pp-Pitching.csv",
         )
         bbseasonMS.sim_start()
         bbseasonMS.sim_all_days_for_seasons()
@@ -1677,8 +1677,8 @@ if __name__ == "__main__":
             season_print_lineup_b=False,
             season_print_box_score_b=False,
             season_team_to_follow=my_team_to_follow,
-            load_batter_file="aggr-stats-pp-Batting.csv",  # 'random-aggr-stats-pp-Batting.csv',
-            load_pitcher_file="aggr-stats-pp-Pitching.csv",
+            load_batter_file="player-projected-stats-pp-Batting.csv",  # 'random-player-projected-stats-pp-Batting.csv',
+            load_pitcher_file="player-projected-stats-pp-Pitching.csv",
         )
         # schedule=series_schedule)
         bbseasonSS.sim_full_season()

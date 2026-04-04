@@ -7,6 +7,7 @@ Copyright (c) 2024 Jim Maastricht
 
 Contact: JimMaastricht5@gmail.com
 """
+
 import json
 import bbstats
 import bbteam
@@ -14,15 +15,25 @@ from bblogger import logger
 
 
 class Manager:
-    def __init__(self, team_name, load_batter_file, load_pitcher_file,
-                 load_seasons=2024, new_season=2025, baseball_data=None):
+    def __init__(
+        self,
+        team_name,
+        load_batter_file,
+        load_pitcher_file,
+        load_seasons=2024,
+        new_season=2025,
+        baseball_data=None,
+    ):
         logger.debug("Initializing Manager for team: {}", team_name)
         self.team_name = team_name
         self.baseball_data = baseball_data
         if self.baseball_data is None:
-            self.baseball_data = bbstats.BaseballStats(load_seasons=load_seasons, new_season=new_season,
-                                                       load_batter_file=load_batter_file,
-                                                       load_pitcher_file=load_pitcher_file)
+            self.baseball_data = bbstats.BaseballStats(
+                load_seasons=load_seasons,
+                new_season=new_season,
+                load_batter_file=load_batter_file,
+                load_pitcher_file=load_pitcher_file,
+            )
         self.team = None
         self.setup_team()
         # self.print_team()
@@ -35,8 +46,9 @@ class Manager:
 
     def setup_team(self):
         logger.debug("Setting up team: {}", self.team_name)
-        self.team = bbteam.Team(team_name=self.team_name, baseball_data=self.baseball_data,
-                                interactive=True)
+        self.team = bbteam.Team(
+            team_name=self.team_name, baseball_data=self.baseball_data, interactive=True
+        )
         self.team.set_initial_lineup(show_lineup=False, show_bench=False)
         return
 
@@ -51,8 +63,12 @@ class Manager:
             print("P. Print the Entire Team")
             print("\t P1 Print the Pos Players")
             print("\t P2 Print the Pitchers")
-            print("M. Move a Player to a new team.  Note: This resets lineups and rotations")
-            print("T. Trade Players between two teams.  Note: This resets lineups and rotations")
+            print(
+                "M. Move a Player to a new team.  Note: This resets lineups and rotations"
+            )
+            print(
+                "T. Trade Players between two teams.  Note: This resets lineups and rotations"
+            )
             print("L. Change a Player in the Preferred Lineup")
             print("R. Change the Preferred Starting Rotation")
             print("Load. Load a Saved Team")
@@ -62,9 +78,13 @@ class Manager:
             if choice == "p":
                 self.print_team()
             elif choice == "p1":
-                self.team.print_available_batters(include_starters=True, current_season_stats=True)
+                self.team.print_available_batters(
+                    include_starters=True, current_season_stats=True
+                )
             elif choice == "p2":
-                self.team.print_available_pitchers(include_starters=True, current_season_stats=True)
+                self.team.print_available_pitchers(
+                    include_starters=True, current_season_stats=True
+                )
             elif choice == "l":
                 print("Changing lineup....2")
                 self.lineup_changes()
@@ -73,10 +93,12 @@ class Manager:
             elif choice == "load":
                 self.load_lineup()
             elif choice == "reset":
-                self.team.set_initial_lineup(show_lineup=True, show_bench=True)  # defaults batting and pitching
-            elif choice == 'm':
+                self.team.set_initial_lineup(
+                    show_lineup=True, show_bench=True
+                )  # defaults batting and pitching
+            elif choice == "m":
                 self.move_a_player()  # move players between teams
-            elif choice == 't':
+            elif choice == "t":
                 self.trade_players()  # move players between teams
             elif choice == "0":
                 print("Starting game.")
@@ -89,51 +111,88 @@ class Manager:
         while True:
             try:
                 # self.team.print_available_pitchers(include_starters=True)
-                starting_rotation_order_num = float(input("\nEnter the spot in the starting rotation to change (1-5),"
-                                                        " 0 accepts the lineup: "))
+                starting_rotation_order_num = float(
+                    input(
+                        "\nEnter the spot in the starting rotation to change (1-5),"
+                        " 0 accepts the lineup: "
+                    )
+                )
                 if starting_rotation_order_num == 0:
                     break
                 elif (not 1 <= starting_rotation_order_num <= 5) or not (
-                    abs(starting_rotation_order_num - round(starting_rotation_order_num) == 0)):
-                    print('Enter the spot in the starting rotation to change (1-5)')
-                    print(self.team.print_available_pitchers(include_starters=True, current_season_stats=True))
+                    abs(
+                        starting_rotation_order_num - round(starting_rotation_order_num)
+                        == 0
+                    )
+                ):
+                    print("Enter the spot in the starting rotation to change (1-5)")
+                    print(
+                        self.team.print_available_pitchers(
+                            include_starters=True, current_season_stats=True
+                        )
+                    )
                 else:
                     starting_rotation_order_num = int(starting_rotation_order_num)
                     start_rotation_pitcher_num = int(
-                        input(f'Please enter the number of the pitcher you would like to be '
-                              f'in the starting rotation: '))
+                        input(
+                            f"Please enter the number of the pitcher you would like to be "
+                            f"in the starting rotation: "
+                        )
+                    )
             except ValueError:
                 break
 
-            if (1 <= starting_rotation_order_num <= 5) and (abs(starting_rotation_order_num - round(starting_rotation_order_num) == 0)):
-                self.team.change_starting_rotation(starting_pitcher_num=start_rotation_pitcher_num,
-                                                   rotation_order_num=starting_rotation_order_num)
+            if (1 <= starting_rotation_order_num <= 5) and (
+                abs(
+                    starting_rotation_order_num - round(starting_rotation_order_num)
+                    == 0
+                )
+            ):
+                self.team.change_starting_rotation(
+                    starting_pitcher_num=start_rotation_pitcher_num,
+                    rotation_order_num=starting_rotation_order_num,
+                )
         return
 
     def lineup_changes(self):
         # with print lineup and print bench set to true in bbgame it is not necessary to reprint them here
         while True:
             try:
-                batting_order_number = input("\nEnter the batting order number to change (1-9),  0 accepts the lineup: ")
-                if batting_order_number.lower == 'p1':
-                    print(self.team.print_available_batters(include_starters=True, current_season_stats=True))
+                batting_order_number = input(
+                    "\nEnter the batting order number to change (1-9),  0 accepts the lineup: "
+                )
+                if batting_order_number.lower == "p1":
+                    print(
+                        self.team.print_available_batters(
+                            include_starters=True, current_season_stats=True
+                        )
+                    )
                 else:
                     batting_order_number = int(batting_order_number)
                     if batting_order_number == 0:  # completed
                         break
-                    elif (not 1 <= batting_order_number <= 9) or not (abs(batting_order_number - round(batting_order_number) == 0)):
-                        print('Enter a batting order position betweeen 1 and 9')
+                    elif (not 1 <= batting_order_number <= 9) or not (
+                        abs(batting_order_number - round(batting_order_number) == 0)
+                    ):
+                        print("Enter a batting order position betweeen 1 and 9")
                     else:
                         player_index = int(input("Enter the index of the new player: "))
                         batting_order_number = int(batting_order_number)
             except ValueError:
                 break
 
-            if 1 <= batting_order_number <= 9 and abs(batting_order_number - round(batting_order_number) == 0):
-                self.team.change_lineup(target_batting_order_pos=batting_order_number, pos_player_bench_hashcode=player_index)
+            if 1 <= batting_order_number <= 9 and abs(
+                batting_order_number - round(batting_order_number) == 0
+            ):
+                self.team.change_lineup(
+                    target_batting_order_pos=batting_order_number,
+                    pos_player_bench_hashcode=player_index,
+                )
                 print("\nLineup updated!")
             else:
-                print("Invalid input. Please enter valid batting order and player index numbers.")
+                print(
+                    "Invalid input. Please enter valid batting order and player index numbers."
+                )
         return
 
     def move_a_player(self):
@@ -165,13 +224,15 @@ class Manager:
     def move_multiple_players(self, new_team: str, players: list):
         for player in players:
             print(new_team, player)
-            self.baseball_data.move_a_player_between_teams(player_index=player, new_team=new_team)
+            self.baseball_data.move_a_player_between_teams(
+                player_index=player, new_team=new_team
+            )
         return
 
     @staticmethod
-    def multiplayer_selection(team: str = ''):
+    def multiplayer_selection(team: str = ""):
         players = []
-        player_num = ''
+        player_num = ""
         while player_num != "x":
             player_num = str(input("Enter the player number (enter x when done): "))
             try:
@@ -183,32 +244,50 @@ class Manager:
     def load_lineup(self):
         lineup_dict = {}
         try:
-            with open(self.team_name + '_team.json', 'r') as f:
+            with open(self.team_name + "_team.json", "r") as f:
                 lineup_dict_str = json.load(f)
-                lineup_dict = {int(key): value for key, value in lineup_dict_str.items()}
+                lineup_dict = {
+                    int(key): value for key, value in lineup_dict_str.items()
+                }
         except FileNotFoundError:  # create a default file
-            lineup_dict = {647549: 'LF', 239398: 'C', 224423: '1B', 302715: 'DH', 660657: 'CF', 520723: 'SS',
-                           299454: '3B', 46074: '2B', 752787: 'RF'}
+            lineup_dict = {
+                647549: "LF",
+                239398: "C",
+                224423: "1B",
+                302715: "DH",
+                660657: "CF",
+                520723: "SS",
+                299454: "3B",
+                46074: "2B",
+                752787: "RF",
+            }
             # lineup_dict = self.team.line_up_dict()
-            with open(self.team_name + '_team.json', 'w') as f:
+            with open(self.team_name + "_team.json", "w") as f:
                 json.dump(lineup_dict, f)
         self.team.set_initial_batting_order(lineup_dict)
         return
 
     def print_team(self):
-        self.team.print_available_batters(include_starters=True, current_season_stats=True)
+        self.team.print_available_batters(
+            include_starters=True, current_season_stats=True
+        )
         self.team.print_available_pitchers(include_starters=True)
         return
 
 
 # test code Main
-if __name__ == '__main__':
+if __name__ == "__main__":
     # Configure logger level - change to "DEBUG" for more detailed logs
     from bblogger import configure_logger
+
     configure_logger("INFO")
-    bbgm = Manager(team_name='MIL', load_seasons=2024, new_season=2025,
-                   load_batter_file='aggr-stats-pp-Batting.csv',
-                   load_pitcher_file='aggr-stats-pp-Pitching.csv')
+    bbgm = Manager(
+        team_name="MIL",
+        load_seasons=2024,
+        new_season=2025,
+        load_batter_file="player-projected-stats-pp-Batting.csv",
+        load_pitcher_file="player-projected-stats-pp-Pitching.csv",
+    )
     bbgm.game_setup()
     # bbgm.team.print_starting_lineups()  # reprint line up and loop to unused pos players at top
     # bbgm.team.print_pos_not_in_lineup()  # lineup already printed

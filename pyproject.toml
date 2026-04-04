@@ -1,0 +1,15 @@
+[project]
+name = "baseballsimgit"
+version = "0.1.0"
+description = "Add your description here"
+requires-python = ">=3.13"
+dependencies = [
+    "numpy>=2.1.0",
+    "pandas>=2.2.0",
+    "loguru>=0.7.3",
+    "keyboard>=0.13.5",
+    "requests>=2.31.0",
+    "selenium>=4.15.0",
+    "webdriver-manager>=4.0.0",
+    "pydantic>=2.12.5",
+]

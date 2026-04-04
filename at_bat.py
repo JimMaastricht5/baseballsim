@@ -963,8 +963,8 @@ if __name__ == "__main__":
     stats = bbstats.BaseballStats(
         load_seasons=[2023, 2024, 2025],
         new_season=2026,
-        load_batter_file="aggr-stats-pp-Batting.csv",
-        load_pitcher_file="aggr-stats-pp-Pitching.csv",
+        load_batter_file="player-projected-stats-pp-Batting.csv",
+        load_pitcher_file="player-projected-stats-pp-Pitching.csv",
         suppress_console_output=True,
     )
 

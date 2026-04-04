@@ -1,111 +1,88 @@
-markdown
 # Baseball Simulator
 
-The provided code consists of two main parts: a Python script for 
-preprocessing baseball statistics and a separate script for 
-creating a user interface (UI) using Tkinter.
+A Python-based baseball season simulation with detailed team and player statistics. Simulates individual games or full 162-game seasons using real MLB stats or randomized data.
 
-This project simulates baseball seasons with detailed team and player statistics. 
-It includes:
-- Season scheduling and game simulation
-- Player performance tracking and evaluation
-- Team standings and record management
-- UI  and threaded game simulation modes
+## Documentation
 
-### Baseball Data Preprocessing
+### Architecture & Code
+- **[CLAUDE.md](CLAUDE.md)** - Comprehensive guide for Claude Code (AI assistant)
+- **[PROJECTION_FLOW.md](PROJECTION_FLOW.md)** - Detailed projection algorithm documentation
 
-The first part of the code is in the file BaseballStatsPreProcess.py. This script handles the preprocessing of baseball statistics, including loading data, processing it, and simulating new seasons based on existing data. Here are some key features:
+### UI Documentation
+- **[ui_claude.md](ui/ui_claude.md)** - Complete UI reference guide with widget details, signal system, and patterns
+- **[ui_flowchart.md](ui_flowchart.md)** - Visual flowcharts of UI architecture including:
+  - Application startup flow
+  - Main window layout
+  - Simulation sequence diagrams
+  - Queue communication patterns
+  - Widget update flows
+  - Thread architecture
 
-1. **Loading Data**: The script can load existing season data from CSV files.
-2. **Processing Data**: It processes the data to calculate various performance metrics, such as WAR (Wins Above Replacement), age adjustments, and more.
-3. **Simulating New Seasons**: It simulates new seasons based on either partial existing season data or completely random data.
+## Quick Start
 
-#### Key Classes and Methods
+### 1. Preprocess Data
+```bash
+venv_bb314.2/Scripts/python.exe bbplayer_projections.py
+```
 
-- BaseballStatsPreProcess: This is the main class that handles the entire preprocessing pipeline.
-  - __init__: Initializes the class with parameters such as load seasons, new season, random data generation, and file paths for loading data.
-  - create_hash: Generates a hashcode for each player based on their name.
-  - get_pitching_seasons and get_batting_seasons: Load pitching and batting data from CSV files.
-  - calc_age_adjustment: Applies an age adjustment to performance metrics based on the player's age.
+### 2. Run a Single Game
+```bash
+venv_bb314.2/Scripts/python.exe bbgame.py
+```
 
-### User Interface (UI)
+### 3. Run a Full Season (162 games)
+```bash
+venv_bb314.2/Scripts/python.exe bbseason.py
+```
 
-The second part of the code is in the file bbseason_ui.py. This script creates a graphical user interface using Tkinter to interact with the baseball season simulation. Here are some key features:
+### 4. Run with UI
+```bash
+venv_bb314.2/Scripts/python.exe ui/main_window_tk.py
+```
 
-1. **Main Window**: The UI has a main window where users can specify parameters for the simulation.
-2. **Event Handling**: It handles events such as closing the window and updating settings based on user input.
+## Project Structure
 
-#### Key Classes and Methods
+### Data Preprocessing
+| File | Description |
+|------|-------------|
+| `bbplayer_projections.py` | Main preprocessing orchestrator |
+| `bbplayer_projections_forecast_player.py` | Projection engine with batter/pitcher strategies |
+| `bbstats.py` | Runtime stats management |
 
-- SeasonMainWindow: This is the main class that creates the Tkinter window.
-  - __init__: Initializes the window, sets up UI components, and binds event handlers.
-  - on_close: Handles the window close event.
-  - Other methods handle UI interactions and data processing.
+### Simulation Engine
+| File | Description |
+|------|-------------|
+| `bbgame.py` | Individual game simulation |
+| `bbseason.py` | Full season orchestration |
+| `at_bat.py` | At-bat simulation with odds-ratio calculations |
+
+### Output Files
+| File | Purpose |
+|------|---------|
+| `player-projected-stats-pp-*.csv` | Age-adjusted projections for simulation |
+| `historical-*.csv` | Year-by-year data |
+| `New-Season-stats-pp-*.csv` | Empty placeholder for sim data |
 
 ## Key Features
 
-### Core Simulation Components
-- **Season Management**: Handles complete season scheduling and progression
-- **Game Simulation**: Real-time game simulation with detailed box scores
-- **Player Statistics**: Comprehensive tracking of individual player performance
-- **Team Records**: Dynamic team standings and win-loss tracking
+- **Season Scheduling**: 162-game schedules with rest days
+- **Game Simulation**: Inning-by-inning with detailed box scores
+- **Player Statistics**: Full tracking with injury/fatigue systems
+- **Threaded Execution**: Parallel game simulation for performance
+- **UI Interface**: Tkinter-based graphical interface
 
-### Technical Implementation
-- **Threaded Execution**: Parallel game simulation for performance optimization
-- **Data Persistence**: Automatic saving of game results and season statistics
-- **Flexible Scheduling**: Support for various league structures and schedules
+## Technical Details
 
-### Key Classes and Methods
+- **Python Environment**: Uses `venv_bb314.2/` (Python 3.14.2)
+- **Dependencies**: numpy, pandas, loguru, pygame, selenium
+- **Threading**: Free-threaded Python (3.14t) for parallel execution
 
-#### Main Simulation Class
-- sim_full_season(): simulates a full season of games as defined in the bbseason.py setup
-- sim_day(): Simulates a single day of games across the league
-- sim_day_threaded(): Threaded version for parallel game simulation
-- sim_next_day(): Advances the simulation to the next day
+## Multi-threading Setup
 
-#### Game Management
-- update_win_loss(): Maintains team win-loss records
-- new_game_day(): Prepares team data for new game day
-- print_day_schedule(): Displays daily game schedule
-
-## Usage
-
-The simulator can be run in UI mode or as a batch process. It automatically handles:
-- Team roster management
-- Player injury tracking
-- Rest scheduling
-- Season progression
-
-## Data Flow
-
-1. Season initialization with team and player data
-2. Daily game simulation with thread management
-3. Results aggregation and statistics updating
-4. Season standings calculation and display
-
-## Requirements
-
-- Python 3.14t
-- Standard Python libraries (threading, queue, etc.)
-- Baseball data structures for teams, players, and games
-
-## Contributing
-
-This project simulates baseball scenarios and provides a framework for:
-- Analyzing player performance
-- Testing team strategies
-- Understanding baseball statistics
-- Building predictive models
-- The data can be randomized using bbstats.py to create a custom stats file as input.
-- Running bbgame.py will run a single game with two teams.  bbgame also accepts the number of simulations to run for a signle
-game.  
-- Running bbseason.py will run an entire season of baseball of 162 games with every team.  This takes about 15 minutes if run multi-threaded.
-
-## Multi-threading notes
-1. Install Microsoft's Visual Studio.  You'll need this to compile a python 3.14t version of pandas.
-2.uv python install 3.14t
-3. uv python list
-4. uv python pin 3.14t
-5. uv sync
-6. uv run -- python -X gil=0 bbseason.py
-7. uv run -- python -X gil=0 bbseason_ui.py
+1. Install Microsoft's Visual Studio (for compiling pandas)
+2. `uv python install 3.14t`
+3. `uv python list`
+4. `uv python pin 3.14t`
+5. `uv sync`
+6. `uv run -- python -X gil=0 bbseason.py`
+7. `uv run -- python -X gil=0 ui/main_window_tk.py`

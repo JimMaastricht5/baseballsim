@@ -21,19 +21,20 @@ from ui.theme import (
     ACCENT_BLUE,
     ACCENT_GOLD,
 )
-from ui.widgets.games_played_widget import ScrollableFrame, CollapsibleSection
+from ui.widgets.games_played_widget import (
+    ScrollableFrame,
+)
 
 
 class PlayoffWidget:
     """
-    Playoff widget showing World Series games with structured data.
+    Playoff widget showing playoff games with structured data.
 
     Features:
-    - Visual series score tracking (best-of-7)
-    - Collapsible box score sections
-    - Innings score table
-    - Per-inning collapsible play-by-play
-    - Treeview-based batting/pitching stats
+    - Table view of all playoff games
+    - Series score tracking
+    - Score by inning
+    - Box scores for completed games
     """
 
     def __init__(self, parent: tk.Widget):
@@ -51,52 +52,29 @@ class PlayoffWidget:
         self.current_game = 1
         self.games_data = {}  # {game_num: structured_game}
 
+        # Track all playoff series: {series_key: {away, home, games: [], winner: None}}
+        self.playoff_series = {}  # e.g., {"AL WC A": {"away": "NYY", "home": "BOS", "games": [], "wins": {}}}
+
+        # Current round tracking
+        self.current_round = "Wild Card"
+        self.round_games = []  # Games for current round
+
         # Create header section
-        self.header_frame = tk.Frame(self.frame, bg="#0d2040", height=80)
+        self.header_frame = tk.Frame(self.frame, bg="#0d2040", height=40)
         self.header_frame.pack(fill=tk.X, pady=(0, 5))
         self.header_frame.pack_propagate(False)
 
         self.header_label = tk.Label(
             self.header_frame,
-            text="World Series",
+            text="2026 Playoffs",
             font=("Segoe UI", 16, "bold"),
             bg="#0d2040",
             fg=ACCENT_GOLD,
         )
         self.header_label.pack(pady=5)
 
-        # Series score display
-        self.series_score_frame = tk.Frame(self.header_frame, bg="#0d2040")
-        self.series_score_frame.pack(pady=(0, 5))
-        self.series_labels = {}
-
         # Configure styles
         self._configure_styles()
-
-        # Game selector
-        selector_frame = tk.Frame(self.frame, bg=BG_PANEL)
-        selector_frame.pack(fill=tk.X, padx=10, pady=5)
-
-        tk.Label(
-            selector_frame,
-            text="Game:",
-            font=("Segoe UI", 11, "bold"),
-            bg=BG_PANEL,
-            fg=TEXT_PRIMARY,
-        ).pack(side=tk.LEFT, padx=(0, 5))
-
-        self.game_var = tk.StringVar(value="Game 1")
-        self.game_combo = ttk.Combobox(
-            selector_frame,
-            textvariable=self.game_var,
-            width=12,
-            state="readonly",
-            font=("Segoe UI", 11),
-        )
-        self.game_combo["values"] = ["Game 1"]
-        self.game_combo.current(0)
-        self.game_combo.bind("<<ComboboxSelected>>", self._on_game_selected)
-        self.game_combo.pack(side=tk.LEFT, padx=5)
 
         # Scrollable frame for game display
         self.scrollable_frame = ScrollableFrame(self.frame, style="Scrollable.TFrame")
@@ -186,11 +164,27 @@ class PlayoffWidget:
             foreground=TEXT_PRIMARY,
         )
 
+        # Playoff games table style
+        style.configure(
+            "PlayoffTree.Treeview",
+            font=("Segoe UI", 10),
+            rowheight=25,
+            background=BG_WIDGET,
+            fieldbackground=BG_WIDGET,
+            foreground=TEXT_PRIMARY,
+        )
+        style.configure(
+            "PlayoffTree.Treeview.Heading",
+            font=("Segoe UI", 10, "bold"),
+            background=BG_PANEL,
+            foreground=TEXT_PRIMARY,
+        )
+
     def _show_waiting_message(self):
         """Display message when waiting for World Series to start."""
         label = tk.Label(
             self.scrollable_frame.scrollable_frame,
-            text="Waiting for World Series to begin...\n\nComplete the regular season to unlock playoff games.",
+            text="Waiting for Playoffs to begin...\n\nComplete the regular season to unlock playoff games.",
             font=("Segoe UI", 12),
             fg=TEXT_SECONDARY,
             bg=BG_WIDGET,
@@ -198,71 +192,203 @@ class PlayoffWidget:
         label.pack(pady=50)
 
     def _on_game_selected(self, event=None):
-        """Handle game selection from dropdown."""
-        selected = self.game_var.get()
-        if selected and selected.startswith("Game "):
-            game_num = int(selected.split()[1])
-            self.current_game = game_num
-            self._display_game(game_num)
+        """Handle game selection from dropdown - now disabled."""
+        pass  # Using table display instead
 
-    def _display_game(self, game_num: int):
-        """Display the selected game with structured data."""
+    def _display_todays_games(self):
+        """Display all playoff games as a clear table."""
         for widget in self.scrollable_frame.scrollable_frame.winfo_children():
             widget.destroy()
 
-        if game_num not in self.games_data:
-            tk.Label(
-                self.scrollable_frame.scrollable_frame,
-                text="Game in progress...",
-                font=("Segoe UI", 11),
-                fg=TEXT_SECONDARY,
-            ).pack(pady=20)
+        if not self.games_data:
+            self._show_waiting_message()
             return
 
-        structured_game = self.games_data[game_num]
-        self._display_structured_game(structured_game)
+        # Create Treeview table for games
+        columns = ("game", "matchup", "score", "series")
+        tree = ttk.Treeview(
+            self.scrollable_frame.scrollable_frame,
+            columns=columns,
+            show="headings",
+            style="PlayoffTree.Treeview",
+            height=len(self.games_data),
+        )
+
+        # Configure columns
+        tree.column("#0", width=0, stretch=False)
+        tree.column("game", width=40, anchor=tk.CENTER, stretch=False)
+        tree.column("matchup", width=280, anchor=tk.W, stretch=False)
+        tree.column("score", width=120, anchor=tk.CENTER, stretch=False)
+        tree.column("series", width=60, anchor=tk.CENTER, stretch=False)
+
+        # Configure headings
+        tree.heading("game", text="#")
+        tree.heading("matchup", text="Matchup")
+        tree.heading("score", text="Score")
+        tree.heading("series", text="Series")
+
+        # Configure tags for alternating rows
+        tree.tag_configure("odd", background=BG_WIDGET)
+        tree.tag_configure("even", background=BG_WIDGET_ALT)
+        tree.tag_configure("winner", foreground=ACCENT_GOLD)
+
+        # Add scrollbar
+        scrollbar = ttk.Scrollbar(
+            self.scrollable_frame, orient=tk.VERTICAL, command=tree.yview
+        )
+        tree.configure(yscrollcommand=scrollbar.set)
+
+        tree.pack(side=tk.LEFT, fill=tk.Y)
+        scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+
+        # Get round name helper
+        def get_round_name(game_num):
+            if game_num <= 4:
+                return "WC"
+            elif game_num <= 8:
+                return "DS"
+            elif game_num <= 10:
+                return "LCS"
+            else:
+                return "WS"
+
+        # Get matchup helper - find series between these teams
+        def get_series_status(away, home, current_game_num):
+            """Calculate series wins for both teams up to current game."""
+            away_wins = 0
+            home_wins = 0
+            for gn, g in self.games_data.items():
+                if gn > current_game_num:
+                    continue
+                if (g.away_team == away and g.home_team == home) or (
+                    g.away_team == home and g.home_team == away
+                ):
+                    if g.final_score[0] > g.final_score[1]:
+                        if g.away_team == away:
+                            away_wins += 1
+                        else:
+                            home_wins += 1
+                    elif g.final_score[1] > g.final_score[0]:
+                        if g.home_team == home:
+                            home_wins += 1
+                        else:
+                            away_wins += 1
+            return away_wins, home_wins
+
+        # Populate table
+        for idx, (game_num, structured_game) in enumerate(
+            sorted(self.games_data.items())
+        ):
+            away = structured_game.away_team
+            home = structured_game.home_team
+            away_score, home_score = structured_game.final_score
+
+            # Determine winner for display
+            if away_score > home_score:
+                score_text = f"{away} {away_score} - {home} {home_score}"
+                tags = ("odd" if idx % 2 == 0 else "even", "winner")
+            else:
+                score_text = f"{away} {away_score} - {home} {home_score}"
+                tags = ("odd" if idx % 2 == 0 else "even",)
+
+            # Series status - only count games up to this game
+            away_wins, home_wins = get_series_status(away, home, game_num)
+            series_text = f"{away_wins}-{home_wins}"
+
+            # Matchup with round
+            round_name = get_round_name(game_num)
+            matchup_text = f"{round_name}: {away} @ {home}"
+
+            # Insert row
+            tree.insert(
+                "",
+                tk.END,
+                values=(idx + 1, matchup_text, score_text, series_text),
+                tags=tags,
+            )
+
         self.scrollable_frame.update_scrollregion()
 
+    def _display_game_card(self, parent_frame, structured_game, game_num):
+        """Display a single game card with series info and expandable details."""
+        # This method is no longer used - using _display_todays_games() table instead
+        pass
+
+    def _display_game(self, game_num: int):
+        """Display the selected game with structured data."""
+        # This method is no longer used - using _display_todays_games() table instead
+        pass
+
     def _update_series_display(self):
-        """Update the visual series score display."""
+        """Update the series status display in the header."""
         for label in self.series_labels.values():
             label.destroy()
         self.series_labels.clear()
 
-        teams = list(self.series_score.keys())
-        if len(teams) != 2:
-            return
+        # Collect all unique series matchups from games_data
+        series_info = {}  # {(away, home): (away_wins, home_wins)}
 
-        team1, team2 = teams
-        wins1 = self.series_score.get(team1, 0)
-        wins2 = self.series_score.get(team2, 0)
+        for game in self.games_data.values():
+            away = game.away_team
+            home = game.home_team
+            key = (away, home)
 
-        for i, (team, wins) in enumerate([(team1, wins1), (team2, wins2)]):
-            team_frame = tk.Frame(self.series_score_frame, bg="#0d2040")
-            team_frame.pack(side=tk.LEFT, padx=15)
+            if key not in series_info:
+                series_info[key] = [0, 0]  # away_wins, home_wins
 
-            tk.Label(
-                team_frame,
-                text=f"{team}",
-                font=("Segoe UI", 12, "bold"),
-                bg="#0d2040",
-                fg=ACCENT_GOLD,
-            ).pack(side=tk.LEFT, padx=(0, 10))
+            away_score, home_score = game.final_score
+            if away_score > home_score:
+                series_info[key][0] += 1
+            elif home_score > away_score:
+                series_info[key][1] += 1
 
-            blocks = ""
-            for j in range(4):
-                blocks += "█" if j < wins else "░"
-            blocks += f"  ({wins} wins)"
+        # Display each series
+        for idx, (matchup, (away_wins, home_wins)) in enumerate(series_info.items()):
+            away, home = matchup
+            series_text = f"{away} {away_wins} - {home_wins} {home}"
 
             label = tk.Label(
-                team_frame,
-                text=blocks,
-                font=("Consolas", 12),
+                self.series_status_frame,
+                text=series_text,
+                font=("Segoe UI", 10, "bold"),
                 bg="#0d2040",
-                fg=ACCENT_GOLD,
+                fg=ACCENT_GOLD if away_wins > home_wins else TEXT_PRIMARY,
             )
-            label.pack(side=tk.LEFT)
-            self.series_labels[team] = label
+            label.pack(side=tk.LEFT, padx=10)
+            self.series_labels[f"{away}vs{home}"] = label
+
+    def _display_game_details(self, parent_frame, structured_game):
+        """Display box score and play-by-play for a game card."""
+        away = structured_game.away_team
+        home = structured_game.home_team
+
+        # Box Score: Away Team
+        ttk.Label(
+            parent_frame,
+            text=f"Box Score: {away}",
+            style="WSPlayHeader.TLabel",
+        ).pack(anchor=tk.W, padx=5, pady=(5, 0))
+        self._display_away_team_box_score(
+            parent_frame, away, structured_game.away_box_score
+        )
+
+        # Box Score: Home Team
+        ttk.Label(
+            parent_frame,
+            text=f"Box Score: {home}",
+            style="WSPlayHeader.TLabel",
+        ).pack(anchor=tk.W, padx=5, pady=(5, 0))
+        self._display_home_team_box_score(
+            parent_frame, home, structured_game.home_box_score
+        )
+
+        # Play-By-Play (collapsed)
+        ttk.Label(
+            parent_frame,
+            text="Play-By-Play",
+            style="WSPlayHeader.TLabel",
+        ).pack(anchor=tk.W, padx=5, pady=(5, 0))
+        self._display_play_by_play(parent_frame, structured_game)
 
     def _display_structured_game(self, structured_game):
         """Display a game using structured data."""
@@ -322,11 +448,11 @@ class PlayoffWidget:
             home_section.frame, home, structured_game.home_box_score
         )
 
-        # Play-By-Play
+        # Play-By-Play (collapsed by default)
         pbp_section = CollapsibleSection(
             self.scrollable_frame.scrollable_frame,
             "Play-By-Play",
-            default_expanded=True,
+            default_expanded=False,
             on_toggle=lambda: self.scrollable_frame.update_scrollregion(),
         )
         section_manager.add_section(pbp_section)
@@ -649,7 +775,7 @@ class PlayoffWidget:
         tree.tag_configure("alt", background=BG_WIDGET_ALT)
 
     def _display_play_by_play(self, parent_frame, structured_game):
-        """Display play-by-play with per-inning collapsible sections."""
+        """Display play-by-play as flat list (no collapsible sections per inning)."""
         if not structured_game.innings:
             ttk.Label(
                 parent_frame,
@@ -663,8 +789,6 @@ class PlayoffWidget:
         away_runs = 0
         home_runs = 0
 
-        section_manager = CollapsibleSectionManager(parent_frame)
-
         for i, inning_data in enumerate(structured_game.innings):
             inning_num = i + 1
 
@@ -673,21 +797,17 @@ class PlayoffWidget:
                     continue
 
                 half_label = "Top" if half == "top" else "Bot"
-                section_title = f"{half_label} {inning_num}"
-
-                section = CollapsibleSection(
+                ttk.Label(
                     parent_frame,
-                    section_title,
-                    default_expanded=False,
-                    on_toggle=lambda: self.scrollable_frame.update_scrollregion(),
-                )
-                section_manager.add_section(section)
+                    text=f"  {half_label} {inning_num}:",
+                    style="WSPlayHeader.TLabel",
+                ).pack(anchor=tk.W)
 
                 for play in half_data.plays:
                     if play.play_description:
                         ttk.Label(
-                            section.frame,
-                            text=f"  {play.play_description}",
+                            parent_frame,
+                            text=f"    {play.play_description}",
                             style="WSPlayItem.TLabel",
                         ).pack(anchor=tk.W)
 
@@ -700,25 +820,12 @@ class PlayoffWidget:
 
                 # Score at end of half inning
                 tk.Label(
-                    section.frame,
+                    parent_frame,
                     text=f"  === {away} {away_runs}, {home} {home_runs} ===",
                     font=("Segoe UI", 9, "bold"),
                     foreground=ACCENT_GOLD,
                     bg=BG_WIDGET,
                 ).pack(anchor=tk.W)
-
-                # Bind toggle
-                def make_toggle(section, manager):
-                    def toggle_wrapper(event=None):
-                        manager.toggle_section(section)
-
-                    return toggle_wrapper
-
-                section.caret.bind("<Button-1>", make_toggle(section, section_manager))
-                section.title_label.bind(
-                    "<Button-1>", make_toggle(section, section_manager)
-                )
-                section.pack_header()
 
     def world_series_started(self, ws_data: Dict[str, Any]):
         """
@@ -738,15 +845,12 @@ class PlayoffWidget:
             self.current_game = 1
             self.games_data = {}
             self.header_label.config(text=f"{season} Playoffs")
-            self.game_combo["values"] = ["Game 1"]
-            self.game_var.set("Game 1")
         else:
             al = ws_data.get("al_winner", "")
             nl = ws_data.get("nl_winner", "")
             self.ws_info = ws_data
             self.series_score = {al: 0, nl: 0}
             self.header_label.config(text=f"{season} World Series: {al} vs {nl}")
-            self._update_series_display()
 
     def add_play_by_play(self, play_data: Dict[str, Any]):
         """Handle play-by-play (for future real-time updates)."""
@@ -779,17 +883,8 @@ class PlayoffWidget:
         if structured_game:
             self.games_data[self.game_number] = structured_game
 
-        # Update game selector
-        game_list = [f"Game {i + 1}" for i in range(self.game_number)]
-        self.game_combo["values"] = game_list
-        self.game_combo.current(self.game_number - 1)
-        self.current_game = self.game_number
-
-        # Update series display
-        self._update_series_display()
-
-        # Display the game
-        self._display_game(self.game_number)
+        # Display all games in table format
+        self._display_todays_games()
 
     def world_series_completed(self, ws_data: Dict[str, Any]):
         """
@@ -798,13 +893,15 @@ class PlayoffWidget:
         Args:
             ws_data: Dict with 'champion', 'season', 'series_result'
         """
+        # Keep the game table visible, just add champion banner
         champion = ws_data.get("champion", "")
 
-        for widget in self.scrollable_frame.scrollable_frame.winfo_children():
-            widget.destroy()
+        # First display the game table
+        self._display_todays_games()
 
+        # Then add champion banner at the top
         result_frame = tk.Frame(self.scrollable_frame.scrollable_frame, bg=BG_WIDGET)
-        result_frame.pack(pady=50)
+        result_frame.pack(pady=(10, 20))
 
         tk.Label(
             result_frame,
@@ -837,6 +934,8 @@ class PlayoffWidget:
             bg=BG_WIDGET,
             fg=ACCENT_GOLD,
         ).pack()
+
+        self.scrollable_frame.update_scrollregion()
 
     def get_frame(self) -> tk.Frame:
         """Return the main frame for packing."""

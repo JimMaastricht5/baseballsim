@@ -129,6 +129,10 @@ class UIBaseballSeason(bbseason.BaseballSeason):
         """
 
         def callback(text: str):
+            # Skip play-by-play during playoffs (season_chatty = False)
+            if self.season_chatty is False:
+                return
+
             logger.debug(
                 f"Callback invoked for {away_team} @ {home_team}, team_to_follow={self.team_to_follow}"
             )
@@ -541,7 +545,7 @@ class UIBaseballSeason(bbseason.BaseballSeason):
 
         self.print_box_score_b = True
         self.print_lineup_b = True
-        self.season_chatty = True
+        self.season_chatty = False
         self.ws_active = True
 
         # Activate Playoffs tab and start routing games to the playoff widget

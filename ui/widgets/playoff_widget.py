@@ -4,26 +4,36 @@ Copyright (c) 2024 Jim Maastricht
 
 Playoff widget for baseball season simulation UI.
 
-Displays World Series games with play-by-play and box scores.
+Displays World Series games with structured data, collapsible sections, and box scores.
 """
 
 import tkinter as tk
-from tkinter import scrolledtext, ttk
-from typing import Dict, Any
+from tkinter import ttk
+from typing import Dict, Any, Optional
 
-from ui.theme import (BG_PANEL, BG_WIDGET, BG_DARK, TEXT_PRIMARY, TEXT_HEADING,
-                      ACCENT_BLUE, ACCENT_GOLD, BORDER)
+from ui.theme import (
+    BG_PANEL,
+    BG_WIDGET,
+    BG_WIDGET_ALT,
+    BG_DARK,
+    TEXT_PRIMARY,
+    TEXT_SECONDARY,
+    ACCENT_BLUE,
+    ACCENT_GOLD,
+)
+from ui.widgets.games_played_widget import ScrollableFrame, CollapsibleSection
 
 
 class PlayoffWidget:
     """
-    Playoff widget showing World Series games with play-by-play and box scores.
+    Playoff widget showing World Series games with structured data.
 
     Features:
-    - Shows World Series matchup info
-    - Real-time play-by-play updates
-    - Box scores for completed games
-    - Series score tracking
+    - Visual series score tracking (best-of-7)
+    - Collapsible box score sections
+    - Innings score table
+    - Per-inning collapsible play-by-play
+    - Treeview-based batting/pitching stats
     """
 
     def __init__(self, parent: tk.Widget):
@@ -36,14 +46,13 @@ class PlayoffWidget:
         self.frame = tk.Frame(parent, bg=BG_PANEL)
         self.ws_active = False
         self.ws_info = {}
-        self.series_score = {}  # Track wins per team
+        self.series_score = {}
         self.game_number = 0
-        self.current_game_pbp = 1  # Currently selected game for play-by-play
-        self.game_pbp_data = {}  # Store play-by-play for each game: {game_num: [text_lines]}
-        self.completed_games = set()  # Track which games have ended (no more play-by-play)
+        self.current_game = 1
+        self.games_data = {}  # {game_num: structured_game}
 
         # Create header section
-        self.header_frame = tk.Frame(self.frame, bg="#0d2040", height=60)
+        self.header_frame = tk.Frame(self.frame, bg="#0d2040", height=80)
         self.header_frame.pack(fill=tk.X, pady=(0, 5))
         self.header_frame.pack_propagate(False)
 
@@ -52,224 +61,713 @@ class PlayoffWidget:
             text="World Series",
             font=("Segoe UI", 16, "bold"),
             bg="#0d2040",
-            fg=ACCENT_GOLD
+            fg=ACCENT_GOLD,
         )
-        self.header_label.pack(pady=10)
+        self.header_label.pack(pady=5)
 
-        # Create paned window for box scores and play-by-play
-        paned = tk.PanedWindow(self.frame, orient=tk.HORIZONTAL, sashrelief=tk.RAISED,
-                               bg=BG_DARK)
-        paned.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
+        # Series score display
+        self.series_score_frame = tk.Frame(self.header_frame, bg="#0d2040")
+        self.series_score_frame.pack(pady=(0, 5))
+        self.series_labels = {}
 
-        # Left panel: Box scores (1/3 of space)
-        box_frame = tk.Frame(paned, width=350, bg=BG_PANEL)
-        paned.add(box_frame, minsize=250, width=350)
+        # Configure styles
+        self._configure_styles()
 
-        box_label = tk.Label(box_frame, text="BOX SCORES", font=("Segoe UI", 11, "bold"),
-                            bg=BG_DARK, fg=ACCENT_GOLD, anchor=tk.W, padx=5)
-        box_label.pack(fill=tk.X, pady=(0, 2))
+        # Game selector
+        selector_frame = tk.Frame(self.frame, bg=BG_PANEL)
+        selector_frame.pack(fill=tk.X, padx=10, pady=5)
 
-        self.box_text = scrolledtext.ScrolledText(
-            box_frame, wrap=tk.WORD, font=("Consolas", 9), state=tk.DISABLED,
-            bg=BG_WIDGET, fg=TEXT_PRIMARY, insertbackground=TEXT_PRIMARY
+        tk.Label(
+            selector_frame,
+            text="Game:",
+            font=("Segoe UI", 11, "bold"),
+            bg=BG_PANEL,
+            fg=TEXT_PRIMARY,
+        ).pack(side=tk.LEFT, padx=(0, 5))
+
+        self.game_var = tk.StringVar(value="Game 1")
+        self.game_combo = ttk.Combobox(
+            selector_frame,
+            textvariable=self.game_var,
+            width=12,
+            state="readonly",
+            font=("Segoe UI", 11),
         )
-        self.box_text.pack(fill=tk.BOTH, expand=True, padx=2, pady=2)
+        self.game_combo["values"] = ["Game 1"]
+        self.game_combo.current(0)
+        self.game_combo.bind("<<ComboboxSelected>>", self._on_game_selected)
+        self.game_combo.pack(side=tk.LEFT, padx=5)
 
-        # Configure text tags for box scores
-        self.box_text.tag_configure("header", font=("Segoe UI", 11, "bold"), foreground=ACCENT_GOLD)
-        self.box_text.tag_configure("game_header", font=("Consolas", 10, "bold"), foreground=ACCENT_BLUE)
-        self.box_text.tag_configure("normal", font=("Consolas", 9))
-
-        # Right panel: Play-by-play (2/3 of space)
-        pbp_frame = tk.Frame(paned, width=700, bg=BG_PANEL)
-        paned.add(pbp_frame, minsize=400, width=700)
-
-        # Header with label and game selector
-        pbp_header_frame = tk.Frame(pbp_frame, bg=BG_DARK)
-        pbp_header_frame.pack(fill=tk.X, pady=(0, 2))
-
-        pbp_label = tk.Label(pbp_header_frame, text="PLAY-BY-PLAY", font=("Segoe UI", 11, "bold"),
-                            bg=BG_DARK, fg=ACCENT_BLUE, anchor=tk.W, padx=5)
-        pbp_label.pack(side=tk.LEFT)
-
-        # Game selector dropdown
-        game_selector_frame = tk.Frame(pbp_header_frame, bg=BG_DARK)
-        game_selector_frame.pack(side=tk.RIGHT, padx=5)
-
-        tk.Label(game_selector_frame, text="Game:", bg=BG_DARK, fg=TEXT_PRIMARY,
-                 font=("Segoe UI", 9)).pack(side=tk.LEFT, padx=(0, 5))
-
-        self.game_selector = ttk.Combobox(game_selector_frame, width=8, state='readonly')
-        self.game_selector['values'] = ['Game 1']
-        self.game_selector.current(0)
-        self.game_selector.bind('<<ComboboxSelected>>', self._on_game_selected)
-        self.game_selector.pack(side=tk.LEFT)
-
-        self.pbp_text = scrolledtext.ScrolledText(
-            pbp_frame, wrap=tk.WORD, font=("Consolas", 9), state=tk.DISABLED,
-            bg=BG_WIDGET, fg=TEXT_PRIMARY, insertbackground=TEXT_PRIMARY
-        )
-        self.pbp_text.pack(fill=tk.BOTH, expand=True, padx=2, pady=2)
-
-        # Configure text tags for play-by-play
-        self.pbp_text.tag_configure("header", font=("Segoe UI", 11, "bold"), foreground=ACCENT_GOLD)
-        self.pbp_text.tag_configure("inning", font=("Consolas", 9, "bold"), foreground=ACCENT_BLUE)
-        self.pbp_text.tag_configure("normal", font=("Consolas", 9))
-        self.pbp_text.tag_configure("score", font=("Consolas", 9, "bold"), foreground="#ff6b6b")
+        # Scrollable frame for game display
+        self.scrollable_frame = ScrollableFrame(self.frame, style="Scrollable.TFrame")
+        self.scrollable_frame.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
 
         # Show initial message
         self._show_waiting_message()
 
+    def _configure_styles(self):
+        """Configure custom ttk styles."""
+        style = ttk.Style()
+
+        style.configure(
+            "WSGameHeader.TLabel",
+            font=("Segoe UI", 14, "bold"),
+            foreground=ACCENT_GOLD,
+            background=BG_WIDGET,
+            padding=5,
+        )
+
+        style.configure(
+            "WSScoreSummary.TLabel",
+            font=("Segoe UI", 12),
+            foreground=TEXT_PRIMARY,
+            background=BG_WIDGET,
+            padding=(10, 0, 5, 5),
+        )
+
+        style.configure(
+            "WSSectionHeader.TLabel",
+            font=("Segoe UI", 11, "bold"),
+            foreground=ACCENT_BLUE,
+            background=BG_WIDGET,
+            padding=(5, 10, 5, 3),
+        )
+
+        style.configure(
+            "WSTeamHeader.TLabel",
+            font=("Segoe UI", 10, "bold"),
+            foreground=ACCENT_BLUE,
+            background=BG_WIDGET,
+            padding=(10, 5, 5, 2),
+        )
+
+        style.configure(
+            "WSPlayHeader.TLabel",
+            font=("Segoe UI", 10, "bold"),
+            foreground=ACCENT_BLUE,
+            background=BG_WIDGET,
+            padding=(10, 8, 5, 2),
+        )
+
+        style.configure(
+            "WSPlayItem.TLabel",
+            font=("Segoe UI", 9),
+            foreground=TEXT_PRIMARY,
+            background=BG_WIDGET,
+            padding=(15, 1, 5, 1),
+        )
+
+        style.configure(
+            "WSBoxScore.Treeview",
+            font=("Segoe UI", 9),
+            rowheight=18,
+            background=BG_WIDGET,
+            fieldbackground=BG_WIDGET,
+            foreground=TEXT_PRIMARY,
+        )
+        style.configure(
+            "WSBoxScore.Treeview.Heading",
+            font=("Segoe UI", 9, "bold"),
+            background=BG_PANEL,
+            foreground=TEXT_PRIMARY,
+        )
+        style.configure(
+            "WSInningScore.Treeview",
+            font=("Segoe UI", 9),
+            rowheight=20,
+            background=BG_WIDGET,
+            fieldbackground=BG_WIDGET,
+            foreground=TEXT_PRIMARY,
+        )
+        style.configure(
+            "WSInningScore.Treeview.Heading",
+            font=("Segoe UI", 9, "bold"),
+            background=BG_PANEL,
+            foreground=TEXT_PRIMARY,
+        )
+
     def _show_waiting_message(self):
         """Display message when waiting for World Series to start."""
-        self.pbp_text.configure(state=tk.NORMAL)
-        self.pbp_text.delete(1.0, tk.END)
-        self.pbp_text.insert(tk.END, "\n\n")
-        self.pbp_text.insert(tk.END, "    Waiting for World Series to begin...\n\n", "header")
-        self.pbp_text.insert(tk.END, "    Complete the regular season to unlock playoff games.", "normal")
-        self.pbp_text.configure(state=tk.DISABLED)
+        label = tk.Label(
+            self.scrollable_frame.scrollable_frame,
+            text="Waiting for World Series to begin...\n\nComplete the regular season to unlock playoff games.",
+            font=("Segoe UI", 12),
+            fg=TEXT_SECONDARY,
+            bg=BG_WIDGET,
+        )
+        label.pack(pady=50)
 
-    def _on_game_selected(self, event):
+    def _on_game_selected(self, event=None):
         """Handle game selection from dropdown."""
-        selected = self.game_selector.get()
-        if selected and selected.startswith('Game '):
+        selected = self.game_var.get()
+        if selected and selected.startswith("Game "):
             game_num = int(selected.split()[1])
-            self.current_game_pbp = game_num
-            self._display_game_pbp(game_num)
+            self.current_game = game_num
+            self._display_game(game_num)
 
-    def _display_game_pbp(self, game_num: int):
-        """Display play-by-play for the selected game."""
-        self.pbp_text.configure(state=tk.NORMAL)
-        self.pbp_text.delete(1.0, tk.END)
+    def _display_game(self, game_num: int):
+        """Display the selected game with structured data."""
+        for widget in self.scrollable_frame.scrollable_frame.winfo_children():
+            widget.destroy()
 
-        # Show game header
-        if self.ws_active and self.ws_info:
-            al = self.ws_info.get('al_winner', '')
-            nl = self.ws_info.get('nl_winner', '')
-            self.pbp_text.insert(tk.END, f"Game {game_num}: {al} vs {nl}\n", "header")
-            self.pbp_text.insert(tk.END, "-" * 40 + "\n\n", "normal")
+        if game_num not in self.games_data:
+            tk.Label(
+                self.scrollable_frame.scrollable_frame,
+                text="Game in progress...",
+                font=("Segoe UI", 11),
+                fg=TEXT_SECONDARY,
+            ).pack(pady=20)
+            return
 
-        # Display stored play-by-play for this game
-        if game_num in self.game_pbp_data:
-            for text, tag in self.game_pbp_data[game_num]:
-                self.pbp_text.insert(tk.END, text + "\n", tag)
+        structured_game = self.games_data[game_num]
+        self._display_structured_game(structured_game)
+        self.scrollable_frame.update_scrollregion()
+
+    def _update_series_display(self):
+        """Update the visual series score display."""
+        for label in self.series_labels.values():
+            label.destroy()
+        self.series_labels.clear()
+
+        teams = list(self.series_score.keys())
+        if len(teams) != 2:
+            return
+
+        team1, team2 = teams
+        wins1 = self.series_score.get(team1, 0)
+        wins2 = self.series_score.get(team2, 0)
+
+        for i, (team, wins) in enumerate([(team1, wins1), (team2, wins2)]):
+            team_frame = tk.Frame(self.series_score_frame, bg="#0d2040")
+            team_frame.pack(side=tk.LEFT, padx=15)
+
+            tk.Label(
+                team_frame,
+                text=f"{team}",
+                font=("Segoe UI", 12, "bold"),
+                bg="#0d2040",
+                fg=ACCENT_GOLD,
+            ).pack(side=tk.LEFT, padx=(0, 10))
+
+            blocks = ""
+            for j in range(4):
+                blocks += "█" if j < wins else "░"
+            blocks += f"  ({wins} wins)"
+
+            label = tk.Label(
+                team_frame,
+                text=blocks,
+                font=("Consolas", 12),
+                bg="#0d2040",
+                fg=ACCENT_GOLD,
+            )
+            label.pack(side=tk.LEFT)
+            self.series_labels[team] = label
+
+    def _display_structured_game(self, structured_game):
+        """Display a game using structured data."""
+        away = structured_game.away_team
+        home = structured_game.home_team
+        away_score, home_score = structured_game.final_score
+
+        inning_text = f"{structured_game.final_inning}"
+        if structured_game.is_extra_innings:
+            inning_text += " (Extra Innings)"
+
+        # Game header
+        header_frame = tk.Frame(self.scrollable_frame.scrollable_frame, bg=BG_WIDGET)
+        header_frame.pack(fill=tk.X, padx=5, pady=(10, 0))
+
+        ttk.Label(
+            header_frame,
+            text=f"{away} @ {home}",
+            style="WSGameHeader.TLabel",
+        ).pack(anchor=tk.W, padx=10, pady=(10, 5))
+
+        ttk.Label(
+            header_frame,
+            text=f"Final: {away} {away_score} - {home} {home_score}  |  {inning_text}",
+            style="WSScoreSummary.TLabel",
+        ).pack(anchor=tk.W, padx=10, pady=(0, 5))
+
+        # Inning scores
+        self._display_inning_scores(structured_game, away, home)
+
+        # Create section manager for proper pack ordering
+        section_manager = CollapsibleSectionManager(
+            self.scrollable_frame.scrollable_frame
+        )
+
+        # Box Score: Away Team
+        away_section = CollapsibleSection(
+            self.scrollable_frame.scrollable_frame,
+            f"Box Score: {away}",
+            default_expanded=False,
+            on_toggle=lambda: self.scrollable_frame.update_scrollregion(),
+        )
+        section_manager.add_section(away_section)
+        self._display_away_team_box_score(
+            away_section.frame, away, structured_game.away_box_score
+        )
+
+        # Box Score: Home Team
+        home_section = CollapsibleSection(
+            self.scrollable_frame.scrollable_frame,
+            f"Box Score: {home}",
+            default_expanded=False,
+            on_toggle=lambda: self.scrollable_frame.update_scrollregion(),
+        )
+        section_manager.add_section(home_section)
+        self._display_home_team_box_score(
+            home_section.frame, home, structured_game.home_box_score
+        )
+
+        # Play-By-Play
+        pbp_section = CollapsibleSection(
+            self.scrollable_frame.scrollable_frame,
+            "Play-By-Play",
+            default_expanded=True,
+            on_toggle=lambda: self.scrollable_frame.update_scrollregion(),
+        )
+        section_manager.add_section(pbp_section)
+        self._display_play_by_play(pbp_section.frame, structured_game)
+
+        # Bind toggles to use manager
+        def make_toggle(section, manager):
+            def toggle_wrapper(event=None):
+                manager.toggle_section(section)
+
+            return toggle_wrapper
+
+        for section in [away_section, home_section, pbp_section]:
+            section.caret.bind("<Button-1>", make_toggle(section, section_manager))
+            section.title_label.bind(
+                "<Button-1>", make_toggle(section, section_manager)
+            )
+
+        # Pack sections
+        away_section.pack_header(pady=(15, 0))
+        home_section.pack_header()
+        pbp_section.pack_header()
+
+    def _display_inning_scores(self, structured_game, away, home):
+        """Display score by inning using Treeview."""
+        if not structured_game.inning_scores:
+            return
+
+        ttk.Label(
+            self.scrollable_frame.scrollable_frame,
+            text="SCORE BY INNING",
+            style="WSSectionHeader.TLabel",
+        ).pack(anchor=tk.W, padx=10, pady=(10, 0))
+
+        num_innings = len(structured_game.inning_scores)
+        inning_cols = [f"inn_{i}" for i in range(1, num_innings + 1)]
+        columns = ["Team"] + inning_cols + ["R", "H", "E"]
+
+        team_width = 50
+        inning_width = 28
+        rh_width = 30
+
+        tree_frame = tk.Frame(self.scrollable_frame.scrollable_frame, bg=BG_WIDGET)
+        tree_frame.pack(fill=tk.X, padx=10, pady=5)
+
+        tree = ttk.Treeview(
+            tree_frame,
+            columns=columns,
+            show="headings",
+            style="WSInningScore.Treeview",
+            height=2,
+        )
+
+        tree.column("#0", width=0, stretch=False)
+        tree.heading("#0", text="")
+
+        tree.column("Team", width=team_width, anchor=tk.W, stretch=False)
+        tree.heading("Team", text="")
+
+        for i, col in enumerate(inning_cols):
+            tree.column(col, width=inning_width, anchor=tk.CENTER, stretch=False)
+            tree.heading(col, text=str(i + 1))
+
+        tree.column("R", width=rh_width, anchor=tk.CENTER, stretch=False)
+        tree.heading("R", text="R")
+        tree.column("H", width=rh_width, anchor=tk.CENTER, stretch=False)
+        tree.heading("H", text="H")
+        tree.column("E", width=rh_width, anchor=tk.CENTER, stretch=False)
+        tree.heading("E", text="E")
+
+        tree.pack(fill=tk.X, expand=True)
+
+        # Away row
+        away_values = [away]
+        for inn in structured_game.inning_scores:
+            away_values.append(str(inn.away_runs))
+        if structured_game.away_box_score:
+            away_values.extend(
+                [
+                    str(structured_game.final_score[0]),
+                    str(structured_game.away_box_score.total_hits),
+                    str(structured_game.away_box_score.total_errors),
+                ]
+            )
         else:
-            self.pbp_text.insert(tk.END, "No play-by-play data for this game yet.\n", "normal")
+            away_values.extend(["", "", ""])
+        tree.insert("", tk.END, values=away_values)
 
-        self.pbp_text.configure(state=tk.DISABLED)
+        # Home row
+        home_values = [home]
+        for inn in structured_game.inning_scores:
+            home_values.append(str(inn.home_runs))
+        if structured_game.home_box_score:
+            home_values.extend(
+                [
+                    str(structured_game.final_score[1]),
+                    str(structured_game.home_box_score.total_hits),
+                    str(structured_game.home_box_score.total_errors),
+                ]
+            )
+        else:
+            home_values.extend(["", "", ""])
+        tree.insert("", tk.END, values=home_values)
+
+    def _display_away_team_box_score(self, parent_frame, team, box_score):
+        """Display away team batting and pitching inside a collapsible section."""
+        batting_label = tk.Label(
+            parent_frame,
+            text="  Batting",
+            font=("Segoe UI", 10, "bold"),
+            bg=BG_WIDGET,
+            fg=ACCENT_BLUE,
+            anchor="w",
+        )
+        batting_label.pack(anchor=tk.W, padx=20, pady=(5, 0))
+        self._display_batting_in_section(
+            parent_frame, team, box_score, show_header=False
+        )
+
+        pitching_label = tk.Label(
+            parent_frame,
+            text="  Pitching",
+            font=("Segoe UI", 10, "bold"),
+            bg=BG_WIDGET,
+            fg=ACCENT_BLUE,
+            anchor="w",
+        )
+        pitching_label.pack(anchor=tk.W, padx=20, pady=(10, 5))
+        self._display_pitching_in_section(
+            parent_frame, team, box_score, show_header=False
+        )
+
+    def _display_home_team_box_score(self, parent_frame, team, box_score):
+        """Display home team batting and pitching inside a collapsible section."""
+        batting_label = tk.Label(
+            parent_frame,
+            text="  Batting",
+            font=("Segoe UI", 10, "bold"),
+            bg=BG_WIDGET,
+            fg=ACCENT_BLUE,
+            anchor="w",
+        )
+        batting_label.pack(anchor=tk.W, padx=20, pady=(5, 0))
+        self._display_batting_in_section(
+            parent_frame, team, box_score, show_header=False
+        )
+
+        pitching_label = tk.Label(
+            parent_frame,
+            text="  Pitching",
+            font=("Segoe UI", 10, "bold"),
+            bg=BG_WIDGET,
+            fg=ACCENT_BLUE,
+            anchor="w",
+        )
+        pitching_label.pack(anchor=tk.W, padx=20, pady=(10, 5))
+        self._display_pitching_in_section(
+            parent_frame, team, box_score, show_header=False
+        )
+
+    def _display_batting_in_section(
+        self, parent_frame, team, box_score, show_header=True
+    ):
+        """Display batting box score in a section."""
+        if show_header:
+            ttk.Label(
+                parent_frame,
+                text=f"  {team}",
+                style="WSTeamHeader.TLabel",
+            ).pack(anchor=tk.W, padx=10)
+
+        name_width = 140
+        stat_width = 40
+        columns = ["Player", "Pos", "AB", "R", "H", "2B", "3B", "HR", "RBI", "BB", "K"]
+
+        if not box_score or not box_score.batters:
+            num_rows = 1
+        else:
+            num_rows = len(box_score.batters)
+            if box_score.totals_batting:
+                num_rows += 1
+
+        tree_frame = tk.Frame(parent_frame, bg=BG_WIDGET)
+        tree_frame.pack(anchor=tk.W, padx=10, pady=2)
+
+        tree = ttk.Treeview(
+            tree_frame,
+            columns=columns,
+            show="headings",
+            style="WSBoxScore.Treeview",
+            height=num_rows,
+        )
+
+        tree.column("#0", width=0, stretch=False)
+        for i, col in enumerate(columns):
+            if i == 0:
+                tree.column(col, width=name_width, anchor=tk.W)
+            elif i == 1:
+                tree.column(col, width=45, anchor=tk.CENTER)
+            else:
+                tree.column(col, width=stat_width, anchor=tk.CENTER)
+            tree.heading(col, text=col)
+
+        tree.pack(anchor=tk.W)
+
+        if not box_score:
+            tree.insert("", tk.END, values=["No data"] + [""] * len(columns))
+            return
+
+        for idx, batter in enumerate(box_score.batters):
+            stats = batter.stats
+            name = batter.name[:22] if len(batter.name) > 22 else batter.name
+            position = getattr(batter, "position", getattr(batter, "pos", ""))
+            values = [
+                name,
+                position,
+                int(stats.AB),
+                int(stats.R),
+                int(stats.H),
+                int(stats.D),
+                int(stats.T),
+                int(stats.HR),
+                int(stats.RBI),
+                int(getattr(stats, "BB", 0)),
+                int(getattr(stats, "SO", 0)),
+            ]
+            tree.insert(
+                "", tk.END, values=values, tags=("alt",) if idx % 2 == 1 else ()
+            )
+
+        if box_score.totals_batting:
+            totals = box_score.totals_batting
+            tree.insert(
+                "",
+                tk.END,
+                values=[
+                    "TOTALS",
+                    "",
+                    int(totals.AB),
+                    int(totals.R),
+                    int(totals.H),
+                    int(totals.D),
+                    int(totals.T),
+                    int(totals.HR),
+                    int(totals.RBI),
+                    int(getattr(totals, "BB", 0)),
+                    int(getattr(totals, "SO", 0)),
+                ],
+                tags=("totals",),
+            )
+
+        tree.tag_configure("alt", background=BG_WIDGET_ALT)
+        tree.tag_configure("totals", background="#2a2a3a", foreground=ACCENT_GOLD)
+
+    def _display_pitching_in_section(
+        self, parent_frame, team, box_score, show_header=True
+    ):
+        """Display pitching box score in a section."""
+        if show_header:
+            ttk.Label(
+                parent_frame,
+                text=f"  {team}",
+                style="WSTeamHeader.TLabel",
+            ).pack(anchor=tk.W, padx=10)
+
+        name_width = 140
+        stat_width = 35
+        columns = ["Pitcher", "IP", "H", "ER", "SO", "BB", "HR", "W", "L", "HLD", "SV"]
+
+        if not box_score or not box_score.pitchers:
+            num_rows = 1
+        else:
+            num_rows = len(box_score.pitchers)
+
+        tree_frame = tk.Frame(parent_frame, bg=BG_WIDGET)
+        tree_frame.pack(anchor=tk.W, padx=10, pady=2)
+
+        tree = ttk.Treeview(
+            tree_frame,
+            columns=columns,
+            show="headings",
+            style="WSBoxScore.Treeview",
+            height=num_rows,
+        )
+
+        tree.column("#0", width=0, stretch=False)
+        for i, col in enumerate(columns):
+            if i == 0:
+                tree.column(col, width=name_width, anchor=tk.W)
+            else:
+                tree.column(col, width=stat_width, anchor=tk.CENTER)
+            tree.heading(col, text=col)
+
+        tree.pack(anchor=tk.W)
+
+        if not box_score or not box_score.pitchers:
+            tree.insert("", tk.END, values=["No data"] + [""] * len(columns))
+            return
+
+        for idx, pitcher in enumerate(box_score.pitchers):
+            stats = pitcher.stats
+            name = pitcher.name[:22] if len(pitcher.name) > 22 else pitcher.name
+            values = [
+                name,
+                f"{stats.IP:.1f}",
+                int(stats.H),
+                int(stats.ER),
+                int(stats.SO),
+                int(stats.BB),
+                int(stats.HR),
+                int(stats.W),
+                int(stats.L),
+                int(getattr(stats, "HLD", 0)),
+                int(getattr(stats, "SV", 0)),
+            ]
+            tree.insert(
+                "", tk.END, values=values, tags=("alt",) if idx % 2 == 1 else ()
+            )
+
+        tree.tag_configure("alt", background=BG_WIDGET_ALT)
+
+    def _display_play_by_play(self, parent_frame, structured_game):
+        """Display play-by-play with per-inning collapsible sections."""
+        if not structured_game.innings:
+            ttk.Label(
+                parent_frame,
+                text="  No play-by-play data available",
+                style="WSPlayItem.TLabel",
+            ).pack(anchor=tk.W, padx=10)
+            return
+
+        away = structured_game.away_team
+        home = structured_game.home_team
+        away_runs = 0
+        home_runs = 0
+
+        section_manager = CollapsibleSectionManager(parent_frame)
+
+        for i, inning_data in enumerate(structured_game.innings):
+            inning_num = i + 1
+
+            for half, half_data in inning_data.items():
+                if not half_data.plays:
+                    continue
+
+                half_label = "Top" if half == "top" else "Bot"
+                section_title = f"{half_label} {inning_num}"
+
+                section = CollapsibleSection(
+                    parent_frame,
+                    section_title,
+                    default_expanded=False,
+                    on_toggle=lambda: self.scrollable_frame.update_scrollregion(),
+                )
+                section_manager.add_section(section)
+
+                for play in half_data.plays:
+                    if play.play_description:
+                        ttk.Label(
+                            section.frame,
+                            text=f"  {play.play_description}",
+                            style="WSPlayItem.TLabel",
+                        ).pack(anchor=tk.W)
+
+                    runs = getattr(play, "runs_scored", []) or []
+                    num_runs = len(runs) if isinstance(runs, list) else runs
+                    if half == "top":
+                        away_runs += num_runs
+                    else:
+                        home_runs += num_runs
+
+                # Score at end of half inning
+                tk.Label(
+                    section.frame,
+                    text=f"  === {away} {away_runs}, {home} {home_runs} ===",
+                    font=("Segoe UI", 9, "bold"),
+                    foreground=ACCENT_GOLD,
+                    bg=BG_WIDGET,
+                ).pack(anchor=tk.W)
+
+                # Bind toggle
+                def make_toggle(section, manager):
+                    def toggle_wrapper(event=None):
+                        manager.toggle_section(section)
+
+                    return toggle_wrapper
+
+                section.caret.bind("<Button-1>", make_toggle(section, section_manager))
+                section.title_label.bind(
+                    "<Button-1>", make_toggle(section, section_manager)
+                )
+                section.pack_header()
 
     def world_series_started(self, ws_data: Dict[str, Any]):
         """
         Handle playoff/World Series start signal.
 
-        Called twice during a full-bracket run:
-          1. playoff_mode=True  — full playoffs begin; activate widget, clear display
-          2. playoff_mode=False — World Series finalists known; update header/series score
-
         Args:
-            ws_data: Dict with 'al_winner', 'nl_winner', 'season', and optional
-                     'playoff_mode' (bool, default False), 'al_record', 'nl_record'
+            ws_data: Dict with 'al_winner', 'nl_winner', 'season', etc.
         """
-        season = ws_data.get('season', '')
-        playoff_mode = ws_data.get('playoff_mode', False)
+        season = ws_data.get("season", "")
+        playoff_mode = ws_data.get("playoff_mode", False)
 
         if playoff_mode:
-            # Full playoffs starting — reset everything and activate widget
             self.ws_active = True
             self.ws_info = ws_data
             self.series_score = {}
             self.game_number = 0
-            self.current_game_pbp = 1
-            self.game_pbp_data = {}
-            self.completed_games = set()
-
+            self.current_game = 1
+            self.games_data = {}
             self.header_label.config(text=f"{season} Playoffs")
-
-            self.game_selector['values'] = ['Game 1']
-            self.game_selector.current(0)
-            self._display_game_pbp(1)
-
-            self.box_text.configure(state=tk.NORMAL)
-            self.box_text.delete(1.0, tk.END)
-            self.box_text.insert(tk.END, f"{season} Playoffs\n\n", "header")
-            self.box_text.configure(state=tk.DISABLED)
+            self.game_combo["values"] = ["Game 1"]
+            self.game_var.set("Game 1")
         else:
-            # World Series finalists known — update header and reset series score for WS
-            al = ws_data.get('al_winner', '')
-            nl = ws_data.get('nl_winner', '')
+            al = ws_data.get("al_winner", "")
+            nl = ws_data.get("nl_winner", "")
             self.ws_info = ws_data
             self.series_score = {al: 0, nl: 0}
-
             self.header_label.config(text=f"{season} World Series: {al} vs {nl}")
-
-            # Add World Series divider to box scores panel
-            self.box_text.configure(state=tk.NORMAL)
-            self.box_text.insert(
-                tk.END,
-                f"\n{'─' * 28}\n{season} World Series: {al} vs {nl}\n{'─' * 28}\n\n",
-                "game_header"
-            )
-            self.box_text.configure(state=tk.DISABLED)
+            self._update_series_display()
 
     def add_play_by_play(self, play_data: Dict[str, Any]):
-        """
-        Add play-by-play text to the display.
-
-        For World Series games, we now display everything at once when the game completes,
-        so this method just tracks which game is active.
-
-        Args:
-            play_data: Dict with 'text', 'away_team', 'home_team', 'ws_game_num', etc.
-        """
-        from bblogger import logger
-        logger.debug(f"Playoff widget add_play_by_play called: ws_active={self.ws_active}")
-
-        if not self.ws_active:
-            logger.debug("World Series not active, returning")
-            return
-
-        # Get the game number from play_data
-        ws_game_num = play_data.get('ws_game_num')
-        if ws_game_num is None:
-            return
-
-        # Auto-select new games when they start
-        if ws_game_num not in self.game_pbp_data:
-            self.game_pbp_data[ws_game_num] = []
-            # New game detected - update dropdown and auto-select it
-            game_list = [f"Game {i}" for i in range(1, ws_game_num + 1)]
-            self.game_selector['values'] = game_list
-            self.game_selector.current(ws_game_num - 1)  # Select the new game (0-indexed)
-            self.current_game_pbp = ws_game_num
-            # Clear the play-by-play display for the new game
-            self.pbp_text.configure(state=tk.NORMAL)
-            self.pbp_text.delete(1.0, tk.END)
-            self.pbp_text.insert(tk.END, "Game in progress...\n", "normal")
-            self.pbp_text.configure(state=tk.DISABLED)
-            logger.info(f"Auto-selected Game {ws_game_num} in dropdown")
-
-        # Don't display play-by-play incrementally - we'll show everything at once when game completes
+        """Handle play-by-play (for future real-time updates)."""
+        pass
 
     def add_game_result(self, game_data: Dict[str, Any]):
         """
-        Add a completed game's box score to the display.
+        Add a completed game's data.
 
         Args:
-            game_data: Dict with game results and box score info
+            game_data: Dict with game results and structured_game
         """
         if not self.ws_active:
             return
 
         self.game_number += 1
-        away = game_data.get('away_team', '')
-        home = game_data.get('home_team', '')
-        away_r = game_data.get('away_r', 0)
-        home_r = game_data.get('home_r', 0)
-        away_h = game_data.get('away_h', 0)
-        home_h = game_data.get('home_h', 0)
-        away_e = game_data.get('away_e', 0)
-        home_e = game_data.get('home_e', 0)
-        game_recap = game_data.get('game_recap', '')
+        away = game_data.get("away_team", "")
+        home = game_data.get("home_team", "")
+        away_r = game_data.get("away_r", 0)
+        home_r = game_data.get("home_r", 0)
+        structured_game = game_data.get("structured_game")
 
         # Update series score
         if away_r > home_r:
@@ -277,122 +775,21 @@ class PlayoffWidget:
         else:
             self.series_score[home] = self.series_score.get(home, 0) + 1
 
-        # Update game selector dropdown with completed games
-        game_list = [f"Game {i+1}" for i in range(self.game_number)]
-        self.game_selector['values'] = game_list
+        # Store structured game data
+        if structured_game:
+            self.games_data[self.game_number] = structured_game
 
-        # Add final box score to play-by-play for this game
-        self._add_final_box_score_to_pbp(self.game_number, away, home, away_r, home_r,
-                                          away_h, home_h, away_e, home_e, game_recap)
+        # Update game selector
+        game_list = [f"Game {i + 1}" for i in range(self.game_number)]
+        self.game_combo["values"] = game_list
+        self.game_combo.current(self.game_number - 1)
+        self.current_game = self.game_number
 
-        # Add to box scores panel
-        self.box_text.configure(state=tk.NORMAL)
-        self.box_text.insert(tk.END, f"\nGame {self.game_number}\n", "game_header")
-        self.box_text.insert(tk.END, f"{'Team':<6} {'R':>3} {'H':>3} {'E':>3}\n", "normal")
-        self.box_text.insert(tk.END, f"{away:<6} {away_r:>3} {away_h:>3} {away_e:>3}\n", "normal")
-        self.box_text.insert(tk.END, f"{home:<6} {home_r:>3} {home_h:>3} {home_e:>3}\n", "normal")
+        # Update series display
+        self._update_series_display()
 
-        # Show series score
-        teams = list(self.series_score.keys())
-        if len(teams) == 2:
-            self.box_text.insert(tk.END,
-                f"\nSeries: {teams[0]} {self.series_score[teams[0]]}, "
-                f"{teams[1]} {self.series_score[teams[1]]}\n", "game_header")
-
-        self.box_text.insert(tk.END, "-" * 30 + "\n", "normal")
-        self.box_text.configure(state=tk.DISABLED)
-
-    def _add_final_box_score_to_pbp(self, game_num: int, away: str, home: str,
-                                      away_r: int, home_r: int, away_h: int, home_h: int,
-                                      away_e: int, home_e: int, game_recap: str):
-        """
-        Display complete game recap (lineups + play-by-play + box scores) all at once.
-
-        Args:
-            game_num: Game number (1-7)
-            away/home: Team abbreviations
-            away_r/home_r: Runs scored
-            away_h/home_h: Hits
-            away_e/home_e: Errors
-            game_recap: Full game text (contains everything)
-        """
-        from bblogger import logger
-
-        # Mark this game as completed
-        self.completed_games.add(game_num)
-
-        # Ensure game_pbp_data entry exists for this game
-        if game_num not in self.game_pbp_data:
-            self.game_pbp_data[game_num] = []
-
-        # Parse game_recap into sections: lineups, play-by-play, box scores
-        sections = self._parse_game_recap(game_recap)
-
-        # Clear any existing data for this game
-        self.game_pbp_data[game_num] = []
-
-        # Add all sections to game_pbp_data
-        for text, tag in sections:
-            self.game_pbp_data[game_num].append((text, tag))
-
-        logger.info(f"Game {game_num} complete: added {len(sections)} sections to display")
-
-        # If this is the currently displayed game, update the display
-        if game_num == self.current_game_pbp:
-            self._display_game_pbp(game_num)
-
-    def _parse_game_recap(self, game_recap: str) -> list:
-        """
-        Parse game recap into sections for display.
-
-        Args:
-            game_recap: Full game text with lineups, play-by-play, and box scores
-
-        Returns:
-            List of (text, tag) tuples for display
-        """
-        if not game_recap:
-            return [("No game data available.\n", "normal")]
-
-        sections = []
-        lines = game_recap.split('\n')
-
-        # Find key section boundaries
-        lineup_start = -1
-        lineup_end = -1
-        box_score_start = -1
-
-        for i, line in enumerate(lines):
-            if lineup_start == -1 and ('Starting lineup' in line or 'Lineup Card' in line):
-                lineup_start = i
-            elif lineup_start != -1 and lineup_end == -1 and ('Inning 1' in line or 'Top of the 1st' in line):
-                lineup_end = i
-            elif 'Player' in line and 'Team' in line and ('Pos' in line or 'Age' in line):
-                box_score_start = i
-                break
-
-        # Extract lineups
-        if lineup_start != -1 and lineup_end != -1:
-            lineup_text = '\n'.join(lines[lineup_start:lineup_end])
-            if lineup_text.strip():
-                sections.append(("=" * 80 + "\n" + lineup_text + "\n" + "=" * 80 + "\n\n", "normal"))
-
-        # Extract play-by-play (everything between lineups and box scores)
-        pbp_start = lineup_end if lineup_end != -1 else 0
-        pbp_end = box_score_start if box_score_start != -1 else len(lines)
-
-        if pbp_start < pbp_end:
-            pbp_text = '\n'.join(lines[pbp_start:pbp_end])
-            if pbp_text.strip():
-                sections.append((pbp_text + "\n", "normal"))
-
-        # Extract box scores
-        if box_score_start != -1:
-            box_text = '\n'.join(lines[box_score_start:])
-            if box_text.strip():
-                sections.append(("\n" + "=" * 80 + "\n" + "FINAL BOX SCORE\n" + "=" * 80 + "\n" + box_text + "\n" + "=" * 80 + "\n", "normal"))
-
-        return sections if sections else [("No game data available.\n", "normal")]
+        # Display the game
+        self._display_game(self.game_number)
 
     def world_series_completed(self, ws_data: Dict[str, Any]):
         """
@@ -401,17 +798,74 @@ class PlayoffWidget:
         Args:
             ws_data: Dict with 'champion', 'season', 'series_result'
         """
-        champion = ws_data.get('champion', '')
+        champion = ws_data.get("champion", "")
 
-        # Championship message removed from play-by-play per user request
+        for widget in self.scrollable_frame.scrollable_frame.winfo_children():
+            widget.destroy()
 
-        # Add to box scores
-        self.box_text.configure(state=tk.NORMAL)
-        self.box_text.insert(tk.END, "\n" + "=" * 30 + "\n", "header")
-        self.box_text.insert(tk.END, f"{champion} - World Series Champion!\n", "header")
-        self.box_text.insert(tk.END, "=" * 30 + "\n", "header")
-        self.box_text.configure(state=tk.DISABLED)
+        result_frame = tk.Frame(self.scrollable_frame.scrollable_frame, bg=BG_WIDGET)
+        result_frame.pack(pady=50)
+
+        tk.Label(
+            result_frame,
+            text=f"{'=' * 40}",
+            font=("Segoe UI", 14, "bold"),
+            bg=BG_WIDGET,
+            fg=ACCENT_GOLD,
+        ).pack()
+
+        tk.Label(
+            result_frame,
+            text=f"{champion}",
+            font=("Segoe UI", 20, "bold"),
+            bg=BG_WIDGET,
+            fg=ACCENT_GOLD,
+        ).pack(pady=10)
+
+        tk.Label(
+            result_frame,
+            text="WORLD SERIES CHAMPION!",
+            font=("Segoe UI", 16, "bold"),
+            bg=BG_WIDGET,
+            fg=ACCENT_GOLD,
+        ).pack()
+
+        tk.Label(
+            result_frame,
+            text=f"{'=' * 40}",
+            font=("Segoe UI", 14, "bold"),
+            bg=BG_WIDGET,
+            fg=ACCENT_GOLD,
+        ).pack()
 
     def get_frame(self) -> tk.Frame:
         """Return the main frame for packing."""
         return self.frame
+
+
+class CollapsibleSectionManager:
+    """Manages collapsible sections to ensure proper pack ordering."""
+
+    def __init__(self, parent):
+        self.parent = parent
+        self.sections = []
+
+    def add_section(self, section):
+        """Add a section."""
+        self.sections.append(section)
+
+    def toggle_section(self, section):
+        """Toggle a section and re-pack all sections in order."""
+        section.toggle()
+        self._repack_all()
+
+    def _repack_all(self):
+        """Repack all sections in their original order."""
+        for section in self.sections:
+            section.frame.pack_forget()
+            section.header_frame.pack_forget()
+
+        for section in self.sections:
+            section.header_frame.pack(fill=tk.X, padx=5, pady=(10, 0))
+            if section.expanded:
+                section.frame.pack(fill=tk.X, padx=5, pady=(0, 5))

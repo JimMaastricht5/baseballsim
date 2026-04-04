@@ -1213,6 +1213,8 @@ class Game:
         )
 
         # Update inning scores
+        # inning_score structure: [inning_num, away_runs, home_runs]
+        # Values are strings, so we convert to int
         self.structured_game.inning_scores = []
         for i in range(1, len(self.inning_score)):
             if i < len(self.inning_score):
@@ -1220,11 +1222,14 @@ class Game:
                 self.structured_game.inning_scores.append(
                     InningScore(
                         inning=i,
-                        away_runs=inning[AWAY] if isinstance(inning[AWAY], int) else 0,
-                        home_runs=inning[HOME] if isinstance(inning[HOME], int) else 0,
+                        away_runs=int(inning[AWAY + 1])
+                        if inning[AWAY + 1] not in ("", None)
+                        else 0,
+                        home_runs=int(inning[HOME + 1])
+                        if inning[HOME + 1] not in ("", None)
+                        else 0,
                     )
                 )
-
         # Check for extra innings
         self.structured_game.is_extra_innings = (
             len(self.structured_game.inning_scores) > 9

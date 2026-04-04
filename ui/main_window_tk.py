@@ -517,10 +517,14 @@ F1     - Show this help"""
         pause_button.pack(side=tk.LEFT, padx=10)
 
         # Start Now button - immediately starts simulation running
+        def on_start_now_click():
+            countdown_finished["value"] = True
+            countdown_dialog.destroy()
+
         start_now_button = tk.Button(
             button_frame,
             text="Start Now",
-            command=countdown_dialog.destroy,
+            command=on_start_now_click,
             width=10,
             font=("Arial", 10, "bold"),
         )

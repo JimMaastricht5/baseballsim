@@ -2,6 +2,43 @@
 
 A Python-based baseball season simulation with detailed team and player statistics. Simulates individual games or full 162-game seasons using real MLB stats or randomized data.
 
+## Prerequisites
+
+- **uv** - Package manager (install from [astral.sh](https://astral.sh/uv))
+- **Free-threaded Python 3.14** - Required for multi-threaded simulation performance
+
+### Setup
+```bash
+uv python install 3.14.0
+uv sync
+```
+
+## Quick Start
+
+### Run with UI (Recommended)
+```bash
+python run.py
+```
+
+This launches the graphical season simulator with defaults:
+- Team to follow: **MIL**
+- Games: **162**
+- Stats from: **2023, 2024, 2025**
+
+Override defaults with command-line arguments:
+```bash
+python run.py --team NYM --games 81 --seasons 2024,2025
+```
+
+### Available Arguments
+| Argument | Short | Default | Description |
+|----------|-------|---------|-------------|
+| `--team` | `-t` | MIL | Team to follow |
+| `--games` | `-g` | 162 | Number of games to simulate (1-162) |
+| `--seasons` | `-s` | 2023,2024,2025 | Years to load stats from |
+| `--new-season` | `-n` | 2026 | Season to simulate |
+| `--dialog` | `-d` | | Show startup dialog |
+
 ## Documentation
 
 ### Architecture & Code
@@ -9,36 +46,8 @@ A Python-based baseball season simulation with detailed team and player statisti
 - **[PROJECTION_FLOW.md](PROJECTION_FLOW.md)** - Detailed projection algorithm documentation
 
 ### UI Documentation
-- **[ui_claude.md](ui/ui_claude.md)** - Complete UI reference guide with widget details, signal system, and patterns
-- **[ui_flowchart.md](ui_flowchart.md)** - Visual flowcharts of UI architecture including:
-  - Application startup flow
-  - Main window layout
-  - Simulation sequence diagrams
-  - Queue communication patterns
-  - Widget update flows
-  - Thread architecture
-
-## Quick Start
-
-### 1. Preprocess Data
-```bash
-venv_bb314.2/Scripts/python.exe bbplayer_projections.py
-```
-
-### 2. Run a Single Game
-```bash
-venv_bb314.2/Scripts/python.exe bbgame.py
-```
-
-### 3. Run a Full Season (162 games)
-```bash
-venv_bb314.2/Scripts/python.exe bbseason.py
-```
-
-### 4. Run with UI
-```bash
-venv_bb314.2/Scripts/python.exe ui/main_window_tk.py
-```
+- **[ui_claude.md](ui/ui_claude.md)** - Complete UI reference guide with widget details
+- **[ui_flowchart.md](ui_flowchart.md)** - Visual flowcharts of UI architecture
 
 ## Project Structure
 
@@ -73,16 +82,5 @@ venv_bb314.2/Scripts/python.exe ui/main_window_tk.py
 
 ## Technical Details
 
-- **Python Environment**: Uses `venv_bb314.2/` (Python 3.14.2)
-- **Dependencies**: numpy, pandas, loguru, pygame, selenium
-- **Threading**: Free-threaded Python (3.14t) for parallel execution
-
-## Multi-threading Setup
-
-1. Install Microsoft's Visual Studio (for compiling pandas)
-2. `uv python install 3.14t`
-3. `uv python list`
-4. `uv python pin 3.14t`
-5. `uv sync`
-6. `uv run -- python -X gil=0 bbseason.py`
-7. `uv run -- python -X gil=0 ui/main_window_tk.py`
+- **Python Environment**: uv-managed free-threaded Python 3.14
+- **Dependencies**: numpy, pandas, loguru, pygame, selenium, pydantic

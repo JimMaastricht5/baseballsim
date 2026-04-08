@@ -29,9 +29,7 @@ from typing import List, Tuple, Optional, Dict, Any, ClassVar
 from pydantic import BaseModel, Field
 import queue
 from bblogger import logger
-
-AWAY = 0
-HOME = 1
+from ui.models.game_data import AWAY, HOME, InningRow, InningScore
 
 
 class BattingStats(BaseModel):
@@ -192,14 +190,6 @@ class InningHalf(BaseModel):
     pitching_team: str
     plays: List[PlayResult] = Field(default_factory=list)
     runs_scored: int = 0
-
-
-class InningScore(BaseModel):
-    """Score for a single inning."""
-
-    inning: int
-    away_runs: int = 0
-    home_runs: int = 0
 
 
 class TeamBoxScore(BaseModel):
@@ -471,18 +461,18 @@ class Game:
         self.win_loss = []
         self.is_save_sit = [False, False]
         self.total_score = [0, 0]  # total score
+        # InningRow: stores (number, away_runs, home_runs) for each inning
         self.inning_score = [
-            ["   ", away_team_name, home_team_name],
-            [1, 0, ""],
-            [2, "", ""],
-            [3, "", ""],
-            [4, "", ""],
-            [5, "", ""],
-            [6, "", ""],
-            [7, "", ""],
-            [8, "", ""],
-            [9, "", ""],
-        ]  # inning 1, away, home score
+            InningRow(number=1),
+            InningRow(number=2),
+            InningRow(number=3),
+            InningRow(number=4),
+            InningRow(number=5),
+            InningRow(number=6),
+            InningRow(number=7),
+            InningRow(number=8),
+            InningRow(number=9),
+        ]
         self.inning = [1, 1]
         self.batting_num = [1, 1]
         self.prior_batter_out_num = [1, 1]  # used for extra inning runners
@@ -588,30 +578,16 @@ class Game:
         :param number_of_runs: number of run scored so far in this half inning
         :return: None
         """
-        if (
-            len(self.inning_score) <= self.inning[self.team_hitting()]
-        ):  # header rows + rows in score must = innings
-            self.inning_score.append(
-                [self.inning[self.team_hitting()], "", ""]
-            )  # expand scores by new inning
+        # Expand innings list if needed for extra innings
+        if len(self.inning_score) <= self.inning[self.team_hitting()]:
+            self.inning_score.append(InningRow(number=self.inning[self.team_hitting()]))
 
-        # inning score is a list of lists with inning number and away and home scores
-        # add one to top bottom to account for inning header
-        self.inning_score[self.inning[self.team_hitting()]][self.team_hitting() + 1] = (
-            str(number_of_runs)
-            if self.inning_score[self.inning[self.team_hitting()]][
-                self.team_hitting() + 1
-            ]
-            == ""
-            else str(
-                int(
-                    self.inning_score[self.inning[self.team_hitting()]][
-                        self.team_hitting() + 1
-                    ]
-                )
-                + number_of_runs
-            )
-        )
+        # Update the appropriate team's runs using InningRow
+        inning_idx = self.inning[self.team_hitting()]
+        if self.team_hitting() == AWAY:
+            self.inning_score[inning_idx].away_runs = number_of_runs
+        else:
+            self.inning_score[inning_idx].home_runs = number_of_runs
 
         # pitcher of record tracking, look for lead change
         if (
@@ -645,7 +621,15 @@ class Game:
                 self.play_by_play_callback(final_heading)
 
             # Full inning-by-inning format for followed games
-            print_inning_score = self.inning_score.copy()
+            # Convert InningRow objects to lists for printing
+            print_inning_score = [
+                [
+                    row.number,
+                    row.away_runs if row.away_runs else "",
+                    row.home_runs if row.home_runs else "",
+                ]
+                for row in self.inning_score
+            ]
             print_inning_score.append(
                 ["R", self.total_score[AWAY], self.total_score[HOME]]
             )
@@ -1212,24 +1196,15 @@ class Game:
             self.total_score[HOME],
         )
 
-        # Update inning scores
-        # inning_score structure: [inning_num, away_runs, home_runs]
-        # Values are strings, so we convert to int
-        self.structured_game.inning_scores = []
-        for i in range(1, len(self.inning_score)):
-            if i < len(self.inning_score):
-                inning = self.inning_score[i]
-                self.structured_game.inning_scores.append(
-                    InningScore(
-                        inning=i,
-                        away_runs=int(inning[AWAY + 1])
-                        if inning[AWAY + 1] not in ("", None)
-                        else 0,
-                        home_runs=int(inning[HOME + 1])
-                        if inning[HOME + 1] not in ("", None)
-                        else 0,
-                    )
-                )
+        # Update inning scores - use InningRow directly
+        self.structured_game.inning_scores = [
+            InningScore(
+                inning=row.number,
+                away_runs=row.away_runs,
+                home_runs=row.home_runs,
+            )
+            for row in self.inning_score
+        ]
         # Check for extra innings
         self.structured_game.is_extra_innings = (
             len(self.structured_game.inning_scores) > 9

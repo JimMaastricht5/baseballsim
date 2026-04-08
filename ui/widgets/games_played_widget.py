@@ -22,6 +22,7 @@ from ui.theme import (
     ACCENT_GOLD,
     TEXT_HEADING,
 )
+from ui.models.game_data import AWAY, HOME, InningScore
 
 
 class ScrollableFrame(ttk.Frame):

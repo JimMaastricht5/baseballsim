@@ -109,6 +109,7 @@ class BaseballStatsPreProcess:
 
         self.numeric_bcols = [
             "G",
+            "PA",
             "AB",
             "R",
             "H",

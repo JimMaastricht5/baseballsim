@@ -104,6 +104,7 @@ class TeamBoxScore:
         self.box_batting[["G"]] = 1
         self.box_batting[
             [
+                "PA",
                 "AB",
                 "R",
                 "H",
@@ -326,6 +327,7 @@ class TeamBoxScore:
             ValueError: If a player with hashcode 0 is in scoring list
         """
         with self.lock:
+            self.box_batting.at[batter_index, "PA"] += 1  # Always count PA
             if outcomes.score_book_cd not in [
                 "BB",
                 "HBP",

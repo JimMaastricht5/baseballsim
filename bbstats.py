@@ -105,6 +105,7 @@ class BaseballStats:
 
         self.numeric_bcols = [
             "G",
+            "PA",
             "AB",
             "R",
             "H",
@@ -501,6 +502,66 @@ class BaseballStats:
         df = team_batting_stats(df, filter_stats=False)
         df = self.add_missing_cols(df)
 
+        return df
+
+    def get_simulated_batting_data(self, team_name: Optional[str] = None) -> DataFrame:
+        """
+        Get ONLY the simulated (accumulated game) stats.
+
+        Returns the accumulated stats from games played without any projection data.
+
+        Args:
+            team_name: Optional team filter
+
+        Returns:
+            DataFrame with accumulated game stats
+        """
+        with self.thread_lock:
+            if team_name is None:
+                df = self.new_season_batting_data.copy()
+            else:
+                df = self.new_season_batting_data[
+                    self.new_season_batting_data["Team"] == team_name
+                ].copy()
+
+        df = team_batting_stats(df, filter_stats=False)
+        df = self.add_missing_cols(df)
+
+        # DEBUG: Log sample data to verify no projection data leaking
+        # if not df.empty:
+        #     sample = df[df["PA"] > 0].head(3)
+        #     if not sample.empty:
+        #         logger.info(
+        #             f"get_simulated_batting_data sample (PA>0): "
+        #             f"{sample[['Player', 'Team', 'PA', 'AB', 'H', 'AVG']].to_string()}"
+        #         )
+        #     else:
+        #         logger.info("get_simulated_batting_data: No players with PA > 0")
+
+        return df
+
+    def get_simulated_pitching_data(self, team_name: Optional[str] = None) -> DataFrame:
+        """
+        Get ONLY the simulated (accumulated game) stats.
+
+        Returns the accumulated stats from games played without any projection data.
+
+        Args:
+            team_name: Optional team filter
+
+        Returns:
+            DataFrame with accumulated game stats
+        """
+        with self.thread_lock:
+            if team_name is None:
+                df = self.new_season_pitching_data.copy()
+            else:
+                df = self.new_season_pitching_data[
+                    self.new_season_pitching_data["Team"] == team_name
+                ].copy()
+
+        df = team_pitching_stats(df, filter_stats=False)
+        df = self.add_missing_cols(df)
         return df
 
     def get_pitching_data(

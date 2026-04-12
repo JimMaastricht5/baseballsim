@@ -233,14 +233,7 @@ class PlayoffWidget:
         tree.tag_configure("even", background=BG_WIDGET_ALT)
         tree.tag_configure("winner", foreground=ACCENT_GOLD)
 
-        # Add scrollbar
-        scrollbar = ttk.Scrollbar(
-            self.scrollable_frame, orient=tk.VERTICAL, command=tree.yview
-        )
-        tree.configure(yscrollcommand=scrollbar.set)
-
-        tree.pack(side=tk.LEFT, fill=tk.Y)
-        scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+        tree.pack(fill=tk.BOTH, expand=True)
 
         # Get round name helper
         def get_round_name(game_num):

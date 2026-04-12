@@ -505,7 +505,7 @@ def main():
     """
     # You can modify these parameters as needed
     downloader = StatsDownloader(
-        season=[2025],
+        season=[2026],
         headless=False,  # Set to True to run browser in background
     )
 

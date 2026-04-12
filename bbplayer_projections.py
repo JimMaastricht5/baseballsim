@@ -81,6 +81,7 @@ class BaseballStatsPreProcess:
         load_seasons: List[int],
         new_season: Optional[int] = None,
         generate_random_data: bool = False,
+        min_games_for_trusted: int = 80,
         load_batter_file: str = "player-stats-Batters.csv",
         load_pitcher_file: str = "player-stats-Pitching.csv",
     ) -> None:
@@ -98,6 +99,9 @@ class BaseballStatsPreProcess:
             aggregated data.
         :param generate_random_data: When True, replaces all player, team, city,
             and league names with randomly generated ones before saving.
+        :param min_games_for_trusted: Minimum games in the max season for projections
+            to be considered trusted. If max season has fewer games, it's excluded
+            from projection calculations. Defaults to 80.
         :param load_batter_file: Base filename for raw batter CSV files
             (year prefix added automatically, e.g. ``'player-stats-Batters.csv'``).
         :param load_pitcher_file: Base filename for raw pitcher CSV files.
@@ -254,6 +258,8 @@ class BaseballStatsPreProcess:
             [load_seasons] if not isinstance(load_seasons, list) else load_seasons
         )  # convert to list
         self.new_season = new_season
+        self.min_games_for_trusted = min_games_for_trusted
+        self.projection_trusted = True
         self.pitching_data = None
         self.batting_data = None
         self.pitching_data_historical = None
@@ -265,7 +271,16 @@ class BaseballStatsPreProcess:
         self.df_salary = salary.retrieve_salary(
             "mlb-salaries-2000-24.csv", self.create_hash
         )
-        self.get_seasons(load_batter_file, load_pitcher_file)  # get existing data file
+
+        # Step 1: Load ALL seasons raw data first
+        self._load_raw_data(load_batter_file, load_pitcher_file)
+
+        # Step 2: Auto-detect which seasons to use for projections
+        self._detect_projection_seasons()
+
+        # Step 3: Process with the appropriate seasons
+        self.get_seasons(load_batter_file, load_pitcher_file)
+
         collision = set(self.batting_data.index).intersection(
             set(self.pitching_data.index)
         )
@@ -287,6 +302,69 @@ class BaseballStatsPreProcess:
         combined_string = f"{name}_{role}"
         hex_hash = hashlib.md5(combined_string.encode()).hexdigest()
         return int(hex_hash, 16)
+
+    def _load_raw_data(self, batter_file: str, pitcher_file: str) -> None:
+        """
+        Load raw CSV data for all seasons without projection.
+
+        Loads batting and pitching data for all seasons in load_seasons,
+        stores them for threshold detection before projection.
+        """
+        self.raw_batting_data = None
+        self.raw_pitching_data = None
+
+        for season in self.load_seasons:
+            # Load batting data
+            bdf = pd.read_csv(str(season) + f" {batter_file}")
+            bdf["Season"] = season
+            self.raw_batting_data = pd.concat([self.raw_batting_data, bdf], axis=0)
+
+            # Load pitching data
+            pdf = pd.read_csv(str(season) + f" {pitcher_file}")
+            pdf["Season"] = season
+            self.raw_pitching_data = pd.concat([self.raw_pitching_data, pdf], axis=0)
+
+    def _detect_projection_seasons(self) -> None:
+        """
+        Auto-detect which seasons to use for projections based on games played.
+
+        Checks the maximum games in the most recent season across both batters and pitchers.
+        If any player has >= min_games_for_trusted, the season is considered trusted
+        and included in projections. Otherwise, it's excluded.
+
+        Sets self.projection_seasons and self.projection_trusted accordingly.
+        """
+        max_season = max(self.load_seasons)
+
+        # Get max games for batters in max season
+        max_season_batters = self.raw_batting_data[
+            self.raw_batting_data["Season"] == max_season
+        ]
+        max_batter_games = (
+            max_season_batters["G"].max() if not max_season_batters.empty else 0
+        )
+
+        # Get max games for pitchers in max season
+        max_season_pitchers = self.raw_pitching_data[
+            self.raw_pitching_data["Season"] == max_season
+        ]
+        max_pitcher_games = (
+            max_season_pitchers["G"].max() if not max_season_pitchers.empty else 0
+        )
+
+        max_games_in_season = max(max_batter_games, max_pitcher_games)
+
+        if max_games_in_season >= self.min_games_for_trusted:
+            self.projection_seasons = self.load_seasons
+            self.projection_trusted = True
+        else:
+            self.projection_seasons = self.load_seasons[:-1]
+            self.projection_trusted = False
+            print(
+                f"WARNING: {max_season} has max {max_games_in_season} games "
+                f"(threshold: {self.min_games_for_trusted}). "
+                f"Not used in projections."
+            )
 
     def save_data(self) -> None:
         """
@@ -661,7 +739,9 @@ class BaseballStatsPreProcess:
         # Missed 2+ years? They are effectively retired for sim purposes.
         return False
 
-    def get_pitching_seasons(self, pitcher_file: str, load_seasons: List[int]) -> tuple:
+    def get_pitching_seasons(
+        self, pitcher_file: str, load_seasons: List[int], projection_seasons: List[int]
+    ) -> tuple:
         """
         Load, clean, and project pitcher data for the specified seasons.
 
@@ -679,7 +759,8 @@ class BaseballStatsPreProcess:
         Derived columns added to aggregated data: ``AB``, ``2B``, ``3B``,
         ``HBP``, ``OBP``, ``Total_OB``, ``Total_Outs``, ``AVG_faced``,
         ``Game_Fatigue_Factor``, ``Condition``, ``Status``, ``BS``, ``HLD``,
-        ``Injury_Rate_Adj``, ``Injury_Perf_Adj``, ``Streak_Adjustment``.
+        ``Injury_Rate_Adj``, ``Injury_Perf_Adj``, ``Streak_Adjustment``,
+        ``Projection_Trusted``.
 
         .. caution::
             WAR and salary columns are summed across seasons during the merge;
@@ -687,7 +768,8 @@ class BaseballStatsPreProcess:
 
         :param pitcher_file: Base filename for raw pitcher CSVs
             (year prefix added automatically).
-        :param load_seasons: List of season years to load and project from.
+        :param load_seasons: List of ALL season years to load (for historical data).
+        :param projection_seasons: List of season years to use for projections.
         :return: Tuple of ``(aggregated_df, historical_df)``.
         """
         # Returns tuple of (aggregated_df, historical_df)
@@ -809,7 +891,19 @@ class BaseballStatsPreProcess:
         historical_data = historical_data.set_index("Player_Season_Key")
 
         # *** Create AGGREGATED data (trend-based projections) - one row per player ***
-        # Apply trend-based projection to 2026 instead of simple summation
+        # Filter to projection_seasons for league averages and projections
+        projection_data = pitching_data[
+            pitching_data["Season"].isin(projection_seasons)
+        ].copy()
+        max_season = max(load_seasons)
+
+        # Identify rookies: players who only appear in max season
+        all_seasons_data = pitching_data.copy()
+        player_seasons = all_seasons_data.groupby("Hashcode")["Season"].apply(set)
+        rookies = player_seasons[
+            player_seasons.apply(lambda x: len(x) == 1 and max_season in x)
+        ].index.tolist()
+
         stats_to_project = [
             "G",
             "GS",
@@ -829,14 +923,32 @@ class BaseballStatsPreProcess:
             "WP",
         ]
         league_averages = self.calculate_league_averages(
-            historical_df=historical_data, is_pitching=True
+            historical_df=projection_data, is_pitching=True
         )
+
+        # Filter projection_data to only include players with valid history for projection
+        # Players need at least some IP in projection seasons to be projected
+        # Also ensure data is clean (no NaN, no inf)
+        projection_data_clean = projection_data.copy()
+        projection_data_clean = projection_data_clean[projection_data_clean["IP"] >= 1]
+        projection_data_clean = projection_data_clean.replace([np.inf, -np.inf], np.nan)
+        projection_data_clean = projection_data_clean.dropna(
+            subset=["IP", "H", "BB", "SO"]
+        )
+
+        valid_players = projection_data_clean["Hashcode"].unique()
+        projection_data_filtered = projection_data[
+            projection_data["Hashcode"].isin(valid_players)
+        ]
+
         projector = player_projector.PlayerProjector(league_averages)
         pitching_data = projector.calculate_projected_stats(
-            history=historical_data, stats=stats_to_project, is_p=True
+            history=projection_data_filtered, stats=stats_to_project, is_p=True
         )
         pitching_data = pitching_data.set_index("Hashcode")
-        most_recent_season = max(load_seasons)
+        most_recent_season = (
+            max(projection_seasons) if projection_seasons else max(load_seasons)
+        )
         pitching_data["Should_Retain"] = pitching_data.apply(
             lambda row: self.is_active_candidate(
                 row["Years_Included"],
@@ -846,13 +958,26 @@ class BaseballStatsPreProcess:
             ),
             axis=1,
         )
+
+        # Also retain rookies (only in max season) - they will be flagged as untrusted
+        pitching_data.loc[pitching_data.index.isin(rookies), "Should_Retain"] = True
+
         players_before_filter = len(pitching_data)
         pitching_data = pitching_data[pitching_data["Should_Retain"]]
         pitching_data = pitching_data.drop("Should_Retain", axis=1)
         players_after_filter = len(pitching_data)
+
+        # Add Projection_Trusted flag
+        pitching_data["Projection_Trusted"] = ~pitching_data.index.isin(rookies)
+
         print(
             f"Pitchers: Filtered {players_before_filter - players_after_filter} players not in {most_recent_season} season (kept {players_after_filter})"
         )
+        if not self.projection_trusted:
+            rookie_count = len([p for p in rookies if p in pitching_data.index])
+            print(
+                f"         {rookie_count} rookies (only in {max_season}) marked as untrusted projections"
+            )
 
         # Apply random data jigger if needed (to both datasets)
         if self.generate_random_data:
@@ -874,7 +999,7 @@ class BaseballStatsPreProcess:
         pitching_data["3B"] = 0
         pitching_data["HBP"] = 0
         pitching_data["Season"] = str(
-            max(load_seasons) + 1
+            max(projection_seasons) + 1 if projection_seasons else max(load_seasons) + 1
         )  # Projected year (e.g., 2026)
         pitching_data["OBP"] = pitching_data["WHIP"] / (
             3 + pitching_data["WHIP"]
@@ -908,9 +1033,15 @@ class BaseballStatsPreProcess:
             historical_data["Injury_Perf_Adj"] = 0
         if "Streak_Adjustment" not in historical_data.columns:
             historical_data["Streak_Adjustment"] = 0.0  # Always 0 for historical data
+        if "Projection_Trusted" not in historical_data.columns:
+            historical_data["Projection_Trusted"] = (
+                True  # Historical data is always trusted
+            )
         return pitching_data, historical_data
 
-    def get_batting_seasons(self, batter_file: str, load_seasons: List[int]) -> tuple:
+    def get_batting_seasons(
+        self, batter_file: str, load_seasons: List[int], projection_seasons: List[int]
+    ) -> tuple:
         """
         Load, clean, and project batter data for the specified seasons.
 
@@ -929,7 +1060,7 @@ class BaseballStatsPreProcess:
         Derived columns added to aggregated data: ``OBP``, ``SLG``, ``OPS``,
         ``Total_OB``, ``Total_Outs``, ``E``, ``Game_Fatigue_Factor``,
         ``Condition``, ``Status``, ``Injury_Rate_Adj``, ``Injury_Perf_Adj``,
-        ``Streak_Adjustment``.
+        ``Streak_Adjustment``, ``Projection_Trusted``.
 
         Same columns are also calculated for the historical DataFrame.
 
@@ -938,7 +1069,8 @@ class BaseballStatsPreProcess:
 
         :param batter_file: Base filename for raw batter CSVs
             (year prefix added automatically).
-        :param load_seasons: List of season years to load and project from.
+        :param load_seasons: List of ALL season years to load (for historical data).
+        :param projection_seasons: List of season years to use for projections.
         :return: Tuple of ``(aggregated_df, historical_df)``.
         """
         # Returns tuple of (aggregated_df, historical_df)
@@ -1055,7 +1187,19 @@ class BaseballStatsPreProcess:
         historical_data = historical_data.set_index("Player_Season_Key")
 
         # *** Create AGGREGATED data (trend-based projections) - one row per player ***
-        # Apply trend-based projection to 2026 instead of simple summation
+        # Filter to projection_seasons for league averages and projections
+        projection_data = batting_data[
+            batting_data["Season"].isin(projection_seasons)
+        ].copy()
+        max_season = max(load_seasons)
+
+        # Identify rookies: players who only appear in max season
+        all_seasons_data = batting_data.copy()
+        player_seasons = all_seasons_data.groupby("Hashcode")["Season"].apply(set)
+        rookies = player_seasons[
+            player_seasons.apply(lambda x: len(x) == 1 and max_season in x)
+        ].index.tolist()
+
         stats_to_project = [
             "G",
             "PA",
@@ -1076,14 +1220,24 @@ class BaseballStatsPreProcess:
             "GIDP",
         ]
         league_averages = self.calculate_league_averages(
-            historical_data, is_pitching=False
-        )
-        projector = player_projector.PlayerProjector(league_averages=league_averages)
-        batting_data = projector.calculate_projected_stats(
-            history=historical_data, stats=stats_to_project, is_p=False
+            projection_data, is_pitching=False
         )
 
-        most_recent_season = max(load_seasons)
+        # Filter projection_data to only include players with valid history for projection
+        # Players need at least some AB in projection seasons to be projected
+        valid_players = projection_data[projection_data["AB"] >= 1]["Hashcode"].unique()
+        projection_data_filtered = projection_data[
+            projection_data["Hashcode"].isin(valid_players)
+        ]
+
+        projector = player_projector.PlayerProjector(league_averages=league_averages)
+        batting_data = projector.calculate_projected_stats(
+            history=projection_data_filtered, stats=stats_to_project, is_p=False
+        )
+
+        most_recent_season = (
+            max(projection_seasons) if projection_seasons else max(load_seasons)
+        )
         # Apply the probability logic instead of the hard 'In_Recent_Season' check
         batting_data["Should_Retain"] = batting_data.apply(
             lambda row: self.is_active_candidate(
@@ -1095,12 +1249,25 @@ class BaseballStatsPreProcess:
             axis=1,
         )
 
+        # Also retain rookies (only in max season) - they will be flagged as untrusted
+        batting_data.loc[batting_data.index.isin(rookies), "Should_Retain"] = True
+
         players_before = len(batting_data)
         batting_data = batting_data[batting_data["Should_Retain"]]
         batting_data = batting_data.drop("Should_Retain", axis=1)
+
+        # Add Projection_Trusted flag
+        batting_data["Projection_Trusted"] = ~batting_data.index.isin(rookies)
+
         print(
             f"Batters: Retained {len(batting_data)} players (Filtered {players_before - len(batting_data)} retired/inactive)"
         )
+        if not self.projection_trusted:
+            rookie_count = len([p for p in rookies if p in batting_data.index])
+            print(
+                f"         {rookie_count} rookies (only in {max_season}) marked as untrusted projections"
+            )
+
         batting_data = batting_data.set_index("Hashcode")
 
         # Apply random data jigger if needed (to both datasets)
@@ -1115,7 +1282,7 @@ class BaseballStatsPreProcess:
 
         # Calculate derived stats for AGGREGATED data
         batting_data["Season"] = str(
-            max(load_seasons) + 1
+            max(projection_seasons) + 1 if projection_seasons else max(load_seasons) + 1
         )  # Projected year (e.g., 2026)
         batting_data["OBP"] = self.trunc_col(
             np.nan_to_num(
@@ -1234,6 +1401,10 @@ class BaseballStatsPreProcess:
             historical_data["Injury_Perf_Adj"] = 0
         if "Streak_Adjustment" not in historical_data.columns:
             historical_data["Streak_Adjustment"] = 0.0  # Always 0 for historical data
+        if "Projection_Trusted" not in historical_data.columns:
+            historical_data["Projection_Trusted"] = (
+                True  # Historical data is always trusted
+            )
 
         return batting_data, historical_data
 
@@ -1249,10 +1420,10 @@ class BaseballStatsPreProcess:
         :param pitcher_file: Base filename for raw pitcher CSV files.
         """
         self.pitching_data, self.pitching_data_historical = self.get_pitching_seasons(
-            pitcher_file, self.load_seasons
+            pitcher_file, self.load_seasons, self.projection_seasons
         )
         self.batting_data, self.batting_data_historical = self.get_batting_seasons(
-            batter_file, self.load_seasons
+            batter_file, self.load_seasons, self.projection_seasons
         )
         return
 
@@ -1316,7 +1487,11 @@ class BaseballStatsPreProcess:
             print("No seasons loaded, skipping Def_WAR calculation")
             return
 
-        prior_season = max(self.load_seasons)
+        prior_season = (
+            max(self.projection_seasons)
+            if self.projection_seasons
+            else max(self.load_seasons)
+        )
         print(f"Calculating Def_WAR from {prior_season} season data...")
 
         # === PITCHERS ===
@@ -1726,137 +1901,286 @@ class BaseballStatsPreProcess:
         """
         Generate new-season DataFrames with rate stats preserved and counting stats zeroed.
 
-        Two code paths:
-        - **Actual partial season** (``new_season == load_seasons[-1]`` and not random):
-          Reads real partial-season files directly via ``get_pitching_seasons``
-          and ``get_batting_seasons``.
-        - **Projected next season** (any other case, including random data):
-          Copies the aggregated DataFrames, calculates ERA/WHIP/OBP (pitchers)
-          or AVG/OBP/SLG/OPS (batters) from the projected counting stats, then
-          zeros all counting stats so the simulator starts fresh. Player ages are
-          incremented by 1 when ``new_season`` is not in ``load_seasons``.
+        Uses projected stats from previous seasons as the base for new season.
+        If max season is partial, merges partial season stats into new season file
+        for accumulation. Always includes max season in historical file.
+
+        The projected stats come from projection_seasons (which excludes max season
+        if it's below the min_games_for_trusted threshold).
 
         Results are stored in ``self.new_season_pitching_data`` and
         ``self.new_season_batting_data``.
 
-        :param load_batter_file: Base batter file name (used for the partial-season path).
-        :param load_pitcher_file: Base pitcher file name (used for the partial-season path).
+        :param load_batter_file: Base batter file name.
+        :param load_pitcher_file: Base pitcher file name.
         :raises Exception: If pitching or batting data has not been loaded yet.
         """
         if self.pitching_data is None or self.batting_data is None:
             raise Exception("load at least one season of pitching and batting")
-        # blend of actual partial season, load org new season from file
+
+        # Load partial season data for merging (if max season exists and is partial)
+        max_season = max(self.load_seasons)
+        partial_season_data = None
+        if max_season not in self.projection_seasons:
+            # Max season was excluded from projections, load it for partial stats
+            partial_season_data = self._load_partial_season_data(
+                load_batter_file, load_pitcher_file, max_season
+            )
+
+        # --- Pitching ---
+        self.new_season_pitching_data = self.pitching_data.copy()
+        self.new_season_pitching_data[self.numeric_pcols] = (
+            self.new_season_pitching_data[self.numeric_pcols].astype("int")
+        )
+        self.new_season_pitching_data["Season"] = str(self.new_season)
+
+        # IP can be decimal (e.g., 12.1 = 12 1/3 innings), change column to float
+        self.new_season_pitching_data["IP"] = self.new_season_pitching_data[
+            "IP"
+        ].astype(float)
+
+        # Calculate projected rate stats from counting stats before zeroing
+        pp = self.new_season_pitching_data
+        pp["ERA"] = self.trunc_col(
+            np.nan_to_num(np.divide(pp["ER"] * 9, pp["IP"]), nan=0.0, posinf=0.0), 2
+        )
+        pp["WHIP"] = self.trunc_col(
+            np.nan_to_num(np.divide(pp["BB"] + pp["H"], pp["IP"]), nan=0.0, posinf=0.0),
+            3,
+        )
+        pp["OBP"] = self.trunc_col(
+            np.nan_to_num(np.divide(pp["WHIP"], 3 + pp["WHIP"]), nan=0.0, posinf=0.0),
+            3,
+        )
+
+        # Merge partial season stats if available
+        if partial_season_data is not None and "pitching" in partial_season_data:
+            partial_pitch = partial_season_data["pitching"]
+            for idx in self.new_season_pitching_data.index:
+                if idx in partial_pitch.index:
+                    partial_row = partial_pitch.loc[idx]
+                    # Handle both Series and DataFrame access
+                    g_val = partial_row["G"] if "G" in partial_row.index else None
+                    if (
+                        g_val is not None and pd.notna(g_val).any()
+                        if hasattr(pd.notna(g_val), "any")
+                        else pd.notna(g_val)
+                    ):
+                        self.new_season_pitching_data.loc[idx, "G"] = int(
+                            partial_row["G"]
+                        )
+                        # IP can be decimal (e.g., 12.1 = 12 1/3 innings), store as float
+                        ip_val = partial_row.get("IP", 0)
+                        if pd.notna(ip_val):
+                            self.new_season_pitching_data.at[idx, "IP"] = float(ip_val)
+                        self.new_season_pitching_data.loc[idx, "H"] = int(
+                            partial_row.get("H", 0)
+                        )
+                        self.new_season_pitching_data.loc[idx, "ER"] = int(
+                            partial_row.get("ER", 0)
+                        )
+                        self.new_season_pitching_data.loc[idx, "BB"] = int(
+                            partial_row.get("BB", 0)
+                        )
+                        self.new_season_pitching_data.loc[idx, "SO"] = int(
+                            partial_row.get("SO", 0)
+                        )
+                        self.new_season_pitching_data.loc[idx, "HR"] = int(
+                            partial_row.get("HR", 0)
+                        )
+                        self.new_season_pitching_data.loc[idx, "W"] = int(
+                            partial_row.get("W", 0)
+                        )
+                        self.new_season_pitching_data.loc[idx, "L"] = int(
+                            partial_row.get("L", 0)
+                        )
+
+        # Zero counting stats for simulation tracking (preserve ERA/WHIP/OBP)
+        self.new_season_pitching_data[self.numeric_pcols] = 0
+        self.new_season_pitching_data[
+            [
+                "AVG_faced",
+                "Total_OB",
+                "Total_Outs",
+                "AB",
+                "HLD",
+                "BS",
+                "Injured Days",
+            ]
+        ] = 0
+        self.new_season_pitching_data["Condition"] = 100
+        self.new_season_pitching_data["Streak_Adjustment"] = 0.0
         if (
-            self.load_seasons[-1] == self.new_season
-            and self.generate_random_data is False
-        ):
-            self.new_season_pitching_data = self.get_pitching_seasons(
-                load_pitcher_file, [self.new_season]
+            self.new_season not in self.load_seasons
+        ):  # add a year to age if it is the next year
+            self.new_season_pitching_data["Age"] = (
+                self.new_season_pitching_data["Age"] + 1
             )
-            self.new_season_batting_data = self.get_batting_seasons(
-                load_batter_file, [self.new_season]
-            )
-        else:  # handle random league data and or consecutive seasons
-            # --- Pitching ---
-            self.new_season_pitching_data = self.pitching_data.copy()
-            self.new_season_pitching_data[self.numeric_pcols] = (
-                self.new_season_pitching_data[self.numeric_pcols].astype("int")
-            )
-            self.new_season_pitching_data["Season"] = str(self.new_season)
 
-            # Calculate projected rate stats from counting stats before zeroing
-            pp = self.new_season_pitching_data
-            pp["ERA"] = self.trunc_col(
-                np.nan_to_num(np.divide(pp["ER"] * 9, pp["IP"]), nan=0.0, posinf=0.0), 2
-            )
-            pp["WHIP"] = self.trunc_col(
-                np.nan_to_num(
-                    np.divide(pp["BB"] + pp["H"], pp["IP"]), nan=0.0, posinf=0.0
+        # --- Batting ---
+        self.new_season_batting_data = self.batting_data.copy()
+        self.new_season_batting_data["Season"] = str(self.new_season)
+
+        # Calculate projected rate stats from counting stats before zeroing
+        bp = self.new_season_batting_data
+        bp["AVG"] = self.trunc_col(
+            np.nan_to_num(np.divide(bp["H"], bp["AB"]), nan=0.0, posinf=0.0), 3
+        )
+        bp["OBP"] = self.trunc_col(
+            np.nan_to_num(
+                np.divide(
+                    bp["H"] + bp["BB"] + bp["HBP"],
+                    bp["AB"] + bp["BB"] + bp["HBP"] + bp.get("SF", 0),
                 ),
-                3,
-            )
-            pp["OBP"] = self.trunc_col(
-                np.nan_to_num(
-                    np.divide(pp["WHIP"], 3 + pp["WHIP"]), nan=0.0, posinf=0.0
+                nan=0.0,
+                posinf=0.0,
+            ),
+            3,
+        )
+        bp["SLG"] = self.trunc_col(
+            np.nan_to_num(
+                np.divide(
+                    (bp["H"] - bp["2B"] - bp["3B"] - bp["HR"])
+                    + bp["2B"] * 2
+                    + bp["3B"] * 3
+                    + bp["HR"] * 4,
+                    bp["AB"],
                 ),
-                3,
+                nan=0.0,
+                posinf=0.0,
+            ),
+            3,
+        )
+        bp["OPS"] = self.trunc_col(
+            np.nan_to_num(bp["OBP"] + bp["SLG"], nan=0.0, posinf=0.0), 3
+        )
+        if (
+            self.new_season not in self.load_seasons
+        ):  # add a year to age if it is the next year
+            self.new_season_batting_data["Age"] = (
+                self.new_season_batting_data["Age"] + 1
             )
 
-            # Zero counting stats for simulation tracking (preserve ERA/WHIP/OBP)
-            self.new_season_pitching_data[self.numeric_pcols] = 0
-            self.new_season_pitching_data[
-                [
-                    "AVG_faced",
-                    "Total_OB",
-                    "Total_Outs",
-                    "AB",
-                    "HLD",
-                    "BS",
-                    "Injured Days",
-                ]
-            ] = 0
-            self.new_season_pitching_data["Condition"] = 100
-            self.new_season_pitching_data["Streak_Adjustment"] = 0.0
-            self.new_season_pitching_data.drop(["Total_OB", "Total_Outs"], axis=1)
-            if (
-                self.new_season not in self.load_seasons
-            ):  # add a year to age if it is the next year
-                self.new_season_pitching_data["Age"] = (
-                    self.new_season_pitching_data["Age"] + 1
-                )
+        # Merge partial season stats if available
+        if partial_season_data is not None and "batting" in partial_season_data:
+            partial_bat = partial_season_data["batting"]
+            for idx in self.new_season_batting_data.index:
+                if idx in partial_bat.index:
+                    partial_row = partial_bat.loc[idx]
+                    # Handle both Series and DataFrame access
+                    g_val = partial_row["G"] if "G" in partial_row.index else None
+                    if (
+                        g_val is not None and pd.notna(g_val).any()
+                        if hasattr(pd.notna(g_val), "any")
+                        else pd.notna(g_val)
+                    ):
+                        self.new_season_batting_data.loc[idx, "G"] = int(
+                            partial_row["G"]
+                        )
+                        self.new_season_batting_data.loc[idx, "AB"] = int(
+                            partial_row.get("AB", 0)
+                        )
+                        self.new_season_batting_data.loc[idx, "H"] = int(
+                            partial_row.get("H", 0)
+                        )
+                        self.new_season_batting_data.loc[idx, "R"] = int(
+                            partial_row.get("R", 0)
+                        )
+                        self.new_season_batting_data.loc[idx, "HR"] = int(
+                            partial_row.get("HR", 0)
+                        )
+                        self.new_season_batting_data.loc[idx, "RBI"] = int(
+                            partial_row.get("RBI", 0)
+                        )
+                        self.new_season_batting_data.loc[idx, "BB"] = int(
+                            partial_row.get("BB", 0)
+                        )
+                        self.new_season_batting_data.loc[idx, "SO"] = int(
+                            partial_row.get("SO", 0)
+                        )
+                        self.new_season_batting_data.loc[idx, "SB"] = int(
+                            partial_row.get("SB", 0)
+                        )
+                        self.new_season_batting_data.loc[idx, "2B"] = int(
+                            partial_row.get("2B", 0)
+                        )
+                        self.new_season_batting_data.loc[idx, "3B"] = int(
+                            partial_row.get("3B", 0)
+                        )
 
-            # --- Batting ---
-            self.new_season_batting_data = self.batting_data.copy()
-            self.new_season_batting_data["Season"] = str(self.new_season)
+        # Zero counting stats for simulation tracking (preserve AVG/OBP/SLG/OPS)
+        self.new_season_batting_data[self.numeric_bcols] = 0
+        self.new_season_batting_data[["Total_OB", "Total_Outs", "Injured Days"]] = 0
+        self.new_season_batting_data["Condition"] = 100
+        self.new_season_batting_data["Streak_Adjustment"] = 0.0
 
-            # Calculate projected rate stats from counting stats before zeroing
-            bp = self.new_season_batting_data
-            bp["AVG"] = self.trunc_col(
-                np.nan_to_num(np.divide(bp["H"], bp["AB"]), nan=0.0, posinf=0.0), 3
-            )
-            bp["OBP"] = self.trunc_col(
-                np.nan_to_num(
-                    np.divide(
-                        bp["H"] + bp["BB"] + bp["HBP"],
-                        bp["AB"] + bp["BB"] + bp["HBP"] + bp.get("SF", 0),
-                    ),
-                    nan=0.0,
-                    posinf=0.0,
-                ),
-                3,
-            )
-            bp["SLG"] = self.trunc_col(
-                np.nan_to_num(
-                    np.divide(
-                        (bp["H"] - bp["2B"] - bp["3B"] - bp["HR"])
-                        + bp["2B"] * 2
-                        + bp["3B"] * 3
-                        + bp["HR"] * 4,
-                        bp["AB"],
-                    ),
-                    nan=0.0,
-                    posinf=0.0,
-                ),
-                3,
-            )
-            bp["OPS"] = self.trunc_col(
-                np.nan_to_num(bp["OBP"] + bp["SLG"], nan=0.0, posinf=0.0), 3
-            )
-            if (
-                self.new_season not in self.load_seasons
-            ):  # add a year to age if it is the next year
-                self.new_season_batting_data["Age"] = (
-                    self.new_season_batting_data["Age"] + 1
-                )
-
-            # Zero counting stats for simulation tracking (preserve AVG/OBP/SLG/OPS)
-            self.new_season_batting_data[self.numeric_bcols] = 0
-            self.new_season_batting_data[["Total_OB", "Total_Outs", "Injured Days"]] = 0
-            self.new_season_batting_data["Condition"] = 100
-            self.new_season_batting_data["Streak_Adjustment"] = 0.0
-            self.new_season_batting_data.drop(["Total_OB", "Total_Outs"], axis=1)
+        # Ensure historical data includes partial season
+        if partial_season_data is not None:
+            self._merge_partial_season_to_historical(partial_season_data)
 
         return
+
+    def _load_partial_season_data(
+        self, batter_file: str, pitcher_file: str, season: int
+    ) -> dict:
+        """
+        Load partial season data for merging into new season file.
+
+        Returns dict with 'pitching' and 'batting' DataFrames.
+        """
+        partial_data = {}
+
+        try:
+            pdf = pd.read_csv(f"{season} {pitcher_file}")
+            pdf["Season"] = season
+            pdf["Player"] = pdf["Player"].str.replace("*", "").str.replace("#", "")
+            pdf["Hashcode"] = pdf["Player"].apply(
+                lambda x: self.create_hash(x, "Pitcher")
+            )
+            pdf = pdf.set_index("Hashcode")
+            partial_data["pitching"] = pdf
+        except FileNotFoundError:
+            partial_data["pitching"] = pd.DataFrame()
+
+        try:
+            bdf = pd.read_csv(f"{season} {batter_file}")
+            bdf["Season"] = season
+            bdf["Player"] = bdf["Player"].str.replace("*", "").str.replace("#", "")
+            bdf["Hashcode"] = bdf["Player"].apply(
+                lambda x: self.create_hash(x, "Hitter")
+            )
+            bdf = bdf.set_index("Hashcode")
+            partial_data["batting"] = bdf
+        except FileNotFoundError:
+            partial_data["batting"] = pd.DataFrame()
+
+        return partial_data if partial_data else None
+
+    def _merge_partial_season_to_historical(self, partial_data: dict) -> None:
+        """
+        Merge partial season data into historical DataFrames.
+        """
+        if "pitching" in partial_data and not partial_data["pitching"].empty:
+            # Add required columns if missing
+            for col in ["Streak_Adjustment", "Projection_Trusted"]:
+                if col not in partial_data["pitching"].columns:
+                    partial_data["pitching"][col] = (
+                        0 if col == "Streak_Adjustment" else False
+                    )
+            self.pitching_data_historical = pd.concat(
+                [self.pitching_data_historical, partial_data["pitching"]], axis=0
+            )
+
+        if "batting" in partial_data and not partial_data["batting"].empty:
+            # Add required columns if missing
+            for col in ["Streak_Adjustment", "Projection_Trusted"]:
+                if col not in partial_data["batting"].columns:
+                    partial_data["batting"][col] = (
+                        0 if col == "Streak_Adjustment" else False
+                    )
+            self.batting_data_historical = pd.concat(
+                [self.batting_data_historical, partial_data["batting"]], axis=0
+            )
 
     @staticmethod
     def trunc_col(df_n: ndarray, d: int = 3) -> ndarray:
@@ -2304,9 +2628,10 @@ if __name__ == "__main__":
 
     print("\n[1/3] Running preprocessing to generate projection files...")
     baseball_data = BaseballStatsPreProcess(
-        load_seasons=[2023, 2024, 2025],
+        load_seasons=[2023, 2024, 2025, 2026],
         new_season=2026,
         generate_random_data=False,
+        min_games_for_trusted=80,
         load_batter_file="player-stats-Batters.csv",
         load_pitcher_file="player-stats-Pitching.csv",
     )

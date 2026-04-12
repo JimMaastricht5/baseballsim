@@ -352,7 +352,11 @@ class PlayerProjector:
 
         # Volume Logic: Aggressive recency weighting (6:3:1) to better project decline/rise
         weights = np.array([1, 3, 6][-num_years:])
-        raw_vol = np.sum(history["PA"].fillna(0).values * weights) / weights.sum()
+        pa_values = history["PA"].fillna(0).values
+        # Ensure weights match pa_values length
+        if len(weights) < len(pa_values):
+            weights = np.resize(weights, len(pa_values))
+        raw_vol = np.sum(pa_values * weights) / weights.sum()
         proj_vol = min(max(150, raw_vol), 700)
 
         result = history.iloc[-1].to_dict()
@@ -698,8 +702,15 @@ class PlayerProjector:
         :param vol_col: Volume denominator column.
         :return: Recency-weighted per-vol rate.
         """
-        rates = (history[stat_col] / history[vol_col].replace(0, 1)).values
         vol_values = history[vol_col].values
+        # Align rates with vol_values to ensure same length
+        rate_denom = history[vol_col].replace(0, 1)
+        rates = (history[stat_col] / rate_denom).values
+
+        # If any NaN or inf in rates, replace with league average rate
+        lg_rate = self.lg_avgs.get(f"{stat_col}_per_{vol_col}", 0.240)
+        rates = np.where(np.isfinite(rates), rates, lg_rate)
+        vol_values = np.where(np.isfinite(vol_values), vol_values, 1)
 
         # If any season has < 50 vol and it's much smaller than the rest,
         # use PA-weighted average instead of recency-weighted
@@ -709,6 +720,10 @@ class PlayerProjector:
             weights = vol_values.astype(float)
         else:
             weights = np.array([2, 4, 6][-len(rates) :])
+
+        # Ensure rates and weights have same length
+        if len(rates) != len(weights):
+            weights = np.resize(weights, len(rates))
 
         return np.average(rates, weights=weights)
 

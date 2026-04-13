@@ -274,6 +274,26 @@ class ToolbarWidget:
         except ValueError:
             return 162
 
+    def set_default_games_from_data(self, baseball_data) -> None:
+        """Set default games based on max games already played in season."""
+        try:
+            max_g = (
+                baseball_data.new_season_batting_data["G"].max()
+                if baseball_data.new_season_batting_data is not None
+                else 0
+            )
+            max_p = (
+                baseball_data.new_season_pitching_data["G"].max()
+                if baseball_data.new_season_pitching_data is not None
+                else 0
+            )
+            max_played = max(max_g, max_p)
+            default_games = 162 - int(max_played)
+            self.games_var.set(str(default_games))
+            self.games_spinbox.config(to=default_games)
+        except Exception:
+            pass  # Keep default 162 if error
+
     def get_obp_adjustment(self) -> float:
         """Get currently selected OBP adjustment value."""
         return float(self.obp_var.get())

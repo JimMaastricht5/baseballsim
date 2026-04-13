@@ -44,6 +44,7 @@ Contact: JimMaastricht5@gmail.com
 
 # data clean up and standardization for stats.  handles random generation if requested
 # data imported from https://www.rotowire.com/baseball/stats.php
+import os
 import pandas as pd
 import random
 import city_names as city
@@ -377,7 +378,7 @@ class BaseballStatsPreProcess:
         - New-season pitching/batting files (saved when ``new_season`` was set).
 
         File names are prefixed with the joined load-season years
-        (e.g. ``'2023 2024 2025 player-projected-stats-pp-Batting.csv'``).
+        (e.g. ``'player-projected-stats-pp-Batting.csv'``).
         Random-data runs use ``'random-'`` variants of each name.
         """
         # Aggregated files now include 'aggr' in name
@@ -422,6 +423,7 @@ class BaseballStatsPreProcess:
                 if self.generate_random_data
                 else "historical-Pitching.csv"
             )
+            self.pitching_data_historical.index.name = "Player_Season_Key"
             self.pitching_data_historical.to_csv(
                 f"{seasons_str} {f_hist_pname}", index=True, header=True
             )
@@ -433,18 +435,74 @@ class BaseballStatsPreProcess:
                 if self.generate_random_data
                 else "historical-Batting.csv"
             )
+            self.batting_data_historical.index.name = "Player_Season_Key"
             self.batting_data_historical.to_csv(
                 f"{seasons_str} {f_hist_bname}", index=True, header=True
             )
             print(f"Saved historical batting data: {seasons_str} {f_hist_bname}")
 
         # Save new season data (no 'aggr' prefix - this is single season data, not aggregated)
+        # Preserve existing stats if games have already been played
         if self.new_season is not None:
+            new_season_batting_file = f"{self.new_season} New-Season-{f_bname_new}"
+            new_season_pitching_file = f"{self.new_season} New-Season-{f_pname_new}"
+
+            # Check if existing file has games played - if so, preserve it
+            if os.path.exists(new_season_batting_file):
+                existing_batting = pd.read_csv(
+                    new_season_batting_file, index_col="Hashcode"
+                )
+                existing_games = (
+                    existing_batting["G"].sum()
+                    if "G" in existing_batting.columns
+                    else 0
+                )
+                if existing_games > 0:
+                    # Merge: add fresh zeros to existing stats
+                    for col in self.numeric_bcols:
+                        if (
+                            col in self.new_season_batting_data.columns
+                            and col in existing_batting.columns
+                        ):
+                            self.new_season_batting_data[col] = (
+                                self.new_season_batting_data[col].fillna(0)
+                                + existing_batting[col].fillna(0)
+                            )
+                    # Preserve non-numeric columns from existing
+                    for col in existing_batting.columns:
+                        if col not in self.numeric_bcols:
+                            self.new_season_batting_data[col] = existing_batting[col]
+                    print(f"Preserved existing batting stats ({existing_games} games)")
+
+            if os.path.exists(new_season_pitching_file):
+                existing_pitching = pd.read_csv(
+                    new_season_pitching_file, index_col="Hashcode"
+                )
+                existing_games = (
+                    existing_pitching["G"].sum()
+                    if "G" in existing_pitching.columns
+                    else 0
+                )
+                if existing_games > 0:
+                    for col in self.numeric_pcols:
+                        if (
+                            col in self.new_season_pitching_data.columns
+                            and col in existing_pitching.columns
+                        ):
+                            self.new_season_pitching_data[col] = (
+                                self.new_season_pitching_data[col].fillna(0)
+                                + existing_pitching[col].fillna(0)
+                            )
+                    for col in existing_pitching.columns:
+                        if col not in self.numeric_pcols:
+                            self.new_season_pitching_data[col] = existing_pitching[col]
+                    print(f"Preserved existing pitching stats ({existing_games} games)")
+
             self.new_season_pitching_data.to_csv(
-                f"{self.new_season} New-Season-{f_pname_new}", index=True, header=True
+                new_season_pitching_file, index=True, header=True
             )
             self.new_season_batting_data.to_csv(
-                f"{self.new_season} New-Season-{f_bname_new}", index=True, header=True
+                new_season_batting_file, index=True, header=True
             )
         return
 
@@ -2202,15 +2260,18 @@ class BaseballStatsPreProcess:
 # =============================================================================
 
 
-def check_batting_integrity():
+def check_batting_integrity(load_seasons: list = None, new_season: int = 2026):
     """Compare projected batting stats against historical baselines."""
-    B_PROJ_FILE = "2023 2024 2025 player-projected-stats-pp-Batting.csv"
-    B_HIST_FILE = "2023 2024 2025 historical-Batting.csv"
+    if load_seasons is None:
+        load_seasons = [2023, 2024, 2025]
+    seasons_str = " ".join(str(s) for s in load_seasons)
+    B_PROJ_FILE = f"{seasons_str} player-projected-stats-pp-Batting.csv"
+    B_HIST_FILE = f"{seasons_str} historical-Batting.csv"
 
     df_proj = pd.read_csv(B_PROJ_FILE)
     df_hist = pd.read_csv(B_HIST_FILE)
-    df_25 = df_hist[df_hist["Season"] == 2025].copy()
-    df_23_25 = df_hist[df_hist["Season"].isin([2023, 2024, 2025])].copy()
+    df_25 = df_hist[df_hist["Season"] == load_seasons[-1]].copy()
+    df_23_25 = df_hist[df_hist["Season"].isin(load_seasons)].copy()
 
     df_proj["BA"] = df_proj["H"] / df_proj["AB"].replace(0, 1)
     df_proj["BB_Rate"] = df_proj["BB"] / df_proj["PA"].replace(0, 1)
@@ -2271,15 +2332,18 @@ def check_batting_integrity():
     print("-" * 90)
 
 
-def check_pitching_integrity():
+def check_pitching_integrity(load_seasons: list = None, new_season: int = 2026):
     """Compare projected pitching stats against historical baselines."""
-    P_PROJ_FILE = "2023 2024 2025 player-projected-stats-pp-Pitching.csv"
-    P_HIST_FILE = "2023 2024 2025 historical-Pitching.csv"
+    if load_seasons is None:
+        load_seasons = [2023, 2024, 2025]
+    seasons_str = " ".join(str(s) for s in load_seasons)
+    P_PROJ_FILE = f"{seasons_str} player-projected-stats-pp-Pitching.csv"
+    P_HIST_FILE = f"{seasons_str} historical-Pitching.csv"
 
     df_proj = pd.read_csv(P_PROJ_FILE)
     df_hist = pd.read_csv(P_HIST_FILE)
-    df_25 = df_hist[df_hist["Season"] == 2025].copy()
-    df_23_25 = df_hist[df_hist["Season"].isin([2023, 2024, 2025])].copy()
+    df_25 = df_hist[df_hist["Season"] == load_seasons[-1]].copy()
+    df_23_25 = df_hist[df_hist["Season"].isin(load_seasons)].copy()
 
     df_proj["H_PA"] = df_proj["H"] / df_proj["PA"].replace(0, 1)
     df_proj["BB_PA"] = df_proj["BB"] / df_proj["PA"].replace(0, 1)
@@ -2334,14 +2398,18 @@ def check_pitching_integrity():
     print("-" * 90)
 
 
-def diagnose_power_inflation():
-    """Compare 2026 projections vs 2025 actual for power metrics (2B, 3B, HR -> SLG)."""
-    B_PROJ_FILE = "2023 2024 2025 player-projected-stats-pp-Batting.csv"
-    B_HIST_FILE = "2023 2024 2025 historical-Batting.csv"
+def diagnose_power_inflation(load_seasons: list = None, new_season: int = 2026):
+    """Compare projections vs most recent actual for power metrics (2B, 3B, HR -> SLG)."""
+    if load_seasons is None:
+        load_seasons = [2023, 2024, 2025]
+    seasons_str = " ".join(str(s) for s in load_seasons)
+    prior_season = load_seasons[-1]
+    B_PROJ_FILE = f"{seasons_str} player-projected-stats-pp-Batting.csv"
+    B_HIST_FILE = f"{seasons_str} historical-Batting.csv"
 
     df_proj = pd.read_csv(B_PROJ_FILE)
     df_hist = pd.read_csv(B_HIST_FILE)
-    df_25 = df_hist[df_hist["Season"] == 2025].copy()
+    df_25 = df_hist[df_hist["Season"] == prior_season].copy()
 
     df_proj["1B"] = (
         df_proj["H"]
@@ -2409,16 +2477,20 @@ def diagnose_power_inflation():
     print("-" * 90)
 
 
-def diagnose_bip_leakage():
+def diagnose_bip_leakage(load_seasons: list = None, new_season: int = 2026):
     """Compare BABIP between projection and historical baselines."""
-    P_PROJ_FILE = "2023 2024 2025 player-projected-stats-pp-Pitching.csv"
-    P_HIST_FILE = "2023 2024 2025 historical-Pitching.csv"
+    if load_seasons is None:
+        load_seasons = [2023, 2024, 2025]
+    seasons_str = " ".join(str(s) for s in load_seasons)
+    prior_season = load_seasons[-1]
+    P_PROJ_FILE = f"{seasons_str} player-projected-stats-pp-Pitching.csv"
+    P_HIST_FILE = f"{seasons_str} historical-Pitching.csv"
 
     df_p_hist = pd.read_csv(P_HIST_FILE)
     df_p_proj = pd.read_csv(P_PROJ_FILE)
 
-    p_25 = df_p_hist[df_p_hist["Season"] == 2025].copy()
-    p_23_25 = df_p_hist[df_p_hist["Season"].isin([2023, 2024, 2025])].copy()
+    p_25 = df_p_hist[df_p_hist["Season"] == prior_season].copy()
+    p_23_25 = df_p_hist[df_p_hist["Season"].isin(load_seasons)].copy()
 
     p_25["BIP"] = p_25["PA"] - p_25["SO"] - p_25["BB"]
     p_25_h_bip = p_25["H"].sum() / p_25["BIP"].sum()
@@ -2446,22 +2518,26 @@ def diagnose_bip_leakage():
     print("-" * 90)
 
 
-def diagnose_h_surplus():
+def diagnose_h_surplus(load_seasons: list = None, new_season: int = 2026):
     """Compare hit rates between projection and baselines."""
-    B_PROJ_FILE = "2023 2024 2025 player-projected-stats-pp-Batting.csv"
-    B_HIST_FILE = "2023 2024 2025 historical-Batting.csv"
-    P_PROJ_FILE = "2023 2024 2025 player-projected-stats-pp-Pitching.csv"
-    P_HIST_FILE = "2023 2024 2025 historical-Pitching.csv"
+    if load_seasons is None:
+        load_seasons = [2023, 2024, 2025]
+    seasons_str = " ".join(str(s) for s in load_seasons)
+    prior_season = load_seasons[-1]
+    B_PROJ_FILE = f"{seasons_str} player-projected-stats-pp-Batting.csv"
+    B_HIST_FILE = f"{seasons_str} historical-Batting.csv"
+    P_PROJ_FILE = f"{seasons_str} player-projected-stats-pp-Pitching.csv"
+    P_HIST_FILE = f"{seasons_str} historical-Pitching.csv"
 
     df_b_proj = pd.read_csv(B_PROJ_FILE)
     df_b_hist = pd.read_csv(B_HIST_FILE)
     df_p_proj = pd.read_csv(P_PROJ_FILE)
     df_p_hist = pd.read_csv(P_HIST_FILE)
 
-    b_25 = df_b_hist[df_b_hist["Season"] == 2025]
-    b_23_25 = df_b_hist[df_b_hist["Season"].isin([2023, 2024, 2025])]
-    p_25 = df_p_hist[df_p_hist["Season"] == 2025]
-    p_23_25 = df_p_hist[df_p_hist["Season"].isin([2023, 2024, 2025])]
+    b_25 = df_b_hist[df_b_hist["Season"] == prior_season]
+    b_23_25 = df_b_hist[df_b_hist["Season"].isin(load_seasons)]
+    p_25 = df_p_hist[df_p_hist["Season"] == prior_season]
+    p_23_25 = df_p_hist[df_p_hist["Season"].isin(load_seasons)]
 
     b_25_h_rate = b_25["H"].sum() / b_25["PA"].sum()
     b_23_25_h_rate = b_23_25["H"].sum() / b_23_25["PA"].sum()
@@ -2502,10 +2578,13 @@ def diagnose_h_surplus():
 # =============================================================================
 
 
-def run_player_checks():
+def run_player_checks(load_seasons: list = None):
     """Run checks for specific players of interest."""
+    if load_seasons is None:
+        load_seasons = [2023, 2024, 2025, 2026]
+
     baseball_data = BaseballStatsPreProcess(
-        load_seasons=[2023, 2024, 2025],
+        load_seasons=load_seasons,
         new_season=2026,
         generate_random_data=False,
         load_batter_file="player-stats-Batters.csv",
@@ -2579,12 +2658,9 @@ def run_player_checks():
 
     seasons_str = " ".join(str(s) for s in baseball_data.load_seasons)
     try:
-        hist_bat_df = pd.read_csv(
-            f"{seasons_str} historical-Batting.csv", index_col="Player_Season_Key"
-        )
-        hist_pit_df = pd.read_csv(
-            f"{seasons_str} historical-Pitching.csv", index_col="Player_Season_Key"
-        )
+        # Read without specifying index - pandas will use the first column which has the key as values
+        hist_bat_df = pd.read_csv(f"{seasons_str} historical-Batting.csv", index_col=0)
+        hist_pit_df = pd.read_csv(f"{seasons_str} historical-Pitching.csv", index_col=0)
     except FileNotFoundError:
         hist_bat_df = hist_pit_df = pd.DataFrame()
 
@@ -2637,14 +2713,14 @@ if __name__ == "__main__":
     )
 
     print("\n[2/3] Running forecast integrity checks...")
-    check_batting_integrity()
-    check_pitching_integrity()
-    diagnose_h_surplus()
-    diagnose_power_inflation()
-    diagnose_bip_leakage()
+    check_batting_integrity(load_seasons=[2023, 2024, 2025, 2026])
+    check_pitching_integrity(load_seasons=[2023, 2024, 2025, 2026])
+    diagnose_h_surplus(load_seasons=[2023, 2024, 2025, 2026])
+    diagnose_power_inflation(load_seasons=[2023, 2024, 2025, 2026])
+    diagnose_bip_leakage(load_seasons=[2023, 2024, 2025, 2026])
 
     print("\n[3/3] Running player-specific checks...")
-    run_player_checks()
+    run_player_checks(load_seasons=[2023, 2024, 2025, 2026])
 
     print("=" * 90)
     print("PREPROCESSING COMPLETE")

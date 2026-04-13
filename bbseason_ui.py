@@ -226,8 +226,8 @@ Examples:
                        help='Team to follow (default: MIL)')
     parser.add_argument('--games', '-g', type=int, default=162,
                        help='Number of games to simulate (default: 162)')
-    parser.add_argument('--seasons', '-s', type=str, default='2023,2024,2025',
-                       help='Years to load stats from (default: 2023,2024,2025)')
+    parser.add_argument('--seasons', '-s', type=str, default='2023,2024,2025,2026',
+                       help='Years to load stats from (default: 2023,2024,2025,2026)')
     parser.add_argument('--new-season', '-n', type=int, default=2026,
                        help='Season to simulate (default: 2026)')
     

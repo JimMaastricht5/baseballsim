@@ -677,6 +677,11 @@ class RosterWidget:
             except Exception as e:
                 logger.warning(f"Error inserting current season row: {e}")
 
+        # Filter out current season from historical (current_season_row shows 2026)
+        current_season = getattr(self.baseball_data, "new_season", None)
+        if current_season and "Season" in historical_df.columns:
+            historical_df = historical_df[historical_df["Season"] != current_season]
+
         for idx, row in historical_df.iterrows():
             try:
                 if is_batter:

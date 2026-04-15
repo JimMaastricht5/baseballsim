@@ -301,15 +301,27 @@ class BaseballStats:
         # 27.5% of pitchers w > 5 in will spend time on IL per season (188 out of 684)
         # 26.3% of pitching injuries affect the throwing elbow results in avg of 74 days lost
         # position player (non-pitcher) longevitiy: https://www.nytimes.com/2007/07/15/sports/baseball/15careers.html
+
+        # --- Recovery/Fatigue Constants ---
         self.condition_change_per_day = (
-            17  # improve with rest, mid-point of normal dist for recovery
+            17  # Base daily condition recovery (mid-point of distribution)
         )
-        self.fatigue_start_perc = 70  # 85% of way to avg max is where fatigue starts, adjust factor to inc outing lgth
-        self.fatigue_rate = 0.001  # at 85% of avg max pitchers have a .014 increase in OBP.  using .001 as proxy
-        self.fatigue_pitching_change_limit = (
-            5  # change pitcher at # or below out of 100
+        self.fatigue_start_perc = (
+            70  # % of avg batters faced where pitcher fatigue begins
         )
-        self.fatigue_unavailable = 33  # condition must be 33 or higher for a pitcher or pos player to be available
+        self.fatigue_rate = 0.001  # OBP penalty rate when pitcher is fatigued
+        self.fatigue_pitching_change_limit = 5  # Pull pitcher when condition <= 5
+        # fatigue_unavailable: Player ineligible for selection when condition <= 33
+        # Gap of 28 points between (5) and (33) creates a "tired but playable" zone
+        # This allows relievers in close games to be used even when fatigued
+        self.fatigue_unavailable = 33
+        self.recovery_age_peak = (
+            20  # Age at which recovery rate peaks (youngest in system)
+        )
+        self.recovery_min_factor = (
+            0.20  # Minimum recovery is 20% of base (floor at ~3.4 points)
+        )
+        self.rest_day_bonus = 5  # Extra condition recovery for players who didn't play
         self.pitching_injury_rate = (
             0.275  # 27.5 out of 100 players injured per season-> per game
         )
@@ -332,14 +344,19 @@ class BaseballStats:
             else injury_perf_adj
         )
         # PERFORMANCE: Return scalar directly instead of size=1 array with [0] indexing
-        self.rnd_condition_chg = lambda age: abs(
+        # Uses power curve formula: base * (1 - ((age - peak) / 40) ^ 2), floored at 20%
+        self.rnd_condition_chg = lambda age: max(
+            self.condition_change_per_day / 2,
             self._rng_instance.normal(
                 loc=(
                     self.condition_change_per_day
-                    - (age - 20) / 100 * self.condition_change_per_day
+                    * max(
+                        self.recovery_min_factor,
+                        1 - ((age - self.recovery_age_peak) / 40) ** 2,
+                    )
                 ),
                 scale=self.condition_change_per_day / 3,
-            )
+            ),
         )
         self.rnd_p_inj = lambda age: abs(
             self._rng_instance.normal(
@@ -1636,36 +1653,60 @@ class BaseballStats:
                 teams_to_follow
             )  # Print hot/cold players for followed teams
 
-            # VECTORIZED: Update pitcher condition (10-50x faster than apply with lambda)
+            # Identify players who played yesterday (for rest day bonus)
+            played_pitcher_idx = self.new_season_pitching_data[
+                self.new_season_pitching_data["IP"] > 0
+            ].index
+            played_batter_idx = self.new_season_batting_data[
+                self.new_season_batting_data["AB"] > 0
+            ].index
+
+            # VECTORIZED: Update pitcher condition with age-adjusted power curve recovery
             pitcher_ages = self.new_season_pitching_data["Age"].values
-            loc_values = (
-                self.condition_change_per_day
-                - (pitcher_ages - 20) / 100 * self.condition_change_per_day
+            # Recovery formula: base * (1 - ((age - peak) / 40) ^ 2), floored at 20%
+            age_factor = 1 - ((pitcher_ages - self.recovery_age_peak) / 40) ** 2
+            age_factor = np.maximum(self.recovery_min_factor, age_factor)
+            loc_values = self.condition_change_per_day * age_factor
+
+            # Generate recovery with floor (prevents unnatural jumps from np.abs)
+            raw_recovery = self._rng_instance.normal(
+                loc=loc_values,
+                scale=self.condition_change_per_day / 3,
+                size=len(pitcher_ages),
             )
-            random_changes = np.abs(
-                self._rng_instance.normal(
-                    loc=loc_values,
-                    scale=self.condition_change_per_day / 3,
-                    size=len(pitcher_ages),
-                )
+            random_changes = np.clip(
+                raw_recovery,
+                self.condition_change_per_day / 2,  # Floor at 50% of base
+                None,
             )
+
+            # Apply rest day bonus to non-playing pitchers
+            non_players = ~self.new_season_pitching_data.index.isin(played_pitcher_idx)
+            random_changes[non_players] += self.rest_day_bonus
+
             self.new_season_pitching_data["Condition"] = (
                 self.new_season_pitching_data["Condition"] + random_changes
             ).clip(lower=0, upper=100)
 
-            # VECTORIZED: Update batter condition (10-50x faster than apply with lambda)
+            # VECTORIZED: Update batter condition with age-adjusted power curve recovery
             batter_ages = self.new_season_batting_data["Age"].values
-            loc_values = (
-                self.condition_change_per_day
-                - (batter_ages - 20) / 100 * self.condition_change_per_day
+            age_factor = 1 - ((batter_ages - self.recovery_age_peak) / 40) ** 2
+            age_factor = np.maximum(self.recovery_min_factor, age_factor)
+            loc_values = self.condition_change_per_day * age_factor
+
+            raw_recovery = self._rng_instance.normal(
+                loc=loc_values,
+                scale=self.condition_change_per_day / 3,
+                size=len(batter_ages),
             )
-            random_changes = np.abs(
-                self._rng_instance.normal(
-                    loc=loc_values,
-                    scale=self.condition_change_per_day / 3,
-                    size=len(batter_ages),
-                )
+            random_changes = np.clip(
+                raw_recovery, self.condition_change_per_day / 2, None
             )
+
+            # Apply rest day bonus to non-playing batters
+            non_players = ~self.new_season_batting_data.index.isin(played_batter_idx)
+            random_changes[non_players] += self.rest_day_bonus
+
             self.new_season_batting_data["Condition"] = (
                 self.new_season_batting_data["Condition"] + random_changes
             ).clip(lower=0, upper=100)

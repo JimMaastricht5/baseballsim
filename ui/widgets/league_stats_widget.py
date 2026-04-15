@@ -394,6 +394,7 @@ class LeagueStatsWidget:
                 "Player",
                 "Team",
                 "Pos",
+                "G",
                 "AB",
                 "R",
                 "H",
@@ -715,6 +716,7 @@ class LeagueStatsWidget:
                             row.get("Player", "Unknown"),
                             row.get("Team", ""),
                             pos,
+                            self._format_diff_value(row.get("G", 0)),
                             self._format_diff_value(row.get("AB", 0)),
                             self._format_diff_value(row.get("R", 0)),
                             self._format_diff_value(row.get("H", 0)),
@@ -741,6 +743,7 @@ class LeagueStatsWidget:
                             row.get("Player", "Unknown"),
                             row.get("Team", ""),
                             pos,
+                            int(row.get("G", 0)),
                             int(row.get("AB", 0)),
                             int(row.get("R", 0)),
                             int(row.get("H", 0)),
@@ -1233,6 +1236,11 @@ class LeagueStatsWidget:
                 tree.insert("", tk.END, values=values, tags=("projected",))
             except Exception as e:
                 logger.warning(f"Error inserting projected row: {e}")
+
+        # Filter out current season from historical (projected row shows current season)
+        current_season = getattr(self.baseball_data, "new_season", None)
+        if current_season and "Season" in historical_df.columns:
+            historical_df = historical_df[historical_df["Season"] != current_season]
 
         for idx, row in historical_df.iterrows():
             try:

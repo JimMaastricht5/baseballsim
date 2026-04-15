@@ -128,11 +128,10 @@ class BaseballStatsPreProcess:
             "SO",
             "SH",
             "SF",
-            "BA",
             "GIDP",
             "HBP",
             "Condition",
-        ]  # these cols will get added to running season total
+        ]  # these cols will get added to running season total (BA is rate stat, not counting)
         self.numeric_pcols = [
             "G",
             "GS",
@@ -448,7 +447,13 @@ class BaseballStatsPreProcess:
             new_season_pitching_file = f"{self.new_season} New-Season-{f_pname_new}"
 
             # Check if existing file has games played - if so, preserve it
-            if os.path.exists(new_season_batting_file):
+            # Only preserve if current data has no valid games (all zeros from failed merge)
+            current_games = (
+                self.new_season_batting_data["G"].sum()
+                if "G" in self.new_season_batting_data.columns
+                else 0
+            )
+            if os.path.exists(new_season_batting_file) and current_games == 0:
                 existing_batting = pd.read_csv(
                     new_season_batting_file, index_col="Hashcode"
                 )
@@ -458,23 +463,26 @@ class BaseballStatsPreProcess:
                     else 0
                 )
                 if existing_games > 0:
-                    # Merge: add fresh zeros to existing stats
+                    # Preserve: copy existing stats to new_season_data
                     for col in self.numeric_bcols:
                         if (
                             col in self.new_season_batting_data.columns
                             and col in existing_batting.columns
                         ):
-                            self.new_season_batting_data[col] = (
-                                self.new_season_batting_data[col].fillna(0)
-                                + existing_batting[col].fillna(0)
-                            )
+                            self.new_season_batting_data[col] = existing_batting[
+                                col
+                            ].fillna(0)
                     # Preserve non-numeric columns from existing
                     for col in existing_batting.columns:
                         if col not in self.numeric_bcols:
                             self.new_season_batting_data[col] = existing_batting[col]
                     print(f"Preserved existing batting stats ({existing_games} games)")
 
-            if os.path.exists(new_season_pitching_file):
+            if os.path.exists(new_season_pitching_file) and (
+                self.new_season_pitching_data["G"].sum() == 0
+                if "G" in self.new_season_pitching_data.columns
+                else True
+            ):
                 existing_pitching = pd.read_csv(
                     new_season_pitching_file, index_col="Hashcode"
                 )
@@ -489,15 +497,16 @@ class BaseballStatsPreProcess:
                             col in self.new_season_pitching_data.columns
                             and col in existing_pitching.columns
                         ):
-                            self.new_season_pitching_data[col] = (
-                                self.new_season_pitching_data[col].fillna(0)
-                                + existing_pitching[col].fillna(0)
-                            )
+                            self.new_season_pitching_data[col] = existing_pitching[
+                                col
+                            ].fillna(0)
                     for col in existing_pitching.columns:
                         if col not in self.numeric_pcols:
                             self.new_season_pitching_data[col] = existing_pitching[col]
                     print(f"Preserved existing pitching stats ({existing_games} games)")
 
+            self.new_season_pitching_data.index.name = "Hashcode"
+            self.new_season_batting_data.index.name = "Hashcode"
             self.new_season_pitching_data.to_csv(
                 new_season_pitching_file, index=True, header=True
             )
@@ -2017,17 +2026,37 @@ class BaseballStatsPreProcess:
             for idx in self.new_season_pitching_data.index:
                 if idx in partial_pitch.index:
                     partial_row = partial_pitch.loc[idx]
-                    # Handle both Series and DataFrame access
                     g_val = partial_row["G"] if "G" in partial_row.index else None
                     if (
                         g_val is not None and pd.notna(g_val).any()
                         if hasattr(pd.notna(g_val), "any")
                         else pd.notna(g_val)
                     ):
+                        # Update team info from partial data (in case of mid-season trades)
+                        if "Team" in partial_row.index and pd.notna(
+                            partial_row.get("Team")
+                        ):
+                            self.new_season_pitching_data.loc[idx, "Team"] = (
+                                partial_row["Team"]
+                            )
+                        if "League" in partial_row.index and pd.notna(
+                            partial_row.get("League")
+                        ):
+                            self.new_season_pitching_data.loc[idx, "League"] = (
+                                partial_row["League"]
+                            )
+                        if "Division" in partial_row.index and pd.notna(
+                            partial_row.get("Division")
+                        ):
+                            self.new_season_pitching_data.loc[idx, "Division"] = (
+                                partial_row["Division"]
+                            )
                         self.new_season_pitching_data.loc[idx, "G"] = int(
-                            partial_row["G"]
+                            partial_row.get("G", 0)
                         )
-                        # IP can be decimal (e.g., 12.1 = 12 1/3 innings), store as float
+                        self.new_season_pitching_data.loc[idx, "GS"] = int(
+                            partial_row.get("GS", 0)
+                        )
                         ip_val = partial_row.get("IP", 0)
                         if pd.notna(ip_val):
                             self.new_season_pitching_data.at[idx, "IP"] = float(ip_val)
@@ -2052,20 +2081,98 @@ class BaseballStatsPreProcess:
                         self.new_season_pitching_data.loc[idx, "L"] = int(
                             partial_row.get("L", 0)
                         )
+                    else:
+                        # Player in partial data but no valid games - zero out
+                        self.new_season_pitching_data.loc[idx, self.numeric_pcols] = 0
+                        self.new_season_pitching_data.loc[
+                            idx,
+                            [
+                                "ERA",
+                                "WHIP",
+                                "OBP",
+                                "AVG_faced",
+                                "Total_OB",
+                                "Total_Outs",
+                                "AB",
+                                "HLD",
+                                "BS",
+                                "Injured Days",
+                            ],
+                        ] = 0
+                else:
+                    # Player not in partial data - zero out (hasn't pitched yet)
+                    self.new_season_pitching_data.loc[idx, self.numeric_pcols] = 0
+                    self.new_season_pitching_data.loc[
+                        idx,
+                        [
+                            "ERA",
+                            "WHIP",
+                            "OBP",
+                            "AVG_faced",
+                            "Total_OB",
+                            "Total_Outs",
+                            "AB",
+                            "HLD",
+                            "BS",
+                            "Injured Days",
+                        ],
+                    ] = 0
 
-        # Zero counting stats for simulation tracking (preserve ERA/WHIP/OBP)
-        self.new_season_pitching_data[self.numeric_pcols] = 0
-        self.new_season_pitching_data[
-            [
-                "AVG_faced",
-                "Total_OB",
-                "Total_Outs",
-                "AB",
-                "HLD",
-                "BS",
-                "Injured Days",
-            ]
-        ] = 0
+            # Recalculate derived stats from partial data
+            pp = self.new_season_pitching_data
+            pp["ERA"] = self.trunc_col(
+                np.nan_to_num(
+                    np.divide(pp["ER"] * 9, pp["IP"].replace(0, np.nan)),
+                    nan=0.0,
+                    posinf=0.0,
+                ),
+                2,
+            )
+            pp["WHIP"] = self.trunc_col(
+                np.nan_to_num(
+                    np.divide(pp["BB"] + pp["H"], pp["IP"].replace(0, np.nan)),
+                    nan=0.0,
+                    posinf=0.0,
+                ),
+                3,
+            )
+            pp["OBP"] = self.trunc_col(
+                np.nan_to_num(
+                    np.divide(pp["WHIP"], 3 + pp["WHIP"]), nan=0.0, posinf=0.0
+                ),
+                3,
+            )
+            pp["Total_OB"] = pp["H"] + pp["BB"]
+            pp["Total_Outs"] = pp["IP"] * 3
+            pp["AVG_faced"] = self.trunc_col(
+                np.nan_to_num(
+                    np.divide(
+                        pp["Total_OB"] + pp["Total_Outs"], pp["G"].replace(0, np.nan)
+                    ),
+                    nan=0.0,
+                    posinf=0.0,
+                ),
+                3,
+            )
+
+        else:
+            # Zero counting stats for simulation tracking (no partial data)
+            self.new_season_pitching_data[self.numeric_pcols] = 0
+            self.new_season_pitching_data[
+                [
+                    "ERA",
+                    "WHIP",
+                    "OBP",
+                    "AVG_faced",
+                    "Total_OB",
+                    "Total_Outs",
+                    "AB",
+                    "HLD",
+                    "BS",
+                    "Injured Days",
+                ]
+            ] = 0
+
         self.new_season_pitching_data["Condition"] = 100
         self.new_season_pitching_data["Streak_Adjustment"] = 0.0
         if (
@@ -2125,7 +2232,6 @@ class BaseballStatsPreProcess:
             for idx in self.new_season_batting_data.index:
                 if idx in partial_bat.index:
                     partial_row = partial_bat.loc[idx]
-                    # Handle both Series and DataFrame access
                     g_val = partial_row["G"] if "G" in partial_row.index else None
                     if (
                         g_val is not None and pd.notna(g_val).any()
@@ -2133,7 +2239,10 @@ class BaseballStatsPreProcess:
                         else pd.notna(g_val)
                     ):
                         self.new_season_batting_data.loc[idx, "G"] = int(
-                            partial_row["G"]
+                            partial_row.get("G", 0)
+                        )
+                        self.new_season_batting_data.loc[idx, "PA"] = int(
+                            partial_row.get("PA", 0)
                         )
                         self.new_season_batting_data.loc[idx, "AB"] = int(
                             partial_row.get("AB", 0)
@@ -2159,18 +2268,99 @@ class BaseballStatsPreProcess:
                         self.new_season_batting_data.loc[idx, "SB"] = int(
                             partial_row.get("SB", 0)
                         )
+                        self.new_season_batting_data.loc[idx, "CS"] = int(
+                            partial_row.get("CS", 0)
+                        )
                         self.new_season_batting_data.loc[idx, "2B"] = int(
                             partial_row.get("2B", 0)
                         )
                         self.new_season_batting_data.loc[idx, "3B"] = int(
                             partial_row.get("3B", 0)
                         )
+                        self.new_season_batting_data.loc[idx, "SH"] = int(
+                            partial_row.get("SH", 0)
+                        )
+                        self.new_season_batting_data.loc[idx, "SF"] = int(
+                            partial_row.get("SF", 0)
+                        )
+                        self.new_season_batting_data.loc[idx, "HBP"] = int(
+                            partial_row.get("HBP", 0)
+                        )
+                        self.new_season_batting_data.loc[idx, "GIDP"] = int(
+                            partial_row.get("GIDP", 0)
+                        )
+                        # Preserve team info from partial data (handles mid-season trades)
+                        team_val = partial_row.get("Team")
+                        if pd.notna(team_val):
+                            self.new_season_batting_data.loc[idx, "Team"] = team_val
+                        league_val = partial_row.get("League")
+                        if pd.notna(league_val):
+                            self.new_season_batting_data.loc[idx, "League"] = league_val
+                        division_val = partial_row.get("Division")
+                        if pd.notna(division_val):
+                            self.new_season_batting_data.loc[idx, "Division"] = (
+                                division_val
+                            )
+                    else:
+                        # Player in partial data but no valid games - zero out
+                        self.new_season_batting_data.loc[idx, self.numeric_bcols] = 0
+                        self.new_season_batting_data.loc[
+                            idx, ["AVG", "OBP", "SLG", "OPS", "Total_OB", "Total_Outs"]
+                        ] = 0
+                else:
+                    # Player not in partial data - zero out (hasn't played yet)
+                    self.new_season_batting_data.loc[idx, self.numeric_bcols] = 0
+                    self.new_season_batting_data.loc[
+                        idx, ["AVG", "OBP", "SLG", "OPS", "Total_OB", "Total_Outs"]
+                    ] = 0
 
-        # Zero counting stats for simulation tracking (preserve AVG/OBP/SLG/OPS)
-        self.new_season_batting_data[self.numeric_bcols] = 0
-        self.new_season_batting_data[["Total_OB", "Total_Outs", "Injured Days"]] = 0
+            # Recalculate derived stats from partial data
+            bp = self.new_season_batting_data
+            bp["AVG"] = self.trunc_col(
+                np.nan_to_num(
+                    np.divide(bp["H"], bp["AB"].replace(0, np.nan)), nan=0.0, posinf=0.0
+                ),
+                3,
+            )
+            bp["OBP"] = self.trunc_col(
+                np.nan_to_num(
+                    np.divide(
+                        bp["H"] + bp["BB"] + bp["HBP"],
+                        bp["AB"] + bp["BB"] + bp["HBP"] + bp["SF"].fillna(0),
+                    ),
+                    nan=0.0,
+                    posinf=0.0,
+                ),
+                3,
+            )
+            singles = bp["H"] - bp["2B"] - bp["3B"] - bp["HR"]
+            bp["SLG"] = self.trunc_col(
+                np.nan_to_num(
+                    np.divide(
+                        singles + bp["2B"] * 2 + bp["3B"] * 3 + bp["HR"] * 4,
+                        bp["AB"].replace(0, np.nan),
+                    ),
+                    nan=0.0,
+                    posinf=0.0,
+                ),
+                3,
+            )
+            bp["OPS"] = self.trunc_col(
+                np.nan_to_num(bp["OBP"] + bp["SLG"], nan=0.0, posinf=0.0), 3
+            )
+            bp["Total_OB"] = bp["H"] + bp["BB"] + bp["HBP"]
+            bp["Total_Outs"] = bp["AB"] - bp["H"]
+
+        else:
+            # Zero counting stats for simulation tracking (no partial data)
+            self.new_season_batting_data[self.numeric_bcols] = 0
+            self.new_season_batting_data[
+                ["AVG", "OBP", "SLG", "OPS", "Total_OB", "Total_Outs"]
+            ] = 0
+
         self.new_season_batting_data["Condition"] = 100
         self.new_season_batting_data["Streak_Adjustment"] = 0.0
+        self.new_season_batting_data["Injured Days"] = 0
 
         # Ensure historical data includes partial season
         if partial_season_data is not None:

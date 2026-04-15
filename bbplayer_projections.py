@@ -2407,25 +2407,52 @@ class BaseballStatsPreProcess:
     def _merge_partial_season_to_historical(self, partial_data: dict) -> None:
         """
         Merge partial season data into historical DataFrames.
+        The partial season is determined from max(load_seasons).
         """
+        max_season = max(self.load_seasons)
+
         if "pitching" in partial_data and not partial_data["pitching"].empty:
+            # Drop existing rows for the partial season (they'll be replaced)
+            if "Season" in self.pitching_data_historical.columns:
+                self.pitching_data_historical = self.pitching_data_historical[
+                    self.pitching_data_historical["Season"] != max_season
+                ]
             # Add required columns if missing
             for col in ["Streak_Adjustment", "Projection_Trusted"]:
                 if col not in partial_data["pitching"].columns:
                     partial_data["pitching"][col] = (
                         0 if col == "Streak_Adjustment" else False
                     )
+            # Fix index: create proper Player_Season_Key format
+            partial_data["pitching"]["Player_Season_Key"] = (
+                partial_data["pitching"].index.astype(str) + "_" + str(max_season)
+            )
+            partial_data["pitching"] = partial_data["pitching"].set_index(
+                "Player_Season_Key"
+            )
             self.pitching_data_historical = pd.concat(
                 [self.pitching_data_historical, partial_data["pitching"]], axis=0
             )
 
         if "batting" in partial_data and not partial_data["batting"].empty:
+            # Drop existing rows for the partial season (they'll be replaced)
+            if "Season" in self.batting_data_historical.columns:
+                self.batting_data_historical = self.batting_data_historical[
+                    self.batting_data_historical["Season"] != max_season
+                ]
             # Add required columns if missing
             for col in ["Streak_Adjustment", "Projection_Trusted"]:
                 if col not in partial_data["batting"].columns:
                     partial_data["batting"][col] = (
                         0 if col == "Streak_Adjustment" else False
                     )
+            # Fix index: create proper Player_Season_Key format
+            partial_data["batting"]["Player_Season_Key"] = (
+                partial_data["batting"].index.astype(str) + "_" + str(max_season)
+            )
+            partial_data["batting"] = partial_data["batting"].set_index(
+                "Player_Season_Key"
+            )
             self.batting_data_historical = pd.concat(
                 [self.batting_data_historical, partial_data["batting"]], axis=0
             )

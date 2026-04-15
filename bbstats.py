@@ -377,13 +377,6 @@ class BaseballStats:
 
         self.league_pitching_totals = team_pitching_totals(self.pitching_data)
 
-        # Cache additional league-wide statistics used in SimAB
-        # batting_data_sum = self.batting_data[['H', 'BB', 'HBP']].sum()
-        # self.league_batting_total_ob = batting_data_sum['H'] + batting_data_sum['BB'] + batting_data_sum['HBP']
-        # self.league_pitching_total_ob = self.pitching_data[['H', 'BB']].sum().sum()
-        # self.league_total_outs = self.batting_data['AB'].sum() - batting_data_sum.sum()
-        # self.league_k_rate_per_ab = self.batting_data['SO'].sum() / self.league_total_outs
-
         # Correct denominators ensure the Odds Ratio is comparing Apples to Apples
         # --- 1. BATTER LEAGUE TOTALS (The Hitter Baseline) ---
         # Correct OBP events
@@ -399,7 +392,7 @@ class BaseballStats:
             + b_totals["SH"]
         )
 
-        # NEW: Explicitly set the baseline OBP for SimAB to use
+        # Explicitly set the baseline OBP for SimAB to use
         self.league_batting_obp = self.league_batting_total_ob / self.league_pa_batting
 
         # Correct Outs (Every out that isn't a K is a ball-in-play out)
@@ -421,7 +414,6 @@ class BaseballStats:
             p_totals = self.pitching_data[["IP", "H", "BB", "HBP", "SO", "HR"]].sum()
 
         # Convert IP (decimal) to actual Outs to avoid the "IP * 3" rounding error
-        # (IP.floor * 3) + (decimal_remainder * 10)
         p_outs = (np.floor(p_totals["IP"]) * 3) + (np.round(p_totals["IP"] % 1 * 10))
 
         # Batters Faced (BF) = Outs + Hits + Walks + HBP
@@ -526,18 +518,6 @@ class BaseballStats:
 
         df = team_batting_stats(df, filter_stats=False)
         df = self.add_missing_cols(df)
-
-        # DEBUG: Log sample data to verify no projection data leaking
-        # if not df.empty:
-        #     sample = df[df["PA"] > 0].head(3)
-        #     if not sample.empty:
-        #         logger.info(
-        #             f"get_simulated_batting_data sample (PA>0): "
-        #             f"{sample[['Player', 'Team', 'PA', 'AB', 'H', 'AVG']].to_string()}"
-        #         )
-        #     else:
-        #         logger.info("get_simulated_batting_data: No players with PA > 0")
-
         return df
 
     def get_simulated_pitching_data(self, team_name: Optional[str] = None) -> DataFrame:

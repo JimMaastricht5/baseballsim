@@ -1064,8 +1064,26 @@ class LeagueStatsWidget:
             projected_row = self.baseball_data.get_player_projected_data(
                 player_name, is_batter
             )
+
+            # Get current season stats (partial + simulation accumulated)
+            current_season_row = None
+            if is_batter:
+                batting_df = self.baseball_data.get_batting_data(
+                    team_name=None, prior_season=False
+                )
+                matches = batting_df[batting_df["Player"] == player_name]
+                if not matches.empty:
+                    current_season_row = matches.iloc[0]
+            else:
+                pitching_df = self.baseball_data.get_pitching_data(
+                    team_name=None, prior_season=False
+                )
+                matches = pitching_df[pitching_df["Player"] == player_name]
+                if not matches.empty:
+                    current_season_row = matches.iloc[0]
+
             self._show_history_popup(
-                player_name, historical_df, is_batter, projected_row
+                player_name, historical_df, is_batter, projected_row, current_season_row
             )
 
         except Exception as e:
@@ -1075,16 +1093,25 @@ class LeagueStatsWidget:
             logger.error(traceback.format_exc())
 
     def _show_history_popup(
-        self, player_name: str, historical_df, is_batter: bool, projected_row=None
+        self,
+        player_name: str,
+        historical_df,
+        is_batter: bool,
+        projected_row=None,
+        current_season_row=None,
     ):
         """
-        Open a popup window showing player historical stats with projected row at top.
+        Open a popup window showing player stats:
+        - Projected row at top (from projection files)
+        - Current season (2026) accumulated stats
+        - Historical seasons below
 
         Args:
             player_name: Player name for window title
-            historical_df: DataFrame with historical stats
+            historical_df: DataFrame with historical stats (excluding current season)
             is_batter: True for batting columns, False for pitching columns
             projected_row: Optional Series with projected new-season stats
+            current_season_row: Optional Series with current season accumulated stats
         """
         popup = tk.Toplevel()
         popup.title(f"{player_name} - Historical Stats")
@@ -1237,10 +1264,53 @@ class LeagueStatsWidget:
             except Exception as e:
                 logger.warning(f"Error inserting projected row: {e}")
 
-        # Filter out current season from historical (projected row shows current season)
-        current_season = getattr(self.baseball_data, "new_season", None)
-        if current_season and "Season" in historical_df.columns:
-            historical_df = historical_df[historical_df["Season"] != current_season]
+        # Insert current season (2026) accumulated stats
+        if current_season_row is not None:
+            try:
+                r = current_season_row
+                if is_batter:
+                    avg_val = r.get("AVG", r.get("BA", 0))
+                    values = (
+                        "2026",
+                        r.get("Team", ""),
+                        int(r.get("Age", 0)),
+                        int(r.get("G", 0)),
+                        int(r.get("AB", 0)),
+                        int(r.get("R", 0)),
+                        int(r.get("H", 0)),
+                        int(r.get("2B", 0)),
+                        int(r.get("3B", 0)),
+                        int(r.get("HR", 0)),
+                        int(r.get("RBI", 0)),
+                        int(r.get("BB", 0)),
+                        int(r.get("SO", 0)),
+                        f"{float(avg_val):.3f}",
+                        f"{float(r.get('OBP', 0)):.3f}",
+                        f"{float(r.get('SLG', 0)):.3f}",
+                        f"{float(r.get('OPS', 0)):.3f}",
+                    )
+                else:
+                    values = (
+                        "2026",
+                        r.get("Team", ""),
+                        int(r.get("Age", 0)),
+                        int(r.get("G", 0)),
+                        int(r.get("GS", 0)),
+                        f"{float(r.get('IP', 0)):.1f}",
+                        int(r.get("W", 0)),
+                        int(r.get("L", 0)),
+                        int(r.get("H", 0)),
+                        int(r.get("R", 0)),
+                        int(r.get("ER", 0)),
+                        int(r.get("HR", 0)),
+                        int(r.get("BB", 0)),
+                        int(r.get("SO", 0)),
+                        f"{float(r.get('ERA', 0)):.2f}",
+                        f"{float(r.get('WHIP', 0)):.2f}",
+                    )
+                tree.insert("", tk.END, values=values)
+            except Exception as e:
+                logger.warning(f"Error inserting current season row: {e}")
 
         for idx, row in historical_df.iterrows():
             try:

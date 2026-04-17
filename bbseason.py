@@ -28,6 +28,7 @@ Contact: JimMaastricht5@gmail.com
 """
 
 import datetime
+import os
 import queue
 import random
 import threading
@@ -177,26 +178,27 @@ LOSS = 1
 
 class BaseballSeason:
     def __init__(
-        self,
-        load_seasons: List[int],
-        new_season: int,
-        team_list: Optional[list] = None,
-        season_length: int = 6,
-        series_length: int = 3,
-        rotation_len: int = 5,
-        include_leagues: list = None,
-        season_interactive: bool = False,
-        season_print_lineup_b: bool = False,
-        season_print_box_score_b: bool = False,
-        season_chatty: bool = False,
-        season_team_to_follow: Optional[List[str]] = None,
-        load_batter_file: str = "player-projected-stats-pp-Batting.csv",
-        load_pitcher_file: str = "player-projected-stats-pp-Pitching.csv",
-        schedule: list = None,
-        suppress_console_output: bool = False,
-        obp_adjustment: float = None,
-        output_handler: Optional[OutputHandlerType] = None,
-        play_by_play_callback_factory: Optional[PlayByPlayCallbackFactory] = None,
+            self,
+            load_seasons: List[int],
+            new_season: int,
+            team_list: Optional[list] = None,
+            season_length: int = 6,
+            series_length: int = 3,
+            rotation_len: int = 5,
+            include_leagues: list = None,
+            season_interactive: bool = False,
+            season_print_lineup_b: bool = False,
+            season_print_box_score_b: bool = False,
+            season_chatty: bool = False,
+            season_team_to_follow: Optional[List[str]] = None,
+            load_batter_file: str = "player-projected-stats-pp-Batting.csv",
+            load_pitcher_file: str = "player-projected-stats-pp-Pitching.csv",
+            schedule: list = None,
+            load_schedule_file: str = None,
+            suppress_console_output: bool = False,
+            obp_adjustment: float = None,
+            output_handler: Optional[OutputHandlerType] = None,
+            play_by_play_callback_factory: Optional[PlayByPlayCallbackFactory] = None,
     ) -> None:
         """
         :param load_seasons: list of seasons to load for stats, can blend multiple seasons
@@ -254,9 +256,13 @@ class BaseballSeason:
         if len(self.teams) % 2 == 1:  # odd number of teams
             self.teams.append("OFF DAY")
 
+        # Initialize schedule date/time data before create_schedule is called
+        self.schedule_dates = []  # Date string for each day (e.g., "2026-04-16")
+        self.schedule_times = {}  # {(away, home): "7:10 PM"} for scheduled games
+
         self.schedule = [] if schedule is None else schedule
         if schedule is None:
-            self.create_schedule()  # set schedule if not passed
+            self.create_schedule(csv_path=load_schedule_file)  # set schedule if not passed
 
         # Initialize team standings from partial season data
         self.team_win_loss = {}
@@ -292,16 +298,105 @@ class BaseballSeason:
     def get_team_names(self) -> list:
         return self.teams
 
-    def create_schedule(self) -> None:
+    def get_date_for_day(self, day_num: int) -> str:
+        """Return formatted date string (e.g., 'April 16, 2026')."""
+        if day_num < len(self.schedule_dates):
+            dt = datetime.datetime.strptime(self.schedule_dates[day_num], "%Y-%m-%d")
+            return dt.strftime("%B %d, %Y")
+        return f"Day {day_num + 1}"
+
+    def get_time_for_game(self, away: str, home: str) -> str:
+        """Return 12-hour time string or empty string."""
+        return self.schedule_times.get((away, home), "")
+
+    def get_current_date_display(self) -> str:
+        """Return today's date formatted for display."""
+        return datetime.datetime.now().strftime("%B %d, %Y")
+
+    def _convert_time_to_12hr(self, time_24h: str) -> str:
+        """Convert '14:10' to '2:10 PM'."""
+        try:
+            dt = datetime.datetime.strptime(time_24h, "%H:%M")
+            return dt.strftime("%-I:%M %p").lstrip("0")
+        except ValueError:
+            return time_24h
+
+    def load_schedule_from_csv(self, csv_path: str = None) -> bool:
+        """Load schedule from downloaded CSV file.
+
+        Priority:
+        1. Use provided csv_path parameter
+        2. Check for default file "{new_season} MLB Schedule.csv"
+        3. Return False if not found
+
+        Returns:
+            True if loaded successfully, False otherwise
         """
-        set the schedule for the seasons using the teams, series length, min games in season, and limit of games
-        Ensures every team plays exactly self.season_length games by ignoring 'OFF' days in the count.
-          ([['MIL', 'COL'], ['PIT', 'CIN'], ['CHC', 'STL']])  # test schedule
-          if there are an odd number of teams there may be an "OFF" day in the schedule
-          :return: None
+        if csv_path is None:
+            csv_path = f"{self.new_season} MLB Schedule.csv"
+
+        if not os.path.exists(csv_path):
+            logger.debug(f"Schedule CSV not found: {csv_path}")
+            return False
+
+        df = pd.read_csv(csv_path)
+        valid_teams = set(self.baseball_data.get_all_team_names())
+        today = datetime.datetime.now().strftime("%Y-%m-%d")
+
+        self.schedule = []
+        self.schedule_dates = []
+        self.schedule_times = {}
+
+        for date in sorted(df["Date"].unique()):
+            if date < today:
+                continue
+
+            day_games = df[df["Date"] == date]
+            day_schedule = []
+
+            for _, row in day_games.iterrows():
+                away, home = row["Away_Team"], row["Home_Team"]
+
+                if away not in valid_teams or home not in valid_teams:
+                    logger.warning(f"Skipping game: {away} @ {home} - team not found")
+                    continue
+
+                day_schedule.append([home, away])
+
+                if pd.notna(row["Time"]) and row["Time"]:
+                    time_12h = self._convert_time_to_12hr(str(row["Time"]))
+                    self.schedule_times[(away, home)] = time_12h
+
+            if day_schedule:
+                self.schedule.append(day_schedule)
+                self.schedule_dates.append(date)
+
+        logger.info(f"Loaded {len(self.schedule)} days from {csv_path}")
+        return True
+
+    def create_schedule(self, schedule: list = None, csv_path: str = None) -> None:
         """
-        # 1. Setup
-        # Remove any existing 'OFF DAY' to prevent double-counting or odd lists
+        Create or load schedule for the season.
+
+        Priority:
+        1. Use provided schedule list (existing behavior)
+        2. Load from CSV file (csv_path or default "{year} MLB Schedule.csv")
+        3. Generate random schedule (existing behavior)
+
+        Args:
+            schedule: Optional pre-built schedule (pass-through, uses as-is)
+            csv_path: Optional path to CSV schedule file
+        """
+        # 1. If schedule list provided, use it
+        if schedule is not None:
+            self.schedule = schedule
+            return
+
+        # 2. Try to load from CSV
+        if self.load_schedule_from_csv(csv_path):
+            return
+
+        # 3. Generate random schedule
         teams_list = [t for t in self.teams if t != "OFF DAY"]
         target_games = self.season_length
 
@@ -389,7 +484,7 @@ class BaseballSeason:
         if games:
             games_per_line = 5
             for i in range(0, len(games), games_per_line):
-                line_games = games[i : i + games_per_line]
+                line_games = games[i: i + games_per_line]
                 schedule_str += "   ".join(line_games) + "\n"
 
         # Print off day at the end
@@ -433,8 +528,8 @@ class BaseballSeason:
         teams_per_col = (n_teams + 2) // 3  # Round up to distribute evenly
 
         col1 = display_df.iloc[:teams_per_col].reset_index(drop=True)
-        col2 = display_df.iloc[teams_per_col : teams_per_col * 2].reset_index(drop=True)
-        col3 = display_df.iloc[teams_per_col * 2 :].reset_index(drop=True)
+        col2 = display_df.iloc[teams_per_col: teams_per_col * 2].reset_index(drop=True)
+        col3 = display_df.iloc[teams_per_col * 2:].reset_index(drop=True)
 
         # Build standings text
         standings_text = f"{'Team':<5} {'W-L':<8} {'Pct':<6} {'GB':<5}   {'Team':<5} {'W-L':<8} {'Pct':<6} {'GB':<5}   {'Team':<5} {'W-L':<8} {'Pct':<6} {'GB':<5}\n"
@@ -1269,23 +1364,23 @@ class BaseballSeason:
 
 class MultiBaseballSeason:
     def __init__(
-        self,
-        load_seasons: List[int],
-        new_season: int,
-        team_lists: Optional[list] = None,
-        season_length: int = 6,
-        series_length: int = 3,
-        rotation_len: int = 5,
-        majors_minors: list = None,
-        season_interactive: bool = False,
-        season_print_lineup_b: bool = False,
-        season_print_box_score_b: bool = False,
-        season_chatty: bool = False,
-        season_team_to_follow: Optional[List[str]] = None,
-        load_batter_file: str = "stats-pp-Batting.csv",
-        load_pitcher_file: str = "stats-pp-Pitching.csv",
-        output_handler: Optional[OutputHandlerType] = None,
-        play_by_play_callback_factory: Optional[PlayByPlayCallbackFactory] = None,
+            self,
+            load_seasons: List[int],
+            new_season: int,
+            team_lists: Optional[list] = None,
+            season_length: int = 6,
+            series_length: int = 3,
+            rotation_len: int = 5,
+            majors_minors: list = None,
+            season_interactive: bool = False,
+            season_print_lineup_b: bool = False,
+            season_print_box_score_b: bool = False,
+            season_chatty: bool = False,
+            season_team_to_follow: Optional[List[str]] = None,
+            load_batter_file: str = "stats-pp-Batting.csv",
+            load_pitcher_file: str = "stats-pp-Pitching.csv",
+            output_handler: Optional[OutputHandlerType] = None,
+            play_by_play_callback_factory: Optional[PlayByPlayCallbackFactory] = None,
     ) -> None:
         """
         :param load_seasons: list of seasons to load for stats, can blend multiple seasons
@@ -1477,6 +1572,7 @@ if __name__ == "__main__":
             season_team_to_follow=my_team_to_follow,
             load_batter_file="player-projected-stats-pp-Batting.csv",  # 'random-player-projected-stats-pp-Batting.csv',
             load_pitcher_file="player-projected-stats-pp-Pitching.csv",
+            load_schedule_file="2026 MLB Schedule.csv"
         )
         # schedule=series_schedule)
         bbseasonSS.sim_full_season()

@@ -41,6 +41,7 @@ import pandas as pd
 import bb_aigm_manager
 import bbgame
 import bbstats
+import bbschedule_mgr
 from bblogger import logger
 
 OutputHandlerType = Callable[[str, str, Optional[Dict[str, Any]]], None]
@@ -256,13 +257,14 @@ class BaseballSeason:
         if len(self.teams) % 2 == 1:  # odd number of teams
             self.teams.append("OFF DAY")
 
-        # Initialize schedule date/time data before create_schedule is called
-        self.schedule_dates = []  # Date string for each day (e.g., "2026-04-16")
-        self.schedule_times = {}  # {(away, home): "7:10 PM"} for scheduled games
+        # Initialize schedule manager
+        self.schedule_manager = bbschedule_mgr.ScheduleManager(
+            self.baseball_data, self.new_season
+        )
 
         self.schedule = [] if schedule is None else schedule
         if schedule is None:
-            self.create_schedule(csv_path=load_schedule_file)  # set schedule if not passed
+            self.create_schedule(csv_path=load_schedule_file)
 
         # Initialize team standings from partial season data
         self.team_win_loss = {}
@@ -273,9 +275,11 @@ class BaseballSeason:
             self.team_win_loss[team] = wins_losses
             self.team_games_played[team] = wins_losses[0] + wins_losses[1]
 
-        # Set season day to max games played (from partial season)
-        if self.team_games_played:
-            self.season_day_num = max(self.team_games_played.values())
+        # Find starting position using ScheduleManager
+        self.season_day_num = self.schedule_manager.find_start_day(
+            self.team_win_loss, 
+            self.team_to_follow
+        )
 
         # Link team_games_played to baseball_data for prorated 2025 stats (Phase 2: Stats Enhancement)
         self.baseball_data.team_games_played = self.team_games_played
@@ -299,80 +303,20 @@ class BaseballSeason:
         return self.teams
 
     def get_date_for_day(self, day_num: int) -> str:
-        """Return formatted date string (e.g., 'April 16, 2026')."""
-        if day_num < len(self.schedule_dates):
-            dt = datetime.datetime.strptime(self.schedule_dates[day_num], "%Y-%m-%d")
-            return dt.strftime("%B %d, %Y")
-        return f"Day {day_num + 1}"
+        """Return formatted date string for schedule index (e.g., 'April 16, 2026')."""
+        return self.schedule_manager.get_date_for_index(day_num)
+
+    def get_current_schedule_index(self) -> int:
+        """Return the schedule index for current simulation day."""
+        return self.season_day_num
 
     def get_time_for_game(self, away: str, home: str) -> str:
         """Return 12-hour time string or empty string."""
-        return self.schedule_times.get((away, home), "")
+        return self.schedule_manager.get_time_for_game(away, home)
 
     def get_current_date_display(self) -> str:
         """Return today's date formatted for display."""
         return datetime.datetime.now().strftime("%B %d, %Y")
-
-    def _convert_time_to_12hr(self, time_24h: str) -> str:
-        """Convert '14:10' to '2:10 PM'."""
-        try:
-            dt = datetime.datetime.strptime(time_24h, "%H:%M")
-            return dt.strftime("%-I:%M %p").lstrip("0")
-        except ValueError:
-            return time_24h
-
-    def load_schedule_from_csv(self, csv_path: str = None) -> bool:
-        """Load schedule from downloaded CSV file.
-
-        Priority:
-        1. Use provided csv_path parameter
-        2. Check for default file "{new_season} MLB Schedule.csv"
-        3. Return False if not found
-
-        Returns:
-            True if loaded successfully, False otherwise
-        """
-        if csv_path is None:
-            csv_path = f"{self.new_season} MLB Schedule.csv"
-
-        if not os.path.exists(csv_path):
-            logger.debug(f"Schedule CSV not found: {csv_path}")
-            return False
-
-        df = pd.read_csv(csv_path)
-        valid_teams = set(self.baseball_data.get_all_team_names())
-        today = datetime.datetime.now().strftime("%Y-%m-%d")
-
-        self.schedule = []
-        self.schedule_dates = []
-        self.schedule_times = {}
-
-        for date in sorted(df["Date"].unique()):
-            if date < today:
-                continue
-
-            day_games = df[df["Date"] == date]
-            day_schedule = []
-
-            for _, row in day_games.iterrows():
-                away, home = row["Away_Team"], row["Home_Team"]
-
-                if away not in valid_teams or home not in valid_teams:
-                    logger.warning(f"Skipping game: {away} @ {home} - team not found")
-                    continue
-
-                day_schedule.append([home, away])
-
-                if pd.notna(row["Time"]) and row["Time"]:
-                    time_12h = self._convert_time_to_12hr(str(row["Time"]))
-                    self.schedule_times[(away, home)] = time_12h
-
-            if day_schedule:
-                self.schedule.append(day_schedule)
-                self.schedule_dates.append(date)
-
-        logger.info(f"Loaded {len(self.schedule)} days from {csv_path}")
-        return True
 
     def create_schedule(self, schedule: list = None, csv_path: str = None) -> None:
         """
@@ -392,71 +336,17 @@ class BaseballSeason:
             self.schedule = schedule
             return
 
-        # 2. Try to load from CSV
-        if self.load_schedule_from_csv(csv_path):
+        # 2. Try to load from CSV via schedule_manager
+        if self.schedule_manager.load_from_csv(csv_path):
+            # Sync schedule data from manager
+            self.schedule = self.schedule_manager.schedule
+            self.schedule_dates = self.schedule_manager.schedule_dates
+            self.schedule_times = self.schedule_manager.schedule_times
             return
 
         # 3. Generate random schedule
-        teams_list = [t for t in self.teams if t != "OFF DAY"]
-        target_games = self.season_length
-
-        # Round Robin requires an even number of participants
-        if len(teams_list) % 2 != 0:
-            teams_list.append("OFF")
-
-        num_teams = len(teams_list)
-        num_rounds = num_teams - 1
-
-        # Use the first real team to track progress
-        tracking_team = [t for t in teams_list if t != "OFF"][0]
-        games_scheduled_for_tracker = 0
-
-        self.schedule = []
-        random.shuffle(teams_list)
-
-        # 2. Main Loop: Continue until the tracking team has scheduled 162 ACTUAL games
-        while games_scheduled_for_tracker < target_games:
-            # Perform one full Round-Robin rotation (everyone plays everyone once)
-            for _ in range(num_rounds):
-                # Generate pairs for this specific rotation round
-                round_pairs = []
-                tracker_has_game_this_round = False
-
-                for i in range(num_teams // 2):
-                    home = teams_list[i]
-                    away = teams_list[num_teams - 1 - i]
-
-                    # If the tracking team is playing a REAL team, count it
-                    if tracking_team in (home, away) and "OFF" not in (home, away):
-                        tracker_has_game_this_round = True
-
-                    # Add to pairings; translate "OFF" to "OFF DAY" for your print logic
-                    if home == "OFF":
-                        round_pairs.append([away, "OFF DAY"])
-                    elif away == "OFF":
-                        round_pairs.append([home, "OFF DAY"])
-                    else:
-                        round_pairs.append([home, away])
-
-                # 3. Add the series (usually 3 games) to the schedule
-                for _ in range(self.series_length):
-                    # Check if we still need games for the tracker
-                    if games_scheduled_for_tracker < target_games:
-                        self.schedule.append(round_pairs)
-
-                        # Only increment the game count if the tracker isn't on an OFF day
-                        if tracker_has_game_this_round:
-                            games_scheduled_for_tracker += 1
-                    else:
-                        # Tracker is full, but we stop here to keep team schedules aligned
-                        break
-
-                # 4. Rotate teams (Circle Method: keep index 0 fixed, rotate the rest)
-                # [A, B, C, D] -> [A, D, B, C]
-                teams_list = [teams_list[0]] + [teams_list[-1]] + teams_list[1:-1]
-
-                if games_scheduled_for_tracker >= target_games:
-                    break
+        self.schedule_manager.create_random(self.teams, self.season_length, self.series_length)
+        self.schedule = self.schedule_manager.schedule
         return
 
     def print_day_schedule(self, day: int) -> str:
@@ -1043,6 +933,12 @@ class BaseballSeason:
         )
         for match_up in todays_games:  # run all games for a day, day starts at zero
             if "OFF DAY" not in match_up:  # not an off day
+                # Skip already completed games (check using CSV data)
+                away, home = match_up[0], match_up[1]
+                if self.schedule_manager.is_game_completed(away, home):
+                    self.output_handler(OutputCategory.SIM_PROGRESS, f"Skipping {away} @ {home} (already played)\n", metadata=None)
+                    continue
+
                 # Create play-by-play callback if factory is provided
                 pbp_callback = None
                 if self.play_by_play_callback_factory:

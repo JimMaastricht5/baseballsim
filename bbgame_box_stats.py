@@ -16,7 +16,7 @@ Contact: JimMaastricht5@gmail.com
 import pandas as pd
 import bbstats
 import numpy as np
-from at_bat import OutCome
+from bbat_bat import OutCome
 from numpy import float64, int32, int64
 from pandas.core.frame import DataFrame
 from pandas.core.series import Series

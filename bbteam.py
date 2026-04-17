@@ -12,7 +12,7 @@ PRIMARY CLASS:
 - Team: Represents a single team, managing its roster, calculating dynamic lineups
   and rotations, tracking pitcher fatigue, and handling in-game substitutions.
 
-DEPENDENCIES: pandas, gameteamboxstats, bbstats, bblogger.
+DEPENDENCIES: pandas, bbgame_box_stats, bbstats, bblogger.
 
 Contact: JimMaastricht5@gmail.com
 """
@@ -20,7 +20,7 @@ Contact: JimMaastricht5@gmail.com
 import pandas as pd
 from dotenv.parser import Position
 
-import gameteamboxstats
+import bbgame_box_stats
 import bbstats
 import numpy as np
 from numpy import bool_, float64, int32, int64
@@ -308,7 +308,7 @@ class Team:
             self.print_available_pitchers(
                 include_starters=False, current_season_stats=current_season_stats
             )
-        self.box_score = gameteamboxstats.TeamBoxScore(
+        self.box_score = bbgame_box_stats.TeamBoxScore(
             self.gameplay_lineup_df, self.gameplay_pitching_df, self.team_name
         )
         return self.lineup_card
@@ -1077,7 +1077,7 @@ class Team:
             )  # insert new player
             self.cur_lineup_index_list.remove(cur_player_index)  # remove old player
             self.set_prior_and_new_pos_player_batting_bench_dfs()
-            self.box_score = gameteamboxstats.TeamBoxScore(
+            self.box_score = bbgame_box_stats.TeamBoxScore(
                 self.gameplay_lineup_df, self.gameplay_pitching_df, self.team_name
             )  # update box score
         else:

@@ -127,7 +127,7 @@ class SeasonWorker(threading.Thread):
                 ],  # Convert single string to single-element list
                 load_batter_file="player-projected-stats-pp-Batting.csv",
                 load_pitcher_file="player-projected-stats-pp-Pitching.csv",
-                schedule=None,  # Let it generate schedule
+                load_schedule_file=f"{self.new_season} MLB Schedule.csv",  # Load from downloaded schedule
                 suppress_console_output=True,  # Suppress disabled list and hot/cold list prints for UI
                 obp_adjustment=self.obp_adjustment,
             )

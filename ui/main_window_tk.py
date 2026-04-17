@@ -838,9 +838,16 @@ F1     - Show this help"""
                 schedule = [(m[0], m[1]) for m in current_day_games if "OFF DAY" not in m]
                 self.games_widget.on_day_started(start_day, schedule)
                 # Update schedule widget
-                self.schedule_widget.update_schedule(start_day, worker.season.schedule)
+                self.schedule_widget.update_schedule(
+                    start_day,
+                    worker.season.schedule,
+                    worker.season.schedule_times,
+                    worker.season.schedule_dates
+                )
                 # Update day label to reflect partial season start
-                self.day_label.config(text=f"Day: {start_day + 1} / {self.season_length}")
+                date_str = worker.season.get_date_for_day(start_day)
+                games_played = max(worker.season.team_games_played.values())
+                self.day_label.config(text=f"{date_str} Day {start_day + 1} of 162")
                 # Show partial season standings
                 standings_data = worker.season.extract_standings()
                 followed_team = worker.team_to_follow
@@ -874,13 +881,25 @@ F1     - Show this help"""
             self.games_widget.on_day_started(day_num, schedule)
 
             # Update schedule widget
-            self.schedule_widget.update_schedule(day_num, worker.season.schedule)
+            self.schedule_widget.update_schedule(
+                day_num,
+                worker.season.schedule,
+                worker.season.schedule_times,
+                worker.season.schedule_dates
+            )
 
         # Update progress bar
         self.progress_bar["value"] = day_num + 1
         progress_pct = int((day_num + 1) / self.season_length * 100)
         self.progress_label.config(text=f"{progress_pct}%")
-        self.day_label.config(text=f"Day: {day_num + 1} / {self.season_length}")
+        # Update day label with date and games played
+        worker = self.controller.get_worker()
+        if worker and worker.season:
+            # Use schedule index for date, day_num for counter
+            sched_idx = worker.season.get_current_schedule_index()
+            date_str = worker.season.get_date_for_day(sched_idx)
+            games_played = max(worker.season.team_games_played.values())
+            self.day_label.config(text=f"{date_str} Day {day_num + 1} of 162")
 
         # Update ETA
         if self.simulation_start_time is not None and day_num > 0:
@@ -902,6 +921,9 @@ F1     - Show this help"""
 
         # Update games widget (progressive update) - regular season only
         self.games_widget.on_game_completed(game_data)
+
+        # Update schedule widget with completed game
+        self.schedule_widget.on_game_completed(game_data)
 
         # If there's a game_recap, add to games_played widget
         if game_data.get("game_recap") and game_data.get("day_num") is not None:

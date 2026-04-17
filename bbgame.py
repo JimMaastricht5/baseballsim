@@ -16,18 +16,20 @@ DEPENDENCIES: bbstats, bbteam, at_bat, bbbaserunners, bblogger.
 Contact: JimMaastricht5@gmail.com
 """
 
+import datetime
+import queue
+import random
+from typing import List, Tuple, Optional, Dict, ClassVar
+
+import numpy as np
+import pandas as pd
+from pandas.core.series import Series
+from pydantic import BaseModel, Field
+
+import bbat_bat as at_bat
+import bbbaserunners
 import bbstats
 import bbteam
-import pandas as pd
-import at_bat
-import numpy as np
-import random
-import bbbaserunners
-import datetime
-from pandas.core.series import Series
-from typing import List, Tuple, Optional, Dict, Any, ClassVar
-from pydantic import BaseModel, Field
-import queue
 from bblogger import logger
 from ui.models.game_data import AWAY, HOME, InningRow, InningScore
 
@@ -332,27 +334,27 @@ class GameRecap(BaseModel):
 
 class Game:
     def __init__(
-        self,
-        away_team_name: str = "",
-        home_team_name: str = "",
-        baseball_data=None,
-        game_num: int = 1,
-        rotation_len: int = 5,
-        print_lineup: bool = False,
-        chatty: bool = False,
-        print_box_score_b: bool = False,
-        team_to_follow: Optional[List[str]] = None,
-        load_seasons: List[int] = 2025,
-        new_season: int = 2026,
-        starting_pitchers: None = None,
-        starting_lineups: None = None,
-        load_batter_file: str = "player-stats-Batters.csv",
-        load_pitcher_file: str = "player-stats-Pitching.csv",
-        interactive: bool = False,
-        show_bench: bool = False,
-        debug: bool = False,
-        play_by_play_callback=None,
-        obp_adjustment=None,
+            self,
+            away_team_name: str = "",
+            home_team_name: str = "",
+            baseball_data=None,
+            game_num: int = 1,
+            rotation_len: int = 5,
+            print_lineup: bool = False,
+            chatty: bool = False,
+            print_box_score_b: bool = False,
+            team_to_follow: Optional[List[str]] = None,
+            load_seasons: List[int] = 2025,
+            new_season: int = 2026,
+            starting_pitchers: None = None,
+            starting_lineups: None = None,
+            load_batter_file: str = "player-stats-Batters.csv",
+            load_pitcher_file: str = "player-stats-Pitching.csv",
+            interactive: bool = False,
+            show_bench: bool = False,
+            debug: bool = False,
+            play_by_play_callback=None,
+            obp_adjustment=None,
     ) -> None:
         """
         class manages the details of an individual game
@@ -548,8 +550,8 @@ class Game:
         :return: score difference
         """
         return (
-            self.total_score[self.team_pitching()]
-            - self.total_score[self.team_hitting()]
+                self.total_score[self.team_pitching()]
+                - self.total_score[self.team_hitting()]
         )
 
     def save_sit(self) -> bool:
@@ -560,9 +562,9 @@ class Game:
         :return: true save situation
         """
         return (
-            self.score_diff() > 0
-            and (self.score_diff() <= self.bases.count_runners() + 2)
-            and self.inning[self.team_hitting()] >= 8
+                self.score_diff() > 0
+                and (self.score_diff() <= self.bases.count_runners() + 2)
+                and self.inning[self.team_hitting()] >= 8
         )
 
     def close_game(self) -> bool:
@@ -591,9 +593,9 @@ class Game:
 
         # pitcher of record tracking, look for lead change
         if (
-            self.total_score[self.team_hitting()]
-            <= self.total_score[self.team_pitching()]
-            < (self.total_score[self.team_hitting()] + self.bases.runs_scored)
+                self.total_score[self.team_hitting()]
+                <= self.total_score[self.team_pitching()]
+                < (self.total_score[self.team_hitting()] + self.bases.runs_scored)
         ):
             self.winning_pitcher = self.teams[self.team_hitting()].is_pitching_index()
             self.losing_pitcher = self.teams[self.team_pitching()].is_pitching_index()
@@ -690,7 +692,7 @@ class Game:
         output = ""
 
         for i in range(0, len(game_summaries), games_per_line):
-            batch = game_summaries[i : i + games_per_line]
+            batch = game_summaries[i: i + games_per_line]
 
             # Header line with R H E repeated
             header_parts = []
@@ -726,15 +728,15 @@ class Game:
         :return: should we switch pitchers?
         """
         if (
-            self.teams[self.team_pitching()].is_pitcher_fatigued(pitching.Condition)
-            and self.outs < 3
+                self.teams[self.team_pitching()].is_pitcher_fatigued(pitching.Condition)
+                and self.outs < 3
         ) or (pitch_switch is False and (self.close_game() or self.save_sit())):
             prior_pitcher = self.teams[self.team_pitching()].is_pitching_index()
             self.teams[self.team_pitching()].pitching_change(
                 inning=self.inning[self.team_hitting()], score_diff=self.score_diff()
             )
             if (
-                prior_pitcher != self.teams[self.team_pitching()].is_pitching_index()
+                    prior_pitcher != self.teams[self.team_pitching()].is_pitching_index()
             ):  # we are switching pitchers
                 pitching = self.teams[
                     self.team_pitching()
@@ -1022,7 +1024,7 @@ class Game:
                 if self.play_by_play_callback:
                     self.play_by_play_callback(play_text)
             if (
-                self.bases.count_runners() >= 1 and self.outs < 3 and self.chatty
+                    self.bases.count_runners() >= 1 and self.outs < 3 and self.chatty
             ):  # leave out batter check for runner
                 play_text = f"\t{self.bases.describe_runners()}\n"
                 self.game_recap += play_text
@@ -1035,8 +1037,8 @@ class Game:
             )  # wrap around lineup
             # check for walk off
             if (
-                self.is_extra_innings()
-                and self.total_score[AWAY] < self.total_score[HOME]
+                    self.is_extra_innings()
+                    and self.total_score[AWAY] < self.total_score[HOME]
             ):
                 break  # end the half inning
 
@@ -1088,12 +1090,12 @@ class Game:
         return (
             False
             if self.inning[AWAY] <= 9
-            or self.inning[HOME] <= 8
-            or (
-                self.inning[AWAY] != self.inning[HOME]
-                and self.total_score[AWAY] >= self.total_score[HOME]
-            )
-            or self.total_score[AWAY] == self.total_score[HOME]
+               or self.inning[HOME] <= 8
+               or (
+                       self.inning[AWAY] != self.inning[HOME]
+                       and self.total_score[AWAY] >= self.total_score[HOME]
+               )
+               or self.total_score[AWAY] == self.total_score[HOME]
             else True
         )
 
@@ -1161,7 +1163,7 @@ class Game:
         return self.total_score, self.inning, self.win_loss, self.game_recap
 
     def sim_game_structured(
-        self,
+            self,
     ) -> Tuple[List[int], List[int], List[List[int]], str, GameRecap]:
         """
         Simulate an entire game and return both legacy string and structured data.
@@ -1207,7 +1209,7 @@ class Game:
         ]
         # Check for extra innings
         self.structured_game.is_extra_innings = (
-            len(self.structured_game.inning_scores) > 9
+                len(self.structured_game.inning_scores) > 9
         )
         self.structured_game.final_inning = len(self.structured_game.inning_scores)
 
@@ -1235,13 +1237,13 @@ class Game:
             if box_score and box_score.pitchers:
                 for pitcher in box_score.pitchers:
                     if (
-                        pitcher.stats.W > 0
-                        and self.structured_game.winning_pitcher is None
+                            pitcher.stats.W > 0
+                            and self.structured_game.winning_pitcher is None
                     ):
                         self.structured_game.winning_pitcher = pitcher.name
                     if (
-                        pitcher.stats.L > 0
-                        and self.structured_game.losing_pitcher is None
+                            pitcher.stats.L > 0
+                            and self.structured_game.losing_pitcher is None
                     ):
                         self.structured_game.losing_pitcher = pitcher.name
                     if pitcher.stats.SV > 0:
@@ -1283,8 +1285,8 @@ class Game:
 
         # Get starting pitcher from gameplay_pitching_df
         if (
-            hasattr(team, "gameplay_pitching_df")
-            and team.gameplay_pitching_df is not None
+                hasattr(team, "gameplay_pitching_df")
+                and team.gameplay_pitching_df is not None
         ):
             pitch_df = team.gameplay_pitching_df
             if isinstance(pitch_df, pd.DataFrame):

@@ -9,7 +9,8 @@ Displays upcoming games in a formatted text view.
 
 import tkinter as tk
 from tkinter import scrolledtext
-from typing import List, Tuple
+from datetime import datetime
+from typing import List, Tuple, Dict, Any
 
 from ui.theme import BG_PANEL, BG_WIDGET, TEXT_PRIMARY, TEXT_HEADING, ACCENT_GOLD
 
@@ -32,6 +33,9 @@ class ScheduleWidget:
         """
         self.frame = tk.Frame(parent, bg=BG_PANEL)
         self.followed_team = followed_team
+        self.schedule_times = {}  # {(away, home): "7:10 PM"}
+        self.completed_games = {}  # {(away, home): (away_r, home_r)}
+        self.schedule_dates = []  # List of date strings for each day
 
         # Header
         schedule_header = tk.Label(
@@ -63,17 +67,30 @@ class ScheduleWidget:
                                         lmargin1=20, lmargin2=20)
         self.schedule_text.tag_configure("bold_team", font=("Consolas", 10, "bold"),
                                         lmargin1=20, lmargin2=20, foreground=ACCENT_GOLD)
+        self.schedule_text.tag_configure("time", font=("Consolas", 9),
+                                        foreground="#888888")  # Gray for times
+        self.schedule_text.tag_configure("score", font=("Consolas", 9, "bold"),
+                                        foreground=ACCENT_GOLD)  # Gold for scores
 
         self.schedule_text.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
 
-    def update_schedule(self, current_day: int, schedule: List[List[Tuple]]):
+    def update_schedule(self, current_day: int, schedule: List[List[Tuple]],
+                       schedule_times: Dict = None, schedule_dates: List = None):
         """
         Update the schedule display to show upcoming games.
 
         Args:
             current_day: Current day number (0-indexed)
             schedule: Full season schedule (list of days, each day is list of matchups)
+            schedule_times: Optional dict of {(away, home): "7:10 PM"} for game times
+            schedule_dates: Optional list of date strings for each day
         """
+        # Store schedule times and dates
+        if schedule_times:
+            self.schedule_times = schedule_times
+        if schedule_dates:
+            self.schedule_dates = schedule_dates
+
         # Clear existing schedule
         self.schedule_text.config(state=tk.NORMAL)
         self.schedule_text.delete(1.0, tk.END)
@@ -90,8 +107,9 @@ class ScheduleWidget:
 
             day_games = schedule[day_index]
 
-            # Day header (highlight current day)
-            day_label = f"Day {day_index + 1}"
+            # Day header with date (highlight current day)
+            date_str = self._get_date_for_day(day_index)
+            day_label = f"{date_str} Day {day_index + 1}" if date_str else f"Day {day_index + 1}"
             if i == 0:
                 day_label += " ◄ CURRENT"
                 self.schedule_text.insert(tk.END, day_label + "\n", "current_day")
@@ -134,6 +152,18 @@ class ScheduleWidget:
                     else:
                         self.schedule_text.insert(tk.END, f"{home:3s}", "matchup")
 
+                    # Show time or score
+                    game_key = (away, home)
+                    if game_key in self.schedule_times:
+                        if game_key in self.completed_games:
+                            # Show score
+                            away_r, home_r = self.completed_games[game_key]
+                            self.schedule_text.insert(tk.END, f"  {away_r}-{home_r}", "score")
+                        else:
+                            # Show time
+                            time_str = self.schedule_times[game_key]
+                            self.schedule_text.insert(tk.END, f" {time_str}", "time")
+
                 matchup_count += 1
 
                 # Add line break after every 4 matchups
@@ -148,6 +178,18 @@ class ScheduleWidget:
             self.schedule_text.insert(tk.END, "\n")
 
         self.schedule_text.config(state=tk.DISABLED)
+
+    def _get_date_for_day(self, day_index: int) -> str:
+        """Return formatted date for display."""
+        if day_index < len(self.schedule_dates):
+            dt = datetime.strptime(self.schedule_dates[day_index], "%Y-%m-%d")
+            return dt.strftime("%B %d, %Y")
+        return ""
+
+    def on_game_completed(self, game_data: Dict[str, Any]):
+        """Handle game completion - update schedule display with score."""
+        game_key = (game_data["away_team"], game_data["home_team"])
+        self.completed_games[game_key] = (game_data["away_r"], game_data["home_r"])
 
     def get_frame(self) -> tk.Frame:
         """Get the main frame for adding to parent container."""

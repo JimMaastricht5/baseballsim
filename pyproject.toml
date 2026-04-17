@@ -12,6 +12,7 @@ dependencies = [
     "selenium>=4.15.0",
     "webdriver-manager>=4.0.0",
     "pydantic==2.13.0b3",
+    "ruff>=0.15.10",
 ]
 
 [tool.uv.workspace]
@@ -19,3 +20,16 @@ members = [
     "bbvenv_314t_20260414",
     "bbvenv314t_2026_04_14",
 ]
+
+[tool.ruff]
+# Increase this to 100 or 120 to give horizontal lists more "room"
+line-length = 120
+
+[tool.ruff.lint]
+# Disable the rule that forces trailing commas
+ignore = ["COM812", "ISC001"]
+
+[tool.ruff.format]
+# This tells the formatter: "Ignore the trailing comma
+# and collapse the list if it fits within the line length."
+skip-magic-trailing-comma = true

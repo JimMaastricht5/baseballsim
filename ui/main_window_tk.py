@@ -11,13 +11,7 @@ import tkinter as tk
 from tkinter import ttk, messagebox
 import queue
 
-from ui.theme import (
-    setup_dark_theme,
-    BG_DARK,
-    TEXT_PRIMARY,
-    TEXT_SECONDARY,
-    ACCENT_BLUE,
-)
+from ui.theme import setup_dark_theme, BG_DARK, TEXT_PRIMARY, TEXT_SECONDARY, ACCENT_BLUE
 from ui.widgets import (
     ToolbarWidget,
     StandingsWidget,
@@ -85,9 +79,7 @@ class SeasonMainWindow:
         self.world_series_active = False  # Track if World Series is running
         self.saved_standings = None  # Save regular season standings during playoffs
         self.world_series_teams = set()  # Track which teams are in World Series
-        self.simulation_start_time = (
-            None  # Track simulation start time for elapsed time
-        )
+        self.simulation_start_time = None  # Track simulation start time for elapsed time
 
         self.root.title("Baseball Season Simulator")
         self.root.geometry("1500x900")
@@ -96,9 +88,7 @@ class SeasonMainWindow:
         setup_dark_theme(self.root)
 
         # Comparison mode toggle (Phase 3: Stats Enhancement)
-        self.comparison_mode = tk.StringVar(
-            value="current"
-        )  # "current" or "difference"
+        self.comparison_mode = tk.StringVar(value="current")  # "current" or "difference"
 
         # Create simulation controller
         self.controller = SimulationController(
@@ -126,6 +116,9 @@ class SeasonMainWindow:
         # Setup keyboard shortcuts
         self._setup_keyboard_shortcuts()
 
+        # Load partial season data and display standings immediately
+        self._load_partial_season_data()
+
         logger.info("Main window initialized with modular widgets")
 
     # Menu bar removed - using in-tab toggle buttons instead (Phase 3 revision)
@@ -141,6 +134,74 @@ class SeasonMainWindow:
         self.root.bind("<Control-Right>", lambda e: self.next_series())
         self.root.bind("<Control-Up>", lambda e: self.next_week())
         self.root.bind("<F1>", lambda e: self._show_help())
+
+    def _load_partial_season_data(self):
+        """Load partial season data and display standings at startup."""
+        import bbstats
+
+        try:
+            # Create BaseballStats instance to load partial season data
+            baseball_data = bbstats.BaseballStats(
+                load_seasons=self.load_seasons,
+                new_season=self.new_season,
+                load_batter_file="player-projected-stats-pp-Batting.csv",
+                load_pitcher_file="player-projected-stats-pp-Pitching.csv",
+                suppress_console_output=True,
+            )
+            # Get partial season standings
+            partial_standings = baseball_data.populate_standings_from_partial_season()
+            # Calculate current day from max games played
+            current_day = 0
+            if partial_standings:
+                current_day = max(w + l for w, l in partial_standings.values())
+            # Extract standings for UI (build same structure as extract_standings)
+            standings_data = self._build_standings_data(partial_standings, baseball_data)
+            # Update standings widget
+            self.standings.update_standings(standings_data, self.season_team_to_follow)
+            # Update day label
+            self.day_label.config(text=f"Day: {current_day + 1} / {self.season_length}")
+            self.current_day = current_day + 1
+            logger.debug(f"Loaded partial season standings: day {current_day + 1}")
+        except Exception as e:
+            logger.warning(f"Could not load partial season data: {e}")
+
+    def _build_standings_data(self, partial_standings: dict, baseball_data) -> dict:
+        """Build standings data structure from partial standings."""
+        standings_data = {"al": {}, "nl": {}}
+        if baseball_data.batting_data is None:
+            return standings_data
+        team_df = baseball_data.batting_data[["Team", "League", "Division"]].drop_duplicates()
+        team_league_map = dict(zip(team_df["Team"], team_df["League"]))
+        team_division_map = dict(zip(team_df["Team"], team_df["Division"]))
+        # Build per-division data
+        div_data = {}  # {(league, division): [(team, wins, losses), ...]}
+        for team, (wins, losses) in partial_standings.items():
+            league = team_league_map.get(team, "AL")
+            division = team_division_map.get(team, "East")
+            key = (league.lower(), division)
+            if key not in div_data:
+                div_data[key] = []
+            pct = wins / (wins + losses) if (wins + losses) > 0 else 0.0
+            div_data[key].append((team, wins, losses, pct))
+        # Sort by winning percentage and calculate GB
+        for (league_key, division), teams in div_data.items():
+            teams.sort(key=lambda x: (x[3], -x[1]), reverse=True)  # Sort by pct desc, then wins desc
+            if league_key not in standings_data:
+                standings_data[league_key] = {}
+            standings_data[league_key][division] = {"teams": [], "wins": [], "losses": [], "pct": [], "gb": []}
+            for i, (team, wins, losses, pct) in enumerate(teams):
+                leader_wins, leader_losses = teams[0][1], teams[0][2]
+                if i == 0:
+                    gb = "-"
+                else:
+                    gb_calc = ((leader_wins - wins) + (leader_losses - losses)) / 2.0
+                    gb = f"{gb_calc:.1f}"
+                standings_data[league_key][division]["teams"].append(team)
+                standings_data[league_key][division]["wins"].append(wins)
+                standings_data[league_key][division]["losses"].append(losses)
+                standings_data[league_key][division]["pct"].append(round(pct, 3))
+                standings_data[league_key][division]["gb"].append(gb)
+        return standings_data
 
     def _toggle_pause(self):
         """Toggle between pause and resume based on current state."""
@@ -198,22 +259,16 @@ F1     - Show this help"""
             "next_series": self.next_series,
             "next_week": self.next_week,
         }
-        self.toolbar = ToolbarWidget(
-            self.root, self.season_team_to_follow, toolbar_callbacks
-        )
+        self.toolbar = ToolbarWidget(self.root, self.season_team_to_follow, toolbar_callbacks)
 
     def _create_main_content(self):
         """Create the main layout with paned window, standings, and tabs."""
         # Horizontal paned window for standings (left) and content (right)
-        paned_window = tk.PanedWindow(
-            self.root, orient=tk.HORIZONTAL, sashrelief=tk.RAISED, bg=BG_DARK
-        )
+        paned_window = tk.PanedWindow(self.root, orient=tk.HORIZONTAL, sashrelief=tk.RAISED, bg=BG_DARK)
         paned_window.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
 
         # Left panel: Standings widget
-        self.standings = StandingsWidget(
-            paned_window, self._on_team_selected_from_standings
-        )
+        self.standings = StandingsWidget(paned_window, self._on_team_selected_from_standings)
         paned_window.add(self.standings.get_frame(), minsize=300)
 
         # Right panel: Notebook with tabs
@@ -242,9 +297,7 @@ F1     - Show this help"""
         league_notebook.add(self.league_leaders_widget.get_frame(), text="Leaders")
 
         # League Sub-tab 2: Stats
-        self.league_stats_widget = LeagueStatsWidget(
-            league_notebook, self.comparison_mode
-        )
+        self.league_stats_widget = LeagueStatsWidget(league_notebook, self.comparison_mode)
         league_notebook.add(self.league_stats_widget.get_frame(), text="Stats")
 
         # League Sub-tab 3: IL (Injured List)
@@ -253,9 +306,7 @@ F1     - Show this help"""
 
         # League Sub-tab 4: Admin (Player Management)
         self.admin_widget = AdminWidget(
-            league_notebook,
-            self.controller.get_worker,
-            on_change_callback=self._on_admin_change,
+            league_notebook, self.controller.get_worker, on_change_callback=self._on_admin_change
         )
         league_notebook.add(self.admin_widget.get_frame(), text="Admin")
 
@@ -274,17 +325,11 @@ F1     - Show this help"""
 
         # Team Sub-tab 2: Games Played
         self.games_played_widget = GamesPlayedWidget(self.team_notebook)
-        self.team_notebook.add(
-            self.games_played_widget.get_frame(), text="Games Played"
-        )
+        self.team_notebook.add(self.games_played_widget.get_frame(), text="Games Played")
 
         # Team Sub-tab 3: GM Assessment
-        self.gm_assessment_widget = GMAssessmentWidget(
-            self.team_notebook, self.run_gm_assessments
-        )
-        self.team_notebook.add(
-            self.gm_assessment_widget.get_frame(), text="GM Assessment"
-        )
+        self.gm_assessment_widget = GMAssessmentWidget(self.team_notebook, self.run_gm_assessments)
+        self.team_notebook.add(self.gm_assessment_widget.get_frame(), text="GM Assessment")
 
         # Tab 5: Playoffs (after Team tab)
         self.playoff_widget = PlayoffWidget(self.notebook)
@@ -304,24 +349,14 @@ F1     - Show this help"""
         status_frame.pack(side=tk.BOTTOM, fill=tk.X)
 
         # Status indicator (colored dot)
-        self.status_indicator_canvas = tk.Canvas(
-            status_frame, width=12, height=12, bg=BG_DARK, highlightthickness=0
-        )
+        self.status_indicator_canvas = tk.Canvas(status_frame, width=12, height=12, bg=BG_DARK, highlightthickness=0)
         self.status_indicator_canvas.pack(side=tk.LEFT, padx=(10, 5))
-        self.status_dot = self.status_indicator_canvas.create_oval(
-            2, 2, 10, 10, fill=STATUS_STOPPED, outline=""
-        )
+        self.status_dot = self.status_indicator_canvas.create_oval(2, 2, 10, 10, fill=STATUS_STOPPED, outline="")
         self._update_status_indicator("stopped")
 
         # Phase indicator label
         self.phase_label = tk.Label(
-            status_frame,
-            text="Ready",
-            font=("Segoe UI", 10, "bold"),
-            anchor=tk.W,
-            bg=BG_DARK,
-            fg=ACCENT_BLUE,
-            width=18,
+            status_frame, text="Ready", font=("Segoe UI", 10, "bold"), anchor=tk.W, bg=BG_DARK, fg=ACCENT_BLUE, width=18
         )
         self.phase_label.pack(side=tk.LEFT, padx=(0, 10))
 
@@ -337,31 +372,18 @@ F1     - Show this help"""
         self.day_label.pack(side=tk.LEFT, padx=10)
 
         # Progress bar
-        self.progress_bar = ttk.Progressbar(
-            status_frame, length=200, mode="determinate", maximum=self.season_length
-        )
+        self.progress_bar = ttk.Progressbar(status_frame, length=200, mode="determinate", maximum=self.season_length)
         self.progress_bar.pack(side=tk.LEFT, padx=10)
 
         # Progress percentage label
         self.progress_label = tk.Label(
-            status_frame,
-            text="0%",
-            font=("Segoe UI", 10),
-            width=5,
-            bg=BG_DARK,
-            fg=TEXT_PRIMARY,
+            status_frame, text="0%", font=("Segoe UI", 10), width=5, bg=BG_DARK, fg=TEXT_PRIMARY
         )
         self.progress_label.pack(side=tk.LEFT, padx=5)
 
         # Estimated time remaining
         self.eta_label = tk.Label(
-            status_frame,
-            text="",
-            font=("Segoe UI", 9),
-            anchor=tk.W,
-            bg=BG_DARK,
-            fg=TEXT_SECONDARY,
-            width=15,
+            status_frame, text="", font=("Segoe UI", 9), anchor=tk.W, bg=BG_DARK, fg=TEXT_SECONDARY, width=15
         )
         self.eta_label.pack(side=tk.LEFT, padx=5)
 
@@ -384,13 +406,7 @@ F1     - Show this help"""
         """
         from ui.theme import STATUS_RUNNING, STATUS_PAUSED, STATUS_STOPPED
 
-        color = (
-            STATUS_RUNNING
-            if state == "running"
-            else STATUS_PAUSED
-            if state == "paused"
-            else STATUS_STOPPED
-        )
+        color = STATUS_RUNNING if state == "running" else STATUS_PAUSED if state == "paused" else STATUS_STOPPED
         self.status_indicator_canvas.itemconfig(self.status_dot, fill=color)
 
     def _update_phase(self, phase: str):
@@ -445,9 +461,7 @@ F1     - Show this help"""
         elif remaining < 3600:
             eta_text = f"ETA: {int(remaining // 60)}m {int(remaining % 60)}s"
         else:
-            eta_text = (
-                f"ETA: {int(remaining // 3600)}h {int((remaining % 3600) // 60)}m"
-            )
+            eta_text = f"ETA: {int(remaining // 3600)}h {int((remaining % 3600) // 60)}m"
 
         self.eta_label.config(text=eta_text)
 
@@ -492,9 +506,7 @@ F1     - Show this help"""
         )
         info_label.pack(pady=(15, 5))
 
-        countdown_label = tk.Label(
-            countdown_dialog, text="5", font=("Arial", 48, "bold"), fg="#0066cc"
-        )
+        countdown_label = tk.Label(countdown_dialog, text="5", font=("Arial", 48, "bold"), fg="#0066cc")
         countdown_label.pack(pady=5)
 
         button_frame = tk.Frame(countdown_dialog)
@@ -522,11 +534,7 @@ F1     - Show this help"""
             countdown_dialog.destroy()
 
         start_now_button = tk.Button(
-            button_frame,
-            text="Start Now",
-            command=on_start_now_click,
-            width=10,
-            font=("Arial", 10, "bold"),
+            button_frame, text="Start Now", command=on_start_now_click, width=10, font=("Arial", 10, "bold")
         )
         start_now_button.pack(side=tk.LEFT, padx=10)
 
@@ -560,9 +568,7 @@ F1     - Show this help"""
             worker = self.controller.get_worker()
             if worker and worker.signals:
                 worker.signals.main_window = self
-                logger.debug(
-                    "Set signals.main_window reference for synchronous updates"
-                )
+                logger.debug("Set signals.main_window reference for synchronous updates")
 
             # Reset progress indicators
             self.current_day = 0
@@ -627,19 +633,13 @@ F1     - Show this help"""
                 self.toolbar.update_button_states(simulation_running=True, paused=True)
                 self._update_status_indicator("paused")
                 self._update_phase("Regular Season")
-                self.status_label.config(
-                    text=self._format_status_with_day(
-                        "Season ready - Press Play to start"
-                    )
-                )
+                self.status_label.config(text=self._format_status_with_day("Season ready - Press Play to start"))
             else:
                 # Simulation started running automatically
                 self.toolbar.update_button_states(simulation_running=True, paused=False)
                 self._update_status_indicator("running")
                 self._update_phase("Regular Season")
-                self.status_label.config(
-                    text=self._format_status_with_day("Simulation running...")
-                )
+                self.status_label.config(text=self._format_status_with_day("Simulation running..."))
 
         num_games = self.toolbar.get_num_games()
         obp_adjustment = self.toolbar.get_obp_adjustment()
@@ -665,51 +665,39 @@ F1     - Show this help"""
         if self.controller.pause_season():
             self.toolbar.update_button_states(simulation_running=True, paused=True)
             self._update_status_indicator("paused")
-            self.status_label.config(
-                text=self._format_status_with_day("Simulation paused")
-            )
+            self.status_label.config(text=self._format_status_with_day("Simulation paused"))
 
     def resume_season(self):
         """Resume the simulation from paused state."""
         if self.controller.resume_season():
             self.toolbar.update_button_states(simulation_running=True, paused=False)
             self._update_status_indicator("running")
-            self.status_label.config(
-                text=self._format_status_with_day("Simulation resumed")
-            )
+            self.status_label.config(text=self._format_status_with_day("Simulation resumed"))
 
     def next_day(self):
         """Advance exactly one day, then pause."""
         if self.controller.next_day():
             # Reset button colors after pressing
             self.toolbar.reset_step_button_colors()
-            self.status_label.config(
-                text=self._format_status_with_day("Advancing one day...")
-            )
+            self.status_label.config(text=self._format_status_with_day("Advancing one day..."))
 
     def next_series(self):
         """Advance exactly three days (one series), then pause."""
         if self.controller.next_series():
             # Reset button colors after pressing
             self.toolbar.reset_step_button_colors()
-            self.status_label.config(
-                text=self._format_status_with_day("Advancing 3 days (series)...")
-            )
+            self.status_label.config(text=self._format_status_with_day("Advancing 3 days (series)..."))
 
     def next_week(self):
         """Advance exactly seven days (one week), then pause."""
         if self.controller.next_week():
             # Simulation will auto-pause after stepping through all 7 days
             self.toolbar.update_button_states(simulation_running=True, paused=True)
-            self.status_label.config(
-                text=self._format_status_with_day("Advancing 7 days (week)...")
-            )
+            self.status_label.config(text=self._format_status_with_day("Advancing 7 days (week)..."))
 
     def run_gm_assessments(self):
         """Force all teams to run GM assessments immediately."""
-        self.controller.run_gm_assessments(
-            lambda msg: self.status_label.config(text=self._format_status_with_day(msg))
-        )
+        self.controller.run_gm_assessments(lambda msg: self.status_label.config(text=self._format_status_with_day(msg)))
 
     # =================================================================
     # QUEUE POLLING AND EVENT HANDLING
@@ -841,16 +829,24 @@ F1     - Show this help"""
         """Initialize schedule display when season starts in paused state."""
         worker = self.controller.get_worker()
         if worker and worker.season and worker.season.schedule:
+            start_day = worker.season.season_day_num  # May be > 0 if partial season data
             # Set full season schedule
             self.games_widget.set_season_schedule(worker.season.schedule)
-            # Show day 1 schedule
-            if len(worker.season.schedule) > 0:
-                day_1_games = worker.season.schedule[0]
-                schedule = [(m[0], m[1]) for m in day_1_games if "OFF DAY" not in m]
-                self.games_widget.on_day_started(0, schedule)
+            # Show current day's schedule (may not be day 1 if partial season)
+            if len(worker.season.schedule) > start_day:
+                current_day_games = worker.season.schedule[start_day]
+                schedule = [(m[0], m[1]) for m in current_day_games if "OFF DAY" not in m]
+                self.games_widget.on_day_started(start_day, schedule)
                 # Update schedule widget
-                self.schedule_widget.update_schedule(0, worker.season.schedule)
-                logger.debug("Initialized schedule display for paused season")
+                self.schedule_widget.update_schedule(start_day, worker.season.schedule)
+                # Update day label to reflect partial season start
+                self.day_label.config(text=f"Day: {start_day + 1} / {self.season_length}")
+                # Show partial season standings
+                standings_data = worker.season.extract_standings()
+                followed_team = worker.team_to_follow
+                self.standings.set_followed_team(followed_team)
+                self.standings.update_standings(standings_data, followed_team)
+                logger.debug(f"Initialized schedule display for paused season at day {start_day + 1}")
 
     def _on_day_started(self, day_num: int, schedule_text: str):
         """Handle day_started message."""
@@ -866,9 +862,10 @@ F1     - Show this help"""
         # Extract today's schedule from worker
         worker = self.controller.get_worker()
         if worker and worker.season:
-            # Set the full season schedule on first day
-            if day_num == 0:
+            # Set the full season schedule on first call (handles partial season starts)
+            if not hasattr(self, "_schedule_initialized") or not self._schedule_initialized:
                 self.games_widget.set_season_schedule(worker.season.schedule)
+                self._schedule_initialized = True
 
             todays_games = worker.season.schedule[day_num]
             schedule = [(m[0], m[1]) for m in todays_games if "OFF DAY" not in m]
@@ -895,9 +892,7 @@ F1     - Show this help"""
 
     def _on_game_completed(self, game_data: dict):
         """Handle game_completed message."""
-        logger.debug(
-            f"Game completed: {game_data['away_team']} @ {game_data['home_team']}"
-        )
+        logger.debug(f"Game completed: {game_data['away_team']} @ {game_data['home_team']}")
 
         # If World Series is active, only send to playoff widget
         if self.world_series_active:
@@ -915,9 +910,7 @@ F1     - Show this help"""
                 game_data["away_team"],
                 game_data["home_team"],
                 game_data["game_recap"],
-                game_data.get(
-                    "structured_game"
-                ),  # Structured game data for formatted display
+                game_data.get("structured_game"),  # Structured game data for formatted display
             )
 
     def _on_day_completed(self, game_results: list, standings_data: dict):
@@ -960,9 +953,7 @@ F1     - Show this help"""
         logger.debug(f"GM assessment ready for {team} at {games} games")
 
         # Display in GM assessment widget
-        self.gm_assessment_widget.display_assessment(
-            team, games, wins, losses, games_back, assessment
-        )
+        self.gm_assessment_widget.display_assessment(team, games, wins, losses, games_back, assessment)
 
     def _on_injury_update(self, injury_list: list):
         """Handle injury_update message."""
@@ -1002,14 +993,9 @@ F1     - Show this help"""
             else:
                 elapsed_time_str = f" (Runtime: {seconds}s)"
 
-        self.status_label.config(
-            text=self._format_status_with_day(f"Season complete!{elapsed_time_str}")
-        )
+        self.status_label.config(text=self._format_status_with_day(f"Season complete!{elapsed_time_str}"))
         self.eta_label.config(text="")
-        messagebox.showinfo(
-            "Season Complete",
-            f"The season simulation has completed successfully.{elapsed_time_str}",
-        )
+        messagebox.showinfo("Season Complete", f"The season simulation has completed successfully.{elapsed_time_str}")
 
     def _on_error(self, error_message: str):
         """Handle error_occurred message."""
@@ -1021,11 +1007,7 @@ F1     - Show this help"""
     def _on_pause_state(self, state: str):
         """Handle pause_state message."""
         if state == "pausing":
-            self.status_label.config(
-                text=self._format_status_with_day(
-                    "Pausing - completing currently running games."
-                )
-            )
+            self.status_label.config(text=self._format_status_with_day("Pausing - completing currently running games."))
             self._disable_admin_and_assessment()
         elif state == "paused":
             self._update_status_indicator("paused")
@@ -1058,31 +1040,21 @@ F1     - Show this help"""
         away_team = play_data.get("away_team", "")
         home_team = play_data.get("home_team", "")
 
-        if (
-            self.world_series_teams
-            and away_team in self.world_series_teams
-            and home_team in self.world_series_teams
-        ):
-            logger.debug(
-                f"Play-by-play received: {away_team} @ {home_team}, WS teams: {self.world_series_teams}"
-            )
+        if self.world_series_teams and away_team in self.world_series_teams and home_team in self.world_series_teams:
+            logger.debug(f"Play-by-play received: {away_team} @ {home_team}, WS teams: {self.world_series_teams}")
 
             # Forward to playoff widget
             if hasattr(self, "playoff_widget"):
                 logger.debug(f"Forwarding play-by-play to playoff widget")
                 self.playoff_widget.add_play_by_play(play_data)
         else:
-            logger.debug(
-                f"Skipping play-by-play: {away_team} @ {home_team} (not WS teams)"
-            )
+            logger.debug(f"Skipping play-by-play: {away_team} @ {home_team} (not WS teams)")
         # During regular season, could forward to a different widget if needed
         # For now, only handle playoff play-by-play
 
     def _on_world_series_started(self, ws_data: dict):
         """Handle world_series_started message."""
-        logger.info(
-            f"World Series started: {ws_data.get('al_winner')} vs {ws_data.get('nl_winner')}"
-        )
+        logger.info(f"World Series started: {ws_data.get('al_winner')} vs {ws_data.get('nl_winner')}")
 
         # Set World Series flag and track teams
         self.world_series_active = True
@@ -1099,9 +1071,7 @@ F1     - Show this help"""
                     cleared_count += 1
             except queue.Empty:
                 pass
-            logger.debug(
-                f"Cleared {cleared_count} old play-by-play signals from queue before World Series"
-            )
+            logger.debug(f"Cleared {cleared_count} old play-by-play signals from queue before World Series")
 
         # Clear regular season game displays (they're finished)
         # The games widget will not be updated during World Series
@@ -1134,10 +1104,7 @@ F1     - Show this help"""
             self.playoff_widget.world_series_completed(ws_data)
 
         # Show championship message
-        messagebox.showinfo(
-            "World Series Complete",
-            f"🏆 {ws_data.get('champion')} wins the World Series! 🏆",
-        )
+        messagebox.showinfo("World Series Complete", f"🏆 {ws_data.get('champion')} wins the World Series! 🏆")
 
     # =================================================================
     # HELPER METHODS
@@ -1165,9 +1132,7 @@ F1     - Show this help"""
         is actively running or has paused (e.g., after completing a step operation).
         """
         if self.controller.is_paused():
-            self.status_label.config(
-                text=self._format_status_with_day("Simulation paused")
-            )
+            self.status_label.config(text=self._format_status_with_day("Simulation paused"))
         else:
             self.status_label.config(text=self._format_status_with_day("Simulating..."))
 
@@ -1176,27 +1141,21 @@ F1     - Show this help"""
         worker = self.controller.get_worker()
         if worker and worker.season:
             self.roster_widget.update_roster(
-                self.season_team_to_follow,
-                worker.season.baseball_data,
-                worker.season.team_win_loss,
+                self.season_team_to_follow, worker.season.baseball_data, worker.season.team_win_loss
             )
 
     def _update_league_stats(self):
         """Update league stats widget with current season data."""
         worker = self.controller.get_worker()
         if worker and worker.season:
-            self.league_stats_widget.update_stats(
-                worker.season.baseball_data, worker.season.team_win_loss
-            )
+            self.league_stats_widget.update_stats(worker.season.baseball_data, worker.season.team_win_loss)
 
     def _update_league_leaders(self):
         """Update league leaders widget with current season data."""
         worker = self.controller.get_worker()
         if worker and worker.season:
             # Pass current_day as games_played for PA/IP minimum calculations
-            self.league_leaders_widget.update_leaders(
-                worker.season.baseball_data, games_played=self.current_day
-            )
+            self.league_leaders_widget.update_leaders(worker.season.baseball_data, games_played=self.current_day)
 
     def _populate_injuries_teams(self):
         """Populate injuries team dropdown with all teams."""
@@ -1205,9 +1164,7 @@ F1     - Show this help"""
             try:
                 all_teams = worker.season.baseball_data.get_all_team_names()
                 self.injuries_widget.populate_team_filter(all_teams)
-                logger.debug(
-                    f"Populated injury team filter with {len(all_teams)} teams"
-                )
+                logger.debug(f"Populated injury team filter with {len(all_teams)} teams")
             except Exception as e:
                 logger.error(f"Error populating injury teams: {e}")
 
@@ -1238,11 +1195,7 @@ F1     - Show this help"""
                             {
                                 "player": row["Player"],
                                 "team": row["Team"],
-                                "position": str(pos)
-                                .replace("[", "")
-                                .replace("]", "")
-                                .replace("'", "")
-                                .strip(),
+                                "position": str(pos).replace("[", "").replace("]", "").replace("'", "").strip(),
                                 "injury": row.get("Injury Description", "Unknown"),
                                 "days_remaining": int(row.get("Injured Days", 0)),
                                 "status": "IL",
@@ -1266,9 +1219,7 @@ F1     - Show this help"""
                         )
 
                 self.injuries_widget.update_injuries(injury_list)
-                logger.debug(
-                    f"Refreshed IL widget with {len(injury_list)} injured players"
-                )
+                logger.debug(f"Refreshed IL widget with {len(injury_list)} injured players")
             except Exception as e:
                 logger.error(f"Error refreshing injuries widget: {e}")
 

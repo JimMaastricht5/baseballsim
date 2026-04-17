@@ -218,6 +218,24 @@ class ScheduleManager:
             return dt.strftime("%m/%d/%Y")
         return f"Day {idx + 1}"
 
+    def get_game_counter(self, team_win_loss: Dict, team_to_follow: List[str]) -> int:
+        """Get game number from team's wins + losses.
+
+        Args:
+            team_win_loss: Dict mapping team to [wins, losses]
+            team_to_follow: List of teams to follow
+
+        Returns:
+            Game number (wins + losses) for followed team, or 0
+        """
+        if not team_to_follow:
+            return 0
+        team = team_to_follow[0]
+        if team in team_win_loss:
+            wins, losses = team_win_loss[team]
+            return wins + losses
+        return 0
+
     def get_time_for_game(self, away: str, home: str) -> str:
         """Get 12-hour time for a game.
         

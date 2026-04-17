@@ -846,8 +846,8 @@ F1     - Show this help"""
                 )
                 # Update day label to reflect partial season start
                 date_str = worker.season.get_date_for_day(start_day)
-                games_played = max(worker.season.team_games_played.values())
-                self.day_label.config(text=f"{date_str} Day {start_day + 1} of 162")
+                game_num = worker.season.get_game_number()
+                self.day_label.config(text=f"{date_str} Day {game_num} of {self.season_length}")
                 # Show partial season standings
                 standings_data = worker.season.extract_standings()
                 followed_team = worker.team_to_follow
@@ -895,11 +895,12 @@ F1     - Show this help"""
         # Update day label with date and games played
         worker = self.controller.get_worker()
         if worker and worker.season:
-            # Use schedule index for date, day_num for counter
+            # Use schedule index for calendar date
             sched_idx = worker.season.get_current_schedule_index()
             date_str = worker.season.get_date_for_day(sched_idx)
-            games_played = max(worker.season.team_games_played.values())
-            self.day_label.config(text=f"{date_str} Day {day_num + 1} of 162")
+            # Use team's actual game number (wins + losses)
+            game_num = worker.season.get_game_number()
+            self.day_label.config(text=f"{date_str} Day {game_num} of {self.season_length}")
 
         # Update ETA
         if self.simulation_start_time is not None and day_num > 0:

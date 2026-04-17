@@ -310,6 +310,15 @@ class BaseballSeason:
         """Return the schedule index for current simulation day."""
         return self.season_day_num
 
+    def get_game_number(self) -> int:
+        """Get game number from team's wins + losses (for followed team)."""
+        if self.team_to_follow:
+            team = self.team_to_follow[0]
+            if team in self.team_win_loss:
+                wins, losses = self.team_win_loss[team]
+                return wins + losses
+        return 0
+
     def get_time_for_game(self, away: str, home: str) -> str:
         """Return 12-hour time string or empty string."""
         return self.schedule_manager.get_time_for_game(away, home)

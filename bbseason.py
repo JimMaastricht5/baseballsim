@@ -323,6 +323,14 @@ class BaseballSeason:
         """Return 12-hour time string or empty string."""
         return self.schedule_manager.get_time_for_game(away, home)
 
+    def get_schedule_day(self, day_index: int):
+        """Return ScheduleDay object for given index."""
+        return self.schedule_manager.get_day(day_index)
+
+    def get_games_for_day(self, day_index: int):
+        """Return list of GameMatchup objects for given index."""
+        return self.schedule_manager.get_games_for_day(day_index)
+
     def get_current_date_display(self) -> str:
         """Return today's date formatted for display."""
         return datetime.datetime.now().strftime("%B %d, %Y")
@@ -366,18 +374,32 @@ class BaseballSeason:
         """
         schedule_str = ""
         game_day_off = ""
-        day_schedule = self.schedule[day]
+        day_obj = self.schedule[day]
+        
+        # Handle both new format (ScheduleDay object) and old format (list)
+        if hasattr(day_obj, 'games'):
+            day_schedule = day_obj.games
+        else:
+            day_schedule = day_obj
+            
         games = []
 
         # Collect games and off days
         for game in day_schedule:
-            if "OFF DAY" not in game:
+            # Handle both new format (GameMatchup) and old format (tuple)
+            if hasattr(game, 'is_off_day'):
+                if game.is_off_day:
+                    game_day_off = game.home if game.home != "OFF DAY" else game.away
+                else:
+                    games.append(f"{game.away:>3} @ {game.home:<3}")
+            elif "OFF DAY" not in game:
                 games.append(f"{game[0]:>3} @ {game[1]:<3}")
             else:
                 game_day_off = game[0] if game[0] != "OFF DAY" else game[1]
 
         # Print header
-        schedule_str += f"Day {day + 1} Games:\n"
+        date_str = self.get_date_for_day(day)
+        schedule_str += f"{date_str} Games:\n"
 
         # Print games in 5 columns
         if games:
@@ -857,7 +879,7 @@ class BaseballSeason:
             self.print_day_schedule(season_day_num),
             metadata={"day": season_day_num + 1, "schedule": self.schedule[season_day_num]},
         )
-        todays_games = self.schedule[season_day_num]
+        todays_games = self.schedule_manager.get_games_for_day(season_day_num)
         # Pass team_to_follow list (if not empty) to show hot/cold players
         teams_list = self.team_to_follow if len(self.team_to_follow) > 0 else None
         self.baseball_data.new_game_day(teams_to_follow=teams_list)  # update rest, injury, and print lists
@@ -865,53 +887,57 @@ class BaseballSeason:
         # Collect game results
         game_results = []
 
-        for match_up in todays_games:  # run all games for a day, day starts at zero
-            if "OFF DAY" not in match_up:  # not an off day
-                # Create play-by-play callback if factory is provided
-                pbp_callback = None
-                if self.play_by_play_callback_factory:
-                    pbp_callback = self.play_by_play_callback_factory(match_up[0], match_up[1], season_day_num)
+        for game in todays_games:  # run all games for a day, day starts at zero
+            if game.is_off_day:  # not an off day
+                continue
+            # Create play-by-play callback if factory is provided
+            pbp_callback = None
+            if self.play_by_play_callback_factory:
+                pbp_callback = self.play_by_play_callback_factory(game.away, game.home, season_day_num)
 
-                # Check if this is a followed game (for structured output)
-                is_followed = (not self.team_to_follow) or any(team in self.team_to_follow for team in match_up)
+            # Check if this is a followed game (for structured output)
+            is_followed = (not self.team_to_follow) or any(team in [game.away, game.home] for team in self.team_to_follow)
 
-                game = bbgame.Game(
-                    away_team_name=match_up[0],
-                    home_team_name=match_up[1],
-                    baseball_data=self.baseball_data,
-                    game_num=season_day_num,
-                    rotation_len=self.rotation_len,
-                    print_lineup=self.print_lineup_b,
-                    chatty=self.season_chatty,
-                    print_box_score_b=self.print_box_score_b,
-                    team_to_follow=self.team_to_follow,
-                    interactive=self.interactive,
-                    play_by_play_callback=pbp_callback,
-                    obp_adjustment=self.obp_adjustment,
+            game_sim = bbgame.Game(
+                away_team_name=game.away,
+                home_team_name=game.home,
+                baseball_data=self.baseball_data,
+                game_num=season_day_num,
+                rotation_len=self.rotation_len,
+                print_lineup=self.print_lineup_b,
+                chatty=self.season_chatty,
+                print_box_score_b=self.print_box_score_b,
+                team_to_follow=self.team_to_follow,
+                interactive=self.interactive,
+                play_by_play_callback=pbp_callback,
+                obp_adjustment=self.obp_adjustment,
+            )
+
+            # Use structured output for followed games
+            if is_followed:
+                score, inning, win_loss_list, game_recap, structured_game = game_sim.sim_game_structured()
+            else:
+                score, inning, win_loss_list, game_recap = game_sim.sim_game()
+                structured_game = None
+
+            self.update_win_loss(away_team_name=game.away, home_team_name=game.home, win_loss=win_loss_list)
+            self.baseball_data.game_results_to_season(box_score_class=game_sim.teams[AWAY].box_score)
+            self.baseball_data.game_results_to_season(box_score_class=game_sim.teams[HOME].box_score)
+
+            # Mark game as completed and store scores
+            self.schedule_manager.mark_game_completed(game.home, game.away, score[1], score[0])
+
+            # Store results for processing
+            game_results.append(
+                (
+                    (game.away, game.home),
+                    score,
+                    game_recap,
+                    game_sim.teams[AWAY].box_score,
+                    game_sim.teams[HOME].box_score,
+                    structured_game,
                 )
-
-                # Use structured output for followed games
-                if is_followed:
-                    score, inning, win_loss_list, game_recap, structured_game = game.sim_game_structured()
-                else:
-                    score, inning, win_loss_list, game_recap = game.sim_game()
-                    structured_game = None
-
-                self.update_win_loss(away_team_name=match_up[0], home_team_name=match_up[1], win_loss=win_loss_list)
-                self.baseball_data.game_results_to_season(box_score_class=game.teams[AWAY].box_score)
-                self.baseball_data.game_results_to_season(box_score_class=game.teams[HOME].box_score)
-
-                # Store results for processing
-                game_results.append(
-                    (
-                        match_up,
-                        score,
-                        game_recap,
-                        game.teams[AWAY].box_score,
-                        game.teams[HOME].box_score,
-                        structured_game,
-                    )
-                )
+            )
 
         # Process and print all game results
         self._process_and_print_game_results(game_results)
@@ -931,53 +957,54 @@ class BaseballSeason:
             self.print_day_schedule(season_day_num) + "\n",
             metadata={"day": season_day_num + 1, "schedule": self.schedule[season_day_num]},
         )
-        todays_games = self.schedule[season_day_num]
+        todays_games = self.schedule_manager.get_games_for_day(season_day_num)
         # Pass team_to_follow list (if not empty) to show hot/cold players
         teams_list = self.team_to_follow if len(self.team_to_follow) > 0 else None
         self.baseball_data.new_game_day(teams_to_follow=teams_list)  # update rest, injury, and print lists
+        date_str = self.get_date_for_day(season_day_num)
         self.output_handler(
             OutputCategory.SIM_PROGRESS,
-            f"Simulating day #{season_day_num + 1} for league(s): {self.leagues_str}",
-            metadata={"day": season_day_num + 1, "leagues": self.leagues_str},
+            f"Simulating {date_str} (#{season_day_num + 1}) for league(s): {self.leagues_str}",
+            metadata={"day": season_day_num + 1, "date": date_str, "leagues": self.leagues_str},
         )
-        for match_up in todays_games:  # run all games for a day, day starts at zero
-            if "OFF DAY" not in match_up:  # not an off day
-                # Skip already completed games (check using CSV data)
-                away, home = match_up[0], match_up[1]
-                if self.schedule_manager.is_game_completed(away, home):
-                    self.output_handler(OutputCategory.SIM_PROGRESS, f"Skipping {away} @ {home} (already played)\n", metadata=None)
-                    continue
+        for game in todays_games:  # run all games for a day, day starts at zero
+            if game.is_off_day:  # not an off day
+                continue
+            # Skip already completed games (check using CSV data)
+            if self.schedule_manager.is_game_completed(game.home, game.away):
+                self.output_handler(OutputCategory.SIM_PROGRESS, f"Skipping {game.away} @ {game.home} (already played)\n", metadata=None)
+                continue
 
-                # Create play-by-play callback if factory is provided
-                pbp_callback = None
-                if self.play_by_play_callback_factory:
-                    pbp_callback = self.play_by_play_callback_factory(match_up[0], match_up[1], season_day_num)
+            # Create play-by-play callback if factory is provided
+            pbp_callback = None
+            if self.play_by_play_callback_factory:
+                pbp_callback = self.play_by_play_callback_factory(game.away, game.home, season_day_num)
 
-                # Check if this is a followed game (for structured output)
-                is_followed = (not self.team_to_follow) or any(team in self.team_to_follow for team in match_up)
+            # Check if this is a followed game (for structured output)
+            is_followed = (not self.team_to_follow) or any(team in [game.away, game.home] for team in self.team_to_follow)
 
-                # print(f'in sim day threaded: Playing day #{season_day_num + 1}: {match_up[0]} away against {match_up[1]}')
-                game = bbgame.Game(
-                    away_team_name=match_up[0],
-                    home_team_name=match_up[1],
-                    baseball_data=self.baseball_data,
-                    game_num=season_day_num,
-                    rotation_len=self.rotation_len,
-                    print_lineup=self.print_lineup_b,
-                    chatty=self.season_chatty,
-                    print_box_score_b=self.print_box_score_b,
-                    team_to_follow=self.team_to_follow,
-                    interactive=self.interactive,
-                    play_by_play_callback=pbp_callback,
-                    obp_adjustment=self.obp_adjustment,
-                )
-                q = queue.Queue()
-                thread = threading.Thread(target=game.sim_game_threaded, args=(q, is_followed))
-                threads.append(thread)
-                queues.append(q)
-                match_ups.append(match_up)
-                thread.start()
-                self.output_handler(OutputCategory.SIM_PROGRESS, ".", metadata=None)
+            # print(f'in sim day threaded: Playing day #{season_day_num + 1}: {game.away} away against {game.home}')
+            game_sim = bbgame.Game(
+                away_team_name=game.away,
+                home_team_name=game.home,
+                baseball_data=self.baseball_data,
+                game_num=season_day_num,
+                rotation_len=self.rotation_len,
+                print_lineup=self.print_lineup_b,
+                chatty=self.season_chatty,
+                print_box_score_b=self.print_box_score_b,
+                team_to_follow=self.team_to_follow,
+                interactive=self.interactive,
+                play_by_play_callback=pbp_callback,
+                obp_adjustment=self.obp_adjustment,
+            )
+            q = queue.Queue()
+            thread = threading.Thread(target=game_sim.sim_game_threaded, args=(q, is_followed))
+            threads.append(thread)
+            queues.append(q)
+            match_ups.append(game)
+            thread.start()
+            self.output_handler(OutputCategory.SIM_PROGRESS, ".", metadata=None)
         self.output_handler(OutputCategory.SIM_PROGRESS, "\n", metadata=None)
 
         # Collect game results
@@ -992,13 +1019,16 @@ class BaseballSeason:
             else:
                 (score, inning, win_loss_list, away_box_score, home_box_score, game_recap) = result
                 structured_game = None
-            match_up = match_ups[ii]
-            self.update_win_loss(away_team_name=match_up[0], home_team_name=match_up[1], win_loss=win_loss_list)
+            game_obj = match_ups[ii]
+            self.update_win_loss(away_team_name=game_obj.away, home_team_name=game_obj.home, win_loss=win_loss_list)
             self.baseball_data.game_results_to_season(box_score_class=away_box_score)
             self.baseball_data.game_results_to_season(box_score_class=home_box_score)
 
+            # Mark game as completed and store scores
+            self.schedule_manager.mark_game_completed(game_obj.home, game_obj.away, score[1], score[0])
+
             # Store results for processing (include structured_game for followed games)
-            game_results.append((match_up, score, game_recap, away_box_score, home_box_score, structured_game))
+            game_results.append(((game_obj.away, game_obj.home), score, game_recap, away_box_score, home_box_score, structured_game))
 
         # Process and print all game results
         self._process_and_print_game_results(game_results)
@@ -1013,10 +1043,11 @@ class BaseballSeason:
         """
         # self.sim_day(season_day_num=self.season_day_num)
         self.sim_day_threaded(season_day_num=self.season_day_num)
+        date_str = self.get_date_for_day(self.season_day_num)
         self.output_handler(
             OutputCategory.DAY_STANDINGS,
-            f"Standings for Day {self.season_day_num + 1}:\n",
-            metadata={"day": self.season_day_num + 1},
+            f"Standings for {date_str}:\n",
+            metadata={"day": self.season_day_num + 1, "date": date_str},
         )
         self.print_standings()
 

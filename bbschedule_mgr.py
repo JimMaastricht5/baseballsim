@@ -37,8 +37,8 @@ class ScheduleManager:
         self.new_season = new_season
         
         self.schedule = []           # Full schedule (list of days, each day is list of games)
-        self.schedule_dates = []     # Date for each day (list of "YYYY-MM-DD" strings)
-        self.schedule_times = {}     # {(away, home): "7:10 PM"} for future games
+        self._schedule_dates = []     # Date for each day (list of "YYYY-MM-DD" strings)
+        self._schedule_times = {}     # {(away, home): "7:10 PM"} for future games
         self.completed_games = {}   # {(away, home): True} for completed games
 
     def load_from_csv(self, csv_path: str = None) -> bool:
@@ -63,14 +63,13 @@ class ScheduleManager:
         valid_teams = set(self.baseball_data.get_all_team_names())
 
         self.schedule = []
-        self.schedule_dates = []
-        self.schedule_times = {}
-        self.completed_games = {}
+        self._schedule_dates = []
+        self._schedule_times = {}
 
         # Load ALL games from CSV
         for date in sorted(df["Date"].unique()):
             day_games = df[df["Date"] == date]
-            day_schedule = []
+            day_schedule = ScheduleDay(date)
 
             for _, row in day_games.iterrows():
                 away, home = row["Away_Team"], row["Home_Team"]
@@ -85,24 +84,28 @@ class ScheduleManager:
                     (pd.isna(row["Time"]) or not row["Time"]) or 
                     (row["Away_Score"] > 0 or row["Home_Score"] > 0)
                 )
-                if is_completed:
-                    self.completed_games[(away, home)] = True
 
-                # Always add to schedule
-                day_schedule.append([home, away])
-
-                # Store time only for future games
+                # Get time for future games
+                game_time = None
                 if not is_completed and pd.notna(row["Time"]) and row["Time"]:
-                    time_12h = self._convert_time_12hr(str(row["Time"]))
-                    self.schedule_times[(away, home)] = time_12h
+                    game_time = self._convert_time_12hr(str(row["Time"]))
+                    self._schedule_times[(away, home)] = game_time
 
-            if day_schedule:
+                # Create GameMatchup object
+                game = GameMatchup(home=home, away=away, time=game_time)
+                if is_completed:
+                    game.completed = True
+                    game.home_score = row["Home_Score"]
+                    game.away_score = row["Away_Score"]
+                
+                day_schedule.games.append(game)
+
+            if day_schedule.games:
                 self.schedule.append(day_schedule)
-                self.schedule_dates.append(date)
+                self._schedule_dates.append(date)
 
         logger.info(
-            f"Loaded {len(self.schedule)} days from {csv_path}, "
-            f"{len(self.completed_games)} completed"
+            f"Loaded {len(self.schedule)} days from {csv_path}"
         )
         return True
 
@@ -120,6 +123,7 @@ class ScheduleManager:
             series_length: Games per series (default 3)
         """
         import random
+        from datetime import datetime, timedelta
 
         teams_list = [t for t in teams if t != "OFF DAY"]
         target_games = season_length
@@ -135,7 +139,14 @@ class ScheduleManager:
         games_scheduled_for_tracker = 0
 
         self.schedule = []
+        self._schedule_dates = []
+        
+        # Start date (today) for random schedule
+        start_date = datetime.now()
+        
         random.shuffle(teams_list)
+        
+        day_counter = 0
 
         while games_scheduled_for_tracker < target_games:
             for _ in range(num_rounds):
@@ -150,15 +161,26 @@ class ScheduleManager:
                         tracker_has_game = True
 
                     if home == "OFF":
-                        round_pairs.append([away, "OFF DAY"])
+                        round_pairs.append((away, "OFF DAY"))
                     elif away == "OFF":
-                        round_pairs.append([home, "OFF DAY"])
+                        round_pairs.append((home, "OFF DAY"))
                     else:
-                        round_pairs.append([home, away])
+                        round_pairs.append((home, away))
 
                 for _ in range(series_length):
                     if games_scheduled_for_tracker < target_games:
-                        self.schedule.append(round_pairs)
+                        # Create ScheduleDay with GameMatchup objects
+                        date_str = (start_date + timedelta(days=day_counter)).strftime("%Y-%m-%d")
+                        day = ScheduleDay(date_str)
+                        
+                        for home, away in round_pairs:
+                            game = GameMatchup(home=home, away=away)
+                            day.games.append(game)
+                        
+                        self.schedule.append(day)
+                        self._schedule_dates.append(date_str)
+                        day_counter += 1
+                        
                         if tracker_has_game:
                             games_scheduled_for_tracker += 1
                     else:
@@ -188,8 +210,9 @@ class ScheduleManager:
         today = datetime.datetime.now().strftime("%Y-%m-%d")
         start_day = 0
         
-        for idx, date in enumerate(self.schedule_dates):
-            if date >= today:
+        for idx, day in enumerate(self.schedule):
+            date = day.date
+            if date >= today and day.has_upcoming_games():
                 start_day = idx
                 break
 
@@ -213,8 +236,8 @@ class ScheduleManager:
         Returns:
             Formatted date (e.g., "04/17/2026") or "Day X" if invalid
         """
-        if idx < len(self.schedule_dates):
-            dt = datetime.datetime.strptime(self.schedule_dates[idx], "%Y-%m-%d")
+        if idx < len(self._schedule_dates):
+            dt = datetime.datetime.strptime(self._schedule_dates[idx], "%Y-%m-%d")
             return dt.strftime("%m/%d/%Y")
         return f"Day {idx + 1}"
 
@@ -246,7 +269,48 @@ class ScheduleManager:
         Returns:
             Time string (e.g., "7:10 PM") or empty string
         """
-        return self.schedule_times.get((away, home), "")
+        return self._schedule_times.get((away, home), "")
+
+    def get_games_for_day(self, day_index: int) -> List[GameMatchup]:
+        """Get list of GameMatchup objects for a day.
+        
+        Args:
+            day_index: Schedule day index
+            
+        Returns:
+            List of GameMatchup objects
+        """
+        if 0 <= day_index < len(self.schedule):
+            return self.schedule[day_index].games
+        return []
+
+    def get_day(self, day_index: int) -> Optional[ScheduleDay]:
+        """Get ScheduleDay object for a day index.
+        
+        Args:
+            day_index: Schedule day index
+            
+        Returns:
+            ScheduleDay object or None
+        """
+        if 0 <= day_index < len(self.schedule):
+            return self.schedule[day_index]
+        return None
+
+    @property
+    def schedule_times(self) -> Dict:
+        """Return schedule times dict for compatibility."""
+        return self._schedule_times
+    
+    @property
+    def schedule_dates(self) -> List:
+        """Return schedule dates list for compatibility."""
+        return self._schedule_dates
+    
+    @property
+    def schedule_list(self) -> List:
+        """Return schedule list (list of games per day) for compatibility."""
+        return self.schedule
 
     def _convert_time_12hr(self, time_24h: str) -> str:
         """Convert '14:10' to '2:10 PM'.
@@ -273,4 +337,78 @@ class ScheduleManager:
         Returns:
             True if game was already played
         """
-        return (away, home) in self.completed_games
+        for day in self.schedule:
+            game = day.get_game(home, away)
+            if game:
+                return game.completed
+        return False
+
+    def mark_game_completed(self, home: str, away: str, home_score: int, away_score: int):
+        """Find game and mark completed with scores.
+        
+        Args:
+            home: Home team abbreviation
+            away: Away team abbreviation
+            home_score: Home team runs scored
+            away_score: Away team runs scored
+        """
+        for day in self.schedule:
+            game = day.get_game(home, away)
+            if game:
+                game.mark_completed(home_score, away_score)
+                logger.debug(f"Marked {away} @ {home} as completed: {away_score}-{home_score}")
+                return
+        logger.warning(f"Could not find game {away} @ {home} to mark completed")
+
+
+class GameMatchup:
+    """Represents a single game matchup in the schedule."""
+    
+    def __init__(self, home: str, away: str, time: str = None):
+        self.home = home                    # "MIL"
+        self.away = away                    # "NYY"
+        self.time = time                    # "7:10 PM" or None
+        self.completed = False              # Game played?
+        self.home_score = None
+        self.away_score = None
+        
+    @property
+    def is_off_day(self) -> bool:
+        return self.home == "OFF DAY" or self.away == "OFF DAY"
+    
+    def mark_completed(self, home_score: int, away_score: int):
+        """Mark game as completed with scores."""
+        self.completed = True
+        self.home_score = home_score
+        self.away_score = away_score
+
+
+class ScheduleDay:
+    """Represents a single day in the schedule with multiple games."""
+    
+    def __init__(self, date: str, games: List[GameMatchup] = None):
+        self.date = date                    # "2026-04-17"
+        self.games = games or []          # List[GameMatchup]
+        
+    @property
+    def is_completed(self) -> bool:
+        """True if all real games (non-off-days) are completed."""
+        real_games = [g for g in self.games if not g.is_off_day]
+        if not real_games:
+            return False
+        return all(g.completed for g in real_games)
+    
+    @property
+    def completed_count(self) -> int:
+        return sum(1 for g in self.games if g.completed)
+    
+    def get_game(self, home: str, away: str) -> GameMatchup:
+        """Find game by teams."""
+        for g in self.games:
+            if g.home == home and g.away == away:
+                return g
+        return None
+    
+    def has_upcoming_games(self) -> bool:
+        """Check if any games not yet completed."""
+        return any(not g.completed and not g.is_off_day for g in self.games)

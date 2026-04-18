@@ -834,8 +834,24 @@ F1     - Show this help"""
             self.games_widget.set_season_schedule(worker.season.schedule)
             # Show current day's schedule (may not be day 1 if partial season)
             if len(worker.season.schedule) > start_day:
-                current_day_games = worker.season.schedule[start_day]
-                schedule = [(m[0], m[1]) for m in current_day_games if "OFF DAY" not in m]
+                # Get games for the day (handle both new ScheduleDay objects and old lists)
+                day_obj = worker.season.schedule[start_day]
+                if hasattr(day_obj, 'games'):
+                    current_day_games = day_obj.games
+                else:
+                    current_day_games = day_obj
+                    
+                # Extract (away, home) tuples
+                schedule = []
+                for game in current_day_games:
+                    if hasattr(game, 'is_off_day') and not game.is_off_day:
+                        schedule.append((game.away, game.home))
+                    elif 'OFF DAY' not in game:
+                        if hasattr(game, 'away'):
+                            schedule.append((game.away, game.home))
+                        else:
+                            schedule.append((game[0], game[1]))
+                            
                 self.games_widget.on_day_started(start_day, schedule)
                 # Update schedule widget
                 self.schedule_widget.update_schedule(
@@ -874,8 +890,23 @@ F1     - Show this help"""
                 self.games_widget.set_season_schedule(worker.season.schedule)
                 self._schedule_initialized = True
 
-            todays_games = worker.season.schedule[day_num]
-            schedule = [(m[0], m[1]) for m in todays_games if "OFF DAY" not in m]
+            # Get games for the day (handle both new ScheduleDay objects and old lists)
+            day_obj = worker.season.schedule[day_num]
+            if hasattr(day_obj, 'games'):
+                todays_games = day_obj.games
+            else:
+                todays_games = day_obj
+                
+            # Extract (away, home) tuples - handle both new GameMatchup objects and old tuples
+            schedule = []
+            for game in todays_games:
+                if hasattr(game, 'is_off_day') and not game.is_off_day:
+                    schedule.append((game.away, game.home))
+                elif 'OFF DAY' not in game:
+                    if hasattr(game, 'away'):
+                        schedule.append((game.away, game.home))
+                    else:
+                        schedule.append((game[0], game[1]))
 
             # Update games widget
             self.games_widget.on_day_started(day_num, schedule)

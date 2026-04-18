@@ -203,16 +203,23 @@ class UIBaseballSeason(bbseason.BaseballSeason):
                 match_up, score, game_recap, away_box_score, home_box_score = result
                 structured_game = None
 
+            # Handle both old tuple format (away, home) and new tuple of tuple ((away, home), ...)
+            # match_up is now always a tuple of (away, home)
+            if isinstance(match_up[0], tuple):
+                away_team, home_team = match_up[0]
+            else:
+                away_team, home_team = match_up
+
             # Check if this was a followed game
             # Empty team_to_follow means follow ALL games (used for World Series)
             is_followed = (not self.team_to_follow) or any(
-                team in self.team_to_follow for team in match_up
+                team in self.team_to_follow for team in [away_team, home_team]
             )
 
             # Build game data dict
             game_data = {
-                "away_team": match_up[0],
-                "home_team": match_up[1],
+                "away_team": away_team,
+                "home_team": home_team,
                 "away_r": score[0],
                 "home_r": score[1],
                 "away_h": away_box_score.total_hits,
@@ -232,20 +239,23 @@ class UIBaseballSeason(bbseason.BaseballSeason):
                 # Emit immediately for followed teams
                 self.signals.emit_game_completed(game_data)
                 logger.debug(
-                    f"Emitted game_completed for {match_up[0]} @ {match_up[1]}"
+                    f"Emitted game_completed for {away_team} @ {home_team}"
                 )
             else:
                 # Collect for batch emission
                 compact_summaries.append(
                     {
-                        "away_team": match_up[0],
-                        "home_team": match_up[1],
+                        "away_team": away_team,
+                        "home_team": home_team,
                         "away_r": score[0],
                         "home_r": score[1],
                         "away_h": away_box_score.total_hits,
                         "home_h": home_box_score.total_hits,
                         "away_e": away_box_score.total_errors,
                         "home_e": home_box_score.total_errors,
+                        "game_recap": "",
+                        "day_num": self.season_day_num,
+                        "structured_game": None,
                     }
                 )
 
@@ -504,18 +514,28 @@ class UIBaseballSeason(bbseason.BaseballSeason):
         Returns:
             str: Formatted schedule text
         """
-        # Call parent to get the formatted text
-        # Note: The parent method prints, so we need to suppress that
-        # For now, we'll replicate the logic to avoid printing
-        todays_games = self.schedule[day]
+        # Get games for the day (handle both new ScheduleDay objects and old lists)
+        day_obj = self.schedule[day]
+        if hasattr(day_obj, 'games'):
+            todays_games = day_obj.games
+        else:
+            todays_games = day_obj
+            
         schedule_lines = []
 
-        for match_up in todays_games:
-            if "OFF DAY" in match_up:
-                off_team = match_up[0] if match_up[0] != "OFF DAY" else match_up[1]
+        for game in todays_games:
+            if hasattr(game, 'is_off_day') and game.is_off_day:
+                off_team = game.home if game.home != "OFF DAY" else game.away
+                schedule_lines.append(f"{off_team} has an OFF DAY")
+            elif 'OFF DAY' in game:
+                off_team = game[0] if game[0] != "OFF DAY" else game[1]
                 schedule_lines.append(f"{off_team} has an OFF DAY")
             else:
-                schedule_lines.append(f"{match_up[0]} @ {match_up[1]}")
+                # Handle both formats
+                if hasattr(game, 'away'):
+                    schedule_lines.append(f"{game.away} @ {game.home}")
+                else:
+                    schedule_lines.append(f"{game[0]} @ {game[1]}")
 
         return f"Day {day + 1}: " + ", ".join(schedule_lines)
 

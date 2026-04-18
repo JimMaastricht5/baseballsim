@@ -74,14 +74,14 @@ class ScheduleWidget:
 
         self.schedule_text.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
 
-    def update_schedule(self, current_day: int, schedule: List[List[Tuple]],
-                       schedule_times: Dict = None, schedule_dates: List = None):
+    def update_schedule(self, current_day: int, schedule: List,
+                   schedule_times: Dict = None, schedule_dates: List = None):
         """
         Update the schedule display to show upcoming games.
 
         Args:
             current_day: Current day number (0-indexed)
-            schedule: Full season schedule (list of days, each day is list of matchups)
+            schedule: Full season schedule (list of ScheduleDay objects or old list of matchups)
             schedule_times: Optional dict of {(away, home): "7:10 PM"} for game times
             schedule_dates: Optional list of date strings for each day
         """
@@ -105,7 +105,14 @@ class ScheduleWidget:
             if day_index >= total_days:
                 break
 
-            day_games = schedule[day_index]
+            # Handle both new format (ScheduleDay objects) and old format (list of tuples)
+            day_obj = schedule[day_index]
+            if hasattr(day_obj, 'games'):
+                # New format: ScheduleDay object
+                day_games = day_obj.games
+            else:
+                # Old format: list of tuples
+                day_games = day_obj
 
             # Day header with date (highlight current day)
             date_str = self._get_date_for_day(day_index)
@@ -117,52 +124,71 @@ class ScheduleWidget:
                 self.schedule_text.insert(tk.END, day_label + "\n", "day_header")
 
             # Format matchups - show 4 per line for better readability
-            # Insert matchups with bold for followed team names
             matchups_per_line = 4
             matchup_count = 0
 
-            for matchup in day_games:
+            for game in day_games:
                 # Add line break and indent after every 4 matchups
                 if matchup_count % matchups_per_line == 0:
                     self.schedule_text.insert(tk.END, "  ", "matchup")  # Indent
                 else:
                     self.schedule_text.insert(tk.END, "   ", "matchup")  # Separator between matchups
 
-                if 'OFF DAY' in matchup:
-                    off_team = matchup[0] if matchup[0] != 'OFF DAY' else matchup[1]
-                    # Insert team name with bold if it's the followed team
-                    if self.followed_team and off_team == self.followed_team:
-                        self.schedule_text.insert(tk.END, f"{off_team:4s}", "bold_team")
-                    else:
-                        self.schedule_text.insert(tk.END, f"{off_team:4s}", "matchup")
-                    self.schedule_text.insert(tk.END, " OFF", "matchup")
-                else:
-                    away, home = matchup[0], matchup[1]
-                    # Insert away team with bold if it's the followed team
-                    if self.followed_team and away == self.followed_team:
-                        self.schedule_text.insert(tk.END, f"{away:3s}", "bold_team")
-                    else:
-                        self.schedule_text.insert(tk.END, f"{away:3s}", "matchup")
-
-                    self.schedule_text.insert(tk.END, " @ ", "matchup")
-
-                    # Insert home team with bold if it's the followed team
-                    if self.followed_team and home == self.followed_team:
-                        self.schedule_text.insert(tk.END, f"{home:3s}", "bold_team")
-                    else:
-                        self.schedule_text.insert(tk.END, f"{home:3s}", "matchup")
-
-                    # Show time or score
-                    game_key = (away, home)
-                    if game_key in self.schedule_times:
-                        if game_key in self.completed_games:
-                            # Show score
-                            away_r, home_r = self.completed_games[game_key]
-                            self.schedule_text.insert(tk.END, f"  {away_r}-{home_r}", "score")
+                # Handle both new format (GameMatchup objects) and old format (tuple)
+                if hasattr(game, 'is_off_day'):
+                    # New format: GameMatchup object
+                    if game.is_off_day:
+                        off_team = game.home if game.home != "OFF DAY" else game.away
+                        if self.followed_team and off_team == self.followed_team:
+                            self.schedule_text.insert(tk.END, f"{off_team:4s}", "bold_team")
                         else:
-                            # Show time
-                            time_str = self.schedule_times[game_key]
-                            self.schedule_text.insert(tk.END, f" {time_str}", "time")
+                            self.schedule_text.insert(tk.END, f"{off_team:4s}", "matchup")
+                        self.schedule_text.insert(tk.END, " OFF", "matchup")
+                    else:
+                        away, home = game.away, game.home
+                        if self.followed_team and away == self.followed_team:
+                            self.schedule_text.insert(tk.END, f"{away:3s}", "bold_team")
+                        else:
+                            self.schedule_text.insert(tk.END, f"{away:3s}", "matchup")
+                        self.schedule_text.insert(tk.END, " @ ", "matchup")
+                        if self.followed_team and home == self.followed_team:
+                            self.schedule_text.insert(tk.END, f"{home:3s}", "bold_team")
+                        else:
+                            self.schedule_text.insert(tk.END, f"{home:3s}", "matchup")
+                        # Show score if completed, time if not
+                        if game.completed and game.away_score is not None and game.home_score is not None:
+                            self.schedule_text.insert(tk.END, f"  {game.away_score}-{game.home_score}", "score")
+                        elif game.time:
+                            self.schedule_text.insert(tk.END, f" {game.time}", "time")
+                else:
+                    # Old format: tuple (away, home) or "OFF DAY"
+                    if 'OFF DAY' in game:
+                        off_team = game[0] if game[0] != 'OFF DAY' else game[1]
+                        if self.followed_team and off_team == self.followed_team:
+                            self.schedule_text.insert(tk.END, f"{off_team:4s}", "bold_team")
+                        else:
+                            self.schedule_text.insert(tk.END, f"{off_team:4s}", "matchup")
+                        self.schedule_text.insert(tk.END, " OFF", "matchup")
+                    else:
+                        away, home = game[0], game[1]
+                        if self.followed_team and away == self.followed_team:
+                            self.schedule_text.insert(tk.END, f"{away:3s}", "bold_team")
+                        else:
+                            self.schedule_text.insert(tk.END, f"{away:3s}", "matchup")
+                        self.schedule_text.insert(tk.END, " @ ", "matchup")
+                        if self.followed_team and home == self.followed_team:
+                            self.schedule_text.insert(tk.END, f"{home:3s}", "bold_team")
+                        else:
+                            self.schedule_text.insert(tk.END, f"{home:3s}", "matchup")
+                        # Show time or score from completed_games dict
+                        game_key = (away, home)
+                        if game_key in self.schedule_times:
+                            if game_key in self.completed_games:
+                                away_r, home_r = self.completed_games[game_key]
+                                self.schedule_text.insert(tk.END, f"  {away_r}-{home_r}", "score")
+                            else:
+                                time_str = self.schedule_times[game_key]
+                                self.schedule_text.insert(tk.END, f" {time_str}", "time")
 
                 matchup_count += 1
 

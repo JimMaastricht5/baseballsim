@@ -834,31 +834,18 @@ F1     - Show this help"""
             self.games_widget.set_season_schedule(worker.season.schedule)
             # Show current day's schedule (may not be day 1 if partial season)
             if len(worker.season.schedule) > start_day:
-                # Get games for the day (handle both new ScheduleDay objects and old lists)
-                day_obj = worker.season.schedule[start_day]
-                if hasattr(day_obj, 'games'):
-                    current_day_games = day_obj.games
-                else:
-                    current_day_games = day_obj
-                    
-                # Extract (away, home) tuples
-                schedule = []
-                for game in current_day_games:
-                    if hasattr(game, 'is_off_day') and not game.is_off_day:
-                        schedule.append((game.away, game.home))
-                    elif 'OFF DAY' not in game:
-                        if hasattr(game, 'away'):
-                            schedule.append((game.away, game.home))
-                        else:
-                            schedule.append((game[0], game[1]))
+                # Get games for the day using ScheduleDay
+                day_obj = worker.season.get_schedule_day(start_day)
+                schedule = [(g.away, g.home) for g in day_obj.games if not g.is_off_day]
+                date_str = worker.season.get_date_for_day(start_day)
                             
-                self.games_widget.on_day_started(start_day, schedule)
+                self.games_widget.on_day_started(start_day, schedule, date_str)
                 # Update schedule widget
                 self.schedule_widget.update_schedule(
                     start_day,
-                    worker.season.schedule,
-                    worker.season.schedule_times,
-                    worker.season.schedule_dates
+                    worker.season.schedule_manager.schedule,
+                    worker.season.schedule_manager.schedule_times,
+                    worker.season.schedule_manager.schedule_dates
                 )
                 # Update day label to reflect partial season start
                 date_str = worker.season.get_date_for_day(start_day)
@@ -891,32 +878,20 @@ F1     - Show this help"""
                 self._schedule_initialized = True
 
             # Get games for the day (handle both new ScheduleDay objects and old lists)
-            day_obj = worker.season.schedule[day_num]
-            if hasattr(day_obj, 'games'):
-                todays_games = day_obj.games
-            else:
-                todays_games = day_obj
-                
-            # Extract (away, home) tuples - handle both new GameMatchup objects and old tuples
-            schedule = []
-            for game in todays_games:
-                if hasattr(game, 'is_off_day') and not game.is_off_day:
-                    schedule.append((game.away, game.home))
-                elif 'OFF DAY' not in game:
-                    if hasattr(game, 'away'):
-                        schedule.append((game.away, game.home))
-                    else:
-                        schedule.append((game[0], game[1]))
+            # Get games for the day using ScheduleDay
+            todays_games = worker.season.get_games_for_day(day_num)
+            schedule = [(g.away, g.home) for g in todays_games if not g.is_off_day]
+            date_str = worker.season.get_date_for_day(day_num)
 
             # Update games widget
-            self.games_widget.on_day_started(day_num, schedule)
+            self.games_widget.on_day_started(day_num, schedule, date_str)
 
             # Update schedule widget
             self.schedule_widget.update_schedule(
                 day_num,
-                worker.season.schedule,
-                worker.season.schedule_times,
-                worker.season.schedule_dates
+                worker.season.schedule_manager.schedule,
+                worker.season.schedule_manager.schedule_times,
+                worker.season.schedule_manager.schedule_dates
             )
 
         # Update progress bar

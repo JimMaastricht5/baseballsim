@@ -105,18 +105,13 @@ class ScheduleWidget:
             if day_index >= total_days:
                 break
 
-            # Handle both new format (ScheduleDay objects) and old format (list of tuples)
+            # Schedule contains ScheduleDay objects
             day_obj = schedule[day_index]
-            if hasattr(day_obj, 'games'):
-                # New format: ScheduleDay object
-                day_games = day_obj.games
-            else:
-                # Old format: list of tuples
-                day_games = day_obj
+            day_games = day_obj.games
 
             # Day header with date (highlight current day)
             date_str = self._get_date_for_day(day_index)
-            day_label = f"{date_str} Day {day_index + 1}" if date_str else f"Day {day_index + 1}"
+            day_label = date_str if date_str else f"Day {day_index + 1}"
             if i == 0:
                 day_label += " ◄ CURRENT"
                 self.schedule_text.insert(tk.END, day_label + "\n", "current_day")
@@ -134,61 +129,30 @@ class ScheduleWidget:
                 else:
                     self.schedule_text.insert(tk.END, "   ", "matchup")  # Separator between matchups
 
-                # Handle both new format (GameMatchup objects) and old format (tuple)
-                if hasattr(game, 'is_off_day'):
-                    # New format: GameMatchup object
-                    if game.is_off_day:
-                        off_team = game.home if game.home != "OFF DAY" else game.away
-                        if self.followed_team and off_team == self.followed_team:
-                            self.schedule_text.insert(tk.END, f"{off_team:4s}", "bold_team")
-                        else:
-                            self.schedule_text.insert(tk.END, f"{off_team:4s}", "matchup")
-                        self.schedule_text.insert(tk.END, " OFF", "matchup")
+                # GameMatchup object
+                if game.is_off_day:
+                    off_team = game.home if game.home != "OFF DAY" else game.away
+                    if self.followed_team and off_team == self.followed_team:
+                        self.schedule_text.insert(tk.END, f"{off_team:4s}", "bold_team")
                     else:
-                        away, home = game.away, game.home
-                        if self.followed_team and away == self.followed_team:
-                            self.schedule_text.insert(tk.END, f"{away:3s}", "bold_team")
-                        else:
-                            self.schedule_text.insert(tk.END, f"{away:3s}", "matchup")
-                        self.schedule_text.insert(tk.END, " @ ", "matchup")
-                        if self.followed_team and home == self.followed_team:
-                            self.schedule_text.insert(tk.END, f"{home:3s}", "bold_team")
-                        else:
-                            self.schedule_text.insert(tk.END, f"{home:3s}", "matchup")
-                        # Show score if completed, time if not
-                        if game.completed and game.away_score is not None and game.home_score is not None:
-                            self.schedule_text.insert(tk.END, f"  {game.away_score}-{game.home_score}", "score")
-                        elif game.time:
-                            self.schedule_text.insert(tk.END, f" {game.time}", "time")
+                        self.schedule_text.insert(tk.END, f"{off_team:4s}", "matchup")
+                    self.schedule_text.insert(tk.END, " OFF", "matchup")
                 else:
-                    # Old format: tuple (away, home) or "OFF DAY"
-                    if 'OFF DAY' in game:
-                        off_team = game[0] if game[0] != 'OFF DAY' else game[1]
-                        if self.followed_team and off_team == self.followed_team:
-                            self.schedule_text.insert(tk.END, f"{off_team:4s}", "bold_team")
-                        else:
-                            self.schedule_text.insert(tk.END, f"{off_team:4s}", "matchup")
-                        self.schedule_text.insert(tk.END, " OFF", "matchup")
+                    away, home = game.away, game.home
+                    if self.followed_team and away == self.followed_team:
+                        self.schedule_text.insert(tk.END, f"{away:3s}", "bold_team")
                     else:
-                        away, home = game[0], game[1]
-                        if self.followed_team and away == self.followed_team:
-                            self.schedule_text.insert(tk.END, f"{away:3s}", "bold_team")
-                        else:
-                            self.schedule_text.insert(tk.END, f"{away:3s}", "matchup")
-                        self.schedule_text.insert(tk.END, " @ ", "matchup")
-                        if self.followed_team and home == self.followed_team:
-                            self.schedule_text.insert(tk.END, f"{home:3s}", "bold_team")
-                        else:
-                            self.schedule_text.insert(tk.END, f"{home:3s}", "matchup")
-                        # Show time or score from completed_games dict
-                        game_key = (away, home)
-                        if game_key in self.schedule_times:
-                            if game_key in self.completed_games:
-                                away_r, home_r = self.completed_games[game_key]
-                                self.schedule_text.insert(tk.END, f"  {away_r}-{home_r}", "score")
-                            else:
-                                time_str = self.schedule_times[game_key]
-                                self.schedule_text.insert(tk.END, f" {time_str}", "time")
+                        self.schedule_text.insert(tk.END, f"{away:3s}", "matchup")
+                    self.schedule_text.insert(tk.END, " @ ", "matchup")
+                    if self.followed_team and home == self.followed_team:
+                        self.schedule_text.insert(tk.END, f"{home:3s}", "bold_team")
+                    else:
+                        self.schedule_text.insert(tk.END, f"{home:3s}", "matchup")
+                    # Show score if completed, time if not
+                    if game.completed and game.away_score is not None and game.home_score is not None:
+                        self.schedule_text.insert(tk.END, f"  {game.away_score}-{game.home_score}", "score")
+                    elif game.time:
+                        self.schedule_text.insert(tk.END, f" {game.time}", "time")
 
                 matchup_count += 1
 

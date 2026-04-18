@@ -514,28 +514,17 @@ class UIBaseballSeason(bbseason.BaseballSeason):
         Returns:
             str: Formatted schedule text
         """
-        # Get games for the day (handle both new ScheduleDay objects and old lists)
-        day_obj = self.schedule[day]
-        if hasattr(day_obj, 'games'):
-            todays_games = day_obj.games
-        else:
-            todays_games = day_obj
+        day_obj = self.schedule_manager.get_day(day)
+        todays_games = day_obj.games
             
         schedule_lines = []
 
         for game in todays_games:
-            if hasattr(game, 'is_off_day') and game.is_off_day:
+            if game.is_off_day:
                 off_team = game.home if game.home != "OFF DAY" else game.away
                 schedule_lines.append(f"{off_team} has an OFF DAY")
-            elif 'OFF DAY' in game:
-                off_team = game[0] if game[0] != "OFF DAY" else game[1]
-                schedule_lines.append(f"{off_team} has an OFF DAY")
             else:
-                # Handle both formats
-                if hasattr(game, 'away'):
-                    schedule_lines.append(f"{game.away} @ {game.home}")
-                else:
-                    schedule_lines.append(f"{game[0]} @ {game[1]}")
+                schedule_lines.append(f"{game.away} @ {game.home}")
 
         return f"Day {day + 1}: " + ", ".join(schedule_lines)
 

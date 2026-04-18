@@ -84,6 +84,7 @@ class GamesWidget:
         self.current_day_results = {}   # Dict: {(away, home): game_data}
         self.previous_day_results = {}  # Dict: {(away, home): game_data} from previous day
         self.current_day_num = 0  # Track current day number for header
+        self.current_date_str = None  # Track current date string for display
         self.season_schedule = []  # Full season schedule for looking ahead
 
     def set_season_schedule(self, schedule: List[List[Tuple[str, str]]]):
@@ -95,13 +96,14 @@ class GamesWidget:
         """
         self.season_schedule = schedule
 
-    def on_day_started(self, day_num: int, schedule: List[Tuple[str, str]]):
+    def on_day_started(self, day_num: int, schedule: List[Tuple[str, str]], date_str: str = None):
         """
         Handle day started event.
 
         Args:
             day_num: Current day number (0-indexed)
             schedule: List of (away_team, home_team) tuples for today's games
+            date_str: Date string for display (e.g., "04/17/2026")
         """
         # Move current results to previous
         self.previous_day_results = self.current_day_results.copy()
@@ -110,6 +112,11 @@ class GamesWidget:
         self.current_day_num = day_num
         self.current_day_schedule = schedule
         self.current_day_results = {}
+        
+        # Use date string if provided, otherwise format from day number
+        if date_str is None:
+            date_str = f"Day {day_num + 1}"
+        self.current_date_str = date_str
 
         # Update RESULTS section
         self.results_text.config(state=tk.NORMAL)
@@ -117,7 +124,7 @@ class GamesWidget:
 
         # Show yesterday's results if available
         if day_num > 0 and self.previous_day_results:
-            self.results_text.insert(tk.END, f"═══ Day {day_num} Results ═══\n\n", "day_header")
+            self.results_text.insert(tk.END, f"═══ {date_str} Results ═══\n\n", "day_header")
             self._display_yesterday_results()
         else:
             self.results_text.insert(tk.END, "No completed games yet\n", "normal_text")
@@ -130,7 +137,7 @@ class GamesWidget:
         self.schedule_text.delete(1.0, tk.END)
 
         # Show today's schedule
-        self.schedule_text.insert(tk.END, f"═══ Day {day_num + 1} Schedule ═══\n\n", "day_header")
+        self.schedule_text.insert(tk.END, f"═══ {date_str} Schedule ═══\n\n", "day_header")
         self._display_games_grid()
 
         self.schedule_text.see(1.0)
@@ -166,20 +173,24 @@ class GamesWidget:
         # Rebuild display with all results
         self._rebuild_games_display()
 
-    def display_paused_state(self, season_schedule: List[List[Tuple]]):
+    def display_paused_state(self, season_schedule: List[List[Tuple]], date_str: str = None):
         """
         Display completed day results and next day schedule when paused.
 
         Args:
             season_schedule: Full season schedule for looking up next day
+            date_str: Date string for display (e.g., "04/17/2026")
         """
+        # Use date string if provided, otherwise use day number
+        if date_str is None:
+            date_str = f"Day {self.current_day_num + 1}"
+            
         # Update RESULTS section
         self.results_text.config(state=tk.NORMAL)
         self.results_text.delete(1.0, tk.END)
 
         # Show completed day's results
-        completed_day = self.current_day_num + 1  # Display number (1-indexed)
-        self.results_text.insert(tk.END, f"═══ Day {completed_day} Results ═══\n\n", "day_header")
+        self.results_text.insert(tk.END, f"═══ {date_str} Results ═══\n\n", "day_header")
 
         if self.current_day_results:
             self._display_completed_day_results()
@@ -196,7 +207,9 @@ class GamesWidget:
         # Show next day's schedule if available
         next_day_num = self.current_day_num + 1  # 0-indexed for lookup
         if next_day_num < len(season_schedule):
-            self.schedule_text.insert(tk.END, f"═══ Day {next_day_num + 1} Schedule ═══\n\n", "day_header")
+            # Get next day date if available
+            next_date_str = self._get_date_for_day(next_day_num, season_schedule)
+            self.schedule_text.insert(tk.END, f"═══ {next_date_str} Schedule ═══\n\n", "day_header")
             self._display_next_day_schedule(season_schedule[next_day_num])
         else:
             self.schedule_text.insert(tk.END, "═══ Season Complete ═══\n", "day_header")
@@ -283,18 +296,26 @@ class GamesWidget:
         all_games_complete = (len(self.current_day_schedule) > 0 and
                              len(self.current_day_results) == len(self.current_day_schedule))
 
+        # Use stored date string or fall back to day number
+        date_str = self.current_date_str if self.current_date_str else f"Day {self.current_day_num + 1}"
+
         # Update RESULTS section
         self.results_text.config(state=tk.NORMAL)
         self.results_text.delete(1.0, tk.END)
 
         if all_games_complete:
             # Show current day's completed results
-            self.results_text.insert(tk.END, f"═══ Day {self.current_day_num + 1} Results ═══\n\n", "day_header")
+            self.results_text.insert(tk.END, f"═══ {date_str} Results ═══\n\n", "day_header")
             self._display_completed_day_results()
         else:
             # Games in progress - show yesterday's results
             if self.current_day_num > 0 and self.previous_day_results:
-                self.results_text.insert(tk.END, f"═══ Day {self.current_day_num} Results ═══\n\n", "day_header")
+                # Get yesterday's date
+                if self.current_day_num > 1 and self.season_schedule:
+                    yesterday_date = self._get_date_for_day(self.current_day_num - 1, self.season_schedule)
+                else:
+                    yesterday_date = f"Day {self.current_day_num}"
+                self.results_text.insert(tk.END, f"═══ {yesterday_date} Results ═══\n\n", "day_header")
                 self._display_yesterday_results()
             else:
                 self.results_text.insert(tk.END, "No completed games yet\n", "normal_text")
@@ -310,13 +331,14 @@ class GamesWidget:
             # Show next day's schedule if available
             next_day_num = self.current_day_num + 1
             if next_day_num < len(self.season_schedule):
-                self.schedule_text.insert(tk.END, f"═══ Day {next_day_num + 1} Schedule ═══\n\n", "day_header")
+                next_date_str = self._get_date_for_day(next_day_num, self.season_schedule)
+                self.schedule_text.insert(tk.END, f"═══ {next_date_str} Schedule ═══\n\n", "day_header")
                 self._display_next_day_schedule(self.season_schedule[next_day_num])
             else:
                 self.schedule_text.insert(tk.END, "═══ Season Complete ═══\n", "day_header")
         else:
             # Games in progress - show today's schedule (with partial results)
-            self.schedule_text.insert(tk.END, f"═══ Day {self.current_day_num + 1} Schedule ═══\n\n", "day_header")
+            self.schedule_text.insert(tk.END, f"═══ {date_str} Schedule ═══\n\n", "day_header")
             self._display_games_grid()
 
         self.schedule_text.see(1.0)
@@ -471,6 +493,28 @@ class GamesWidget:
                 self.schedule_text.insert(tk.END, "  -   -    -", "normal_text")
 
             self.schedule_text.insert(tk.END, "\n\n")
+
+    def _get_date_for_day(self, day_num: int, season_schedule) -> str:
+        """Get date string for a day from schedule.
+        
+        Args:
+            day_num: Day index (0-indexed)
+            season_schedule: Full season schedule (list of ScheduleDay objects)
+            
+        Returns:
+            Date string (e.g., "04/17/2026") or "Day X" if not available
+        """
+        if day_num < len(season_schedule):
+            day_obj = season_schedule[day_num]
+            if hasattr(day_obj, 'date'):
+                # ScheduleDay object - parse date
+                try:
+                    from datetime import datetime
+                    dt = datetime.strptime(day_obj.date, "%Y-%m-%d")
+                    return dt.strftime("%m/%d/%Y")
+                except:
+                    pass
+        return f"Day {day_num + 1}"
 
     def get_frame(self) -> tk.Frame:
         """Get the main frame for adding to parent container."""

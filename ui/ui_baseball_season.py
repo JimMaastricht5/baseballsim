@@ -514,19 +514,58 @@ class UIBaseballSeason(bbseason.BaseballSeason):
         Returns:
             str: Formatted schedule text
         """
-        day_obj = self.schedule_manager.get_day(day)
-        todays_games = day_obj.games
+        # Check if we're in playoffs
+        regular_season_days = len(self.schedule_manager._schedule_dates)
+        
+        if day >= regular_season_days:
+            # Use playoff schedule
+            playoff_index = day - regular_season_days
+            if self.schedule_manager.is_playoff_day(playoff_index):
+                todays_games = self.schedule_manager.get_playoff_games_for_day(playoff_index)
+                # Get date for playoff day
+                date_str = self.schedule_manager.get_playoff_date(playoff_index)
+                from datetime import datetime
+                dt = datetime.strptime(date_str, "%Y-%m-%d")
+                date_display = dt.strftime("%B %d, %Y")
+            else:
+                todays_games = []
+                date_display = f"Day {day + 1}"
+        else:
+            # Regular season
+            day_obj = self.schedule_manager.get_day(day)
+            if day_obj and hasattr(day_obj, 'games'):
+                todays_games = day_obj.games
+            else:
+                todays_games = []
+            date_str = self.get_date_for_day(day)
+            from datetime import datetime
+            try:
+                dt = datetime.strptime(date_str, "%m/%d/%Y")
+                date_display = dt.strftime("%B %d, %Y")
+            except:
+                date_display = date_str
             
         schedule_lines = []
 
         for game in todays_games:
-            if game.is_off_day:
+            if hasattr(game, 'is_off_day') and game.is_off_day:
                 off_team = game.home if game.home != "OFF DAY" else game.away
                 schedule_lines.append(f"{off_team} has an OFF DAY")
+            elif game == "OFF DAY" or (isinstance(game, (list, tuple)) and "OFF DAY" in game):
+                off_team = game[0] if game[0] != "OFF DAY" else game[1] if isinstance(game, (list, tuple)) else game
+                schedule_lines.append(f"{off_team} has an OFF DAY")
             else:
-                schedule_lines.append(f"{game.away} @ {game.home}")
+                # Handle both formats
+                if hasattr(game, 'away'):
+                    # Include round name for playoff games
+                    if hasattr(game, 'round_name'):
+                        schedule_lines.append(f"{game.away} @ {game.home} ({game.round_name})")
+                    else:
+                        schedule_lines.append(f"{game.away} @ {game.home}")
+                else:
+                    schedule_lines.append(f"{game[0]} @ {game[1]}")
 
-        return f"Day {day + 1}: " + ", ".join(schedule_lines)
+        return f"{date_display}: " + ", ".join(schedule_lines) if schedule_lines else f"{date_display}: No games"
 
     def run_playoffs(self) -> None:
         """

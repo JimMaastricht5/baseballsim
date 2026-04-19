@@ -39,7 +39,12 @@ class ScheduleManager:
         self.schedule = []           # Full schedule (list of days, each day is list of games)
         self._schedule_dates = []     # Date for each day (list of "YYYY-MM-DD" strings)
         self._schedule_times = {}     # {(away, home): "7:10 PM"} for future games
-        self.completed_games = {}   # {(away, home): True} for completed games
+        self.completed_games = {}     # {(away, home): True} for completed games
+        
+        # Playoff schedule (separate from regular season)
+        self._playoff_schedule = []   # List[ScheduleDay] for playoff games
+        self._playoff_dates = []      # ["2026-10-01", ...] for playoffs
+        self._series_winners = {}     # {(away, home): winner_team} for completed series
 
     def load_from_csv(self, csv_path: str = None) -> bool:
         """Load schedule from downloaded CSV file.
@@ -360,6 +365,184 @@ class ScheduleManager:
                 return
         logger.warning(f"Could not find game {away} @ {home} to mark completed")
 
+    def clear_playoffs(self):
+        """Clear all playoff data."""
+        self._playoff_schedule = []
+        self._playoff_dates = []
+        self._series_winners = {}
+
+    def get_playoff_date(self, day_offset: int) -> str:
+        """Calculate date for playoff day N (0 = first playoff day).
+        
+        Args:
+            day_offset: Days from start of playoffs (0-21 for full playoffs)
+            
+        Returns:
+            Date string in "YYYY-MM-DD" format
+        """
+        if not self._schedule_dates:
+            # Default to October 1 if no regular season dates
+            base_date = datetime.datetime(2026, 10, 1)
+        else:
+            # Start from end of regular season
+            last_date = self._schedule_dates[-1]
+            base_date = datetime.datetime.strptime(last_date, "%Y-%m-%d")
+        
+        # First playoff day is the first Monday on or after Oct 1
+        # Find first Monday in October
+        oct_1 = datetime.datetime(base_date.year, 10, 1)
+        # Days until next Monday (0=Monday, so Monday=0)
+        days_until_monday = (7 - oct_1.weekday()) % 7
+        if days_until_monday == 0 and oct_1.weekday() != 0:
+            days_until_monday = 7
+        first_playoff_monday = oct_1 + datetime.timedelta(days=days_until_monday)
+        
+        playoff_date = first_playoff_monday + datetime.timedelta(days=day_offset)
+        return playoff_date.strftime("%Y-%m-%d")
+
+    def is_playoff_day(self, day_index: int) -> bool:
+        """Check if day index is in playoffs.
+        
+        Args:
+            day_index: Day index relative to start of playoffs
+            
+        Returns:
+            True if day_index is within playoff schedule
+        """
+        return 0 <= day_index < len(self._playoff_schedule)
+
+    def get_playoff_games_for_day(self, day_index: int) -> List[GameMatchup]:
+        """Get games for a specific playoff day.
+        
+        Args:
+            day_index: Day index relative to start of playoffs (0 = first playoff day)
+            
+        Returns:
+            List of GameMatchup objects for that day
+        """
+        if 0 <= day_index < len(self._playoff_schedule):
+            return self._playoff_schedule[day_index].games
+        return []
+
+    def get_series_games(self, away: str, home: str) -> List[PlayoffMatchup]:
+        """Get all games for a playoff series.
+        
+        Args:
+            away: Away team abbreviation
+            home: Home team abbreviation
+            
+        Returns:
+            List of PlayoffMatchup objects for this series, sorted by game_num
+        """
+        series_games = []
+        for day in self._playoff_schedule:
+            for game in day.games:
+                if isinstance(game, PlayoffMatchup):
+                    if (game.away == away and game.home == home):
+                        series_games.append(game)
+        return sorted(series_games, key=lambda g: g.game_num)
+
+    def set_series_winner(self, away: str, home: str, winner: str):
+        """Mark series as complete with winner.
+        
+        Args:
+            away: Away team abbreviation
+            home: Home team abbreviation  
+            winner: Winning team abbreviation
+        """
+        self._series_winners[(away, home)] = winner
+        for game in self.get_series_games(away, home):
+            game.series_winner = winner
+
+    def get_series_winner(self, away: str, home: str) -> Optional[str]:
+        """Get winner of completed series.
+        
+        Args:
+            away: Away team abbreviation
+            home: Home team abbreviation
+            
+        Returns:
+            Winner team abbreviation or None if not complete
+        """
+        return self._series_winners.get((away, home))
+
+    def build_full_playoff_bracket(self, al_seeds: List[str], nl_seeds: List[str]):
+        """Build entire playoff schedule at start of playoffs.
+        
+        Creates all playoff games upfront with correct home/away based on MLB format:
+        - Wild Card: Best of 3, all games at higher seed
+        - Division Series: Best of 5, 2-2-1 format
+        - LCS: Best of 7, 2-3-2 format
+        - World Series: Best of 7, 2-3-2 format
+        
+        Args:
+            al_seeds: List of 6 AL team abbreviations in seed order (1-6)
+            nl_seeds: List of 6 NL team abbreviations in seed order (1-6)
+        """
+        self.clear_playoffs()
+        
+        # Day offset tracker
+        day_offset = 0
+        
+        def add_series_games(home: str, away: str, best_of: int, round_name: str):
+            """Add all games for a series."""
+            nonlocal day_offset
+            games_to_add = []
+            
+            for game_num in range(1, best_of + 1):
+                # Determine home team based on MLB format
+                if best_of == 3:  # WC: all at higher seed
+                    current_home, current_away = home, away
+                elif best_of == 5:  # DS: 2-2-1
+                    current_home, current_away = (home, away) if game_num in [1, 2, 5] else (away, home)
+                else:  # LCS/WS: 2-3-2
+                    current_home, current_away = (home, away) if game_num in [1, 2, 6, 7] else (away, home)
+                
+                game = PlayoffMatchup(
+                    home=current_home,
+                    away=current_away,
+                    round_name=round_name,
+                    game_num=game_num,
+                    series_game_index=game_num
+                )
+                games_to_add.append(game)
+            
+            # Add games to schedule (one day per game for playoffs)
+            for game in games_to_add:
+                date_str = self.get_playoff_date(day_offset)
+                day = ScheduleDay(date_str, [game])
+                self._playoff_schedule.append(day)
+                self._playoff_dates.append(date_str)
+                day_offset += 1
+            
+            return games_to_add
+        
+        # Build Wild Card Round (2 days - 3 games each league)
+        # AL: Seed 6 @ Seed 3 (WC1), Seed 5 @ Seed 4 (WC2)
+        # Note: Using seeds as placeholders - actual winners determined after games
+        add_series_games(al_seeds[2], al_seeds[5], 3, "AL Wild Card A")
+        add_series_games(al_seeds[3], al_seeds[4], 3, "AL Wild Card B")
+        # NL: Seed 6 @ Seed 3 (WC1), Seed 5 @ Seed 4 (WC2)
+        add_series_games(nl_seeds[2], nl_seeds[5], 3, "NL Wild Card A")
+        add_series_games(nl_seeds[3], nl_seeds[4], 3, "NL Wild Card B")
+        
+        # Division Series (4 series per league = 20 games max)
+        # DS1: Seed 1 vs WC2 Winner, DS2: Seed 2 vs WC1 Winner
+        # Using seed numbers as placeholders - will be replaced with actual winners
+        add_series_games(al_seeds[0], al_seeds[4], 5, "ALDS A")  # Seed 1 vs WC2 (placeholder)
+        add_series_games(al_seeds[1], al_seeds[5], 5, "ALDS B")  # Seed 2 vs WC1 (placeholder)
+        add_series_games(nl_seeds[0], nl_seeds[4], 5, "NLDS A")
+        add_series_games(nl_seeds[1], nl_seeds[5], 5, "NLDS B")
+        
+        # League Championship Series (2 series per league = 14 games max)
+        add_series_games(al_seeds[0], al_seeds[1], 7, "ALCS")  # Placeholders
+        add_series_games(nl_seeds[0], nl_seeds[1], 7, "NLCS")
+        
+        # World Series (7 games max)
+        add_series_games("AL", "NL", 7, "World Series")
+        
+        logger.info(f"Built playoff schedule: {day_offset} days, {sum(len(d.games) for d in self._playoff_schedule)} games")
+
 
 class GameMatchup:
     """Represents a single game matchup in the schedule."""
@@ -381,6 +564,25 @@ class GameMatchup:
         self.completed = True
         self.home_score = home_score
         self.away_score = away_score
+
+
+class PlayoffMatchup(GameMatchup):
+    """Represents a single playoff game matchup."""
+    
+    def __init__(self, home: str, away: str, round_name: str, game_num: int, series_game_index: int):
+        super().__init__(home, away, time=None)
+        self.round_name = round_name        # "AL Wild Card A", "ALDS A", "NLCS", "World Series"
+        self.game_num = game_num            # 1-7 (which game in series)
+        self.series_game_index = series_game_index  # 1 of N games in round
+        self.series_winner = None           # Set after series completes
+        
+    @property
+    def is_off_day(self) -> bool:
+        return False  # Playoff games are never off days
+    
+    def mark_series_complete(self, winner: str):
+        """Mark the entire series as complete with winner."""
+        self.series_winner = winner
 
 
 class ScheduleDay:

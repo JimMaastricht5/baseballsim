@@ -76,6 +76,7 @@ class SeasonMainWindow:
         self.season_print_box_score_b = season_print_box_score_b
         self.season_team_to_follow = season_team_to_follow or "MIL"
         self.current_day = 0  # Track current simulation day for status messages
+        self._current_processing_day = -1  # Track day being processed (for sync with worker)
         self.world_series_active = False  # Track if World Series is running
         self.saved_standings = None  # Save regular season standings during playoffs
         self.world_series_teams = set()  # Track which teams are in World Series
@@ -735,7 +736,8 @@ F1     - Show this help"""
             # Check day_completed queue
             try:
                 msg = signals.day_completed_queue.get_nowait()
-                self._on_day_completed(msg[1], msg[2])
+                # msg = ('day_completed', game_results, standings_data, day_number)
+                self._on_day_completed(msg[1], msg[2], msg[3])
             except queue.Empty:
                 pass
             except Exception as e:
@@ -946,9 +948,12 @@ F1     - Show this help"""
                 game_data.get("structured_game"),  # Structured game data for formatted display
             )
 
-    def _on_day_completed(self, game_results: list, standings_data: dict):
+    def _on_day_completed(self, game_results: list, standings_data: dict, day_number: int):
         """Handle day_completed message."""
         logger.debug(f"Day completed with {len(game_results)} non-followed games")
+
+        # Track the current day being processed (for synchronization)
+        self._current_processing_day = day_number
 
         # Skip regular season widget updates during World Series
         if self.world_series_active:
@@ -973,6 +978,12 @@ F1     - Show this help"""
         # Update status message based on actual controller pause state
         # This is called after the day completes, so the worker has updated its pause flag
         self._update_status_from_controller()
+
+        # Signal back to worker that UI has finished processing this day
+        # This ensures the worker waits for UI to catch up before proceeding to next day
+        worker = self.controller.get_worker()
+        if worker:
+            worker.signals.emit_day_processed(day_number)
 
     def _on_gm_assessment(self, assessment_data: dict):
         """Handle gm_assessment_ready message."""

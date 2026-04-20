@@ -9,6 +9,7 @@ background thread and putting messages on queues to update the UI.
 """
 
 import threading
+import queue
 
 from ui.signals import SeasonSignals
 from ui.ui_baseball_season import UIBaseballSeason
@@ -159,8 +160,23 @@ class SeasonWorker(threading.Thread):
                 # 2. Call print_standings() (suppressed)
                 # 3. Call check_gm_assessments() which emits gm_assessment_ready
                 # 4. Increment season_day_num
+                current_day = self.season.season_day_num
                 self.season.sim_next_day()
                 logger.debug(f"Completed day {self.season.season_day_num}")
+
+                # Wait for UI to process all signals for this day before proceeding
+                logger.debug(f"Waiting for UI to process day {current_day}")
+                while True:
+                    try:
+                        msg = self.signals.day_processed_queue.get(timeout=30.0)
+                        if msg[1] == current_day:
+                            logger.debug(f"UI finished processing day {current_day}")
+                            break
+                        else:
+                            logger.warning(f"Received day_processed for wrong day: {msg[1]} vs {current_day}")
+                    except queue.Empty:
+                        logger.warning(f"Timeout waiting for day_processed for day {current_day}")
+                        break
 
                 # If in step mode, decrement counter and pause when done
                 if self._step_mode:

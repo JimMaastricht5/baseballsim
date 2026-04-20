@@ -67,6 +67,10 @@ class SeasonSignals:
         self.pause_state_queue = queue.Queue()
         # Message format: (pause_state: str) - "running", "pausing", "paused"
 
+        # Day processed queue - UI signals back to worker after draining all signals for a day
+        self.day_processed_queue = queue.Queue()
+        # Message format: (day_number: int) - signals worker that UI has processed all signals for this day
+
     def emit_day_started(self, day_number: int, schedule_text: str):
         """
         Emit day_started signal.
@@ -77,15 +81,16 @@ class SeasonSignals:
         """
         self.day_started_queue.put(('day_started', day_number, schedule_text))
 
-    def emit_day_completed(self, game_results: List[Dict], standings_data: Dict):
+    def emit_day_completed(self, game_results: List[Dict], standings_data: Dict, day_number: int):
         """
         Emit day_completed signal.
 
         Args:
             game_results (list): List of game result dicts for non-followed teams
             standings_data (dict): Current standings
+            day_number (int): The day number that completed
         """
-        self.day_completed_queue.put(('day_completed', game_results, standings_data))
+        self.day_completed_queue.put(('day_completed', game_results, standings_data, day_number))
 
     def emit_game_completed(self, game_data: Dict):
         """
@@ -179,3 +184,13 @@ class SeasonSignals:
             state (str): One of "running", "pausing", "paused"
         """
         self.pause_state_queue.put(('pause_state', state))
+
+    def emit_day_processed(self, day_number: int):
+        """
+        Emit day_processed signal - UI signals back after draining all signals for a day.
+        This ensures the worker waits for UI to catch up before proceeding to the next day.
+
+        Args:
+            day_number (int): The day number that was processed
+        """
+        self.day_processed_queue.put(('day_processed', day_number))

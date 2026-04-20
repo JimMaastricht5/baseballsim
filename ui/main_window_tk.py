@@ -832,14 +832,18 @@ F1     - Show this help"""
             start_day = worker.season.season_day_num  # May be > 0 if partial season data
             # Set full season schedule
             self.games_widget.set_season_schedule(worker.season.schedule)
-            # Show current day's schedule (may not be day 1 if partial season)
+# Show current day's schedule (may not be day 1 if partial season)
             if len(worker.season.schedule) > start_day:
                 # Get games for the day using ScheduleDay
                 day_obj = worker.season.get_schedule_day(start_day)
                 schedule = [(g.away, g.home) for g in day_obj.games if not g.is_off_day]
                 date_str = worker.season.get_date_for_day(start_day)
                             
+                # Set schedule and dates for games widget
+                self.games_widget.set_season_schedule(worker.season.schedule)
+                self.games_widget.set_schedule_dates(worker.season.schedule_manager.schedule_dates)
                 self.games_widget.on_day_started(start_day, schedule, date_str)
+                
                 # Update schedule widget
                 self.schedule_widget.update_schedule(
                     start_day,
@@ -875,9 +879,9 @@ F1     - Show this help"""
             # Set the full season schedule on first call (handles partial season starts)
             if not hasattr(self, "_schedule_initialized") or not self._schedule_initialized:
                 self.games_widget.set_season_schedule(worker.season.schedule)
+                self.games_widget.set_schedule_dates(worker.season.schedule_manager.schedule_dates)
                 self._schedule_initialized = True
 
-            # Get games for the day (handle both new ScheduleDay objects and old lists)
             # Get games for the day using ScheduleDay
             todays_games = worker.season.get_games_for_day(day_num)
             schedule = [(g.away, g.home) for g in todays_games if not g.is_off_day]
@@ -885,7 +889,7 @@ F1     - Show this help"""
 
             # Update games widget
             self.games_widget.on_day_started(day_num, schedule, date_str)
-
+            
             # Update schedule widget
             self.schedule_widget.update_schedule(
                 day_num,

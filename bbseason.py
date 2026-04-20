@@ -28,9 +28,7 @@ Contact: JimMaastricht5@gmail.com
 """
 
 import datetime
-import os
 import queue
-import random
 import threading
 from typing import Callable, Optional, Dict, Any
 from typing import List
@@ -40,8 +38,8 @@ import pandas as pd
 
 import bb_aigm_manager
 import bbgame
-import bbstats
 import bbschedule_mgr
+import bbstats
 from bblogger import logger
 
 OutputHandlerType = Callable[[str, str, Optional[Dict[str, Any]]], None]
@@ -277,7 +275,7 @@ class BaseballSeason:
 
         # Find starting position using ScheduleManager
         self.season_day_num = self.schedule_manager.find_start_day(
-            self.team_win_loss, 
+            self.team_win_loss,
             self.team_to_follow
         )
 
@@ -374,14 +372,24 @@ class BaseballSeason:
         """
         schedule_str = ""
         game_day_off = ""
-        day_obj = self.schedule[day]
         
-        # Handle both new format (ScheduleDay object) and old format (list)
-        if hasattr(day_obj, 'games'):
-            day_schedule = day_obj.games
+        # Check if we're in playoffs
+        regular_season_days = len(self.schedule_manager._schedule_dates)
+        if day >= regular_season_days:
+            # Use playoff schedule
+            playoff_index = day - regular_season_days
+            if self.schedule_manager.is_playoff_day(playoff_index):
+                day_schedule = self.schedule_manager.get_playoff_games_for_day(playoff_index)
+            else:
+                return "Playoffs complete"
         else:
-            day_schedule = day_obj
-            
+            day_obj = self.schedule[day]
+            # Handle both new format (ScheduleDay object) and old format (list)
+            if hasattr(day_obj, 'games'):
+                day_schedule = day_obj.games
+            else:
+                day_schedule = day_obj
+
         games = []
 
         # Collect games and off days
@@ -874,12 +882,26 @@ class BaseballSeason:
         sim one day of games across the league
         :return: None
         """
+        # Check if we're in playoffs
+        regular_season_days = len(self.schedule_manager._schedule_dates)
+        if season_day_num >= regular_season_days:
+            # Use playoff schedule
+            playoff_index = season_day_num - regular_season_days
+            if self.schedule_manager.is_playoff_day(playoff_index):
+                todays_games = self.schedule_manager.get_playoff_games_for_day(playoff_index)
+                schedule_for_meta = todays_games
+            else:
+                todays_games = []
+                schedule_for_meta = []
+        else:
+            todays_games = self.schedule_manager.get_games_for_day(season_day_num)
+            schedule_for_meta = todays_games
+
         self.output_handler(
             OutputCategory.DAY_SCHEDULE,
             self.print_day_schedule(season_day_num),
-            metadata={"day": season_day_num + 1, "schedule": self.schedule[season_day_num]},
+            metadata={"day": season_day_num + 1, "schedule": schedule_for_meta},
         )
-        todays_games = self.schedule_manager.get_games_for_day(season_day_num)
         # Pass team_to_follow list (if not empty) to show hot/cold players
         teams_list = self.team_to_follow if len(self.team_to_follow) > 0 else None
         self.baseball_data.new_game_day(teams_to_follow=teams_list)  # update rest, injury, and print lists
@@ -896,7 +918,8 @@ class BaseballSeason:
                 pbp_callback = self.play_by_play_callback_factory(game.away, game.home, season_day_num)
 
             # Check if this is a followed game (for structured output)
-            is_followed = (not self.team_to_follow) or any(team in [game.away, game.home] for team in self.team_to_follow)
+            is_followed = (not self.team_to_follow) or any(
+                team in [game.away, game.home] for team in self.team_to_follow)
 
             game_sim = bbgame.Game(
                 away_team_name=game.away,
@@ -952,24 +975,27 @@ class BaseballSeason:
         threads = []
         queues = []
         match_ups = []
-        self.output_handler(
-            OutputCategory.DAY_SCHEDULE,
-            self.print_day_schedule(season_day_num) + "\n",
-            metadata={"day": season_day_num + 1, "schedule": self.schedule[season_day_num]},
-        )
         
-        # Check if we're in playoffs
+        # Check if we're in playoffs FIRST
         regular_season_days = len(self.schedule_manager._schedule_dates)
         if season_day_num >= regular_season_days:
             # Use playoff schedule
             playoff_index = season_day_num - regular_season_days
             if self.schedule_manager.is_playoff_day(playoff_index):
                 todays_games = self.schedule_manager.get_playoff_games_for_day(playoff_index)
+                schedule_for_meta = todays_games
             else:
                 # No more playoff games
                 return
         else:
             todays_games = self.schedule_manager.get_games_for_day(season_day_num)
+            schedule_for_meta = todays_games
+            
+        self.output_handler(
+            OutputCategory.DAY_SCHEDULE,
+            self.print_day_schedule(season_day_num) + "\n",
+            metadata={"day": season_day_num + 1, "schedule": schedule_for_meta},
+        )
         # Pass team_to_follow list (if not empty) to show hot/cold players
         teams_list = self.team_to_follow if len(self.team_to_follow) > 0 else None
         self.baseball_data.new_game_day(teams_to_follow=teams_list)  # update rest, injury, and print lists
@@ -984,7 +1010,8 @@ class BaseballSeason:
                 continue
             # Skip already completed games (check using CSV data)
             if self.schedule_manager.is_game_completed(game.home, game.away):
-                self.output_handler(OutputCategory.SIM_PROGRESS, f"Skipping {game.away} @ {game.home} (already played)\n", metadata=None)
+                self.output_handler(OutputCategory.SIM_PROGRESS,
+                                    f"Skipping {game.away} @ {game.home} (already played)\n", metadata=None)
                 continue
 
             # Create play-by-play callback if factory is provided
@@ -993,7 +1020,8 @@ class BaseballSeason:
                 pbp_callback = self.play_by_play_callback_factory(game.away, game.home, season_day_num)
 
             # Check if this is a followed game (for structured output)
-            is_followed = (not self.team_to_follow) or any(team in [game.away, game.home] for team in self.team_to_follow)
+            is_followed = (not self.team_to_follow) or any(
+                team in [game.away, game.home] for team in self.team_to_follow)
 
             # print(f'in sim day threaded: Playing day #{season_day_num + 1}: {game.away} away against {game.home}')
             game_sim = bbgame.Game(
@@ -1040,7 +1068,8 @@ class BaseballSeason:
             self.schedule_manager.mark_game_completed(game_obj.home, game_obj.away, score[1], score[0])
 
             # Store results for processing (include structured_game for followed games)
-            game_results.append(((game_obj.away, game_obj.home), score, game_recap, away_box_score, home_box_score, structured_game))
+            game_results.append(
+                ((game_obj.away, game_obj.home), score, game_recap, away_box_score, home_box_score, structured_game))
 
         # Process and print all game results
         self._process_and_print_game_results(game_results)
@@ -1203,7 +1232,7 @@ class BaseballSeason:
 
         # Get pre-built series games from schedule_manager
         series_games = self.schedule_manager.get_series_games(away, home)
-        
+
         if not series_games:
             logger.error(f"No series games found for {away} @ {home}")
             return home  # Default to home team as winner
@@ -1222,10 +1251,10 @@ class BaseballSeason:
                 break
 
         winner = home if home_wins > away_wins else away
-        
+
         # Mark series as complete in schedule manager
         self.schedule_manager.set_series_winner(away, home, winner)
-        
+
         self.output_handler(
             OutputCategory.PLAYOFF_ROUND_END,
             f"Result: {winner} wins series {max(home_wins, away_wins)}-{min(home_wins, away_wins)}\n",
@@ -1245,17 +1274,17 @@ class BaseballSeason:
         # Get seeds for both leagues
         al_seeds = self.get_playoff_seeds("AL")
         nl_seeds = self.get_playoff_seeds("NL")
-        
+
         if len(al_seeds) < 6 or len(nl_seeds) < 6:
             logger.warning("Not enough teams to run full playoffs.")
             return
 
         # Build full playoff bracket upfront
         self.schedule_manager.build_full_playoff_bracket(al_seeds, nl_seeds)
-        
+
         # Track playoff day offset (after regular season)
         self.playoff_day_offset = len(self.schedule_manager._schedule_dates)
-        
+
         # Show bracket
         self.output_handler(
             OutputCategory.PLAYOFF_ROUND_START,
@@ -1267,7 +1296,7 @@ class BaseballSeason:
         )
 
         # === AL PLAYOFFS ===
-        
+
         # 1. Wild Card Round (Best of 3)
         # WC1: Seed 6 @ Seed 3, WC2: Seed 5 @ Seed 4
         al_wc1_winner = self.run_playoff_series(al_seeds[5], al_seeds[2], 3, "AL Wild Card A")

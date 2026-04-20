@@ -752,8 +752,6 @@ class Game:
                     self.game_recap += play_text
                     if self.play_by_play_callback:
                         self.play_by_play_callback(play_text)
-                    # print(f'\tManager has made the call to the bull pen.  Pitching change....')
-                    # print(f'\t{pitching.Player} has entered the game for {self.team_names[self.team_pitching()]}')
         return pitch_switch
 
     def balk_wild_pitch(self) -> None:
@@ -1153,10 +1151,6 @@ class Game:
         :return: tuple contains a list of total score for each team, inning by inning score and win loss records,
             and the output string
         """
-        # self.game_recap += f'{self.team_names[0]} vs. {self.team_names[1]} - Final:\n'
-        # if self.is_followed_game:
-        #     followed_teams_in_game = [team for team in self.team_names if team in self.team_to_follow]
-        #     # self.game_recap += f'Following team(s): {", ".join(followed_teams_in_game)}\n'
         while self.is_game_end() is False:
             self.sim_half_inning()
         self.end_game()
@@ -1321,18 +1315,6 @@ class Game:
     def _build_team_box_score(self, team: bbteam.Team, team_idx: int) -> TeamBoxScore:
         """Build a structured TeamBoxScore from the team's box_score object."""
         box = team.box_score
-
-        # DEBUG
-        # logger.info(f"_build_team_box_score: team={team.team_name}, box={box}")
-        # if box and hasattr(box, "box_batting"):
-        #     logger.info(f"  box_batting is None: {box.box_batting is None}")
-        #     logger.info(
-        #         f"  box_batting empty: {box.box_batting.empty if box.box_batting is not None else 'N/A'}"
-        #     )
-        #     if box.box_batting is not None and not box.box_batting.empty:
-        #         logger.info(
-        #             f"  box_batting rows: {len(box.box_batting)}, columns: {list(box.box_batting.columns)[:5]}"
-        #         )
 
         # Build batter entries
         batters = []

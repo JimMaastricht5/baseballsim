@@ -13,6 +13,7 @@ from tkinter import scrolledtext
 from typing import List, Tuple, Dict, Any
 
 from ui.theme import BG_PANEL, BG_WIDGET, TEXT_PRIMARY, TEXT_HEADING, ACCENT_GOLD
+from bblogger import logger
 
 
 class GamesWidget:
@@ -81,6 +82,7 @@ class GamesWidget:
         self.completed_games = {}  # {(day, away, home): {away_r, home_r, away_h, home_h, away_e, home_e}}
         self.schedule_dates = []
         self._current_day = 0
+        self._batch_update_day = None  # Day number being batched - suppress individual redraws
 
     def set_season_schedule(self, schedule: List):
         """Set the full season schedule."""
@@ -216,13 +218,13 @@ class GamesWidget:
 
     def on_day_started(self, day_num: int, schedule: List[Tuple[str, str]], date_str: str = None):
         """Handle day started - update display."""
+        self._batch_update_day = day_num
         self.update_schedule(day_num)
 
     def on_game_completed(self, game_data: Dict[str, Any]):
-        """Handle game completion - update scoreboard."""
+        """Handle game completion - store result, skip redraw during batch."""
         day_num = game_data.get('day_num')
         if day_num is None:
-            # If no day_num provided, use current display day
             day_num = self._current_day
         away = game_data['away_team']
         home = game_data['home_team']
@@ -236,12 +238,14 @@ class GamesWidget:
             'away_e': game_data.get('away_e', 0),
             'home_e': game_data.get('home_e', 0),
         }
-        # Update using the day_num from the game, not current display day
-        self.update_schedule(day_num)
+        logger.debug(f"GamesWidget stored: Day {day_num} {away}@{home}, total: {len(self.completed_games)}")
+        if day_num != self._batch_update_day:
+            self.update_schedule(day_num)
 
     def on_day_completed(self, game_results: List[Dict], standings_data: Dict, day_number: int = None):
-        """Handle day completed - update scores."""
+        """Handle day completed - update all scores and redraw once."""
         update_day = day_number if day_number is not None else self._current_day
+        logger.info(f"on_day_completed: Day {update_day}, receiving {len(game_results)} games")
         for game in game_results:
             day_num = game.get('day_num', update_day)
             away = game['away_team']
@@ -255,7 +259,9 @@ class GamesWidget:
                 'away_e': game.get('away_e', 0),
                 'home_e': game.get('home_e', 0),
             }
-        # Update using the actual completed day, not current display day
+            logger.info(f"  batch: Day {day_num} {away}@{home}")
+        logger.debug(f"on_day_completed: total stored after: {len(self.completed_games)}")
+        self._batch_update_day = None
         self.update_schedule(update_day)
 
     def get_frame(self) -> tk.Frame:

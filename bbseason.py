@@ -918,8 +918,8 @@ class BaseballSeason:
         for game in todays_games:  # run all games for a day, day starts at zero
             if game.is_off_day:  # not an off day
                 continue
-            # Skip already completed games (check using CSV data)
-            if self.schedule_manager.is_game_completed(game.home, game.away):
+            # Skip already completed games (check from schedule object)
+            if game.completed:
                 self.output_handler(OutputCategory.SIM_PROGRESS,
                                     f"Skipping {game.away} @ {game.home} (already played)\n", metadata=None)
                 continue

@@ -210,57 +210,28 @@ class UIBaseballSeason(bbseason.BaseballSeason):
             else:
                 away_team, home_team = match_up
 
-            # Check if this was a followed game
-            # Empty team_to_follow means follow ALL games (used for World Series)
-            is_followed = (not self.team_to_follow) or any(
-                team in self.team_to_follow for team in [away_team, home_team]
+            # Build game data dict for batch emission (all games go to day_completed)
+            compact_summaries.append(
+                {
+                    "away_team": away_team,
+                    "home_team": home_team,
+                    "away_r": score[0],
+                    "home_r": score[1],
+                    "away_h": away_box_score.total_hits,
+                    "home_h": home_box_score.total_hits,
+                    "away_e": away_box_score.total_errors,
+                    "home_e": home_box_score.total_errors,
+                    "game_recap": game_recap,
+                    "day_num": self.season_day_num,
+                    "structured_game": structured_game,
+                }
             )
-
-            # Build game data dict
-            game_data = {
-                "away_team": away_team,
-                "home_team": home_team,
-                "away_r": score[0],
-                "home_r": score[1],
-                "away_h": away_box_score.total_hits,
-                "home_h": home_box_score.total_hits,
-                "away_e": away_box_score.total_errors,
-                "home_e": home_box_score.total_errors,
-                "game_recap": game_recap
-                if is_followed
-                else "",  # Full recap for followed games
-                "day_num": self.season_day_num
-                if is_followed
-                else None,  # Use instance variable
-                "structured_game": structured_game,  # Structured game data for formatted display
-            }
-
-            if is_followed:
-                # Emit immediately for followed teams
-                self.signals.emit_game_completed(game_data)
-                logger.debug(
-                    f"Emitted game_completed for {away_team} @ {home_team}"
-                )
-            else:
-                # Collect for batch emission
-                compact_summaries.append(
-                    {
-                        "away_team": away_team,
-                        "home_team": home_team,
-                        "away_r": score[0],
-                        "home_r": score[1],
-                        "away_h": away_box_score.total_hits,
-                        "home_h": home_box_score.total_hits,
-                        "away_e": away_box_score.total_errors,
-                        "home_e": home_box_score.total_errors,
-                        "game_recap": "",
-                        "day_num": self.season_day_num,
-                        "structured_game": None,
-                    }
-                )
 
         # Emit batch update with standings
         standings_data = self.extract_standings()
+        logger.info(f"Emitting day_completed: Day {self.season_day_num}, {len(compact_summaries)} games")
+        for g in compact_summaries:
+            logger.info(f"  day_completed game: {g['away_team']}@{g['home_team']}")
         self.signals.emit_day_completed(compact_summaries, standings_data, self.season_day_num)
         logger.debug(
             f"Emitted day_completed with {len(compact_summaries)} games and standings"

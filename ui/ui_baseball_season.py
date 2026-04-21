@@ -229,9 +229,9 @@ class UIBaseballSeason(bbseason.BaseballSeason):
 
         # Emit batch update with standings
         standings_data = self.extract_standings()
-        logger.info(f"Emitting day_completed: Day {self.season_day_num}, {len(compact_summaries)} games")
+        logger.debug(f"Emitting day_completed: Day {self.season_day_num}, {len(compact_summaries)} games")
         for g in compact_summaries:
-            logger.info(f"  day_completed game: {g['away_team']}@{g['home_team']}")
+            logger.debug(f"  day_completed game: {g['away_team']}@{g['home_team']}")
         self.signals.emit_day_completed(compact_summaries, standings_data, self.season_day_num)
         logger.debug(
             f"Emitted day_completed with {len(compact_summaries)} games and standings"

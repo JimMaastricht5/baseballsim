@@ -143,65 +143,82 @@ class GamesWidget:
             if not day_games:
                 self.schedule_text.insert(tk.END, "  No games\n", "matchup")
             else:
-                # Process games in groups of 4 per line (like schedule widget)
-                matchups_per_line = 4
-                matchup_count = 0
-                pending_games = []  # Games to show on this line
-                completed_games_list = []  # Completed games for this line
+                # Categorize games
+                completed_rows = []  # [(game, result)]
+                pending_rows = []   # [game]
 
                 for game in day_games:
                     if game.is_off_day:
                         off_team = game.home if game.home != "OFF DAY" else game.away
                         self.schedule_text.insert(tk.END, f"  {off_team} OFF\n", "off_day")
-                        matchup_count += 1
                     else:
-                        away, home = game.away, game.home
-                        game_key = (day_index, away, home)
-
+                        game_key = (day_index, game.away, game.home)
                         if game_key in self.completed_games:
-                            completed_games_list.append((game_key, game, self.completed_games[game_key]))
+                            completed_rows.append((game, self.completed_games[game_key]))
                         else:
-                            pending_games.append((game, game_key))
+                            pending_rows.append(game)
 
-                        matchup_count += 1
+                # Combine: completed first, then pending
+                all_rows = completed_rows + [(g, None) for g in pending_rows]
 
-                # Display completed games, then pending games
-                # Format: (game_obj, is_completed, result_dict_or_None)
-                all_game_items = []
-                for g in completed_games_list:
-                    game_key, game, result = g
-                    all_game_items.append((game, True, result))
-                for g in pending_games:
-                    game, game_key = g
-                    all_game_items.append((game, False, None))
+                # 3 games per line
+                for row_idx in range(0, len(all_rows), 3):
+                    chunk = all_rows[row_idx:row_idx + 3]
 
-                # Show one game per line with full R H E scoreboard
-                for j, (game, is_completed, result) in enumerate(all_game_items):
-                    away, home = game.away, game.home
+                    # Row 1: matchup line
+                    for game, result in chunk:
+                        away, home = game.away, game.home
+                        time_str = game.time if game.time else ""
+                        if result:
+                            # Completed: compact matchup (no time needed)
+                            entry = f"{away}@{home}"
+                            self.schedule_text.insert(tk.END, f"{entry:<15}", "matchup")
+                        else:
+                            # Pending: matchup with time
+                            entry = f"{away}@{home} {time_str}" if time_str else f"{away}@{home}"
+                            self.schedule_text.insert(tk.END, f"{entry:<15}", "matchup")
+                    self.schedule_text.insert(tk.END, "\n", "matchup")
 
-                    if is_completed and result:
-                        away_r = result.get('away_r', 0)
-                        home_r = result.get('home_r', 0)
-                        away_h = result.get('away_h', 0)
-                        home_h = result.get('home_h', 0)
-                        away_e = result.get('away_e', 0)
-                        home_e = result.get('home_e', 0)
+                    # Row 2: RHE label or stats
+                    for game, result in chunk:
+                        if result:
+                            away_r = result.get('away_r', 0)
+                            away_h = result.get('away_h', 0)
+                            away_e = result.get('away_e', 0)
+                            entry = f"  R  H  E"
+                            self.schedule_text.insert(tk.END, f"{entry:<15}", "score")
+                        else:
+                            self.schedule_text.insert(tk.END, f"{'':15}", "matchup")
+                    self.schedule_text.insert(tk.END, "\n", "matchup")
 
-                        self.schedule_text.insert(tk.END, "        R  H  E\n", "score")
-                        self.schedule_text.insert(tk.END, f"  {away:>3s}  {away_r:>2d}  {away_h:>1d}  {away_e:>1d}\n",
-                                                  "score")
-                        self.schedule_text.insert(tk.END, f"  {home:>3s}  {home_r:>2d}  {home_h:>1d}  {home_e:>1d}\n",
-                                                  "score")
-                    elif game.time:
-                        self.schedule_text.insert(tk.END, f"  {away} @ {home} {game.time}\n", "matchup")
-                    else:
-                        self.schedule_text.insert(tk.END, f"  {away} @ {home}\n", "matchup")
+                    # Row 3: away team line
+                    for game, result in chunk:
+                        away = game.away
+                        if result:
+                            away_r = result.get('away_r', 0)
+                            away_h = result.get('away_h', 0)
+                            away_e = result.get('away_e', 0)
+                            entry = f"{away} {away_r} {away_h} {away_e}"
+                            self.schedule_text.insert(tk.END, f"{entry:<15}", "score")
+                        else:
+                            self.schedule_text.insert(tk.END, f"{'':15}", "matchup")
+                    self.schedule_text.insert(tk.END, "\n", "matchup")
 
-                    # Add blank line between games for readability
-                    if j < len(all_game_items) - 1:
-                        self.schedule_text.insert(tk.END, "\n", "matchup")
+                    # Row 4: home team line
+                    for game, result in chunk:
+                        home = game.home
+                        if result:
+                            home_r = result.get('home_r', 0)
+                            home_h = result.get('home_h', 0)
+                            home_e = result.get('home_e', 0)
+                            entry = f"{home} {home_r} {home_h} {home_e}"
+                            self.schedule_text.insert(tk.END, f"{entry:<15}", "score")
+                        else:
+                            self.schedule_text.insert(tk.END, f"{'':15}", "matchup")
+                    self.schedule_text.insert(tk.END, "\n", "matchup")
 
-            self.schedule_text.insert(tk.END, "\n")
+                    # Row 5: blank separator
+                    self.schedule_text.insert(tk.END, "\n", "matchup")
 
         self.schedule_text.config(state=tk.DISABLED)
         self.schedule_text.see("1.0")
@@ -245,7 +262,7 @@ class GamesWidget:
     def on_day_completed(self, game_results: List[Dict], standings_data: Dict, day_number: int = None):
         """Handle day completed - update all scores and redraw once."""
         update_day = day_number if day_number is not None else self._current_day
-        logger.info(f"on_day_completed: Day {update_day}, receiving {len(game_results)} games")
+        logger.debug(f"on_day_completed: Day {update_day}, receiving {len(game_results)} games")
         for game in game_results:
             day_num = game.get('day_num', update_day)
             away = game['away_team']
@@ -259,7 +276,7 @@ class GamesWidget:
                 'away_e': game.get('away_e', 0),
                 'home_e': game.get('home_e', 0),
             }
-            logger.info(f"  batch: Day {day_num} {away}@{home}")
+            logger.debug(f"  batch: Day {day_num} {away}@{home}")
         logger.debug(f"on_day_completed: total stored after: {len(self.completed_games)}")
         self._batch_update_day = None
         self.update_schedule(update_day)

@@ -8,8 +8,8 @@ Displays today's schedule and results in a scrolling list format.
 """
 
 import tkinter as tk
-from tkinter import scrolledtext
 from datetime import datetime
+from tkinter import scrolledtext
 from typing import List, Tuple, Dict, Any
 
 from ui.theme import BG_PANEL, BG_WIDGET, TEXT_PRIMARY, TEXT_HEADING, ACCENT_GOLD
@@ -53,28 +53,28 @@ class GamesWidget:
 
         # Configure text tags for formatting
         self.schedule_text.tag_configure("day_header", font=("Segoe UI", 12, "bold"),
-                                        foreground=ACCENT_GOLD, spacing1=8, spacing3=3)
+                                         foreground=ACCENT_GOLD, spacing1=8, spacing3=3)
         self.schedule_text.tag_configure("current_day", background="#1f3010",
-                                        font=("Segoe UI", 12, "bold"), foreground=ACCENT_GOLD,
-                                        spacing1=8, spacing3=3)
+                                         font=("Segoe UI", 12, "bold"), foreground=ACCENT_GOLD,
+                                         spacing1=8, spacing3=3)
         self.schedule_text.tag_configure("matchup", font=("Consolas", 9),
-                                        lmargin1=10, lmargin2=10)
+                                         lmargin1=10, lmargin2=10)
         self.schedule_text.tag_configure("game_sep", font=("Consolas", 9),
-                                        foreground="#666666")
+                                         foreground="#666666")
         self.schedule_text.tag_configure("scoreboard_header", font=("Consolas", 8),
-                                        foreground="#888888")
+                                         foreground="#888888")
         self.schedule_text.tag_configure("score", font=("Consolas", 10, "bold"),
-                                        foreground=ACCENT_GOLD)
+                                         foreground=ACCENT_GOLD)
         self.schedule_text.tag_configure("time", font=("Consolas", 9),
-                                        foreground="#888888")
+                                         foreground="#888888")
         self.schedule_text.tag_configure("off_day", font=("Consolas", 9),
-                                        foreground="#666666")
+                                         foreground="#666666")
         self.schedule_text.tag_configure("team_name", font=("Consolas", 9, "bold"),
-                                        foreground=ACCENT_GOLD)
+                                         foreground=ACCENT_GOLD)
         self.schedule_text.tag_configure("rhe_label", font=("Consolas", 7),
-                                        foreground="#888888")
+                                         foreground="#888888")
         self.schedule_text.tag_configure("rhe_value", font=("Consolas", 9),
-                                        foreground=TEXT_PRIMARY)
+                                         foreground=TEXT_PRIMARY)
 
         # State
         self.season_schedule = []
@@ -185,12 +185,11 @@ class GamesWidget:
                         away_e = result.get('away_e', 0)
                         home_e = result.get('home_e', 0)
 
-                        # Traditional newspaper scoreboard format:
-                        #       R  H  E
-                        # MIL   3  7  1
-                        # MIA   5  6  0
-                        self.schedule_text.insert(tk.END, f"  {away:>3s}  {away_r:>2d}  {away_h:>1d}  {away_e:>1d}\n", "score")
-                        self.schedule_text.insert(tk.END, f"  {home:>3s}  {home_r:>2d}  {home_h:>1d}  {home_e:>1d}\n", "score")
+                        self.schedule_text.insert(tk.END, "        R  H  E\n", "score")
+                        self.schedule_text.insert(tk.END, f"  {away:>3s}  {away_r:>2d}  {away_h:>1d}  {away_e:>1d}\n",
+                                                  "score")
+                        self.schedule_text.insert(tk.END, f"  {home:>3s}  {home_r:>2d}  {home_h:>1d}  {home_e:>1d}\n",
+                                                  "score")
                     elif game.time:
                         self.schedule_text.insert(tk.END, f"  {away} @ {home} {game.time}\n", "matchup")
                     else:

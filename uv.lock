@@ -7,12 +7,6 @@ resolution-markers = [
     "sys_platform != 'emscripten' and sys_platform != 'win32'",
 ]
 
-[manifest]
-members = [
-    "baseballsimgit",
-    "bbvenv314t-2026-04-14",
-]
-
 [[package]]
 name = "annotated-types"
 version = "0.7.0"
@@ -59,11 +53,6 @@ requires-dist = [
     { name = "selenium", specifier = ">=4.15.0" },
     { name = "webdriver-manager", specifier = ">=4.0.0" },
 ]
-
-[[package]]
-name = "bbvenv314t-2026-04-14"
-version = "0.1.0"
-source = { virtual = "bbvenv314t_2026_04_14" }
 
 [[package]]
 name = "certifi"

@@ -960,7 +960,7 @@ F1     - Show this help"""
             return
 
         # Update games widget (batch update for non-followed games)
-        self.games_widget.on_day_completed(game_results, standings_data)
+        self.games_widget.on_day_completed(game_results, standings_data, day_number)
 
         # Update standings widget
         worker = self.controller.get_worker()

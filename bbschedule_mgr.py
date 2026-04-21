@@ -198,28 +198,29 @@ class ScheduleManager:
 
     def find_start_day(self, team_win_loss: Dict, team_to_follow: List[str]) -> int:
         """Calculate starting position in schedule.
-        
+
         Logic:
-        1. Find today's position: first date >= today in schedule_dates
+        1. Find the first day that has games NOT yet completed
         2. Calculate team position: wins + losses for followed team
         3. Use MAX of both to ensure we start at or after actual position
-        
+
         Args:
             team_win_loss: Dict mapping team to [wins, losses]
             team_to_follow: List of teams to follow
-            
+
         Returns:
             Day number (index) to start simulation
         """
-        # Find today's position in schedule
-        today = datetime.datetime.now().strftime("%Y-%m-%d")
+        # Find the first day that has upcoming (not completed) games
         start_day = 0
-        
+
         for idx, day in enumerate(self.schedule):
-            date = day.date
-            if date >= today and day.has_upcoming_games():
+            if day.has_upcoming_games():
                 start_day = idx
                 break
+        else:
+            # All games completed, start from last day
+            start_day = len(self.schedule) - 1
 
         # Calculate team's position (wins + losses)
         team_day = 0

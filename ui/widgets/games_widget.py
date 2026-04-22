@@ -43,7 +43,7 @@ class GamesWidget:
         # Single scrolling text widget
         self.schedule_text = scrolledtext.ScrolledText(
             self.frame,
-            wrap=tk.WORD,
+            wrap=tk.NONE,
             font=("Consolas", 9),
             state=tk.DISABLED,
             bg=BG_WIDGET,
@@ -58,24 +58,14 @@ class GamesWidget:
         self.schedule_text.tag_configure("current_day", background="#1f3010",
                                          font=("Segoe UI", 12, "bold"), foreground=ACCENT_GOLD,
                                          spacing1=8, spacing3=3)
+        self.schedule_text.tag_configure("upcoming_header", font=("Segoe UI", 11, "bold"),
+                                         foreground=ACCENT_GOLD, spacing1=8, spacing3=3)
         self.schedule_text.tag_configure("matchup", font=("Consolas", 9),
-                                         lmargin1=10, lmargin2=10)
-        self.schedule_text.tag_configure("game_sep", font=("Consolas", 9),
-                                         foreground="#666666")
-        self.schedule_text.tag_configure("scoreboard_header", font=("Consolas", 8),
-                                         foreground="#888888")
-        self.schedule_text.tag_configure("score", font=("Consolas", 10, "bold"),
-                                         foreground=ACCENT_GOLD)
+                                         lmargin1=20, lmargin2=20)
         self.schedule_text.tag_configure("time", font=("Consolas", 9),
                                          foreground="#888888")
         self.schedule_text.tag_configure("off_day", font=("Consolas", 9),
                                          foreground="#666666")
-        self.schedule_text.tag_configure("team_name", font=("Consolas", 9, "bold"),
-                                         foreground=ACCENT_GOLD)
-        self.schedule_text.tag_configure("rhe_label", font=("Consolas", 7),
-                                         foreground="#888888")
-        self.schedule_text.tag_configure("rhe_value", font=("Consolas", 9),
-                                         foreground=TEXT_PRIMARY)
 
         # State
         self.season_schedule = []
@@ -158,67 +148,88 @@ class GamesWidget:
                         else:
                             pending_rows.append(game)
 
-                # Combine: completed first, then pending
-                all_rows = completed_rows + [(g, None) for g in pending_rows]
+                # === Completed Games Section (3 columns) ===
+                if completed_rows:
+                    # Process in chunks of 3
+                    for chunk_idx in range(0, len(completed_rows), 3):
+                        chunk = completed_rows[chunk_idx:chunk_idx + 3]
 
-                # 3 games per line
-                for row_idx in range(0, len(all_rows), 3):
-                    chunk = all_rows[row_idx:row_idx + 3]
+                        # Pad to 3 if needed
+                        while len(chunk) < 3:
+                            chunk.append((None, None))  # Placeholder
 
-                    # Row 1: matchup line
-                    for game, result in chunk:
+                        # Row 1: RHE header
+                        for game, result in chunk:
+                            if game:
+                                self.schedule_text.insert(tk.END, "    R  H  E", "rhe_header")
+                            else:
+                                self.schedule_text.insert(tk.END, f"{'':15}", "placeholder")
+                        self.schedule_text.insert(tk.END, "\n", "matchup")
+
+                        # Row 2: Away team stats
+                        for game, result in chunk:
+                            if game and result:
+                                away = game.away
+                                away_r = result.get('away_r', 0)
+                                away_h = result.get('away_h', 0)
+                                away_e = result.get('away_e', 0)
+                                entry = f"{away} {away_r} {away_h} {away_e}"
+                                self.schedule_text.insert(tk.END, f"{entry:<15}", "score")
+                            else:
+                                self.schedule_text.insert(tk.END, f"{'':15}", "placeholder")
+                        self.schedule_text.insert(tk.END, "\n", "matchup")
+
+                        # Row 3: Home team stats
+                        for game, result in chunk:
+                            if game and result:
+                                home = game.home
+                                home_r = result.get('home_r', 0)
+                                home_h = result.get('home_h', 0)
+                                home_e = result.get('home_e', 0)
+                                entry = f"{home} {home_r} {home_h} {home_e}"
+                                self.schedule_text.insert(tk.END, f"{entry:<15}", "score")
+                            else:
+                                self.schedule_text.insert(tk.END, f"{'':15}", "placeholder")
+                        self.schedule_text.insert(tk.END, "\n", "matchup")
+
+                # === Pending Games Section (4 per line, like schedule) ===
+                if pending_rows:
+                    self.schedule_text.insert(tk.END, "Upcoming Games\n", "upcoming_header")
+
+                    matchups_per_line = 4
+                    matchup_count = 0
+
+                    for game in pending_rows:
+                        if matchup_count % matchups_per_line == 0:
+                            self.schedule_text.insert(tk.END, "  ", "matchup")
+                        else:
+                            self.schedule_text.insert(tk.END, "   ", "matchup")
+
                         away, home = game.away, game.home
-                        time_str = game.time if game.time else ""
-                        if result:
-                            # Completed: compact matchup (no time needed)
-                            entry = f"{away}@{home}"
-                            self.schedule_text.insert(tk.END, f"{entry:<15}", "matchup")
+                        if self.followed_team and away == self.followed_team:
+                            self.schedule_text.insert(tk.END, f"{away:3s}", "score")
                         else:
-                            # Pending: matchup with time
-                            entry = f"{away}@{home} {time_str}" if time_str else f"{away}@{home}"
-                            self.schedule_text.insert(tk.END, f"{entry:<15}", "matchup")
-                    self.schedule_text.insert(tk.END, "\n", "matchup")
-
-                    # Row 2: RHE label or stats
-                    for game, result in chunk:
-                        if result:
-                            away_r = result.get('away_r', 0)
-                            away_h = result.get('away_h', 0)
-                            away_e = result.get('away_e', 0)
-                            entry = f"  R  H  E"
-                            self.schedule_text.insert(tk.END, f"{entry:<15}", "score")
+                            self.schedule_text.insert(tk.END, f"{away:3s}", "matchup")
+                        self.schedule_text.insert(tk.END, " @ ", "matchup")
+                        if self.followed_team and home == self.followed_team:
+                            self.schedule_text.insert(tk.END, f"{home:3s}", "score")
                         else:
-                            self.schedule_text.insert(tk.END, f"{'':15}", "matchup")
-                    self.schedule_text.insert(tk.END, "\n", "matchup")
+                            self.schedule_text.insert(tk.END, f"{home:3s}", "matchup")
 
-                    # Row 3: away team line
-                    for game, result in chunk:
-                        away = game.away
-                        if result:
-                            away_r = result.get('away_r', 0)
-                            away_h = result.get('away_h', 0)
-                            away_e = result.get('away_e', 0)
-                            entry = f"{away} {away_r} {away_h} {away_e}"
-                            self.schedule_text.insert(tk.END, f"{entry:<15}", "score")
-                        else:
-                            self.schedule_text.insert(tk.END, f"{'':15}", "matchup")
-                    self.schedule_text.insert(tk.END, "\n", "matchup")
+                        if game.time:
+                            self.schedule_text.insert(tk.END, f" {game.time}", "time")
 
-                    # Row 4: home team line
-                    for game, result in chunk:
-                        home = game.home
-                        if result:
-                            home_r = result.get('home_r', 0)
-                            home_h = result.get('home_h', 0)
-                            home_e = result.get('home_e', 0)
-                            entry = f"{home} {home_r} {home_h} {home_e}"
-                            self.schedule_text.insert(tk.END, f"{entry:<15}", "score")
-                        else:
-                            self.schedule_text.insert(tk.END, f"{'':15}", "matchup")
-                    self.schedule_text.insert(tk.END, "\n", "matchup")
+                        matchup_count += 1
 
-                    # Row 5: blank separator
-                    self.schedule_text.insert(tk.END, "\n", "matchup")
+                        if matchup_count % matchups_per_line == 0:
+                            self.schedule_text.insert(tk.END, "\n", "matchup")
+
+                    # Final line break if needed
+                    if matchup_count % matchups_per_line != 0:
+                        self.schedule_text.insert(tk.END, "\n", "matchup")
+
+                # Extra spacing between days
+                self.schedule_text.insert(tk.END, "\n", "matchup")
 
         self.schedule_text.config(state=tk.DISABLED)
         self.schedule_text.see("1.0")

@@ -105,6 +105,10 @@ class GamesWidget:
 
     def _build_day_content(self, day_index: int) -> list:
         """Build formatted content for a single day as list of (tag, text) tuples."""
+        # Configuration constants
+        GAMES_PER_ROW = 6
+        COLUMN_WIDTH = 15
+
         if day_index >= len(self.season_schedule) if hasattr(self, 'season_schedule') else True:
             return []
 
@@ -115,7 +119,7 @@ class GamesWidget:
         lines = [("day_header", f"{date_str}\n")]
 
         if not day_games:
-            return []
+            return lines
 
         completed_rows = []
         for game in day_games:
@@ -129,54 +133,123 @@ class GamesWidget:
                 completed_rows.append((game, self.completed_games[game_key]))
 
         if not completed_rows:
-            return []
+            return lines
 
-        # 3 games per row
-        for chunk_idx in range(0, len(completed_rows), 3):
-            chunk = completed_rows[chunk_idx:chunk_idx + 3]
-            while len(chunk) < 3:
+        # Process games in chunks
+        for chunk_idx in range(0, len(completed_rows), GAMES_PER_ROW):
+            chunk = completed_rows[chunk_idx:chunk_idx + GAMES_PER_ROW]
+
+            while len(chunk) < GAMES_PER_ROW:
                 chunk.append((None, None))
 
-            # Check if any game involves the followed team
-            followed_in_chunk = any(
-                game and (game.away == self.followed_team or game.home == self.followed_team)
-                for game, result in chunk
-                if game and result
-            )
-            row_tag = "score_followed" if followed_in_chunk else "score"
-
-            # Row 1: RHE header
-            row1 = ""
+            # --- Row 1: RHE Header (Always neutral) ---
             for game, result in chunk:
                 if game:
-                    row1 += "    R  H  E    "
+                    # Always use 'rhe_header' tag to avoid highlighting the column titles
+                    lines.append(("rhe_header", "    R  H  E    "))
                 else:
-                    row1 += f"{'':15}"
-            lines.append(("rhe_header", row1 + "\n"))
+                    lines.append(("rhe_header", " " * COLUMN_WIDTH))
+            lines.append(("rhe_header", "\n"))
 
-            # Row 2: Away
-            row2 = ""
+            # --- Row 2: Away Team ---
             for game, result in chunk:
                 if game and result:
                     away = game.away
-                    entry = f"{away} {result['away_r']:>2} {result['away_h']:>2} {result['away_e']:>2}"
-                    row2 += f"{entry:<15}"
+                    entry = f"{away:<3} {result['away_r']:>2} {result['away_h']:>2} {result['away_e']:>2}"
+                    tag = "score_followed" if away == self.followed_team else "score"
+                    lines.append((tag, f"{entry:<{COLUMN_WIDTH}}"))
                 else:
-                    row2 += f"{'':15}"
-            lines.append((row_tag, row2 + "\n"))
+                    lines.append(("score", " " * COLUMN_WIDTH))
+            lines.append(("score", "\n"))
 
-            # Row 3: Home
-            row3 = ""
+            # --- Row 3: Home Team ---
             for game, result in chunk:
                 if game and result:
                     home = game.home
-                    entry = f"{home} {result['home_r']:>2} {result['home_h']:>2} {result['home_e']:>2}"
-                    row3 += f"{entry:<15}"
+                    entry = f"{home:<3} {result['home_r']:>2} {result['home_h']:>2} {result['home_e']:>2}"
+                    tag = "score_followed" if home == self.followed_team else "score"
+                    lines.append((tag, f"{entry:<{COLUMN_WIDTH}}"))
                 else:
-                    row3 += f"{'':15}"
-            lines.append((row_tag, row3 + "\n\n"))
+                    lines.append(("score", " " * COLUMN_WIDTH))
+            lines.append(("score", "\n"))
 
-        return list(reversed(lines))  # need to be reversed since newest lines stay on top of screen
+            # Spacer between rows of box scores
+            lines.append(("score", "\n"))
+
+        return list(reversed(lines))
+
+    # def _build_day_content(self, day_index: int) -> list:
+    #     """Build formatted content for a single day as list of (tag, text) tuples."""
+    #     if day_index >= len(self.season_schedule) if hasattr(self, 'season_schedule') else True:
+    #         return []
+    #
+    #     day_obj = self.season_schedule[day_index]
+    #     day_games = day_obj.games if hasattr(day_obj, 'games') else []
+    #
+    #     date_str = self._get_date_for_day(day_index)
+    #     lines = [("day_header", f"{date_str}\n")]
+    #
+    #     if not day_games:
+    #         return []
+    #
+    #     completed_rows = []
+    #     for game in day_games:
+    #         if game.is_off_day:
+    #             off_team = game.home if game.home != "OFF DAY" else game.away
+    #             lines.append(("off_day", f"  {off_team} OFF\n"))
+    #             continue
+    #
+    #         game_key = (day_index, game.away, game.home)
+    #         if game_key in self.completed_games:
+    #             completed_rows.append((game, self.completed_games[game_key]))
+    #
+    #     if not completed_rows:
+    #         return []
+    #
+    #     # 7 games per row
+    #     for chunk_idx in range(0, len(completed_rows), 3):
+    #         chunk = completed_rows[chunk_idx:chunk_idx + 3]
+    #         while len(chunk) < 3:
+    #             chunk.append((None, None))
+    #
+    #         # Check if any game involves the followed team
+    #         followed_in_chunk = any(
+    #             game and (game.away == self.followed_team or game.home == self.followed_team)
+    #             for game, result in chunk
+    #             if game and result
+    #         )
+    #         row_tag = "score_followed" if followed_in_chunk else "score"
+    #
+    #         # Row 1: RHE header
+    #         for col_idx in range(3):
+    #             game = chunk[col_idx][0] if chunk[col_idx][0] else None
+    #             if game:
+    #                 tag = "score_followed" if self.followed_team and (
+    #                         game.away == self.followed_team or game.home == self.followed_team) else "rhe_header"
+    #                 lines.append((tag, "    R  H  E    "))
+    #             else:
+    #                 lines.append(("rhe_header", f"{'':15}"))
+    #         lines.append(("rhe_header", "\n"))
+    #
+    #         # Row 2: Away
+    #         for col_idx in range(3):
+    #             game, result = chunk[col_idx]
+    #             if game and result:
+    #                 away = game.away
+    #                 entry = f"{away} {result['away_r']:>2} {result['away_h']:>2} {result['away_e']:>2}"
+    #                 tag = "score_followed" if self.followed_team and away == self.followed_team else "score"
+    #                 lines.append((tag, f"{entry:<15}"))
+    #
+    #         # Row 3: Home
+    #         for col_idx in range(3):
+    #             game, result = chunk[col_idx]
+    #             if game and result:
+    #                 home = game.home
+    #                 entry = f"{home} {result['home_r']:>2} {result['home_h']:>2} {result['home_e']:>2}"
+    #                 tag = "score_followed" if self.followed_team and home == self.followed_team else "score"
+    #                 lines.append((tag, f"{entry:<15}"))
+    #
+    #     return list(reversed(lines))  # need to be reversed since newest lines stay on top of screen
 
     def update_schedule(self, current_day: int, schedule=None, schedule_times=None, schedule_dates=None):
         """Update the display."""

@@ -279,7 +279,7 @@ F1     - Show this help"""
 
         # Tab 1: Today's Games
         self.games_widget = GamesWidget(self.notebook, self.season_team_to_follow)
-        self.notebook.add(self.games_widget.get_frame(), text="Today's Games")
+        self.notebook.add(self.games_widget.get_frame(), text="Game Results")
 
         # Tab 2: Schedule
         self.schedule_widget = ScheduleWidget(self.notebook, self.season_team_to_follow)

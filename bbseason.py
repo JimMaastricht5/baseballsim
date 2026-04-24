@@ -1042,6 +1042,10 @@ class BaseballSeason:
         Generic runner for a playoff series. Returns the winning team abbreviation.
         Uses pre-built schedule from schedule_manager, looking up by round_name.
         """
+        import queue
+        import threading
+        import bbgame
+        
         needed_to_win = (best_of // 2) + 1
         home_wins = 0
         away_wins = 0
@@ -1065,8 +1069,37 @@ class BaseballSeason:
 
         # Execute each game in the series
         for game in series_games:
-            # Run the game (sim_next_day will handle the playoff day)
-            self.sim_next_day()
+            # Simulate the playoff game directly (same pattern as sim_day_threaded)
+            game_sim = bbgame.Game(
+                away_team_name=away,
+                home_team_name=home,
+                baseball_data=self.baseball_data,
+                game_num=self.season_day_num,
+                rotation_len=self.rotation_len,
+                print_lineup=self.print_lineup_b,
+                chatty=False,  # Quiet for playoffs
+                print_box_score_b=self.print_box_score_b,
+                team_to_follow=self.team_to_follow,
+                interactive=self.interactive,
+                obp_adjustment=self.obp_adjustment,
+            )
+            q = queue.Queue()
+            is_followed = (not self.team_to_follow) or away in self.team_to_follow or home in self.team_to_follow
+            thread = threading.Thread(target=game_sim.sim_game_threaded, args=(q, is_followed))
+            thread.start()
+            thread.join()
+            result = q.get()
+            
+            # Handle both structured (7 elements) and non-structured (6 elements) results
+            if len(result) == 7:
+                (score, inning, win_loss_list, away_box_score, home_box_score, game_recap, structured_game) = result
+            else:
+                (score, inning, win_loss_list, away_box_score, home_box_score, game_recap) = result
+            
+            # Update team win/loss records
+            self.update_win_loss(away_team_name=away, home_team_name=home, win_loss=win_loss_list)
+            self.baseball_data.game_results_to_season(box_score_class=away_box_score)
+            self.baseball_data.game_results_to_season(box_score_class=home_box_score)
 
             # Check who won the most recent game
             home_wins = self.team_win_loss[home][WIN] - start_wins[home]
@@ -1115,17 +1148,18 @@ class BaseballSeason:
         )
 
         # === WILD CARD ROUND (Best of 3) ===
-        # Build and run AL Wild Card
+        # Build and run AL Wild Card - higher seed hosts (home)
+        # WC A: Seed 6 @ Seed 3, WC B: Seed 5 @ Seed 4
         self.schedule_manager.clear_playoffs()
-        self.schedule_manager.build_playoff_series(al_seeds[2], al_seeds[5], 3, "AL Wild Card A")
-        self.schedule_manager.build_playoff_series(al_seeds[3], al_seeds[4], 3, "AL Wild Card B")
+        self.schedule_manager.build_playoff_series(al_seeds[5], al_seeds[2], 3, "AL Wild Card A")
+        self.schedule_manager.build_playoff_series(al_seeds[4], al_seeds[3], 3, "AL Wild Card B")
         al_wc1_winner = self.run_playoff_series(al_seeds[5], al_seeds[2], 3, "AL Wild Card A")
         al_wc2_winner = self.run_playoff_series(al_seeds[4], al_seeds[3], 3, "AL Wild Card B")
 
-        # Build and run NL Wild Card
+        # Build and run NL Wild Card - higher seed hosts (home)
         self.schedule_manager.clear_playoffs()
-        self.schedule_manager.build_playoff_series(nl_seeds[2], nl_seeds[5], 3, "NL Wild Card A")
-        self.schedule_manager.build_playoff_series(nl_seeds[3], nl_seeds[4], 3, "NL Wild Card B")
+        self.schedule_manager.build_playoff_series(nl_seeds[5], nl_seeds[2], 3, "NL Wild Card A")
+        self.schedule_manager.build_playoff_series(nl_seeds[4], nl_seeds[3], 3, "NL Wild Card B")
         nl_wc1_winner = self.run_playoff_series(nl_seeds[5], nl_seeds[2], 3, "NL Wild Card A")
         nl_wc2_winner = self.run_playoff_series(nl_seeds[4], nl_seeds[3], 3, "NL Wild Card B")
 

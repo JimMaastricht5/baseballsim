@@ -337,9 +337,7 @@ class SimAB:
 
         # We apply a portion of the fatigue factor to the HR rate as well
         # This makes 'tired' pitchers give up 'hanging sliders' (Home Runs)
-        fatigue_hr_boost = (
-            self.pitching.Game_Fatigue_Factor * 0.0
-        )  # adjust up from zero to incorporate feature
+        fatigue_hr_boost = self.pitching.Game_Fatigue_Factor * 0.5
 
         batter_hr_rate = (
             ((self.batting.HR + self.HR_adjustment) / self.batting.Total_OB)

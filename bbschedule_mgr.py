@@ -443,6 +443,62 @@ class ScheduleManager:
                         series_games.append(game)
         return sorted(series_games, key=lambda g: g.game_num)
 
+    def get_series_games_by_round(self, round_name: str) -> List[PlayoffMatchup]:
+        """Get all games for a playoff series by round name.
+        
+        Args:
+            round_name: Round identifier (e.g., "AL Wild Card A", "ALDS A", "ALCS", "World Series")
+            
+        Returns:
+            List of PlayoffMatchup objects for this round, sorted by game_num
+        """
+        series_games = []
+        for day in self._playoff_schedule:
+            for game in day.games:
+                if isinstance(game, PlayoffMatchup) and game.round_name == round_name:
+                    series_games.append(game)
+        return sorted(series_games, key=lambda g: g.game_num)
+
+    def build_playoff_series(self, away: str, home: str, best_of: int, round_name: str):
+        """Build a single playoff series with the given matchup.
+        
+        Args:
+            away: Away team abbreviation
+            home: Home team abbreviation
+            best_of: Best of N games (3, 5, or 7)
+            round_name: Round identifier (e.g., "AL Wild Card A", "ALDS A")
+        """
+        day_offset = len(self._playoff_schedule)
+        games_to_add = []
+        
+        for game_num in range(1, best_of + 1):
+            # Determine home team based on MLB format
+            if best_of == 3:  # WC: all at higher seed
+                current_home, current_away = home, away
+            elif best_of == 5:  # DS: 2-2-1
+                current_home, current_away = (home, away) if game_num in [1, 2, 5] else (away, home)
+            else:  # LCS/WS: 2-3-2
+                current_home, current_away = (home, away) if game_num in [1, 2, 6, 7] else (away, home)
+            
+            game = PlayoffMatchup(
+                home=current_home,
+                away=current_away,
+                round_name=round_name,
+                game_num=game_num,
+                series_game_index=game_num
+            )
+            games_to_add.append(game)
+        
+        # Add games to schedule (one day per game for playoffs)
+        for game in games_to_add:
+            date_str = self.get_playoff_date(day_offset)
+            day = ScheduleDay(date_str, [game])
+            self._playoff_schedule.append(day)
+            self._playoff_dates.append(date_str)
+            day_offset += 1
+        
+        logger.debug(f"Built {round_name}: {away} @ {home} ({best_of} games)")
+
     def set_series_winner(self, away: str, home: str, winner: str):
         """Mark series as complete with winner.
         

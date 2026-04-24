@@ -282,7 +282,7 @@ class BaseballStats:
         # --- Recovery/Fatigue Constants ---
         self.condition_change_per_day = 17  # Base daily condition recovery (mid-point of distribution)
         self.fatigue_start_perc = 70  # % of avg batters faced where pitcher fatigue begins
-        self.fatigue_rate = 0.001  # OBP penalty rate when pitcher is fatigued
+        self.fatigue_rate = 0.005  # OBP penalty rate when pitcher is fatigued (increased from 0.001 for more impact)
         self.fatigue_pitching_change_limit = 5  # Pull pitcher when condition <= 5
         # fatigue_unavailable: Player ineligible for selection when condition <= 33
         # Gap of 28 points between (5) and (33) creates a "tired but playable" zone

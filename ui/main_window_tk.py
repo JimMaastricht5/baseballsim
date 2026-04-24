@@ -940,12 +940,25 @@ F1     - Show this help"""
 
         # If there's a game_recap, add to games_played widget
         if game_data.get("game_recap") and game_data.get("day_num") is not None:
+            # Get date for this day
+            date_str = None
+            try:
+                worker = self.controller.get_worker()
+                if worker and worker.season:
+                    full_date = worker.season.get_date_for_day(game_data["day_num"])
+                    # Strip year - just show "April 5" format
+                    if full_date:
+                        date_str = full_date.replace(", 2026", "").replace(", 2025", "").replace(", 2024", "").replace(", 2023", "")
+            except Exception:
+                pass  # Ignore date lookup errors
+
             self.games_played_widget.add_game_recap(
                 game_data["day_num"],
                 game_data["away_team"],
                 game_data["home_team"],
                 game_data["game_recap"],
-                game_data.get("structured_game"),  # Structured game data for formatted display
+                game_data.get("structured_game"),
+                date_str,
             )
 
     def _on_day_completed(self, game_results: list, standings_data: dict, day_number: int):

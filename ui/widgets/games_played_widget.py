@@ -439,6 +439,7 @@ class GamesPlayedWidget:
         home_team: str,
         game_recap: str,
         structured_game: Any = None,
+        date_str: str = None,
     ):
         """
         Add a game recap to the play-by-play storage.
@@ -449,6 +450,7 @@ class GamesPlayedWidget:
             home_team: Home team abbreviation
             game_recap: Full game play-by-play text (fallback)
             structured_game: GameRecap Pydantic object (preferred)
+            date_str: Date string for this game (e.g., "April 5, 2026")
         """
         if day_num not in self.pbp_by_day:
             self.pbp_by_day[day_num] = []
@@ -457,9 +459,20 @@ class GamesPlayedWidget:
             (away_team, home_team, game_recap, structured_game)
         )
 
-        # Update dropdown with new day
-        current_days = [f"Day {d + 1}" for d in sorted(self.pbp_by_day.keys())]
-        self.pbp_day_combo["values"] = ["Select Day"] + current_days
+        # Store date if provided
+        if date_str:
+            if not hasattr(self, '_day_dates'):
+                self._day_dates = {}
+            self._day_dates[day_num] = date_str
+
+        # Update dropdown with date if available, otherwise use Day # (most recent first)
+        day_options = []
+        for d in sorted(self.pbp_by_day.keys(), reverse=True):
+            if hasattr(self, '_day_dates') and d in self._day_dates:
+                day_options.append(self._day_dates[d])
+            else:
+                day_options.append(f"Day {d + 1}")
+        self.pbp_day_combo["values"] = ["Select Day"] + day_options
 
         logger.debug(
             f"Added game recap for Day {day_num + 1}: {away_team} @ {home_team}"
@@ -472,11 +485,24 @@ class GamesPlayedWidget:
         if selected == "Select Day":
             return
 
-        # Extract day number from "Day X" format
-        try:
-            day_num = int(selected.split()[1]) - 1  # Convert back to 0-indexed
-        except (ValueError, IndexError):
-            logger.error(f"Invalid day selection: {selected}")
+        # Determine day number - check if it's a date string or "Day X" format
+        day_num = None
+        if selected.startswith("Day "):
+            try:
+                day_num = int(selected.split()[1]) - 1  # Convert back to 0-indexed
+            except (ValueError, IndexError):
+                logger.error(f"Invalid day selection: {selected}")
+                return
+        else:
+            # It's a date string - look up day number from _day_dates
+            if hasattr(self, '_day_dates'):
+                for d, date_str in self._day_dates.items():
+                    if date_str == selected:
+                        day_num = d
+                        break
+
+        if day_num is None:
+            logger.error(f"Could not find day number for: {selected}")
             return
 
         # Get games for this day

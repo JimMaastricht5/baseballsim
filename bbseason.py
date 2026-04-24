@@ -1040,7 +1040,7 @@ class BaseballSeason:
     def run_playoff_series(self, away: str, home: str, best_of: int, round_name: str) -> str:
         """
         Generic runner for a playoff series. Returns the winning team abbreviation.
-        Uses pre-built schedule from schedule_manager.
+        Uses pre-built schedule from schedule_manager, looking up by round_name.
         """
         needed_to_win = (best_of // 2) + 1
         home_wins = 0
@@ -1052,11 +1052,15 @@ class BaseballSeason:
         # Track wins specifically for this series
         start_wins = {home: self.team_win_loss[home][WIN], away: self.team_win_loss[away][WIN]}
 
-        # Get pre-built series games from schedule_manager
-        series_games = self.schedule_manager.get_series_games(away, home)
+        # Get pre-built series games from schedule_manager - prefer round_name lookup
+        series_games = self.schedule_manager.get_series_games_by_round(round_name)
+        
+        # Fall back to away/home lookup if no round_name match
+        if not series_games:
+            series_games = self.schedule_manager.get_series_games(away, home)
 
         if not series_games:
-            logger.error(f"No series games found for {away} @ {home}")
+            logger.error(f"No series games found for {away} @ {home} (round: {round_name})")
             return home  # Default to home team as winner
 
         # Execute each game in the series
@@ -1086,7 +1090,7 @@ class BaseballSeason:
     def run_playoffs(self):
         """
         Orchestrates the full MLB playoff bracket.
-        Uses schedule_manager to build and track playoff schedule.
+        Dynamically rebuilds bracket after each round with actual winners.
         """
         if self.season_length < 10:
             return  # Safety for short test seasons
@@ -1101,13 +1105,6 @@ class BaseballSeason:
             logger.warning("Not enough teams to run full playoffs.")
             return
 
-        # Build full playoff bracket upfront
-        self.schedule_manager.build_full_playoff_bracket(al_seeds, nl_seeds)
-
-        # Track playoff day offset (after regular season)
-        self.playoff_day_offset = len(self.schedule_manager._schedule_dates)
-
-        # Show bracket
         self.output_handler(
             OutputCategory.PLAYOFF_ROUND_START,
             f"\nAL Bracket: 1:{al_seeds[0]}, 2:{al_seeds[1]}, 3:{al_seeds[2]} | WC: 4:{al_seeds[3]}, 5:{al_seeds[4]}, 6:{al_seeds[5]}\n",
@@ -1117,40 +1114,53 @@ class BaseballSeason:
             f"\nNL Bracket: 1:{nl_seeds[0]}, 2:{nl_seeds[1]}, 3:{nl_seeds[2]} | WC: 4:{nl_seeds[3]}, 5:{nl_seeds[4]}, 6:{nl_seeds[5]}\n",
         )
 
-        # === AL PLAYOFFS ===
-
-        # 1. Wild Card Round (Best of 3)
-        # WC1: Seed 6 @ Seed 3, WC2: Seed 5 @ Seed 4
+        # === WILD CARD ROUND (Best of 3) ===
+        # Build and run AL Wild Card
+        self.schedule_manager.clear_playoffs()
+        self.schedule_manager.build_playoff_series(al_seeds[2], al_seeds[5], 3, "AL Wild Card A")
+        self.schedule_manager.build_playoff_series(al_seeds[3], al_seeds[4], 3, "AL Wild Card B")
         al_wc1_winner = self.run_playoff_series(al_seeds[5], al_seeds[2], 3, "AL Wild Card A")
         al_wc2_winner = self.run_playoff_series(al_seeds[4], al_seeds[3], 3, "AL Wild Card B")
 
-        # 2. Division Series (Best of 5)
-        # DS1: Seed 1 vs WC2 Winner, DS2: Seed 2 vs WC1 Winner
-        al_ds1_winner = self.run_playoff_series(al_wc2_winner, al_seeds[0], 5, "ALDS A")
-        al_ds2_winner = self.run_playoff_series(al_wc1_winner, al_seeds[1], 5, "ALDS B")
-
-        # 3. League Championship Series (Best of 7)
-        # Higher seed hosts
-        al_lcs_home = al_ds1_winner if al_seeds.index(al_ds1_winner) < al_seeds.index(al_ds2_winner) else al_ds2_winner
-        al_lcs_away = al_ds2_winner if al_lcs_home == al_ds1_winner else al_ds1_winner
-        al_champ = self.run_playoff_series(al_lcs_away, al_lcs_home, 7, "ALCS")
-
-        # === NL PLAYOFFS ===
-
-        # 1. Wild Card Round (Best of 3)
+        # Build and run NL Wild Card
+        self.schedule_manager.clear_playoffs()
+        self.schedule_manager.build_playoff_series(nl_seeds[2], nl_seeds[5], 3, "NL Wild Card A")
+        self.schedule_manager.build_playoff_series(nl_seeds[3], nl_seeds[4], 3, "NL Wild Card B")
         nl_wc1_winner = self.run_playoff_series(nl_seeds[5], nl_seeds[2], 3, "NL Wild Card A")
         nl_wc2_winner = self.run_playoff_series(nl_seeds[4], nl_seeds[3], 3, "NL Wild Card B")
 
-        # 2. Division Series (Best of 5)
+        # === DIVISION SERIES (Best of 5) ===
+        # ALDS A: Seed 1 vs WC2 winner, ALDS B: Seed 2 vs WC1 winner
+        self.schedule_manager.clear_playoffs()
+        self.schedule_manager.build_playoff_series(al_wc2_winner, al_seeds[0], 5, "ALDS A")
+        self.schedule_manager.build_playoff_series(al_wc1_winner, al_seeds[1], 5, "ALDS B")
+        al_ds1_winner = self.run_playoff_series(al_wc2_winner, al_seeds[0], 5, "ALDS A")
+        al_ds2_winner = self.run_playoff_series(al_wc1_winner, al_seeds[1], 5, "ALDS B")
+
+        # NLDS A: Seed 1 vs WC2 winner, NLDS B: Seed 2 vs WC1 winner
+        self.schedule_manager.clear_playoffs()
+        self.schedule_manager.build_playoff_series(nl_wc2_winner, nl_seeds[0], 5, "NLDS A")
+        self.schedule_manager.build_playoff_series(nl_wc1_winner, nl_seeds[1], 5, "NLDS B")
         nl_ds1_winner = self.run_playoff_series(nl_wc2_winner, nl_seeds[0], 5, "NLDS A")
         nl_ds2_winner = self.run_playoff_series(nl_wc1_winner, nl_seeds[1], 5, "NLDS B")
 
-        # 3. League Championship Series (Best of 7)
+        # === LEAGUE CHAMPIONSHIP SERIES (Best of 7) ===
+        # Higher seed hosts based on regular season record
+        al_lcs_home = al_ds1_winner if al_seeds.index(al_ds1_winner) < al_seeds.index(al_ds2_winner) else al_ds2_winner
+        al_lcs_away = al_ds2_winner if al_lcs_home == al_ds1_winner else al_ds1_winner
+        self.schedule_manager.clear_playoffs()
+        self.schedule_manager.build_playoff_series(al_lcs_away, al_lcs_home, 7, "ALCS")
+        al_champ = self.run_playoff_series(al_lcs_away, al_lcs_home, 7, "ALCS")
+
         nl_lcs_home = nl_ds1_winner if nl_seeds.index(nl_ds1_winner) < nl_seeds.index(nl_ds2_winner) else nl_ds2_winner
         nl_lcs_away = nl_ds2_winner if nl_lcs_home == nl_ds1_winner else nl_ds1_winner
+        self.schedule_manager.clear_playoffs()
+        self.schedule_manager.build_playoff_series(nl_lcs_away, nl_lcs_home, 7, "NLCS")
         nl_champ = self.run_playoff_series(nl_lcs_away, nl_lcs_home, 7, "NLCS")
 
-        # 4. World Series
+        # === WORLD SERIES ===
+        self.schedule_manager.clear_playoffs()
+        self.schedule_manager.build_playoff_series(al_champ, nl_champ, 7, "World Series")
         self.run_world_series_new(al_champ, nl_champ)
 
     def run_world_series_new(self, al_champ: str, nl_champ: str):

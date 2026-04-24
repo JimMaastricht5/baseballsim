@@ -588,7 +588,8 @@ class Team:
 
             # Calculate additional fatigue from current outing
             # Reduce condition when facing more than fatigue_start_perc (70%) of average batters
-            workload_fatigue = max(0, (cur_ratio - self.fatigue_start_perc) * 0.3)
+            # Increased multiplier from 0.3 to 1.0 for stronger fatigue impact
+            workload_fatigue = max(0, (cur_ratio - self.fatigue_start_perc) * 1.0)
 
             # New condition = starting condition minus workload fatigue
             new_condition = max(0, starting_condition - workload_fatigue)

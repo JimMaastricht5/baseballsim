@@ -181,12 +181,13 @@ class UIBaseballSeason(bbseason.BaseballSeason):
 
         Processes game results and emits:
         - game_completed signal for each followed team game (immediate)
-        - day_completed signal with batch of non-followed games and standings
+        - day_completed signal with batch of all games and standings
 
         Args:
             game_results: List of tuples (match_up, score, game_recap, away_box_score, home_box_score, structured_game)
         """
         compact_summaries = []
+        followed_game_data = []
 
         for result in game_results:
             # Handle both old format (5 elements) and new format (6 elements with structured_game)
@@ -211,21 +212,30 @@ class UIBaseballSeason(bbseason.BaseballSeason):
                 away_team, home_team = match_up
 
             # Build game data dict for batch emission (all games go to day_completed)
-            compact_summaries.append(
-                {
-                    "away_team": away_team,
-                    "home_team": home_team,
-                    "away_r": score[0],
-                    "home_r": score[1],
-                    "away_h": away_box_score.total_hits,
-                    "home_h": home_box_score.total_hits,
-                    "away_e": away_box_score.total_errors,
-                    "home_e": home_box_score.total_errors,
-                    "game_recap": game_recap,
-                    "day_num": self.season_day_num,
-                    "structured_game": structured_game,
-                }
-            )
+            game_data = {
+                "away_team": away_team,
+                "home_team": home_team,
+                "away_r": score[0],
+                "home_r": score[1],
+                "away_h": away_box_score.total_hits,
+                "home_h": home_box_score.total_hits,
+                "away_e": away_box_score.total_errors,
+                "home_e": home_box_score.total_errors,
+                "game_recap": game_recap,
+                "day_num": self.season_day_num,
+                "structured_game": structured_game,
+            }
+            compact_summaries.append(game_data)
+
+            # Also track followed team games separately for game_completed signal
+            if self.team_to_follow and any(
+                team in self.team_to_follow for team in [away_team, home_team]
+            ):
+                followed_game_data.append(game_data)
+
+        # Emit game_completed for followed team games (immediate update for play-by-play widget)
+        for game_data in followed_game_data:
+            self.signals.emit_game_completed(game_data)
 
         # Emit batch update with standings
         standings_data = self.extract_standings()

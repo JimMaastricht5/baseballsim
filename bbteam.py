@@ -608,32 +608,49 @@ class Team:
         :return: returns the impact to obp for pitcher fatigue, if tired they give up more hits
                 also returns the new cur_ratio
         """
-        # Extract scalars to avoid Series math issues
+        # 1. Data Extraction
         cur_game_faced = self.box_score.batters_faced(cur_pitching_index)
         avg_faced = float(self.gameplay_pitching_df["AVG_faced"])
         current_cond = float(self.gameplay_pitching_df["Condition"])
 
-        if avg_faced <= 0: avg_faced = 20.0
-        cur_ratio = (cur_game_faced / avg_faced) * 100
+        if avg_faced <= 0: avg_faced = 25.0  # Increased default to ~6 innings
 
-        # LOWER the threshold for the multiplier or make it more sensitive to lower performance
+        # Calculate ratio (0.0 to 1.0+ for easier math)
+        cur_ratio_raw = cur_game_faced / avg_faced
+        cur_ratio_pct = cur_ratio_raw * 100
+
+        # 2. Condition Multiplier (Toned down)
+        # The previous np.power(deficit * 4, 2) was likely creating 2x-4x penalties too early.
         multiplier_threshold = self.baseball_data.fatigue_start_perc
+        condition_multiplier = 1.0
+
         if current_cond < multiplier_threshold:
+            # Linearize the deficit so it doesn't explode
             deficit = (multiplier_threshold - current_cond) / multiplier_threshold
-            condition_multiplier = 1 + np.power(deficit * 4, 2)  # more aggressive perf drop
-        else:
-            condition_multiplier = 1.0
+            condition_multiplier = 1 + (deficit * 1.5)  # Max 2.5x penalty instead of infinite
 
+        # 3. Quadratic Fatigue Calculation
+        # This prevents the "3rd inning exit" by making early fatigue negligible.
         in_game_fatigue = 0.0
-        if cur_ratio >= self.fatigue_start_perc:
-            # If fatigue_rate is 0.005, a 10-point ratio overage becomes a .050 OBP penalty
+        start_decimal = self.fatigue_start_perc / 100.0
+
+        if cur_ratio_raw > start_decimal:
+            # Distance past the fatigue point (e.g., 0.05)
+            overage = cur_ratio_raw - start_decimal
+
+            # Squaring the overage creates a curve:
+            # (0.1 over)^2 = 0.01 penalty base (Small)
+            # (0.3 over)^2 = 0.09 penalty base (Large)
+            curve_factor = np.power(overage * 10, 2) / 100
+
             dynamic_rate = self.fatigue_rate * condition_multiplier
-            in_game_fatigue = (cur_ratio - self.fatigue_start_perc) * dynamic_rate
+            # Scale back the raw OBP impact (e.g., .005 * factor)
+            in_game_fatigue = curve_factor * dynamic_rate * 100
 
-        # Update the condition state for the next batter
-        self.set_pitching_condition(cur_ratio)
+        # Update state
+        self.set_pitching_condition(cur_ratio_pct)
 
-        return float(in_game_fatigue), float(cur_ratio)
+        return float(in_game_fatigue), float(cur_ratio_pct)
 
     def set_batting_condition(self) -> None:
         """

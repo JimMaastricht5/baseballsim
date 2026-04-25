@@ -842,6 +842,7 @@ class PlayoffWidget:
         else:
             al = ws_data.get("al_winner", "")
             nl = ws_data.get("nl_winner", "")
+            self.ws_active = True
             self.ws_info = ws_data
             self.series_score = {al: 0, nl: 0}
             self.header_label.config(text=f"{season} World Series: {al} vs {nl}")
@@ -890,8 +891,7 @@ class PlayoffWidget:
         # Keep the game table visible, just add champion banner
         champion = ws_data.get("champion", "")
 
-        # First display the game table
-        self._display_todays_games()
+        # Add champion banner at the bottom (games are already displayed)
 
         # Then add champion banner at the top
         result_frame = tk.Frame(self.scrollable_frame.scrollable_frame, bg=BG_WIDGET)

@@ -1101,6 +1101,26 @@ class BaseballSeason:
             self.baseball_data.game_results_to_season(box_score_class=away_box_score)
             self.baseball_data.game_results_to_season(box_score_class=home_box_score)
 
+            # Emit game result for UI routing (playoff widget)
+            away_score = home_score = None
+            if structured_game:
+                away_score = structured_game.final_score[0]
+                home_score = structured_game.final_score[1]
+            self.output_handler(
+                OutputCategory.GAME_RESULT_FULL,
+                game_recap,
+                metadata={
+                    "game_recap": game_recap,
+                    "structured_game": structured_game,
+                    "is_playoff": True,
+                    "round_name": round_name,
+                    "away_team": away,
+                    "home_team": home,
+                    "away_r": away_score,
+                    "home_r": home_score,
+                },
+            )
+
             # Check who won the most recent game
             home_wins = self.team_win_loss[home][WIN] - start_wins[home]
             away_wins = self.team_win_loss[away][WIN] - start_wins[away]
@@ -1201,7 +1221,19 @@ class BaseballSeason:
         """
         Modified World Series runner that integrates with the playoff flow.
         """
-        self.output_handler(OutputCategory.WORLD_SERIES_START, f"\n{'*' * 20} WORLD SERIES {'*' * 20}\n")
+        al_record = self.team_win_loss[al_champ]
+        nl_record = self.team_win_loss[nl_champ]
+        self.output_handler(
+            OutputCategory.WORLD_SERIES_START,
+            f"\n{'*' * 20} WORLD SERIES {'*' * 20}\n",
+            metadata={
+                "al_winner": al_champ,
+                "nl_winner": nl_champ,
+                "season": self.new_season,
+                "al_start_wins": al_record[WIN],
+                "nl_start_wins": nl_record[WIN],
+            },
+        )
 
         # Determine home field via record
         winner = self.run_playoff_series(al_champ, nl_champ, 7, "World Series")
@@ -1209,7 +1241,11 @@ class BaseballSeason:
         ws_champion_msg = f"\n\n{'=' * 80}\n"
         ws_champion_msg += f"{self.new_season} WORLD SERIES CHAMPION: {self.team_city_dict[winner]} ({winner})\n"
         ws_champion_msg += f"{'=' * 80}\n\n"
-        self.output_handler(OutputCategory.WORLD_SERIES_END, ws_champion_msg)
+        self.output_handler(
+            OutputCategory.WORLD_SERIES_END,
+            ws_champion_msg,
+            metadata={"champion": winner},
+        )
 
     def sim_full_season(self) -> None:
         """

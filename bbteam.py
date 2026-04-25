@@ -17,26 +17,26 @@ DEPENDENCIES: pandas, bbgame_box_stats, bbstats, bblogger.
 Contact: JimMaastricht5@gmail.com
 """
 
+from typing import Any, Dict, List, Optional, Tuple, Union
+
+import numpy as np
 import pandas as pd
-from dotenv.parser import Position
+from numpy import bool_, float64, int32, int64
+from pandas.core.series import Series
 
 import bbgame_box_stats
 import bbstats
-import numpy as np
-from numpy import bool_, float64, int32, int64
-from pandas.core.series import Series
-from typing import Any, Dict, List, Optional, Tuple, Union
 from bblogger import logger
 
 
 class Team:
     def __init__(
-        self,
-        team_name: str,
-        baseball_data: bbstats.BaseballStats,
-        game_num: int = 1,
-        rotation_len: int = 5,
-        interactive: bool = False,
+            self,
+            team_name: str,
+            baseball_data: bbstats.BaseballStats,
+            game_num: int = 1,
+            rotation_len: int = 5,
+            interactive: bool = False,
     ) -> None:
         """
         class handles a single team within a game including all prev year and current year stats, rosters,
@@ -202,8 +202,8 @@ class Team:
 
         # check data type of new season pitching data, after first pass it is converted to a string
         if (
-            self.baseball_data.new_season_pitching_data["Condition"].dtype == float
-            or self.baseball_data.new_season_pitching_data["Condition"].dtype == int
+                self.baseball_data.new_season_pitching_data["Condition"].dtype == float
+                or self.baseball_data.new_season_pitching_data["Condition"].dtype == int
         ):  # action already been performed
             # Sync all dynamic fields (condition, injuries, streaks) from new season to gameplay dataframes
             self.baseball_data.sync_dynamic_fields(
@@ -212,16 +212,16 @@ class Team:
 
             # Apply condition to AVG_faced for pitchers
             self.gameplay_pitchers_df["AVG_faced"] = (
-                self.gameplay_pitchers_df["AVG_faced"]
-                * self.gameplay_pitchers_df["Condition"]
+                    self.gameplay_pitchers_df["AVG_faced"]
+                    * (self.gameplay_pitchers_df["Condition"] / 100)
             )
 
         # test for empty or insufficient number of players generally need 5 starting pitchers and 9 players
         if (
-            len(self.gameplay_pitchers_df) == 0
-            or len(self.gameplay_pitchers_df) < 5
-            or len(self.gameplay_pos_players_df) == 0
-            or len(self.gameplay_pos_players_df) < 9
+                len(self.gameplay_pitchers_df) == 0
+                or len(self.gameplay_pitchers_df) < 5
+                or len(self.gameplay_pos_players_df) == 0
+                or len(self.gameplay_pos_players_df) < 9
         ):
             print(
                 f"Teams available are {self.baseball_data.pitching_data['Team'].unique()}"
@@ -277,12 +277,12 @@ class Team:
         return float(team_def_war)
 
     def set_initial_lineup(
-        self,
-        show_lineup: bool = False,
-        show_bench: bool = False,
-        current_season_stats: bool = True,
-        force_starting_pitcher: None = None,
-        force_lineup_dict: None = None,
+            self,
+            show_lineup: bool = False,
+            show_bench: bool = False,
+            current_season_stats: bool = True,
+            force_starting_pitcher: None = None,
+            force_lineup_dict: None = None,
     ) -> str:
         """
         sets the initial lineup pre-game for pitchers and hitters
@@ -344,7 +344,7 @@ class Team:
         return
 
     def set_initial_batting_order(
-        self, force_lineup_dict: Optional[dict] = None
+            self, force_lineup_dict: Optional[dict] = None
     ) -> None:
         """
         sets the initial batting order and lineup for pos players
@@ -444,7 +444,7 @@ class Team:
         return pos_index_dict
 
     def set_initial_starting_rotation(
-        self, force_starting_pitcher: None = None
+            self, force_starting_pitcher: None = None
     ) -> None:
         """
         set the initial starting rotation or use the pitcher provided
@@ -487,7 +487,7 @@ class Team:
         return
 
     def change_starting_rotation(
-        self, starting_pitcher_num: int, rotation_order_num: int
+            self, starting_pitcher_num: int, rotation_order_num: int
     ) -> None:
         """
         change the default starting pitching rotation
@@ -520,7 +520,7 @@ class Team:
         return
 
     def print_available_batters(
-        self, include_starters: bool = False, current_season_stats: bool = False
+            self, include_starters: bool = False, current_season_stats: bool = False
     ) -> None:
         """
         prints the available position players on the bench
@@ -536,7 +536,7 @@ class Team:
         return
 
     def print_available_pitchers(
-        self, include_starters: bool = False, current_season_stats: bool = False
+            self, include_starters: bool = False, current_season_stats: bool = False
     ) -> None:
         """
         prints the available pitchers in the bullpen
@@ -568,7 +568,7 @@ class Team:
         :return: returns a pandas series containing the current pitchers stats
         """
         if (
-            isinstance(self.gameplay_pitching_df, pd.Series) is not pd.Series
+                isinstance(self.gameplay_pitching_df, pd.Series) is not pd.Series
         ):  # this should never happen
             self.gameplay_pitching_df = self.gameplay_pitching_df.squeeze()
         return self.gameplay_pitching_df  # should be a series with a single row
@@ -582,9 +582,8 @@ class Team:
         :return: None
         """
         try:
-            # Get starting condition from pre-game (carried from new_season_data)
-            # Fall back to 100 if not available
-            starting_condition = float(self.gameplay_pitching_df.get("Condition", 100))
+            # Get starting condition pre-game
+            starting_condition = self.gameplay_pitching_df.Condition
 
             # Calculate additional fatigue from current outing
             # Reduce condition when facing more than fatigue_start_perc (70%) of average batters
@@ -599,6 +598,42 @@ class Team:
             logger.error("Gameplay pitching dataframe:\n{}", self.gameplay_pitching_df)
             raise Exception("set pitching condition error")
         return
+
+    def update_fatigue(self, cur_pitching_index: int64) -> Tuple[float, float64]:
+        """
+        calcs the ratio of batters the pitcher has faced in game against historic avg
+        so if a pitcher faces 10 batters per game, and they have faced 8 the pitcher is 80% of the way to their
+        max outing.
+        :param cur_pitching_index: hashcode of current pitcher
+        :return: returns the impact to obp for pitcher fatigue, if tired they give up more hits
+                also returns the new cur_ratio
+        """
+        # Extract scalars to avoid Series math issues
+        cur_game_faced = self.box_score.batters_faced(cur_pitching_index)
+        avg_faced = float(self.gameplay_pitching_df["AVG_faced"])
+        current_cond = float(self.gameplay_pitching_df["Condition"])
+
+        if avg_faced <= 0: avg_faced = 20.0
+        cur_ratio = (cur_game_faced / avg_faced) * 100
+
+        # LOWER the threshold for the multiplier or make it more sensitive to lower performance
+        multiplier_threshold = self.baseball_data.fatigue_start_perc
+        if current_cond < multiplier_threshold:
+            deficit = (multiplier_threshold - current_cond) / multiplier_threshold
+            condition_multiplier = 1 + np.power(deficit * 4, 2)  # more aggressive perf drop
+        else:
+            condition_multiplier = 1.0
+
+        in_game_fatigue = 0.0
+        if cur_ratio >= self.fatigue_start_perc:
+            # If fatigue_rate is 0.005, a 10-point ratio overage becomes a .050 OBP penalty
+            dynamic_rate = self.fatigue_rate * condition_multiplier
+            in_game_fatigue = (cur_ratio - self.fatigue_start_perc) * dynamic_rate
+
+        # Update the condition state for the next batter
+        self.set_pitching_condition(cur_ratio)
+
+        return float(in_game_fatigue), float(cur_ratio)
 
     def set_batting_condition(self) -> None:
         """
@@ -628,62 +663,6 @@ class Team:
         ]  # data for pos player
         return pos_player_stats  # should be a series with a single row
 
-    def update_fatigue(self, cur_pitching_index: int64) -> Tuple[float, float64]:
-        """
-        calcs the ratio of batters the pitcher has faced in game against historic avg
-        so if a pitcher faces 10 batters per game, and they have faced 8 the pitcher is 80% of the way to their
-        max outing.
-        :param cur_pitching_index: hashcode of current pitcher
-        :return: returns the impact to obp for pitcher fatigue, if tired they give up more hits
-                also returns the new cur_ratio
-        """
-        in_game_fatigue = 0
-        cur_game_faced = self.box_score.batters_faced(cur_pitching_index)
-        avg_faced = self.gameplay_pitching_df.AVG_faced
-        current_cond = self.gameplay_pitching_df.Condition
-
-        # 1. Guard against division by zero
-        if avg_faced == 0 or pd.isna(avg_faced):
-            logger.warning(
-                f"AVG_faced is {avg_faced} for pitcher {cur_pitching_index}, using default 20"
-            )
-            avg_faced = 20.0
-
-        # 2. Calculate workload ratio (0-100+)
-        cur_ratio = (cur_game_faced / avg_faced) * 100
-
-        # 3. Apply Non-Linear Multiplier for Low Condition
-        # If condition is below fatigue_start_perc (e.g., 70), calculate a penalty scale
-        if current_cond < self.fatigue_start_perc:
-            # Calculate how far they are into the "danger zone"
-            deficit = (self.fatigue_start_perc - current_cond) / self.fatigue_start_perc
-            # This multiplier starts at 1.0 and grows quadratically as condition drops
-            # At 40 condition with 70 threshold, multiplier is ~2.3x
-            condition_multiplier = 1 + np.power(
-                deficit * 3, 2
-            )  # change this line if the drop off is too big
-        else:
-            condition_multiplier = 1.0
-
-        # 4. Calculate OBP Impact
-        if cur_ratio >= self.fatigue_start_perc:
-            # Scale the original rate by our condition multiplier
-            dynamic_rate = self.fatigue_rate * condition_multiplier
-            in_game_fatigue = (cur_ratio - self.fatigue_start_perc) * dynamic_rate
-
-        # Update state
-        self.set_pitching_condition(cur_ratio)
-
-        logger.debug(
-            "Pitcher {}: Ratio={}, Cond={}, Penalty={:.4f}",
-            cur_pitching_index,
-            cur_ratio,
-            current_cond,
-            in_game_fatigue,
-        )
-
-        return in_game_fatigue, cur_ratio
-
     def pitching_change(self, inning: int, score_diff: int) -> int64:
         """
         should we make a pitching change?  if so make one
@@ -695,14 +674,14 @@ class Team:
         :return: hashcode for new pitcher or hashcode for current pitcher
         """
         if (
-            0 <= score_diff <= 3
-            and (inning <= 9 and len(self.relievers_df) >= (9 - (inning - 1)))
-            or (inning > 9 and len(self.relievers_df) >= 1)
+                0 <= score_diff <= 3
+                and (inning <= 9 and len(self.relievers_df) >= (9 - (inning - 1)))
+                or (inning > 9 and len(self.relievers_df) >= 1)
         ):
             if inning <= 9:
                 self.cur_pitcher_index = self.relievers_df.index[
                     9 - inning
-                ]  # 7th would be rel 2 since row start 0
+                    ]  # 7th would be rel 2 since row start 0
             else:
                 self.cur_pitcher_index = self.relievers_df.index[
                     0
@@ -734,7 +713,7 @@ class Team:
         return self.cur_pitcher_index
 
     def is_pitcher_fatigued(
-        self, condition: Union[int, int64, float64]
+            self, condition: Union[int, int64, float64]
     ) -> Union[bool, bool_]:
         """
         :param condition: current condition of the pitcher expressed from 0 to 100.
@@ -751,7 +730,7 @@ class Team:
             self.starting_pitchers_df.index
         )
         not_exhausted = ~(
-            self.gameplay_pitchers_df["Condition"] <= self.fatigue_unavailable
+                self.gameplay_pitchers_df["Condition"] <= self.fatigue_unavailable
         )
         not_injured = self.gameplay_pitchers_df["Injured Days"] == 0
         sv_criteria = self.gameplay_pitchers_df.SV > 0
@@ -775,11 +754,11 @@ class Team:
             self.relievers_df.index
         )
         not_exhausted = ~(
-            self.gameplay_pitchers_df["Condition"] <= self.fatigue_unavailable
+                self.gameplay_pitchers_df["Condition"] <= self.fatigue_unavailable
         )
         not_injured = self.gameplay_pitchers_df["Injured Days"] == 0
         df_criteria = (
-            not_selected_criteria & not_reliever_criteria & not_exhausted & not_injured
+                not_selected_criteria & not_reliever_criteria & not_exhausted & not_injured
         )
         self.middle_relievers_df = self.gameplay_pitchers_df[df_criteria].sort_values(
             ["ERA", "IP"], ascending=[True, False]
@@ -787,12 +766,12 @@ class Team:
         return
 
     def search_for_pos(
-        self,
-        position: str,
-        lineup_index_list: List[Union[Any, int64]],
-        stat_criteria: str = "OPS",
-        ignore_exhaustion: bool = False,
-        debug: bool = False,
+            self,
+            position: str,
+            lineup_index_list: List[Union[Any, int64]],
+            stat_criteria: str = "OPS",
+            ignore_exhaustion: bool = False,
+            debug: bool = False,
     ) -> int64:
         """
         find players not in lineup at specified position, sort by stat descending to find the best
@@ -816,7 +795,7 @@ class Team:
             True
             if ignore_exhaustion
             else ~(
-                self.gameplay_pos_players_df["Condition"] <= self.fatigue_unavailable
+                    self.gameplay_pos_players_df["Condition"] <= self.fatigue_unavailable
             )
         )
         not_injured = self.gameplay_pos_players_df["Injured Days"] == 0
@@ -859,7 +838,7 @@ class Team:
             # Step C: Absolute Last Resort - grab any healthy player not in the lineup
             last_resort = self.gameplay_pos_players_df[
                 not_in_lineup & not_injured
-            ].sort_values("Condition", ascending=False)
+                ].sort_values("Condition", ascending=False)
             if not last_resort.empty:
                 return last_resort.index[0]
 
@@ -872,7 +851,7 @@ class Team:
         # 5. Execute Sort (Stat Logic)
         if stat_criteria == "DEF_ADJ_OPS":
             eligible_subset["DEF_ADJ_OPS"] = eligible_subset["OPS"] + (
-                eligible_subset["Def_WAR"] * 0.100
+                    eligible_subset["Def_WAR"] * 0.100
             )
             df_players = eligible_subset.sort_values("DEF_ADJ_OPS", ascending=False)
         else:
@@ -964,11 +943,11 @@ class Team:
         # return top_index
 
     def best_at_stat(
-        self,
-        lineup_index_list: List[int64],
-        stat_criteria: str = "OPS",
-        count: int = 9,
-        exclude: Optional[List[int]] = None,
+            self,
+            lineup_index_list: List[int64],
+            stat_criteria: str = "OPS",
+            count: int = 9,
+            exclude: Optional[List[int]] = None,
     ) -> List[int]:
         """
         find the best available player using a given stat as the selection criteria
@@ -991,7 +970,7 @@ class Team:
         return list(stat_index)
 
     def print_starting_lineups(
-        self, current_season_stats: bool = True, show_pitching_starter: bool = True
+            self, current_season_stats: bool = True, show_pitching_starter: bool = True
     ) -> None:
         """
         print the teams starting lineup
@@ -1061,7 +1040,7 @@ class Team:
         return
 
     def change_lineup(
-        self, pos_player_bench_hashcode: int, target_batting_order_pos: int
+            self, pos_player_bench_hashcode: int, target_batting_order_pos: int
     ) -> None:
         """
         sub a bench player into the lineup, remove player from bench, add to box score
@@ -1088,7 +1067,7 @@ class Team:
         return
 
     def insert_player_in_lineup(
-        self, player_hashcode: int, target_batting_order_pos: int
+            self, player_hashcode: int, target_batting_order_pos: int
     ) -> None:
         """
         insert a player into a spot in the lineup, in front of the old player
@@ -1100,7 +1079,7 @@ class Team:
         return
 
     def move_player_in_lineup(
-        self, player_hashcode, new_target_batter_order_num
+            self, player_hashcode, new_target_batter_order_num
     ) -> None:
         """
         :param player_hashcode: hashcode of player to move

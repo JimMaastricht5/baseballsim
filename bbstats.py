@@ -62,13 +62,13 @@ PITCHER_DIFF_RATE_COLS = ["ERA", "WHIP"]
 
 class BaseballStats:
     def __init__(
-        self,
-        load_seasons: List[int],
-        new_season: int,
-        include_leagues: list = None,
-        load_batter_file: str = "player-projected-stats-pp-Batting.csv",
-        load_pitcher_file: str = "player-projected-stats-pp-Pitching.csv",
-        suppress_console_output: bool = False,
+            self,
+            load_seasons: List[int],
+            new_season: int,
+            include_leagues: list = None,
+            load_batter_file: str = "player-projected-stats-pp-Batting.csv",
+            load_pitcher_file: str = "player-projected-stats-pp-Pitching.csv",
+            suppress_console_output: bool = False,
     ) -> None:
         """
         :param load_seasons: list of seasons to load, each season is an integer year
@@ -289,7 +289,7 @@ class BaseballStats:
         # This allows relievers in close games to be used even when fatigued
         self.fatigue_unavailable = 33
         self.recovery_age_peak = 20  # Age at which recovery rate peaks (youngest in system)
-        self.recovery_min_factor = 0.20  # Minimum recovery is 20% of base (floor at ~3.4 points)
+        self.recovery_min_factor = 0.15  # Minimum recovery is 20% of base (floor at ~3.4 points)
         self.rest_day_bonus = 5  # Extra condition recovery for players who didn't play
         self.pitching_injury_rate = 0.275  # 27.5 out of 100 players injured per season-> per game
         self.pitching_injury_avg_len = 32  # according to mlb avg len is 74 but that cant be a normal dist
@@ -306,8 +306,8 @@ class BaseballStats:
             self.condition_change_per_day / 2,
             self._rng_instance.normal(
                 loc=(
-                    self.condition_change_per_day
-                    * max(self.recovery_min_factor, 1 - ((age - self.recovery_age_peak) / 40) ** 2)
+                        self.condition_change_per_day
+                        * max(self.recovery_min_factor, 1 - ((age - self.recovery_age_peak) / 40) ** 2)
                 ),
                 scale=self.condition_change_per_day / 3,
             ),
@@ -687,7 +687,7 @@ class BaseballStats:
         return
 
     def calculate_prorated_2025_stats(
-        self, team_name: Optional[str] = None, current_games_played: Optional[int] = None
+            self, team_name: Optional[str] = None, current_games_played: Optional[int] = None
     ) -> tuple:
         """
 
@@ -762,7 +762,7 @@ class BaseballStats:
                 ]
                 df_b_full = df_b.copy()
                 df_b_full[full_bat_cols] = (
-                    df_b_full[full_bat_cols] / prorate_factor
+                        df_b_full[full_bat_cols] / prorate_factor
                 )  # undo proration to get full season
                 df_b_full = team_batting_stats(df_b_full, filter_stats=False)
 
@@ -809,11 +809,11 @@ class BaseballStats:
                 # Calculate rate stats from FULL 2025 season (not prorated) for accurate comparison
                 df_p_full = df_p.copy()
                 df_p_full["IP"] = (
-                    df_p_full["Total_Outs_Calc"].apply(lambda x: int(x) + (round(x % 1 * 3) / 10)) / prorate_factor
+                        df_p_full["Total_Outs_Calc"].apply(lambda x: int(x) + (round(x % 1 * 3) / 10)) / prorate_factor
                 )
                 existing_pitch_cols_full = [col for col in pitch_cols if col in df_p_full.columns]
                 df_p_full[existing_pitch_cols_full] = (
-                    df_p_full[existing_pitch_cols_full] / prorate_factor
+                        df_p_full[existing_pitch_cols_full] / prorate_factor
                 )  # undo proration
                 df_p_full = team_pitching_stats(df_p_full, filter_stats=False)
 
@@ -1246,7 +1246,7 @@ class BaseballStats:
         hot_pitchers = self.new_season_pitching_data[self.new_season_pitching_data["Streak_Adjustment"] >= 0.025].copy()
         cold_pitchers = self.new_season_pitching_data[
             self.new_season_pitching_data["Streak_Adjustment"] <= -0.025
-        ].copy()
+            ].copy()
         hot_batters = self.new_season_batting_data[self.new_season_batting_data["Streak_Adjustment"] >= 0.025].copy()
         cold_batters = self.new_season_batting_data[self.new_season_batting_data["Streak_Adjustment"] <= -0.025].copy()
 
@@ -1258,10 +1258,10 @@ class BaseballStats:
 
         # Only print if there are hot/cold players
         if (
-            hot_pitchers.shape[0] > 0
-            or hot_batters.shape[0] > 0
-            or cold_pitchers.shape[0] > 0
-            or cold_batters.shape[0] > 0
+                hot_pitchers.shape[0] > 0
+                or hot_batters.shape[0] > 0
+                or cold_pitchers.shape[0] > 0
+                or cold_batters.shape[0] > 0
         ):
             # Print Hot players
             if hot_pitchers.shape[0] > 0 or hot_batters.shape[0] > 0:
@@ -1391,7 +1391,7 @@ class BaseballStats:
             random_changes[non_players] += self.rest_day_bonus
 
             self.new_season_pitching_data["Condition"] = (
-                self.new_season_pitching_data["Condition"] + random_changes
+                    self.new_season_pitching_data["Condition"] + random_changes
             ).clip(lower=0, upper=100)
 
             # VECTORIZED: Update batter condition with age-adjusted power curve recovery
@@ -1410,7 +1410,7 @@ class BaseballStats:
             random_changes[non_players] += self.rest_day_bonus
 
             self.new_season_batting_data["Condition"] = (
-                self.new_season_batting_data["Condition"] + random_changes
+                    self.new_season_batting_data["Condition"] + random_changes
             ).clip(lower=0, upper=100)
 
             # copy over results in new season to prior season for game management
@@ -1486,12 +1486,12 @@ class BaseballStats:
             # Calculate wOBA
             singles = batting_df["H"] - batting_df["2B"] - batting_df["3B"] - batting_df["HR"]
             woba_numerator = (
-                0.69 * batting_df["BB"]
-                + 0.72 * batting_df["HBP"]
-                + 0.88 * singles
-                + 1.24 * batting_df["2B"]
-                + 1.56 * batting_df["3B"]
-                + 1.95 * batting_df["HR"]
+                    0.69 * batting_df["BB"]
+                    + 0.72 * batting_df["HBP"]
+                    + 0.88 * singles
+                    + 1.24 * batting_df["2B"]
+                    + 1.56 * batting_df["3B"]
+                    + 1.95 * batting_df["HR"]
             )
             plate_appearances = batting_df["AB"] + batting_df["BB"] + batting_df["HBP"] + batting_df["SF"]
             woba = np.where(plate_appearances > 0, woba_numerator / plate_appearances, 0.0)
@@ -1779,7 +1779,7 @@ class BaseballStats:
         return
 
     def _calculate_difference_row(
-        self, current_df: DataFrame, historical_df: DataFrame, is_batting: bool = True
+            self, current_df: DataFrame, historical_df: DataFrame, is_batting: bool = True
     ) -> DataFrame:
         """
         Calculate difference between current and historical stats.
@@ -1800,13 +1800,13 @@ class BaseballStats:
         return diff_df
 
     def print_season(
-        self,
-        df_b: DataFrame,
-        df_p: DataFrame,
-        teams: List[str],
-        summary_only_b: bool = False,
-        condition_text: bool = True,
-        show_2025_comparison: bool = False,
+            self,
+            df_b: DataFrame,
+            df_p: DataFrame,
+            teams: List[str],
+            summary_only_b: bool = False,
+            condition_text: bool = True,
+            show_2025_comparison: bool = False,
     ) -> None:
         """
         print a season either in flight or prior season, called from current and prior season methods
@@ -2000,7 +2000,7 @@ def trunc_col(df_n: Union[ndarray, Series], d: int = 3) -> Union[ndarray, Series
     :param d: number of places to keep
     :return: new df
     """
-    return (df_n * 10**d) / 10**d
+    return (df_n * 10 ** d) / 10 ** d
 
 
 def team_batting_stats(df: DataFrame, filter_stats: bool = True) -> DataFrame:

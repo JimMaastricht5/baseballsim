@@ -9,13 +9,12 @@ Displays World Series games with structured data, collapsible sections, and box 
 
 import tkinter as tk
 from tkinter import ttk
-from typing import Dict, Any, Optional
+from typing import Dict, Any
 
 from ui.theme import (
     BG_PANEL,
     BG_WIDGET,
     BG_WIDGET_ALT,
-    BG_DARK,
     TEXT_PRIMARY,
     TEXT_SECONDARY,
     ACCENT_BLUE,
@@ -24,7 +23,6 @@ from ui.theme import (
 from ui.widgets.games_played_widget import (
     ScrollableFrame,
 )
-from ui.models.game_data import AWAY, HOME, InningScore
 
 
 class PlayoffWidget:
@@ -262,7 +260,7 @@ class PlayoffWidget:
                 if gn > current_game_num:
                     continue
                 if (g.away_team == away and g.home_team == home) or (
-                    g.away_team == home and g.home_team == away
+                        g.away_team == home and g.home_team == away
                 ):
                     if g.final_score[0] > g.final_score[1]:
                         if g.away_team == away:
@@ -278,7 +276,7 @@ class PlayoffWidget:
 
         # Populate table
         for idx, (game_num, structured_game) in enumerate(
-            sorted(self.games_data.items())
+                sorted(self.games_data.items())
         ):
             away = structured_game.away_team
             home = structured_game.home_team
@@ -338,8 +336,8 @@ class PlayoffWidget:
         series_info = {}  # {(away, home): (away_wins, home_wins)}
 
         for game in self.games_data.values():
-            away = game.away_team
-            home = game.home_team
+            away = game.get("away_team") if isinstance(game, dict) else game.away_team
+            home = game.get("home_team") if isinstance(game, dict) else game.home_team
             key = (away, home)
 
             if key not in series_info:
@@ -623,7 +621,7 @@ class PlayoffWidget:
         )
 
     def _display_batting_in_section(
-        self, parent_frame, team, box_score, show_header=True
+            self, parent_frame, team, box_score, show_header=True
     ):
         """Display batting box score in a section."""
         if show_header:
@@ -717,7 +715,7 @@ class PlayoffWidget:
         tree.tag_configure("totals", background="#2a2a3a", foreground=ACCENT_GOLD)
 
     def _display_pitching_in_section(
-        self, parent_frame, team, box_score, show_header=True
+            self, parent_frame, team, box_score, show_header=True
     ):
         """Display pitching box score in a section."""
         if show_header:
@@ -880,11 +878,11 @@ class PlayoffWidget:
         self.game_number += 1
         away = game_data.get("away_team", "")
         home = game_data.get("home_team", "")
-        
+
         # Get scores from game_data metadata - these are the cleanest source
         away_r = game_data.get("away_r", 0)
         home_r = game_data.get("home_r", 0)
-        
+
         # Validate scores - must be positive integers <= 50 (impossible in baseball otherwise)
         def validate_score(score):
             try:
@@ -892,10 +890,10 @@ class PlayoffWidget:
                 return s if 0 <= s <= 50 else None
             except (TypeError, ValueError):
                 return None
-        
+
         away_r = validate_score(away_r)
         home_r = validate_score(home_r)
-        
+
         # Fallback to structured_game if scores missing or invalid
         if (away_r is None or home_r is None) and game_data.get("structured_game"):
             try:
@@ -909,14 +907,14 @@ class PlayoffWidget:
                         home_r = validate_score(fs[1])
             except (AttributeError, TypeError, IndexError):
                 pass
-        
+
         # Use 0-0 as last resort
         away_r = away_r if away_r is not None else 0
         home_r = home_r if home_r is not None else 0
-        
+
         # Get round name from game_data
         round_name = game_data.get("round_name", "")
-        
+
         structured_game = game_data.get("structured_game")
 
         # Update series score
@@ -931,7 +929,7 @@ class PlayoffWidget:
             if hasattr(structured_game, 'round_name'):
                 structured_game.round_name = round_name
             self.games_data[self.game_number] = structured_game
-        
+
         # Also store round info separately for display
         self.games_data[self.game_number + 10000] = {"round_name": round_name, "away": away, "home": home}
 

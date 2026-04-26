@@ -7,10 +7,12 @@ Refactored main window for the baseball season simulation UI using tkinter.
 Provides the primary interface with modular widget components.
 """
 
+import queue
 import tkinter as tk
 from tkinter import ttk, messagebox
-import queue
 
+from bblogger import logger
+from ui.controllers import SimulationController
 from ui.theme import setup_dark_theme, BG_DARK, TEXT_PRIMARY, TEXT_SECONDARY, ACCENT_BLUE
 from ui.widgets import (
     ToolbarWidget,
@@ -26,8 +28,6 @@ from ui.widgets import (
     LeagueLeadersWidget,
     PlayoffWidget,
 )
-from ui.controllers import SimulationController
-from bblogger import logger
 
 
 class SeasonMainWindow:
@@ -38,17 +38,17 @@ class SeasonMainWindow:
     """
 
     def __init__(
-        self,
-        root,
-        load_seasons,
-        new_season,
-        season_length,
-        series_length,
-        rotation_len,
-        season_chatty,
-        season_print_lineup_b,
-        season_print_box_score_b,
-        season_team_to_follow,
+            self,
+            root,
+            load_seasons,
+            new_season,
+            season_length,
+            series_length,
+            rotation_len,
+            season_chatty,
+            season_print_lineup_b,
+            season_print_box_score_b,
+            season_team_to_follow,
     ):
         """
         Initialize the main window and UI components.
@@ -345,7 +345,7 @@ F1     - Show this help"""
 
     def _create_status_bar(self):
         """Create status bar frame with day counter, progress bar, and status message."""
-        from ui.theme import STATUS_RUNNING, STATUS_PAUSED, STATUS_STOPPED
+        from ui.theme import STATUS_STOPPED
 
         status_frame = tk.Frame(self.root, relief=tk.SUNKEN, bd=1, bg=BG_DARK)
         status_frame.pack(side=tk.BOTTOM, fill=tk.X)
@@ -475,7 +475,6 @@ F1     - Show this help"""
         """Start the season simulation."""
         import time
         import tkinter as tk
-        from tkinter import messagebox
 
         selected_team = self.toolbar.get_selected_team()
 
@@ -501,8 +500,8 @@ F1     - Show this help"""
         info_label = tk.Label(
             countdown_dialog,
             text="Simulation will start automatically in:\n\n"
-            "Click PAUSE below if you need time to make roster moves,\n"
-            "place players on IL, or make retirements in the Admin tab.",
+                 "Click PAUSE below if you need time to make roster moves,\n"
+                 "place players on IL, or make retirements in the Admin tab.",
             font=("Arial", 10),
             justify="center",
         )
@@ -652,11 +651,11 @@ F1     - Show this help"""
         self.day_label.config(text=f"Day: 0 / {num_games}")
 
         if self.controller.start_season(
-            selected_team,
-            on_started,
-            season_length=num_games,
-            start_paused=should_start_paused,
-            obp_adjustment=obp_adjustment,
+                selected_team,
+                on_started,
+                season_length=num_games,
+                start_paused=should_start_paused,
+                obp_adjustment=obp_adjustment,
         ):
             logger.info(
                 f"Season started for team: {selected_team}, games: {num_games}, start_paused: {should_start_paused}, OBP adjustment: {obp_adjustment}"
@@ -837,18 +836,18 @@ F1     - Show this help"""
             start_day = worker.season.season_day_num  # May be > 0 if partial season data
             # Set full season schedule
             self.games_widget.set_season_schedule(worker.season.schedule)
-# Show current day's schedule (may not be day 1 if partial season)
+            # Show current day's schedule (may not be day 1 if partial season)
             if len(worker.season.schedule) > start_day:
                 # Get games for the day using ScheduleDay
                 day_obj = worker.season.get_schedule_day(start_day)
                 schedule = [(g.away, g.home) for g in day_obj.games if not g.is_off_day]
                 date_str = worker.season.get_date_for_day(start_day)
-                            
+
                 # Set schedule and dates for games widget
                 self.games_widget.set_season_schedule(worker.season.schedule)
                 self.games_widget.set_schedule_dates(worker.season.schedule_manager.schedule_dates)
                 self.games_widget.on_day_started(start_day, schedule, date_str)
-                
+
                 # Update schedule widget
                 self.schedule_widget.update_schedule(
                     start_day,
@@ -873,7 +872,7 @@ F1     - Show this help"""
 
         # Track current day for status messages (1-indexed for display)
         self.current_day = day_num + 1
-        
+
         # Get date for this day
         self._current_date_str = None
         worker = self.controller.get_worker()
@@ -905,7 +904,7 @@ F1     - Show this help"""
 
             # Update games widget
             self.games_widget.on_day_started(day_num, schedule, date_str)
-            
+
             # Update schedule widget
             self.schedule_widget.update_schedule(
                 day_num,
@@ -942,7 +941,7 @@ F1     - Show this help"""
         if not game_data or not isinstance(game_data, dict):
             logger.warning("game_completed received invalid data")
             return
-        
+
         away_team = game_data.get("away_team", "?")
         home_team = game_data.get("home_team", "?")
         logger.debug(f"Game completed: {away_team} @ {home_team}")
@@ -969,7 +968,8 @@ F1     - Show this help"""
                     full_date = worker.season.get_date_for_day(game_data["day_num"])
                     # Strip year - just show "April 5" format
                     if full_date:
-                        date_str = full_date.replace(", 2026", "").replace(", 2025", "").replace(", 2024", "").replace(", 2023", "")
+                        date_str = full_date.replace(", 2026", "").replace(", 2025", "").replace(", 2024", "").replace(
+                            ", 2023", "")
             except Exception:
                 pass  # Ignore date lookup errors
 
@@ -1190,7 +1190,7 @@ F1     - Show this help"""
 
     def _format_status_with_day(self, message: str) -> str:
         """
-        Format a status message to include current day or date information.
+        Format a status message to include current date and game information.
 
         Args:
             message: Base status message
@@ -1201,7 +1201,7 @@ F1     - Show this help"""
         if self._current_date_str:
             return f"Simulating {self._current_date_str} - {message}"
         elif self.current_day > 0:
-            return f"Simulating day {self.current_day} - {message}"
+            return f""
         return message
 
     def _update_status_from_controller(self):

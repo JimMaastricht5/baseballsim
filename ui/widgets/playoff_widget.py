@@ -47,6 +47,7 @@ class PlayoffWidget:
         self.game_number = 0
         self.current_game = 1
         self.games_data = {}  # {game_num: structured_game}
+        self.series_labels = {}
 
         # Track all playoff series: {series_key: {away, home, games: [], winner: None}}
         self.playoff_series = {}  # e.g., {"AL WC A": {"away": "NYY", "home": "BOS", "games": [], "wins": {}}}
@@ -243,6 +244,7 @@ class PlayoffWidget:
             for gn, g in self.games_data.items():
                 if gn > current_game_num:
                     continue
+                # Skip round info entries (keys >= 10000) - they are metadata, not games
                 if gn < 10000:
                     g_away = _get_attr(g, "away_team", "?")
                     g_home = _get_attr(g, "home_team", "?")
@@ -262,14 +264,18 @@ class PlayoffWidget:
 
         # Populate table - newest games first
         for idx, (game_num, structured_game) in enumerate(sorted(self.games_data.items(), reverse=True)):
+            # Skip round info entries (keys >= 10000) - they are metadata, not games
+            if game_num >= 10000:
+                continue
             away = _get_attr(structured_game, "away_team", "?")
             home = _get_attr(structured_game, "home_team", "?")
-            away_score = _get_attr(structured_game, "away_score", 0)
-            home_score = _get_attr(structured_game, "home_score", 0)
             final_score = _get_attr(structured_game, "final_score", (0, 0))
             if isinstance(final_score, (list, tuple)):
-                away_score = final_score[0] if len(final_score) > 0 else away_score
-                home_score = final_score[1] if len(final_score) > 1 else home_score
+                away_score = final_score[0] if len(final_score) > 0 else 0
+                home_score = final_score[1] if len(final_score) > 1 else 0
+            else:
+                away_score = 0
+                home_score = 0
 
             # Determine winner for display
             if away_score > home_score:
@@ -319,15 +325,22 @@ class PlayoffWidget:
         # Collect all unique series matchups from games_data
         series_info = {}  # {(away, home): (away_wins, home_wins)}
 
-        for game in self.games_data.values():
-            away = game.get("away_team") if isinstance(game, dict) else game.away_team
-            home = game.get("home_team") if isinstance(game, dict) else game.home_team
+        for game_num, game in self.games_data.items():
+            # Skip round info entries (keys >= 10000) - they are metadata, not games
+            if game_num >= 10000:
+                continue
+            away = _get_attr(game, "away_team", "?")
+            home = _get_attr(game, "home_team", "?")
             key = (away, home)
 
             if key not in series_info:
                 series_info[key] = [0, 0]  # away_wins, home_wins
 
-            away_score, home_score = game.final_score
+            final_score = _get_attr(game, "final_score", (0, 0))
+            if isinstance(final_score, (list, tuple)) and len(final_score) >= 2:
+                away_score, home_score = final_score[0], final_score[1]
+            else:
+                away_score, home_score = 0, 0
             if away_score > home_score:
                 series_info[key][0] += 1
             elif home_score > away_score:
@@ -814,12 +827,14 @@ class PlayoffWidget:
         if (away_r is None or home_r is None) and game_data.get("structured_game"):
             try:
                 sg = game_data["structured_game"]
-                away_r = validate_score(getattr(sg, "away_score", None))
-                home_r = validate_score(getattr(sg, "home_score", None))
+                # Use _get_attr for dict/object compatibility
+                away_r = validate_score(_get_attr(sg, "away_score", None))
+                home_r = validate_score(_get_attr(sg, "home_score", None))
                 if away_r is None:
-                    fs = getattr(sg, "final_score", None)
-                    if fs:
+                    fs = _get_attr(sg, "final_score", None)
+                    if fs and isinstance(fs, (list, tuple)) and len(fs) >= 2:
                         away_r = validate_score(fs[0])
+                        home_r = validate_score(fs[1])
                         home_r = validate_score(fs[1])
             except AttributeError, TypeError, IndexError:
                 pass

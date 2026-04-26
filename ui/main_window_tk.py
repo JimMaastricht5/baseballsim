@@ -732,7 +732,9 @@ F1     - Show this help"""
             except queue.Empty:
                 pass
             except Exception as e:
+                import traceback
                 logger.error(f"Error handling game_completed: {e}")
+                logger.error(f"Stack: {traceback.format_exc()}")
 
             # Check day_completed queue
             try:

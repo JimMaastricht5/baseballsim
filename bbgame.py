@@ -1164,13 +1164,13 @@ class Game:
 
         :return: tuple of (total_score, inning_scores, win_loss, legacy_string, structured_game)
         """
-        logger.info(f"sim_game_structured called for {self.team_names}")
+        logger.debug(f"sim_game_structured called for {self.team_names}")
         while self.is_game_end() is False:
             self.sim_half_inning()
         self.end_game()
 
         # Build structured game recap
-        logger.info("Calling _build_structured_game_recap")
+        logger.debug("Calling _build_structured_game_recap")
         self._build_structured_game_recap()
 
         return (
@@ -1212,16 +1212,16 @@ class Game:
         self.structured_game.home_lineup = self._build_team_lineup(self.teams[HOME])
 
         # Build box scores from team box_score objects
-        logger.info("About to build away_box_score")
+        logger.debug("About to build away_box_score")
         self.structured_game.away_box_score = self._build_team_box_score(
             self.teams[AWAY], AWAY
         )
-        logger.info(f"Away box_score built: {self.structured_game.away_box_score}")
-        logger.info("About to build home_box_score")
+        logger.debug(f"Away box_score built: team={self.structured_game.away_box_score.team}")
+        logger.debug("About to build home_box_score")
         self.structured_game.home_box_score = self._build_team_box_score(
             self.teams[HOME], HOME
         )
-        logger.info(f"Home box_score built: {self.structured_game.home_box_score}")
+        logger.debug(f"Home box_score built: team={self.structured_game.home_box_score.team}")
 
         # Find winning/losing pitcher names from box scores
         for box_score in [

@@ -181,7 +181,7 @@ class BaseballSeason:
             load_seasons: List[int],
             new_season: int,
             team_list: Optional[list] = None,
-            season_length: int = 6,
+            season_length: int = 14,
             series_length: int = 3,
             rotation_len: int = 5,
             include_leagues: list = None,
@@ -1045,7 +1045,7 @@ class BaseballSeason:
         import queue
         import threading
         import bbgame
-        
+
         needed_to_win = (best_of // 2) + 1
         home_wins = 0
         away_wins = 0
@@ -1058,7 +1058,7 @@ class BaseballSeason:
 
         # Get pre-built series games from schedule_manager - prefer round_name lookup
         series_games = self.schedule_manager.get_series_games_by_round(round_name)
-        
+
         # Fall back to away/home lookup if no round_name match
         if not series_games:
             series_games = self.schedule_manager.get_series_games(away, home)
@@ -1089,13 +1089,13 @@ class BaseballSeason:
             thread.start()
             thread.join()
             result = q.get()
-            
+
             # Handle both structured (7 elements) and non-structured (6 elements) results
             if len(result) == 7:
                 (score, inning, win_loss_list, away_box_score, home_box_score, game_recap, structured_game) = result
             else:
                 (score, inning, win_loss_list, away_box_score, home_box_score, game_recap) = result
-            
+
             # Update team win/loss records
             self.update_win_loss(away_team_name=away, home_team_name=home, win_loss=win_loss_list)
             self.baseball_data.game_results_to_season(box_score_class=away_box_score)
@@ -1104,8 +1104,8 @@ class BaseballSeason:
             # Emit game result for UI routing (playoff widget)
             away_score = home_score = None
             if structured_game:
-                away_score = structured_game.final_score[0]
-                home_score = structured_game.final_score[1]
+                away_score = int(structured_game.final_score[0])
+                home_score = int(structured_game.final_score[1])
             self.output_handler(
                 OutputCategory.GAME_RESULT_FULL,
                 game_recap,
@@ -1121,9 +1121,13 @@ class BaseballSeason:
                 },
             )
 
-            # Check who won the most recent game
+            # Log playoff game result
             home_wins = self.team_win_loss[home][WIN] - start_wins[home]
             away_wins = self.team_win_loss[away][WIN] - start_wins[away]
+            logger.info(
+                f"[{round_name}] {away} {away_score} @ {home} {home_score} "
+                f"(Series: {away} {away_wins}-{home_wins} {home})"
+            )
 
             # Check if series is over
             if home_wins >= needed_to_win or away_wins >= needed_to_win:
@@ -1257,7 +1261,10 @@ class BaseballSeason:
         # Perform initial GM assessments at start of season
         self.check_gm_assessments()
 
-        while self.season_day_num <= len(self.schedule) - 1:  # loop over every day and every game scheduled that day
+        # loop over every day and every game scheduled that day and check if season limit set to end early
+        team = self.team_to_follow[0] if self.team_to_follow else 'MIL'  # Mil if teams to follow is none
+        while (self.season_day_num <= (len(self.schedule) - 1) and
+               self.team_win_loss[team][0] + self.team_win_loss[team][1] < self.season_length):
             self.sim_next_day()
 
         self.sim_end()

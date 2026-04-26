@@ -73,6 +73,7 @@ def show_history_popup(
             "IP",
             "W",
             "L",
+            "SV",
             "H",
             "R",
             "ER",
@@ -103,7 +104,7 @@ def show_history_popup(
         tree.heading(col, text=col)
         if col in ["Season", "Team"]:
             tree.column(col, width=60, anchor=tk.CENTER)
-        elif col in ["Age", "G", "GS", "W", "L"]:
+        elif col in ["Age", "G", "GS", "W", "L", "SV"]:
             tree.column(col, width=40, anchor=tk.CENTER)
         elif col in ["AB", "R", "H", "HR", "RBI", "SO"]:
             tree.column(col, width=45, anchor=tk.CENTER)
@@ -171,6 +172,7 @@ def show_history_popup(
             f"{float(r.get('IP', 0)):.1f}",
             int(r.get("W", 0)),
             int(r.get("L", 0)),
+            int(r.get("SV", 0)),
             int(r.get("H", 0)),
             int(r.get("R", 0)),
             int(r.get("ER", 0)),
@@ -238,6 +240,7 @@ def show_history_popup(
                     f"{float(row.get('IP', 0)):.1f}",
                     int(row.get("W", 0)),
                     int(row.get("L", 0)),
+                    int(row.get("SV", 0)),
                     int(row.get("H", 0)),
                     int(row.get("R", 0)),
                     int(row.get("ER", 0)),

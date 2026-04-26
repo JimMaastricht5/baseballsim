@@ -235,8 +235,15 @@ class PlayoffWidget:
 
         tree.pack(fill=tk.BOTH, expand=True)
 
-        # Get round name helper
+        # Get round name helper - check stored round_name first
         def get_round_name(game_num):
+            # Check if we have stored round info for this game
+            round_info_key = game_num + 10000
+            if round_info_key in self.games_data:
+                stored_round = self.games_data[round_info_key]
+                if isinstance(stored_round, dict) and 'round_name' in stored_round:
+                    return stored_round['round_name']
+            # Fallback to game number counting
             if game_num <= 4:
                 return "WC"
             elif game_num <= 8:
@@ -289,8 +296,16 @@ class PlayoffWidget:
             away_wins, home_wins = get_series_status(away, home, game_num)
             series_text = f"{away_wins}-{home_wins}"
 
-            # Matchup with round
-            round_name = get_round_name(game_num)
+            # Matchup with round - check stored round_name
+            round_info_key = game_num + 10000
+            if round_info_key in self.games_data:
+                ri = self.games_data[round_info_key]
+                if isinstance(ri, dict) and 'round_name' in ri:
+                    round_name = ri['round_name']
+                else:
+                    round_name = get_round_name(game_num)
+            else:
+                round_name = get_round_name(game_num)
             matchup_text = f"{round_name}: {away} @ {home}"
 
             # Insert row
@@ -858,14 +873,50 @@ class PlayoffWidget:
         Args:
             game_data: Dict with game results and structured_game
         """
-        if not self.ws_active:
-            return
+        # Show all playoff games, not just World Series
+        # if not self.ws_active:
+        #     return
 
         self.game_number += 1
         away = game_data.get("away_team", "")
         home = game_data.get("home_team", "")
+        
+        # Get scores from game_data metadata - these are the cleanest source
         away_r = game_data.get("away_r", 0)
         home_r = game_data.get("home_r", 0)
+        
+        # Validate scores - must be positive integers <= 50 (impossible in baseball otherwise)
+        def validate_score(score):
+            try:
+                s = int(score)
+                return s if 0 <= s <= 50 else None
+            except (TypeError, ValueError):
+                return None
+        
+        away_r = validate_score(away_r)
+        home_r = validate_score(home_r)
+        
+        # Fallback to structured_game if scores missing or invalid
+        if (away_r is None or home_r is None) and game_data.get("structured_game"):
+            try:
+                sg = game_data["structured_game"]
+                away_r = validate_score(getattr(sg, 'away_score', None))
+                home_r = validate_score(getattr(sg, 'home_score', None))
+                if away_r is None:
+                    fs = getattr(sg, 'final_score', None)
+                    if fs:
+                        away_r = validate_score(fs[0])
+                        home_r = validate_score(fs[1])
+            except (AttributeError, TypeError, IndexError):
+                pass
+        
+        # Use 0-0 as last resort
+        away_r = away_r if away_r is not None else 0
+        home_r = home_r if home_r is not None else 0
+        
+        # Get round name from game_data
+        round_name = game_data.get("round_name", "")
+        
         structured_game = game_data.get("structured_game")
 
         # Update series score
@@ -874,9 +925,15 @@ class PlayoffWidget:
         else:
             self.series_score[home] = self.series_score.get(home, 0) + 1
 
-        # Store structured game data
+        # Store structured game data with round name
         if structured_game:
+            # Store round_name on the structured_game object if possible
+            if hasattr(structured_game, 'round_name'):
+                structured_game.round_name = round_name
             self.games_data[self.game_number] = structured_game
+        
+        # Also store round info separately for display
+        self.games_data[self.game_number + 10000] = {"round_name": round_name, "away": away, "home": home}
 
         # Display all games in table format
         self._display_todays_games()

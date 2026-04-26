@@ -2081,6 +2081,9 @@ class BaseballStatsPreProcess:
                         self.new_season_pitching_data.loc[idx, "L"] = int(
                             partial_row.get("L", 0)
                         )
+                        self.new_season_pitching_data.loc[idx, "SV"] = int(
+                            partial_row.get("SV", 0)
+                        )
                     else:
                         # Player in partial data but no valid games - zero out
                         self.new_season_pitching_data.loc[idx, self.numeric_pcols] = 0

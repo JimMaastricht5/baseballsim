@@ -171,7 +171,7 @@ class ToolbarWidget:
             bg=BG_DARK,
             fg=TEXT_PRIMARY,
         ).pack(side=tk.LEFT, padx=5)
-        self.obp_var = tk.StringVar(value="0.009")
+        self.obp_var = tk.StringVar(value="0.000")
         obp_values = [f"{v / 1000:.3f}" for v in range(0, 11, 1)]
         self.obp_combo = ttk.Combobox(
             self.toolbar,

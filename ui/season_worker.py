@@ -8,12 +8,12 @@ This threading.Thread wraps the BaseballSeason simulation, running it in a
 background thread and putting messages on queues to update the UI.
 """
 
-import threading
 import queue
+import threading
 
+from bblogger import logger
 from ui.signals import SeasonSignals
 from ui.ui_baseball_season import UIBaseballSeason
-from bblogger import logger
 
 
 class SeasonWorker(threading.Thread):
@@ -35,18 +35,18 @@ class SeasonWorker(threading.Thread):
     """
 
     def __init__(
-        self,
-        load_seasons=None,
-        new_season=2026,
-        rotation_len=5,
-        series_length=3,
-        season_length=162,
-        season_chatty=False,
-        season_print_lineup_b=False,
-        season_print_box_score_b=False,
-        team_to_follow=None,
-        start_paused=False,
-        obp_adjustment=0.0,
+            self,
+            load_seasons=None,
+            new_season=2026,
+            rotation_len=5,
+            series_length=3,
+            season_length=162,
+            season_chatty=False,
+            season_print_lineup_b=False,
+            season_print_box_score_b=False,
+            team_to_follow=None,
+            start_paused=False,
+            obp_adjustment=0.0,
     ):
         """
         Initialize season worker with simulation parameters.
@@ -64,7 +64,7 @@ class SeasonWorker(threading.Thread):
         self.load_seasons = load_seasons or [2023, 2024, 2025]
         self.new_season = new_season
         self.team_to_follow = (
-            team_to_follow or "MIL"
+                team_to_follow or "MIL"
         )  # Single string, defaults to 'MIL'
         self.random_data = False
         self.rotation_len = rotation_len
@@ -146,7 +146,7 @@ class SeasonWorker(threading.Thread):
             total_days = len(self.season.schedule)
             logger.info(f"Season has {total_days} days scheduled")
 
-            while self.season.season_day_num < total_days:
+            while self.season.season_day_num < total_days and self.season.season_day_num < self.season.season_length:
                 # Check if stopped
                 if self._stopped:
                     logger.info("Season simulation stopped by user")

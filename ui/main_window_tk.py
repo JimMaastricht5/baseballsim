@@ -77,6 +77,7 @@ class SeasonMainWindow:
         self.season_team_to_follow = season_team_to_follow or "MIL"
         self.current_day = 0  # Track current simulation day for status messages
         self._current_processing_day = -1  # Track day being processed (for sync with worker)
+        self._current_date_str = None  # Track current date (e.g., "April 23")
         self.world_series_active = False  # Track if World Series is running
         self.saved_standings = None  # Save regular season standings during playoffs
         self.world_series_teams = set()  # Track which teams are in World Series
@@ -870,6 +871,17 @@ F1     - Show this help"""
 
         # Track current day for status messages (1-indexed for display)
         self.current_day = day_num + 1
+        
+        # Get date for this day
+        self._current_date_str = None
+        worker = self.controller.get_worker()
+        if worker and worker.season:
+            try:
+                date_str = worker.season.get_date_for_day(day_num)
+                if date_str:
+                    self._current_date_str = date_str.split(",")[0]  # "April 23"
+            except Exception:
+                pass
 
         # Skip regular season widget updates during World Series
         if self.world_series_active:
@@ -924,11 +936,18 @@ F1     - Show this help"""
 
     def _on_game_completed(self, game_data: dict):
         """Handle game_completed message."""
-        logger.debug(f"Game completed: {game_data['away_team']} @ {game_data['home_team']}")
+        # Handle edge cases: game_data could be None, wrong type, or missing keys
+        if not game_data or not isinstance(game_data, dict):
+            logger.warning("game_completed received invalid data")
+            return
+        
+        away_team = game_data.get("away_team", "?")
+        home_team = game_data.get("home_team", "?")
+        logger.debug(f"Game completed: {away_team} @ {home_team}")
 
-        # If World Series is active, only send to playoff widget
-        if self.world_series_active:
-            if hasattr(self, "playoff_widget") and self.playoff_widget.ws_active:
+        # If this is a playoff game, route to playoff widget (show all playoff rounds)
+        if game_data.get("is_playoff"):
+            if hasattr(self, "playoff_widget"):
                 self.playoff_widget.add_game_result(game_data)
             return
 
@@ -938,7 +957,7 @@ F1     - Show this help"""
         # Update schedule widget with completed game
         self.schedule_widget.on_game_completed(game_data)
 
-        # If there's a game_recap, add to games_played widget
+        # If there's a game_recap and not playoff, add to games_played widget
         if game_data.get("game_recap") and game_data.get("day_num") is not None:
             # Get date for this day
             date_str = None
@@ -1169,15 +1188,17 @@ F1     - Show this help"""
 
     def _format_status_with_day(self, message: str) -> str:
         """
-        Format a status message to include current day information.
+        Format a status message to include current day or date information.
 
         Args:
             message: Base status message
 
         Returns:
-            Formatted message with day info (e.g., "Simulating day 11 - Simulation paused")
+            Formatted message with day/date info (e.g., "Simulating April 23 - Simulation paused")
         """
-        if self.current_day > 0:
+        if self._current_date_str:
+            return f"Simulating {self._current_date_str} - {message}"
+        elif self.current_day > 0:
             return f"Simulating day {self.current_day} - {message}"
         return message
 

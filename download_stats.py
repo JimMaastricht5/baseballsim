@@ -1,54 +1,27 @@
 """
---- Copyright Notice ---
 Copyright (c) 2024 Jim Maastricht
 
---- File Context and Purpose ---
-DESCRIPTION: Manages the automated downloading of historical and current MLB player
-statistics (batting and pitching) from Baseball Reference using Selenium WebDriver.
-The tool navigates the required pages, simulates the CSV export steps, captures the
-CSV data displayed on the screen, and saves it to local files for subsequent
-preprocessing by the `BaseballStatsPreProcess` module.
+Download MLB player statistics from Baseball Reference using Selenium.
 
-WARNING: This script currently requires manual intervention to click the
-"Share & Export" -> "Get Table as CSV" link in the opened browser window.
-
-PRIMARY CLASS:
-- StatsDownloader: Handles the initiation of the browser, navigation, data
-  extraction, file saving, and cleanup.
-
-DEPENDENCIES: requests, pandas, subprocess, sys, os, time, selenium,
-              webdriver-manager, bbstats_preprocess, bblogger.
-Contact: JimMaastricht5@gmail.com
+WARNING: Requires manual intervention to click "Share & Export" -> "Get Table as CSV".
 """
 
-import requests
 import pandas as pd
-import subprocess
 import sys
 import os
 from typing import Optional, List
 import time
 from selenium import webdriver
 from selenium.webdriver.common.by import By
-from selenium.webdriver.support.ui import WebDriverWait
-from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.chrome.service import Service
-from selenium.webdriver.common.action_chains import ActionChains
 from webdriver_manager.chrome import ChromeDriverManager
-from bbplayer_projections import BaseballStatsPreProcess
 from bblogger import logger
 
 
 class StatsDownloader:
     def __init__(self, season: Optional[List[int]] = None, headless: bool = True):
-        """
-        Initialize the stats downloader
-
-        Args:
-            season: Season year(s) to download (defaults to current year)
-            headless: Whether to run browser in headless mode
-        """
+        """Initialize the stats downloader."""
         if season is None:
             self.seasons = [2024]  # last full season
         elif isinstance(season, list):
@@ -111,14 +84,10 @@ class StatsDownloader:
 
             try:
                 driver.get(batting_url)
-                logger.info(
-                    f"Successfully navigated to Baseball Reference batting page for {season}"
-                )
+                logger.info(f"Successfully navigated to Baseball Reference batting page for {season}")
             except Exception as e:
                 logger.warning(f"Page load timed out or failed: {e}")
-                logger.info(
-                    "Attempting to continue anyway since page may have partially loaded..."
-                )
+                logger.info("Attempting to continue anyway since page may have partially loaded...")
                 # Continue execution - page might be loaded enough to work with
 
             # Wait for page to fully load
@@ -128,12 +97,8 @@ class StatsDownloader:
 
             # Manual Share & Export click
             logger.info("⚠️  MANUAL ACTION REQUIRED ⚠️")
-            logger.info(
-                "Please manually click 'Share & Export' -> 'Get Table as CSV' in the browser window"
-            )
-            input(
-                "Press Enter after you have clicked through to get the CSV data displayed..."
-            )
+            logger.info("Please manually click 'Share & Export' -> 'Get Table as CSV' in the browser window")
+            input("Press Enter after you have clicked through to get the CSV data displayed...")
             logger.info("Continuing to capture CSV data from screen...")
 
             # Wait for CSV data to display on screen
@@ -165,12 +130,8 @@ class StatsDownloader:
 
                     for line in lines:
                         # Stop if we hit the MLB Average line
-                        if ",MLB Average" in line or line.strip().endswith(
-                            "MLB Average"
-                        ):
-                            logger.info(
-                                "Found MLB Average line, stopping data collection"
-                            )
+                        if ",MLB Average" in line or line.strip().endswith("MLB Average"):
+                            logger.info("Found MLB Average line, stopping data collection")
                             break
                         # Only include lines that look like CSV data
                         if line.strip() and ("," in line):
@@ -205,26 +166,20 @@ class StatsDownloader:
                     logger.warning("Could not find CSV content on the page")
                     # Fallback: ask user to manually save
                     logger.info("⚠️  MANUAL ACTION REQUIRED ⚠️")
-                    logger.info(
-                        "Please manually copy the CSV data and save it yourself, then press Enter..."
-                    )
+                    logger.info("Please manually copy the CSV data and save it yourself, then press Enter...")
                     input("Press Enter when you have manually saved the CSV data...")
                     return True
 
             except Exception as e:
                 logger.error(f"Error capturing CSV content: {e}")
                 logger.info("⚠️  MANUAL ACTION REQUIRED ⚠️")
-                logger.info(
-                    "Please manually copy the CSV data and save it yourself, then press Enter..."
-                )
+                logger.info("Please manually copy the CSV data and save it yourself, then press Enter...")
                 input("Press Enter when you have manually saved the CSV data...")
                 return True
 
         except Exception as e:
             logger.error(f"Error downloading batting stats for {season}: {e}")
-            logger.info(
-                "Chrome window left open for debugging - close manually when done"
-            )
+            logger.info("Chrome window left open for debugging - close manually when done")
             error_occurred = True
             return False
         finally:
@@ -262,14 +217,10 @@ class StatsDownloader:
 
             try:
                 driver.get(pitching_url)
-                logger.info(
-                    f"Successfully navigated to Baseball Reference pitching page for {season}"
-                )
+                logger.info(f"Successfully navigated to Baseball Reference pitching page for {season}")
             except Exception as e:
                 logger.warning(f"Page load timed out or failed: {e}")
-                logger.info(
-                    "Attempting to continue anyway since page may have partially loaded..."
-                )
+                logger.info("Attempting to continue anyway since page may have partially loaded...")
                 # Continue execution - page might be loaded enough to work with
 
             # Wait for page to fully load
@@ -279,12 +230,8 @@ class StatsDownloader:
 
             # Manual Share & Export click
             logger.info("⚠️  MANUAL ACTION REQUIRED ⚠️")
-            logger.info(
-                "Please manually click 'Share & Export' -> 'Get Table as CSV' in the browser window"
-            )
-            input(
-                "Press Enter after you have clicked through to get the CSV data displayed..."
-            )
+            logger.info("Please manually click 'Share & Export' -> 'Get Table as CSV' in the browser window")
+            input("Press Enter after you have clicked through to get the CSV data displayed...")
             logger.info("Continuing to capture CSV data from screen...")
 
             # Wait for CSV data to display on screen
@@ -316,12 +263,8 @@ class StatsDownloader:
 
                     for line in lines:
                         # Stop if we hit the League Average line
-                        if ",League Average" in line or line.strip().endswith(
-                            "League Average"
-                        ):
-                            logger.info(
-                                "Found League Average line, stopping data collection"
-                            )
+                        if ",League Average" in line or line.strip().endswith("League Average"):
+                            logger.info("Found League Average line, stopping data collection")
                             break
                         # Only include lines that look like CSV data
                         if line.strip() and ("," in line):
@@ -364,26 +307,20 @@ class StatsDownloader:
                     logger.warning("Could not find CSV content on the page")
                     # Fallback: ask user to manually save
                     logger.info("⚠️  MANUAL ACTION REQUIRED ⚠️")
-                    logger.info(
-                        "Please manually copy the CSV data and save it yourself, then press Enter..."
-                    )
+                    logger.info("Please manually copy the CSV data and save it yourself, then press Enter...")
                     input("Press Enter when you have manually saved the CSV data...")
                     return True
 
             except Exception as e:
                 logger.error(f"Error capturing CSV content: {e}")
                 logger.info("⚠️  MANUAL ACTION REQUIRED ⚠️")
-                logger.info(
-                    "Please manually copy the CSV data and save it yourself, then press Enter..."
-                )
+                logger.info("Please manually copy the CSV data and save it yourself, then press Enter...")
                 input("Press Enter when you have manually saved the CSV data...")
                 return True
 
         except Exception as e:
             logger.error(f"Error downloading pitching stats for {season}: {e}")
-            logger.info(
-                "Chrome window left open for debugging - close manually when done"
-            )
+            logger.info("Chrome window left open for debugging - close manually when done")
             error_occurred = True
             return False
         finally:

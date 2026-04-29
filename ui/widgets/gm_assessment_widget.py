@@ -1,10 +1,7 @@
 """
---- Copyright Notice ---
 Copyright (c) 2024 Jim Maastricht
 
 GM Assessment widget for baseball season simulation UI.
-
-Displays AI GM roster assessment for followed team.
 """
 
 import tkinter as tk
@@ -16,18 +13,10 @@ from ui.theme import BG_PANEL, BG_WIDGET, TEXT_PRIMARY, TEXT_HEADING, ACCENT_BLU
 
 
 class GMAssessmentWidget:
-    """
-    GM Assessment widget showing AI GM roster assessment.
-
-    Features:
-    - Displays team strategy (stage, alpha, win pct, games back)
-    - Shows top 5 most valuable players
-    - Lists trade candidates and targets
-    - Shows release candidates
-    - Update Assessment button to force new assessment
-    """
+    """GM Assessment widget showing AI GM roster assessment."""
 
     def __init__(self, parent: tk.Widget, update_callback: Callable):
+        """Initialize GM assessment widget."""
         """
         Initialize GM assessment widget.
 
@@ -43,29 +32,31 @@ class GMAssessmentWidget:
         gm_header_frame.pack(fill=tk.X, pady=5)
 
         self.gm_header_label = tk.Label(
-            gm_header_frame, text="No GM Assessment Yet",
-            font=("Segoe UI", 11, "bold"), bg=BG_PANEL, fg=TEXT_HEADING
+            gm_header_frame, text="No GM Assessment Yet", font=("Segoe UI", 11, "bold"), bg=BG_PANEL, fg=TEXT_HEADING
         )
         self.gm_header_label.pack(side=tk.LEFT, padx=10)
 
         # Update Assessment button
         self.update_assessment_btn = ttk.Button(
-            gm_header_frame, text="Update Assessment",
-            command=update_callback, width=18, style="GM.TButton"
+            gm_header_frame, text="Update Assessment", command=update_callback, width=18, style="GM.TButton"
         )
         self.update_assessment_btn.pack(side=tk.RIGHT, padx=10)
         self.update_assessment_btn.config(state=tk.DISABLED)  # Initially disabled
 
         # ScrolledText for assessment history
         self.gm_text = scrolledtext.ScrolledText(
-            self.frame, wrap=tk.WORD, font=("Consolas", 9), state=tk.DISABLED,
-            bg=BG_WIDGET, fg=TEXT_PRIMARY, insertbackground=TEXT_PRIMARY
+            self.frame,
+            wrap=tk.WORD,
+            font=("Consolas", 9),
+            state=tk.DISABLED,
+            bg=BG_WIDGET,
+            fg=TEXT_PRIMARY,
+            insertbackground=TEXT_PRIMARY,
         )
 
         # Configure text tags for formatting
         self.gm_text.tag_configure("header", font=("Consolas", 11, "bold"), foreground=ACCENT_BLUE)
-        self.gm_text.tag_configure("section", font=("Consolas", 10, "bold"), underline=True,
-                                   foreground="#79b8ff")
+        self.gm_text.tag_configure("section", font=("Consolas", 10, "bold"), underline=True, foreground="#79b8ff")
         self.gm_text.tag_configure("value", foreground="#56d364")
         self.gm_text.tag_configure("warning", foreground="#e0882d")
         self.gm_text.tag_configure("separator", foreground="#30363d")
@@ -76,8 +67,9 @@ class GMAssessmentWidget:
         """Enable the Update Assessment button."""
         self.update_assessment_btn.config(state=tk.NORMAL)
 
-    def display_assessment(self, team: str, games: int, wins: int, losses: int,
-                          games_back: float, assessment: Dict[str, Any]):
+    def display_assessment(
+        self, team: str, games: int, wins: int, losses: int, games_back: float, assessment: Dict[str, Any]
+    ):
         """
         Format and display GM assessment.
 
@@ -99,9 +91,9 @@ class GMAssessmentWidget:
         self.gm_text.delete(1.0, tk.END)
 
         # Extract data
-        strategy = assessment.get('strategy')
-        roster_values = assessment.get('roster_values', {'batters': [], 'pitchers': []})
-        recommendations = assessment.get('recommendations', {})
+        strategy = assessment.get("strategy")
+        roster_values = assessment.get("roster_values", {"batters": [], "pitchers": []})
+        recommendations = assessment.get("recommendations", {})
 
         if not strategy:
             self.gm_text.insert(tk.END, "No assessment data available.\n")
@@ -117,9 +109,9 @@ class GMAssessmentWidget:
         self.gm_text.insert(tk.END, "\n")
 
         # Calculate total team salary
-        all_players = roster_values.get('batters', []) + roster_values.get('pitchers', [])
-        total_salary = sum(player.salary for player in all_players if hasattr(player, 'salary'))
-        self.gm_text.insert(tk.END, f"TOTAL TEAM SALARY: ${total_salary/1e6:.1f}M\n", "header")
+        all_players = roster_values.get("batters", []) + roster_values.get("pitchers", [])
+        total_salary = sum(player.salary for player in all_players if hasattr(player, "salary"))
+        self.gm_text.insert(tk.END, f"TOTAL TEAM SALARY: ${total_salary / 1e6:.1f}M\n", "header")
         self.gm_text.insert(tk.END, "\n")
 
         # Strategy
@@ -139,16 +131,18 @@ class GMAssessmentWidget:
             self.gm_text.insert(tk.END, "  No player data available\n\n")
         else:
             for i, player in enumerate(all_players[:5], 1):
-                line = (f"{i}. {player.player_name:20s} ({player.position:5s}, Age {player.age:2d}): "
-                       f"Value={player.total_value:5.2f} "
-                       f"(Sim_WAR={player.sim_war:4.2f}, Current={player.immediate_value:4.2f}, "
-                       f"Future Avg={player.future_value:4.2f}/yr) "
-                       f"${player.salary/1e6:6.2f}M\n")
+                line = (
+                    f"{i}. {player.player_name:20s} ({player.position:5s}, Age {player.age:2d}): "
+                    f"Value={player.total_value:5.2f} "
+                    f"(Sim_WAR={player.sim_war:4.2f}, Current={player.immediate_value:4.2f}, "
+                    f"Future Avg={player.future_value:4.2f}/yr) "
+                    f"${player.salary / 1e6:6.2f}M\n"
+                )
                 self.gm_text.insert(tk.END, line, "value")
             self.gm_text.insert(tk.END, "\n")
 
         # Trade candidates
-        trade_away_list = recommendations.get('trade_away', [])
+        trade_away_list = recommendations.get("trade_away", [])
         if trade_away_list:
             self.gm_text.insert(tk.END, "TRADE CANDIDATES (Consider Dealing):\n", "section")
             for i, trade in enumerate(trade_away_list[:5], 1):
@@ -157,7 +151,7 @@ class GMAssessmentWidget:
             self.gm_text.insert(tk.END, "\n")
 
         # Trade targets
-        trade_targets_list = recommendations.get('trade_targets', [])
+        trade_targets_list = recommendations.get("trade_targets", [])
         if trade_targets_list:
             self.gm_text.insert(tk.END, "TRADE TARGETS (Acquire Players Matching):\n", "section")
             for i, target in enumerate(trade_targets_list, 1):
@@ -166,26 +160,30 @@ class GMAssessmentWidget:
             self.gm_text.insert(tk.END, "\n")
 
         # Specific targets
-        specific_targets_list = recommendations.get('specific_targets', [])
+        specific_targets_list = recommendations.get("specific_targets", [])
         if specific_targets_list:
             self.gm_text.insert(tk.END, "SPECIFIC PLAYERS TO TARGET:\n", "section")
             for i, target in enumerate(specific_targets_list[:5], 1):
-                line = (f"{i}. {target['player']:20s} "
-                       f"({target['team']}, {target['position']:6s}, Age {target['age']:2d}) - "
-                       f"{target['reason']}\n")
+                line = (
+                    f"{i}. {target['player']:20s} "
+                    f"({target['team']}, {target['position']:6s}, Age {target['age']:2d}) - "
+                    f"{target['reason']}\n"
+                )
                 self.gm_text.insert(tk.END, line, "value")
             self.gm_text.insert(tk.END, "\n")
 
         # Release candidates
-        release_list = recommendations.get('release', [])
+        release_list = recommendations.get("release", [])
         if release_list:
             self.gm_text.insert(tk.END, "RELEASE CANDIDATES:\n", "section")
             for i, release in enumerate(release_list[:3], 1):
-                sim_war = release.get('sim_war', 0.0)
-                immediate_value = release.get('immediate_value', 0.0)
-                line = (f"{i}. {release['player']:20s} - "
-                       f"Sim_WAR: {sim_war:4.2f}, Value: {immediate_value:4.2f}\n"
-                       f"   {release['reason']}\n")
+                sim_war = release.get("sim_war", 0.0)
+                immediate_value = release.get("immediate_value", 0.0)
+                line = (
+                    f"{i}. {release['player']:20s} - "
+                    f"Sim_WAR: {sim_war:4.2f}, Value: {immediate_value:4.2f}\n"
+                    f"   {release['reason']}\n"
+                )
                 self.gm_text.insert(tk.END, line, "warning")
             self.gm_text.insert(tk.END, "\n")
 

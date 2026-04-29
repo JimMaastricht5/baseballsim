@@ -1,10 +1,7 @@
 """
---- Copyright Notice ---
 Copyright (c) 2024 Jim Maastricht
 
-Refactored main window for the baseball season simulation UI using tkinter.
-
-Provides the primary interface with modular widget components.
+Main Tkinter window for season simulation UI with modular widget components.
 """
 
 import queue
@@ -38,17 +35,17 @@ class SeasonMainWindow:
     """
 
     def __init__(
-            self,
-            root,
-            load_seasons,
-            new_season,
-            season_length,
-            series_length,
-            rotation_len,
-            season_chatty,
-            season_print_lineup_b,
-            season_print_box_score_b,
-            season_team_to_follow,
+        self,
+        root,
+        load_seasons,
+        new_season,
+        season_length,
+        series_length,
+        rotation_len,
+        season_chatty,
+        season_print_lineup_b,
+        season_print_box_score_b,
+        season_team_to_follow,
     ):
         """
         Initialize the main window and UI components.
@@ -500,8 +497,8 @@ F1     - Show this help"""
         info_label = tk.Label(
             countdown_dialog,
             text="Simulation will start automatically in:\n\n"
-                 "Click PAUSE below if you need time to make roster moves,\n"
-                 "place players on IL, or make retirements in the Admin tab.",
+            "Click PAUSE below if you need time to make roster moves,\n"
+            "place players on IL, or make retirements in the Admin tab.",
             font=("Arial", 10),
             justify="center",
         )
@@ -651,11 +648,11 @@ F1     - Show this help"""
         self.day_label.config(text=f"Day: 0 / {num_games}")
 
         if self.controller.start_season(
-                selected_team,
-                on_started,
-                season_length=num_games,
-                start_paused=should_start_paused,
-                obp_adjustment=obp_adjustment,
+            selected_team,
+            on_started,
+            season_length=num_games,
+            start_paused=should_start_paused,
+            obp_adjustment=obp_adjustment,
         ):
             logger.info(
                 f"Season started for team: {selected_team}, games: {num_games}, start_paused: {should_start_paused}, OBP adjustment: {obp_adjustment}"
@@ -732,6 +729,7 @@ F1     - Show this help"""
                 pass
             except Exception as e:
                 import traceback
+
                 logger.error(f"Error handling game_completed: {e}")
                 logger.error(f"Stack: {traceback.format_exc()}")
 
@@ -853,7 +851,7 @@ F1     - Show this help"""
                     start_day,
                     worker.season.schedule_manager.schedule,
                     worker.season.schedule_manager.schedule_times,
-                    worker.season.schedule_manager.schedule_dates
+                    worker.season.schedule_manager.schedule_dates,
                 )
                 # Update day label to reflect partial season start
                 date_str = worker.season.get_date_for_day(start_day)
@@ -910,7 +908,7 @@ F1     - Show this help"""
                 day_num,
                 worker.season.schedule_manager.schedule,
                 worker.season.schedule_manager.schedule_times,
-                worker.season.schedule_manager.schedule_dates
+                worker.season.schedule_manager.schedule_dates,
             )
 
         # Update progress bar
@@ -968,8 +966,12 @@ F1     - Show this help"""
                     full_date = worker.season.get_date_for_day(game_data["day_num"])
                     # Strip year - just show "April 5" format
                     if full_date:
-                        date_str = full_date.replace(", 2026", "").replace(", 2025", "").replace(", 2024", "").replace(
-                            ", 2023", "")
+                        date_str = (
+                            full_date.replace(", 2026", "")
+                            .replace(", 2025", "")
+                            .replace(", 2024", "")
+                            .replace(", 2023", "")
+                        )
             except Exception:
                 pass  # Ignore date lookup errors
 
@@ -1123,7 +1125,7 @@ F1     - Show this help"""
 
             # Forward to playoff widget
             if hasattr(self, "playoff_widget"):
-                logger.debug(f"Forwarding play-by-play to playoff widget")
+                logger.debug("Forwarding play-by-play to playoff widget")
                 self.playoff_widget.add_play_by_play(play_data)
         else:
             logger.debug(f"Skipping play-by-play: {away_team} @ {home_team} (not WS teams)")
@@ -1201,7 +1203,7 @@ F1     - Show this help"""
         if self._current_date_str:
             return f"Simulating {self._current_date_str} - {message}"
         elif self.current_day > 0:
-            return f""
+            return ""
         return message
 
     def _update_status_from_controller(self):

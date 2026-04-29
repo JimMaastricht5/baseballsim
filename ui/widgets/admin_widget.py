@@ -1,33 +1,19 @@
 """
---- Copyright Notice ---
 Copyright (c) 2024 Jim Maastricht
 
 Admin widget for baseball season simulation UI.
-
-Provides player management functionality - move players between teams,
-retire players, and place players on the disabled list.
 """
 
 import tkinter as tk
 from tkinter import ttk, messagebox
-from typing import List, Dict, Any, Callable, Optional
+from typing import Callable, Optional
 from bblogger import logger
 
-from ui.theme import BG_PANEL, BG_ELEVATED, TEXT_PRIMARY, TEXT_SECONDARY, TEXT_HEADING, ACCENT_GREEN
+from ui.theme import BG_PANEL, BG_ELEVATED, TEXT_PRIMARY, TEXT_SECONDARY, TEXT_HEADING
 
 
 class AdminWidget:
-    """
-    Admin widget for player management.
-
-    Features:
-    - Search players by name
-    - Filter by team
-    - Move players between teams
-    - Retire players (remove from new season)
-    - Place players on disabled list (injured list)
-    - Save changes to CSV files
-    """
+    """Admin widget for player management."""
 
     def __init__(self, parent: tk.Widget, get_worker_callback: Callable, on_change_callback: Optional[Callable] = None):
         """
@@ -50,7 +36,7 @@ class AdminWidget:
             font=("Arial", 11, "bold"),
             pady=5,
             bg=BG_PANEL,
-            fg=TEXT_HEADING
+            fg=TEXT_HEADING,
         )
         admin_header.pack()
 
@@ -58,26 +44,32 @@ class AdminWidget:
         search_frame = tk.Frame(self.frame, bg=BG_PANEL)
         search_frame.pack(fill=tk.X, padx=10, pady=5)
 
-        tk.Label(search_frame, text="Search:", font=("Segoe UI", 10),
-                 bg=BG_PANEL, fg=TEXT_PRIMARY).pack(side=tk.LEFT, padx=5)
+        tk.Label(search_frame, text="Search:", font=("Segoe UI", 10), bg=BG_PANEL, fg=TEXT_PRIMARY).pack(
+            side=tk.LEFT, padx=5
+        )
         self.admin_search_var = tk.StringVar()
-        self.admin_search_var.trace('w', lambda *args: self._filter_players())
-        search_entry = tk.Entry(search_frame, textvariable=self.admin_search_var, width=30,
-                                font=("Segoe UI", 10), bg=BG_ELEVATED, fg=TEXT_PRIMARY,
-                                insertbackground=TEXT_PRIMARY, relief=tk.FLAT)
+        self.admin_search_var.trace("w", lambda *args: self._filter_players())
+        search_entry = tk.Entry(
+            search_frame,
+            textvariable=self.admin_search_var,
+            width=30,
+            font=("Segoe UI", 10),
+            bg=BG_ELEVATED,
+            fg=TEXT_PRIMARY,
+            insertbackground=TEXT_PRIMARY,
+            relief=tk.FLAT,
+        )
         search_entry.pack(side=tk.LEFT, padx=5)
 
-        tk.Label(search_frame, text="Team Filter:", font=("Segoe UI", 10),
-                 bg=BG_PANEL, fg=TEXT_PRIMARY).pack(side=tk.LEFT, padx=15)
-        self.admin_team_filter_var = tk.StringVar(value="All Teams")
-        self.admin_team_filter_var.trace('w', lambda *args: self._filter_players())
-        self.admin_team_filter_combo = ttk.Combobox(
-            search_frame,
-            textvariable=self.admin_team_filter_var,
-            width=15,
-            state="readonly"
+        tk.Label(search_frame, text="Team Filter:", font=("Segoe UI", 10), bg=BG_PANEL, fg=TEXT_PRIMARY).pack(
+            side=tk.LEFT, padx=15
         )
-        self.admin_team_filter_combo['values'] = ['All Teams']
+        self.admin_team_filter_var = tk.StringVar(value="All Teams")
+        self.admin_team_filter_var.trace("w", lambda *args: self._filter_players())
+        self.admin_team_filter_combo = ttk.Combobox(
+            search_frame, textvariable=self.admin_team_filter_var, width=15, state="readonly"
+        )
+        self.admin_team_filter_combo["values"] = ["All Teams"]
         self.admin_team_filter_combo.pack(side=tk.LEFT, padx=5)
 
         # Player list frame with treeview
@@ -98,7 +90,7 @@ class AdminWidget:
             show="headings",
             height=15,
             yscrollcommand=tree_scroll_y.set,
-            xscrollcommand=tree_scroll_x.set
+            xscrollcommand=tree_scroll_x.set,
         )
         tree_scroll_y.config(command=self.admin_players_tree.yview)
         tree_scroll_x.config(command=self.admin_players_tree.xview)
@@ -125,16 +117,14 @@ class AdminWidget:
         action_frame = tk.Frame(self.frame, bg=BG_PANEL)
         action_frame.pack(fill=tk.X, padx=10, pady=10)
 
-        tk.Label(action_frame, text="Move selected player to:", font=("Segoe UI", 10, "bold"),
-                 bg=BG_PANEL, fg=TEXT_PRIMARY).pack(side=tk.LEFT, padx=5)
+        tk.Label(
+            action_frame, text="Move selected player to:", font=("Segoe UI", 10, "bold"), bg=BG_PANEL, fg=TEXT_PRIMARY
+        ).pack(side=tk.LEFT, padx=5)
         self.admin_dest_team_var = tk.StringVar()
         self.admin_dest_team_combo = ttk.Combobox(
-            action_frame,
-            textvariable=self.admin_dest_team_var,
-            width=15,
-            state="readonly"
+            action_frame, textvariable=self.admin_dest_team_var, width=15, state="readonly"
         )
-        self.admin_dest_team_combo['values'] = []
+        self.admin_dest_team_combo["values"] = []
         self.admin_dest_team_combo.pack(side=tk.LEFT, padx=5)
 
         self.move_btn = tk.Button(
@@ -145,7 +135,7 @@ class AdminWidget:
             fg="white",
             font=("Arial", 10, "bold"),
             width=15,
-            state=tk.DISABLED
+            state=tk.DISABLED,
         )
         self.move_btn.pack(side=tk.LEFT, padx=5)
 
@@ -157,7 +147,7 @@ class AdminWidget:
             fg="white",
             font=("Arial", 10, "bold"),
             width=15,
-            state=tk.DISABLED
+            state=tk.DISABLED,
         )
         self.retire_btn.pack(side=tk.LEFT, padx=5)
 
@@ -169,22 +159,38 @@ class AdminWidget:
             fg="white",
             font=("Arial", 10, "bold"),
             width=15,
-            state=tk.DISABLED
+            state=tk.DISABLED,
         )
         self.save_btn.pack(side=tk.LEFT, padx=5)
 
         # Disabled List (IL) section
-        il_frame = tk.LabelFrame(self.frame, text="Place Player on Disabled List", font=("Arial", 10, "bold"),
-                                 padx=10, pady=5, bg=BG_PANEL, fg=TEXT_PRIMARY)
+        il_frame = tk.LabelFrame(
+            self.frame,
+            text="Place Player on Disabled List",
+            font=("Arial", 10, "bold"),
+            padx=10,
+            pady=5,
+            bg=BG_PANEL,
+            fg=TEXT_PRIMARY,
+        )
         il_frame.pack(fill=tk.X, padx=10, pady=(5, 0))
 
         il_inner_frame = tk.Frame(il_frame, bg=BG_PANEL)
         il_inner_frame.pack(fill=tk.X, pady=5)
 
-        tk.Label(il_inner_frame, text="Injury Days:", font=("Arial", 10), bg=BG_PANEL, fg=TEXT_PRIMARY).pack(side=tk.LEFT, padx=5)
+        tk.Label(il_inner_frame, text="Injury Days:", font=("Arial", 10), bg=BG_PANEL, fg=TEXT_PRIMARY).pack(
+            side=tk.LEFT, padx=5
+        )
         self.il_days_var = tk.StringVar(value="30")
-        il_days_entry = tk.Entry(il_inner_frame, textvariable=self.il_days_var, width=8, font=("Arial", 10),
-                                  bg=BG_ELEVATED, fg=TEXT_PRIMARY, insertbackground=TEXT_PRIMARY)
+        il_days_entry = tk.Entry(
+            il_inner_frame,
+            textvariable=self.il_days_var,
+            width=8,
+            font=("Arial", 10),
+            bg=BG_ELEVATED,
+            fg=TEXT_PRIMARY,
+            insertbackground=TEXT_PRIMARY,
+        )
         il_days_entry.pack(side=tk.LEFT, padx=5)
 
         il_hint_label = tk.Label(
@@ -192,7 +198,7 @@ class AdminWidget:
             text="(Short: 5-14, Medium: 15-29, Long: 30+)",
             font=("Arial", 8),
             fg=TEXT_SECONDARY,
-            bg=BG_PANEL
+            bg=BG_PANEL,
         )
         il_hint_label.pack(side=tk.LEFT, padx=5)
 
@@ -204,7 +210,7 @@ class AdminWidget:
             fg="white",
             font=("Arial", 10, "bold"),
             width=15,
-            state=tk.DISABLED
+            state=tk.DISABLED,
         )
         self.place_il_btn.pack(side=tk.LEFT, padx=10)
 
@@ -213,8 +219,9 @@ class AdminWidget:
             self.frame,
             text="Ready. Select a player and destination team, then click 'Move Player'.",
             font=("Segoe UI", 9),
-            bg=BG_PANEL, fg=TEXT_SECONDARY,
-            anchor=tk.W
+            bg=BG_PANEL,
+            fg=TEXT_SECONDARY,
+            anchor=tk.W,
         )
         self.admin_status_label.pack(fill=tk.X, padx=10, pady=5)
 
@@ -225,8 +232,7 @@ class AdminWidget:
         """
         worker = self.get_worker()
         if not worker or not worker.season:
-            self.admin_status_label.config(text="Start simulation to load players",
-                                           fg="#e0882d")
+            self.admin_status_label.config(text="Start simulation to load players", fg="#e0882d")
             return
 
         try:
@@ -236,49 +242,53 @@ class AdminWidget:
             # Load batters
             batting_df = baseball_data.new_season_batting_data
             for idx, row in batting_df.iterrows():
-                pos = row.get('Pos', 'Unknown')
+                pos = row.get("Pos", "Unknown")
                 if isinstance(pos, list):
-                    pos = pos[0] if pos else 'Unknown'
-                pos = str(pos).replace('[', '').replace(']', '').replace("'", '').replace('"', '').strip()
+                    pos = pos[0] if pos else "Unknown"
+                pos = str(pos).replace("[", "").replace("]", "").replace("'", "").replace('"', "").strip()
 
-                self.admin_all_players.append({
-                    'player': row['Player'],
-                    'pos': pos,
-                    'team': row['Team'],
-                    'age': int(row.get('Age', 0)),
-                    'type': 'Batter',
-                    'hashcode': idx
-                })
+                self.admin_all_players.append(
+                    {
+                        "player": row["Player"],
+                        "pos": pos,
+                        "team": row["Team"],
+                        "age": int(row.get("Age", 0)),
+                        "type": "Batter",
+                        "hashcode": idx,
+                    }
+                )
 
             # Load pitchers
             pitching_df = baseball_data.new_season_pitching_data
             for idx, row in pitching_df.iterrows():
-                self.admin_all_players.append({
-                    'player': row['Player'],
-                    'pos': 'P',
-                    'team': row['Team'],
-                    'age': int(row.get('Age', 0)),
-                    'type': 'Pitcher',
-                    'hashcode': idx
-                })
+                self.admin_all_players.append(
+                    {
+                        "player": row["Player"],
+                        "pos": "P",
+                        "team": row["Team"],
+                        "age": int(row.get("Age", 0)),
+                        "type": "Pitcher",
+                        "hashcode": idx,
+                    }
+                )
 
             # Populate team dropdowns
-            all_teams = sorted(set(p['team'] for p in self.admin_all_players))
-            self.admin_team_filter_combo['values'] = ['All Teams'] + all_teams
-            self.admin_dest_team_combo['values'] = all_teams
+            all_teams = sorted(set(p["team"] for p in self.admin_all_players))
+            self.admin_team_filter_combo["values"] = ["All Teams"] + all_teams
+            self.admin_dest_team_combo["values"] = all_teams
 
             # Display players
             self._filter_players()
 
             self.admin_status_label.config(
-                text=f"Loaded {len(self.admin_all_players)} players. Select a player to move.",
-                fg="#56d364"
+                text=f"Loaded {len(self.admin_all_players)} players. Select a player to move.", fg="#56d364"
             )
             logger.info(f"Loaded {len(self.admin_all_players)} players for admin management")
 
         except Exception as e:
             logger.error(f"Error loading admin players: {e}")
             import traceback
+
             logger.error(traceback.format_exc())
             self.admin_status_label.config(text=f"Error loading players: {e}", fg="#ff6b6b")
 
@@ -288,7 +298,9 @@ class AdminWidget:
         self.retire_btn.config(state=tk.NORMAL)
         self.save_btn.config(state=tk.NORMAL)
         self.place_il_btn.config(state=tk.NORMAL)
-        self.admin_status_label.config(text="Ready. Simulation paused - you can move, retire, or place players on IL.", fg="#006600")
+        self.admin_status_label.config(
+            text="Ready. Simulation paused - you can move, retire, or place players on IL.", fg="#006600"
+        )
 
     def disable_buttons(self):
         """Disable admin buttons when simulation is running."""
@@ -314,11 +326,11 @@ class AdminWidget:
         filtered_players = []
         for player in self.admin_all_players:
             # Filter by search text (player name)
-            if search_text and search_text not in player['player'].lower():
+            if search_text and search_text not in player["player"].lower():
                 continue
 
             # Filter by team
-            if team_filter != "All Teams" and player['team'] != team_filter:
+            if team_filter != "All Teams" and player["team"] != team_filter:
                 continue
 
             filtered_players.append(player)
@@ -329,20 +341,19 @@ class AdminWidget:
                 "",
                 tk.END,
                 values=(
-                    player['player'],
-                    player['pos'],
-                    player['team'],
-                    player['age'],
-                    player['type'],
-                    player['hashcode']
-                )
+                    player["player"],
+                    player["pos"],
+                    player["team"],
+                    player["age"],
+                    player["type"],
+                    player["hashcode"],
+                ),
             )
 
         # Update status with count
         if search_text or team_filter != "All Teams":
             self.admin_status_label.config(
-                text=f"Showing {len(filtered_players)} of {len(self.admin_all_players)} players",
-                fg=TEXT_SECONDARY
+                text=f"Showing {len(filtered_players)} of {len(self.admin_all_players)} players", fg=TEXT_SECONDARY
             )
 
     def move_player(self):
@@ -351,31 +362,22 @@ class AdminWidget:
 
         # Check if simulation is running (not paused)
         if worker and worker.is_alive() and not worker._paused:
-            messagebox.showwarning(
-                "Simulation Running",
-                "Please pause the simulation before moving players."
-            )
+            messagebox.showwarning("Simulation Running", "Please pause the simulation before moving players.")
             return
 
         # Check if worker/season exists
         if not worker or not worker.season:
-            messagebox.showwarning(
-                "No Simulation",
-                "Please start a simulation before moving players."
-            )
+            messagebox.showwarning("No Simulation", "Please start a simulation before moving players.")
             return
 
         # Get selected player
         selected_items = self.admin_players_tree.selection()
         if not selected_items:
-            messagebox.showwarning(
-                "No Player Selected",
-                "Please select a player to move."
-            )
+            messagebox.showwarning("No Player Selected", "Please select a player to move.")
             return
 
         selected_item = selected_items[0]
-        values = self.admin_players_tree.item(selected_item, 'values')
+        values = self.admin_players_tree.item(selected_item, "values")
         player_name = values[0]
         current_team = values[2]
         hashcode = int(values[5])
@@ -383,25 +385,16 @@ class AdminWidget:
         # Get destination team
         dest_team = self.admin_dest_team_var.get()
         if not dest_team:
-            messagebox.showwarning(
-                "No Destination Team",
-                "Please select a destination team."
-            )
+            messagebox.showwarning("No Destination Team", "Please select a destination team.")
             return
 
         # Check if moving to same team
         if current_team == dest_team:
-            messagebox.showinfo(
-                "Same Team",
-                f"{player_name} is already on {current_team}."
-            )
+            messagebox.showinfo("Same Team", f"{player_name} is already on {current_team}.")
             return
 
         # Confirm move
-        confirm = messagebox.askyesno(
-            "Confirm Move",
-            f"Move {player_name} from {current_team} to {dest_team}?"
-        )
+        confirm = messagebox.askyesno("Confirm Move", f"Move {player_name} from {current_team} to {dest_team}?")
 
         if not confirm:
             return
@@ -417,43 +410,36 @@ class AdminWidget:
 
             # Update in-memory list
             for player in self.admin_all_players:
-                if player['hashcode'] == hashcode:
-                    player['team'] = dest_team
+                if player["hashcode"] == hashcode:
+                    player["team"] = dest_team
                     break
 
             # Update treeview
-            self.admin_players_tree.item(selected_item, values=(
-                values[0], values[1], dest_team, values[3], values[4], values[5]
-            ))
+            self.admin_players_tree.item(
+                selected_item, values=(values[0], values[1], dest_team, values[3], values[4], values[5])
+            )
 
             self.admin_status_label.config(
                 text=f"Moved {player_name} from {current_team} to {dest_team}. Click 'Save Changes' to persist.",
-                fg="#56d364"
+                fg="#56d364",
             )
             logger.info(f"Moved player {hashcode} ({player_name}) from {current_team} to {dest_team}")
 
         except Exception as e:
             logger.error(f"Error moving player: {e}")
-            messagebox.showerror(
-                "Move Failed",
-                f"Error moving player: {str(e)}"
-            )
+            messagebox.showerror("Move Failed", f"Error moving player: {str(e)}")
 
     def save_changes(self):
         """Save all player movements to CSV files."""
         worker = self.get_worker()
         if not worker or not worker.season:
-            messagebox.showwarning(
-                "No Simulation",
-                "Please start a simulation before saving."
-            )
+            messagebox.showwarning("No Simulation", "Please start a simulation before saving.")
             return
 
         # Confirm save
         confirm = messagebox.askyesno(
             "Confirm Save",
-            "Save all player movements to New-Season-stats CSV files?\n\n"
-            "This will overwrite the existing files."
+            "Save all player movements to New-Season-stats CSV files?\n\nThis will overwrite the existing files.",
         )
 
         if not confirm:
@@ -471,52 +457,38 @@ class AdminWidget:
                 "Save Successful",
                 f"Player movements saved to:\n"
                 f"- {new_season} New-Season-stats-pp-Batting.csv\n"
-                f"- {new_season} New-Season-stats-pp-Pitching.csv"
+                f"- {new_season} New-Season-stats-pp-Pitching.csv",
             )
 
-            self.admin_status_label.config(
-                text="Changes saved successfully to CSV files.",
-                fg="#56d364"
-            )
+            self.admin_status_label.config(text="Changes saved successfully to CSV files.", fg="#56d364")
             logger.info("Admin player changes saved to CSV files")
 
         except Exception as e:
             logger.error(f"Error saving admin changes: {e}")
             import traceback
+
             logger.error(traceback.format_exc())
-            messagebox.showerror(
-                "Save Failed",
-                f"Error saving changes: {str(e)}"
-            )
+            messagebox.showerror("Save Failed", f"Error saving changes: {str(e)}")
 
     def retire_player(self):
         """Retire selected player, removing them from new season DataFrames."""
         worker = self.get_worker()
 
         if worker and worker.is_alive() and not worker._paused:
-            messagebox.showwarning(
-                "Simulation Running",
-                "Please pause the simulation before retiring players."
-            )
+            messagebox.showwarning("Simulation Running", "Please pause the simulation before retiring players.")
             return
 
         if not worker or not worker.season:
-            messagebox.showwarning(
-                "No Simulation",
-                "Please start a simulation before retiring players."
-            )
+            messagebox.showwarning("No Simulation", "Please start a simulation before retiring players.")
             return
 
         selected_items = self.admin_players_tree.selection()
         if not selected_items:
-            messagebox.showwarning(
-                "No Player Selected",
-                "Please select a player to retire."
-            )
+            messagebox.showwarning("No Player Selected", "Please select a player to retire.")
             return
 
         selected_item = selected_items[0]
-        values = self.admin_players_tree.item(selected_item, 'values')
+        values = self.admin_players_tree.item(selected_item, "values")
         player_name = values[0]
         player_type = values[4]
         hashcode = int(values[5])
@@ -525,7 +497,7 @@ class AdminWidget:
             "Confirm Retirement",
             f"Retire {player_name} ({player_type})?\n\n"
             f"This will permanently remove them from the new season roster.\n"
-            f"Click 'Save Changes' to persist."
+            f"Click 'Save Changes' to persist.",
         )
 
         if not confirm:
@@ -541,16 +513,13 @@ class AdminWidget:
                     self.on_change_callback()
 
                 # Remove from in-memory list
-                self.admin_all_players = [
-                    p for p in self.admin_all_players if p['hashcode'] != hashcode
-                ]
+                self.admin_all_players = [p for p in self.admin_all_players if p["hashcode"] != hashcode]
 
                 # Refresh the treeview
                 self._filter_players()
 
                 self.admin_status_label.config(
-                    text=f"Retired {name} ({ptype}). Click 'Save Changes' to persist.",
-                    fg="#FF5722"
+                    text=f"Retired {name} ({ptype}). Click 'Save Changes' to persist.", fg="#FF5722"
                 )
                 logger.info(f"Retired player {hashcode} ({name})")
             else:
@@ -565,44 +534,31 @@ class AdminWidget:
         worker = self.get_worker()
 
         if worker and worker.is_alive() and not worker._paused:
-            messagebox.showwarning(
-                "Simulation Running",
-                "Please pause the simulation before placing players on IL."
-            )
+            messagebox.showwarning("Simulation Running", "Please pause the simulation before placing players on IL.")
             return
 
         if not worker or not worker.season:
-            messagebox.showwarning(
-                "No Simulation",
-                "Please start a simulation before placing players on IL."
-            )
+            messagebox.showwarning("No Simulation", "Please start a simulation before placing players on IL.")
             return
 
         selected_items = self.admin_players_tree.selection()
         if not selected_items:
-            messagebox.showwarning(
-                "No Player Selected",
-                "Please select a player to place on the disabled list."
-            )
+            messagebox.showwarning("No Player Selected", "Please select a player to place on the disabled list.")
             return
 
         try:
             injury_days = int(self.il_days_var.get())
             if injury_days < 1 or injury_days > 365:
                 messagebox.showwarning(
-                    "Invalid Injury Days",
-                    "Please enter a number between 1 and 365 for injury days."
+                    "Invalid Injury Days", "Please enter a number between 1 and 365 for injury days."
                 )
                 return
         except ValueError:
-            messagebox.showwarning(
-                "Invalid Input",
-                "Please enter a valid number for injury days."
-            )
+            messagebox.showwarning("Invalid Input", "Please enter a valid number for injury days.")
             return
 
         selected_item = selected_items[0]
-        values = self.admin_players_tree.item(selected_item, 'values')
+        values = self.admin_players_tree.item(selected_item, "values")
         player_name = values[0]
         player_type = values[4]
         hashcode = int(values[5])
@@ -611,7 +567,7 @@ class AdminWidget:
             "Confirm IL Placement",
             f"Place {player_name} ({player_type}) on Disabled List?\n\n"
             f"Approximate injury duration: {injury_days} days\n"
-            f"The system will generate an appropriate injury description."
+            f"The system will generate an appropriate injury description.",
         )
 
         if not confirm:
@@ -629,15 +585,15 @@ class AdminWidget:
                 il_type = "IL" if actual_days >= 10 else "Day-to-Day"
                 self.admin_status_label.config(
                     text=f"Placed {player_name} on {il_type}: {injury_desc} ({actual_days} days). "
-                         f"Click 'Save Changes' to persist.",
-                    fg="#9C27B0"
+                    f"Click 'Save Changes' to persist.",
+                    fg="#9C27B0",
                 )
                 logger.info(f"Placed player {hashcode} ({player_name}) on IL: {injury_desc} ({actual_days} days)")
                 messagebox.showinfo(
                     "IL Placement Complete",
                     f"{player_name} has been placed on the {il_type}.\n\n"
                     f"Injury: {injury_desc}\n"
-                    f"Duration: {actual_days} days"
+                    f"Duration: {actual_days} days",
                 )
             else:
                 messagebox.showerror("IL Placement Failed", f"Could not place player {player_name} on IL")

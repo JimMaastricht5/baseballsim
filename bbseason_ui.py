@@ -1,24 +1,12 @@
 """
---- Copyright Notice ---
 Copyright (c) 2024 Jim Maastricht
 
-PRIMARY FUNCTION:
-- main(): Initializes the tkinter root window and instantiates the
-  SeasonMainWindow class to launch the application.
+UI entry point: startup dialog and Tkinter main window launch for season simulation.
 
-USAGE:
-    python bbseason_ui.py                    # No dialog, uses defaults
-    python bbseason_ui.py --dialog          # Shows startup dialog
-    python bbseason_ui.py --team NYM        # Follow NYM, no dialog
-    python bbseason_ui.py --games 81         # 81 games, no dialog
-
-OPTIONAL COMMAND-LINE ARGUMENTS:
-    --dialog              Show startup dialog for team/games selection
-    --team TEAM          Team to follow (e.g., MIL, NYM)
-    --games N            Number of games to simulate (1-162)
-    --seasons YYYY,YYYY  Years to load stats from
-    --new-season YYYY    Season to simulate
-Contact: JimMaastricht5@gmail.com
+Usage:
+    python bbseason_ui.py                      # Defaults (follow MIL, 162 games)
+    python bbseason_ui.py --team NYM --games 81  # Custom team/games
+    python bbseason_ui.py --seasons 2024,2025    # Load specific seasons
 """
 
 import tkinter as tk
@@ -43,7 +31,7 @@ class StartupDialog:
         self.root.resizable(False, False)
 
         # Result variables
-        self.selected_team = 'MIL'
+        self.selected_team = "MIL"
         self.num_games = 162
         self.confirmed = False
 
@@ -56,7 +44,7 @@ class StartupDialog:
         height = self.root.winfo_height()
         x = (self.root.winfo_screenwidth() // 2) - (width // 2)
         y = (self.root.winfo_screenheight() // 2) - (height // 2)
-        self.root.geometry(f'{width}x{height}+{x}+{y}')
+        self.root.geometry(f"{width}x{height}+{x}+{y}")
 
         # Protocol to handle window close button
         self.root.protocol("WM_DELETE_WINDOW", self._on_cancel)
@@ -75,32 +63,51 @@ class StartupDialog:
         team_label = tk.Label(main_frame, text="Select Team to Follow:", font=("Arial", 11, "bold"))
         team_label.grid(row=0, column=0, sticky=tk.W, pady=(0, 5))
 
-        self.team_var = tk.StringVar(value='MIL')
+        self.team_var = tk.StringVar(value="MIL")
         team_combo = ttk.Combobox(
-            main_frame,
-            textvariable=self.team_var,
-            width=10,
-            state="readonly",
-            font=("Arial", 10)
+            main_frame, textvariable=self.team_var, width=10, state="readonly", font=("Arial", 10)
         )
-        team_combo['values'] = ['ARI', 'ATL', 'BAL', 'BOS', 'CHC', 'CHW', 'CIN', 'CLE',
-                                'COL', 'DET', 'HOU', 'KCR', 'LAA', 'LAD', 'MIA', 'MIL',
-                                'MIN', 'NYM', 'NYY', 'OAK', 'PHI', 'PIT', 'SDP', 'SEA',
-                                'SFG', 'STL', 'TBR', 'TEX', 'TOR', 'WSN']
+        team_combo["values"] = [
+            "ARI",
+            "ATL",
+            "BAL",
+            "BOS",
+            "CHC",
+            "CHW",
+            "CIN",
+            "CLE",
+            "COL",
+            "DET",
+            "HOU",
+            "KCR",
+            "LAA",
+            "LAD",
+            "MIA",
+            "MIL",
+            "MIN",
+            "NYM",
+            "NYY",
+            "OAK",
+            "PHI",
+            "PIT",
+            "SDP",
+            "SEA",
+            "SFG",
+            "STL",
+            "TBR",
+            "TEX",
+            "TOR",
+            "WSN",
+        ]
         team_combo.grid(row=0, column=1, sticky=tk.W, pady=(0, 5))
 
         # Number of games
         games_label = tk.Label(main_frame, text="Number of Games to Simulate:", font=("Arial", 11, "bold"))
         games_label.grid(row=1, column=0, sticky=tk.W, pady=(15, 5))
 
-        self.games_var = tk.StringVar(value='162')
+        self.games_var = tk.StringVar(value="162")
         games_spinbox = tk.Spinbox(
-            main_frame,
-            from_=1,
-            to=162,
-            textvariable=self.games_var,
-            width=10,
-            font=("Arial", 10)
+            main_frame, from_=1, to=162, textvariable=self.games_var, width=10, font=("Arial", 10)
         )
         games_spinbox.grid(row=1, column=1, sticky=tk.W, pady=(15, 5))
 
@@ -115,17 +122,11 @@ class StartupDialog:
             width=12,
             bg="green",
             fg="white",
-            font=("Arial", 10, "bold")
+            font=("Arial", 10, "bold"),
         )
         ok_button.pack(side=tk.LEFT, padx=5)
 
-        cancel_button = tk.Button(
-            button_frame,
-            text="Cancel",
-            command=self._on_cancel,
-            width=12,
-            font=("Arial", 10)
-        )
+        cancel_button = tk.Button(button_frame, text="Cancel", command=self._on_cancel, width=12, font=("Arial", 10))
         cancel_button.pack(side=tk.LEFT, padx=5)
 
     def _on_ok(self):
@@ -160,9 +161,18 @@ class StartupDialog:
         return self.confirmed, self.selected_team, self.num_games
 
 
-def main(load_seasons=None, new_season=2026, season_length=162, series_length=3,
-         rotation_len=5, season_chatty=True, season_print_lineup_b=True,
-         season_print_box_score_b=True, season_team_to_follow='MIL', show_startup_dialog=False):
+def main(
+    load_seasons=None,
+    new_season=2026,
+    season_length=162,
+    series_length=3,
+    rotation_len=5,
+    season_chatty=True,
+    season_print_lineup_b=True,
+    season_print_box_score_b=True,
+    season_team_to_follow="MIL",
+    show_startup_dialog=False,
+):
     """
     Main entry point for the UI application.
 
@@ -183,16 +193,25 @@ def main(load_seasons=None, new_season=2026, season_length=162, series_length=3,
     """
     if load_seasons is None:
         load_seasons = [2023, 2024, 2025]
-    
+
     logger.info("Starting Baseball Season Simulator UI (tkinter)")
 
     root = tk.Tk()
-    root.state('zoomed')
+    root.state("zoomed")
 
     try:
-        window = SeasonMainWindow(root, load_seasons, new_season, season_length, series_length,
-                                  rotation_len, season_chatty, season_print_lineup_b,
-                                  season_print_box_score_b, season_team_to_follow)
+        window = SeasonMainWindow(
+            root,
+            load_seasons,
+            new_season,
+            season_length,
+            series_length,
+            rotation_len,
+            season_chatty,
+            season_print_lineup_b,
+            season_print_box_score_b,
+            season_team_to_follow,
+        )
     except Exception as e:
         logger.error(f"Error creating main window: {e}")
         messagebox.showerror("Error", f"Failed to create main window: {e}")
@@ -207,7 +226,7 @@ def main(load_seasons=None, new_season=2026, season_length=162, series_length=3,
 
 if __name__ == "__main__":
     start_time = datetime.datetime.now()
-    
+
     # Parse command-line arguments
     parser = argparse.ArgumentParser(
         description="Baseball Season Simulator UI",
@@ -218,43 +237,46 @@ Examples:
   python bbseason_ui.py --dialog            # Show startup dialog first
   python bbseason_ui.py --team NYM --games 81  # Follow NYM, 81 games
   python bbseason_ui.py --seasons 2024,2025  # Load stats from 2024 and 2025
-        """
+        """,
     )
-    parser.add_argument('--dialog', '-d', action='store_true',
-                       help='Show startup dialog for team and games selection')
-    parser.add_argument('--team', '-t', type=str, default='MIL',
-                       help='Team to follow (default: MIL)')
-    parser.add_argument('--games', '-g', type=int, default=162,
-                       help='Number of games to simulate (default: 162)')
-    parser.add_argument('--seasons', '-s', type=str, default='2023,2024,2025,2026',
-                       help='Years to load stats from (default: 2023,2024,2025,2026)')
-    parser.add_argument('--new-season', '-n', type=int, default=2026,
-                       help='Season to simulate (default: 2026)')
-    
+    parser.add_argument("--dialog", "-d", action="store_true", help="Show startup dialog for team and games selection")
+    parser.add_argument("--team", "-t", type=str, default="MIL", help="Team to follow (default: MIL)")
+    parser.add_argument("--games", "-g", type=int, default=162, help="Number of games to simulate (default: 162)")
+    parser.add_argument(
+        "--seasons",
+        "-s",
+        type=str,
+        default="2023,2024,2025,2026",
+        help="Years to load stats from (default: 2023,2024,2025,2026)",
+    )
+    parser.add_argument("--new-season", "-n", type=int, default=2026, help="Season to simulate (default: 2026)")
+
     args = parser.parse_args()
-    
+
     # Parse seasons list
-    load_seasons = [int(y.strip()) for y in args.seasons.split(',')]
-    
+    load_seasons = [int(y.strip()) for y in args.seasons.split(",")]
+
     # Validate games
     if args.games < 1 or args.games > 162:
         print("Error: Games must be between 1 and 162")
         sys.exit(1)
-    
-    main(load_seasons=load_seasons,
-         new_season=args.new_season,
-         season_length=args.games,
-         series_length=3,
-         rotation_len=5,
-         season_chatty=True,
-         season_print_lineup_b=True,
-         season_print_box_score_b=True,
-         season_team_to_follow=args.team.upper(),
-         show_startup_dialog=args.dialog)
+
+    main(
+        load_seasons=load_seasons,
+        new_season=args.new_season,
+        season_length=args.games,
+        series_length=3,
+        rotation_len=5,
+        season_chatty=True,
+        season_print_lineup_b=True,
+        season_print_box_score_b=True,
+        season_team_to_follow=args.team.upper(),
+        show_startup_dialog=args.dialog,
+    )
 
     end_time = datetime.datetime.now()
     run_time = end_time - start_time
     total_seconds = run_time.total_seconds()
     minutes = int(total_seconds // 60)
     seconds = int(total_seconds % 60)
-    print(f'Total run time: {minutes} minutes, {seconds} seconds')
+    print(f"Total run time: {minutes} minutes, {seconds} seconds")

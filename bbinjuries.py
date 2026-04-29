@@ -1,28 +1,17 @@
 """
---- Copyright Notice ---
 Copyright (c) 2024 Jim Maastricht
 
---- File Context and Purpose ---
-DESCRIPTION: Defines and manages baseball player injury types, severity levels,
-and typical duration ranges for simulation purposes. Includes differentiation
-between pitcher-specific, batter-specific, and general injuries.
-
-PRIMARY CLASS:
-- InjuryType: Provides methods to select a random injury description based on
-  a desired duration (in days) and to retrieve the duration range for a given
-  injury name.
-
-Contact: JimMaastricht5@gmail.com
+Injury type definitions with duration ranges for pitchers, batters, and general injuries.
 """
 
 import random
-from typing import Dict, List, Tuple
 
 
 class InjuryType:
     """
     Class to manage injury types, descriptions, and their severity levels
     """
+
     def __init__(self):
         """
         Initialize injury types with their duration ranges
@@ -30,65 +19,60 @@ class InjuryType:
         # Pitcher-specific injuries (arm/shoulder focused)
         self.pitcher_injuries = {
             # Long-term (30+ days)
-            'UCL Tear (Tommy John Surgery)': (120, 210),  # 4-7 months
-            'Rotator Cuff Tear': (60, 120),
-            'Labrum Tear': (90, 180),
-            'Stress Fracture (Arm)': (40, 80),
-            'Shoulder Impingement': (30, 60),
-            
+            "UCL Tear (Tommy John Surgery)": (120, 210),  # 4-7 months
+            "Rotator Cuff Tear": (60, 120),
+            "Labrum Tear": (90, 180),
+            "Stress Fracture (Arm)": (40, 80),
+            "Shoulder Impingement": (30, 60),
             # Medium-term (15-30 days)
-            'Forearm Strain': (15, 30),
-            'Shoulder Inflammation': (15, 30),
-            'Elbow Inflammation': (15, 30),
-            'Biceps Tendinitis': (15, 25),
-            'Lat Strain': (20, 30),
-            
+            "Forearm Strain": (15, 30),
+            "Shoulder Inflammation": (15, 30),
+            "Elbow Inflammation": (15, 30),
+            "Biceps Tendinitis": (15, 25),
+            "Lat Strain": (20, 30),
             # Short-term (5-15 days)
-            'Blister': (5, 12),
-            'Finger Strain': (7, 15),
-            'Back Spasms': (7, 14),
-            'Minor Shoulder Fatigue': (7, 14),
-            'Neck Stiffness': (5, 10)
+            "Blister": (5, 12),
+            "Finger Strain": (7, 15),
+            "Back Spasms": (7, 14),
+            "Minor Shoulder Fatigue": (7, 14),
+            "Neck Stiffness": (5, 10),
         }
-        
+
         # Batter-specific injuries (more varied)
         self.batter_injuries = {
             # Long-term (30+ days)
-            'ACL Tear': (180, 270),
-            'Broken Ankle': (40, 60),
-            'Broken Wrist': (30, 50),
-            'Hamstring Tear': (30, 60),
-            'Oblique Strain (Severe)': (30, 45),
-            
+            "ACL Tear": (180, 270),
+            "Broken Ankle": (40, 60),
+            "Broken Wrist": (30, 50),
+            "Hamstring Tear": (30, 60),
+            "Oblique Strain (Severe)": (30, 45),
             # Medium-term (15-30 days)
-            'Oblique Strain (Moderate)': (15, 30),
-            'Hamstring Strain': (15, 25),
-            'Quad Strain': (15, 25),
-            'Wrist Inflammation': (15, 25),
-            'Ankle Sprain': (15, 30),
-            
+            "Oblique Strain (Moderate)": (15, 30),
+            "Hamstring Strain": (15, 25),
+            "Quad Strain": (15, 25),
+            "Wrist Inflammation": (15, 25),
+            "Ankle Sprain": (15, 30),
             # Short-term (5-15 days)
-            'Back Spasms': (7, 14),
-            'Minor Knee Inflammation': (5, 15),
-            'Finger Sprain': (7, 14),
-            'Hip Soreness': (5, 12),
-            'Foot Contusion': (5, 10)
+            "Back Spasms": (7, 14),
+            "Minor Knee Inflammation": (5, 15),
+            "Finger Sprain": (7, 14),
+            "Hip Soreness": (5, 12),
+            "Foot Contusion": (5, 10),
         }
 
         # Both pitchers and batters can get these general injuries
         self.general_injuries = {
             # Special cases with specific IL designations
-            'Concussion': (7, 14),  # 7-day IL specific for concussions
-         #   'COVID-19 Protocol': (10, 21),
-            
+            "Concussion": (7, 14),  # 7-day IL specific for concussions
+            #   'COVID-19 Protocol': (10, 21),
             # Short-term
-            'Illness': (3, 7),
-            'Food Poisoning': (2, 5),
-            'Paternity Leave': (1, 3)
+            "Illness": (3, 7),
+            "Food Poisoning": (2, 5),
+            "Paternity Leave": (1, 3),
         }
-        
+
         # Track injury types that have special IL rules
-        self.concussion_injuries = {'Concussion'}
+        self.concussion_injuries = {"Concussion"}
 
     def get_pitcher_injury(self, days: int) -> str:
         """
@@ -99,7 +83,7 @@ class InjuryType:
         # Special case: small chance for concussion (1% chance)
         if random.random() < 0.01:
             return "Concussion"
-            
+
         # Categorize injuries based on the number of days
         if days >= 30:
             category = {k: v for k, v in self.pitcher_injuries.items() if v[0] >= 30}
@@ -110,12 +94,12 @@ class InjuryType:
         else:
             category = {k: v for k, v in self.pitcher_injuries.items() if v[0] < 15}
             general = {k: v for k, v in self.general_injuries.items() if v[0] < 15 and k != "Concussion"}
-        
+
         # Combine pitcher-specific and general injuries
         combined = {**category, **general}
         if not combined:  # Fallback if no matching injuries found
             return "Undisclosed Injury"
-        
+
         # Return a random injury description from the appropriate category
         return random.choice(list(combined.keys()))
 
@@ -128,7 +112,7 @@ class InjuryType:
         # Special case: small chance for concussion (2% chance - batters more likely to get concussions)
         if random.random() < 0.02:
             return "Concussion"
-            
+
         # Categorize injuries based on the number of days
         if days >= 30:
             category = {k: v for k, v in self.batter_injuries.items() if v[0] >= 30}
@@ -139,12 +123,12 @@ class InjuryType:
         else:
             category = {k: v for k, v in self.batter_injuries.items() if v[0] < 15}
             general = {k: v for k, v in self.general_injuries.items() if v[0] < 15 and k != "Concussion"}
-        
+
         # Combine batter-specific and general injuries
         combined = {**category, **general}
         if not combined:  # Fallback if no matching injuries found
             return "Undisclosed Injury"
-        
+
         # Return a random injury description from the appropriate category
         return random.choice(list(combined.keys()))
 
@@ -159,23 +143,23 @@ class InjuryType:
         if description in self.pitcher_injuries:
             min_days, max_days = self.pitcher_injuries[description]
             return random.randint(min_days, max_days)
-        
+
         # Check batter injuries
         if description in self.batter_injuries:
             min_days, max_days = self.batter_injuries[description]
             return random.randint(min_days, max_days)
-        
+
         # Check general injuries
         if description in self.general_injuries:
             min_days, max_days = self.general_injuries[description]
             return random.randint(min_days, max_days)
-        
+
         # If injury description not found, return a default range based on player type
         if is_pitcher:
             return random.randint(15, 30)  # Default for pitchers
         else:
             return random.randint(10, 20)  # Default for batters
-    
+
     def is_concussion(self, injury_description: str) -> bool:
         """
         Check if the injury is a concussion, requiring 7-day IL
@@ -188,12 +172,12 @@ class InjuryType:
 # Test the class if run directly
 if __name__ == "__main__":
     injury_system = InjuryType()
-    
+
     # Test pitcher injuries
     for days in [10, 20, 45]:
         injury = injury_system.get_pitcher_injury(days)
         print(f"Pitcher injured for {days} days: {injury}")
-        
+
     # Test batter injuries
     for days in [10, 20, 45]:
         injury = injury_system.get_batter_injury(days)

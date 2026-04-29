@@ -1,28 +1,18 @@
 """
---- Copyright Notice ---
 Copyright (c) 2024 Jim Maastricht
 
 Standings widget for baseball season simulation UI.
-
-Displays standings by division with an AL / NL toggle.
-GB is calculated within each division.
 """
 
 import tkinter as tk
 from tkinter import ttk
 from typing import Dict, Any
 
-from ui.theme import (
-    BG_PANEL,
-    BG_ELEVATED,
-    TEXT_HEADING,
-    TEXT_PRIMARY,
-    ACCENT_BLUE,
-    ROW_EVEN,
-    ROW_ODD,
-    ROW_FOLLOWED,
-    FG_FOLLOWED,
-)
+from ui.theme import BG_PANEL, TEXT_PRIMARY, TEXT_HEADING, ACCENT_BLUE, ROW_FOLLOWED, FG_FOLLOWED
+
+# Row styling
+ROW_EVEN = "#1c2333"
+ROW_ODD = "#161b27"
 
 # Division header row styling
 DIV_HEADER_BG = "#1a2744"
@@ -59,24 +49,16 @@ class StandingsWidget:
 
         # Section header
         tk.Label(
-            self.standings_frame,
-            text="STANDINGS",
-            font=("Segoe UI", 12, "bold"),
-            bg=BG_PANEL,
-            fg=TEXT_HEADING,
+            self.standings_frame, text="STANDINGS", font=("Segoe UI", 12, "bold"), bg=BG_PANEL, fg=TEXT_HEADING
         ).pack(pady=5)
 
         # AL / NL dropdown toggle
         toggle_frame = tk.Frame(self.standings_frame, bg=BG_PANEL)
         toggle_frame.pack(pady=(0, 4))
 
-        tk.Label(
-            toggle_frame,
-            text="League:",
-            font=("Segoe UI", 10, "bold"),
-            bg=BG_PANEL,
-            fg=TEXT_PRIMARY,
-        ).pack(side=tk.LEFT, padx=(0, 5))
+        tk.Label(toggle_frame, text="League:", font=("Segoe UI", 10, "bold"), bg=BG_PANEL, fg=TEXT_PRIMARY).pack(
+            side=tk.LEFT, padx=(0, 5)
+        )
 
         self._active_league = tk.StringVar(value="AL")
         self._league_combo = ttk.Combobox(
@@ -88,9 +70,7 @@ class StandingsWidget:
             font=("Segoe UI", 10),
         )
         self._league_combo.pack(side=tk.LEFT)
-        self._league_combo.bind(
-            "<<ComboboxSelected>>", lambda _: self._on_league_toggle()
-        )
+        self._league_combo.bind("<<ComboboxSelected>>", lambda _: self._on_league_toggle())
 
         # Treeview with scrollbar
         tree_frame = tk.Frame(self.standings_frame, bg=BG_PANEL)
@@ -100,11 +80,7 @@ class StandingsWidget:
         scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
 
         self.tree = ttk.Treeview(
-            tree_frame,
-            columns=("team", "wl", "pct", "gb"),
-            show="headings",
-            height=30,
-            yscrollcommand=scrollbar.set,
+            tree_frame, columns=("team", "wl", "pct", "gb"), show="headings", height=30, yscrollcommand=scrollbar.set
         )
         scrollbar.config(command=self.tree.yview)
 
@@ -120,18 +96,12 @@ class StandingsWidget:
 
         # Row tags
         self.tree.tag_configure(
-            "div_header",
-            background=DIV_HEADER_BG,
-            foreground=ACCENT_BLUE,
-            font=("Segoe UI", 9, "bold"),
+            "div_header", background=DIV_HEADER_BG, foreground=ACCENT_BLUE, font=("Segoe UI", 9, "bold")
         )
         self.tree.tag_configure("even", background=ROW_EVEN)
         self.tree.tag_configure("odd", background=ROW_ODD)
         self.tree.tag_configure(
-            "followed",
-            background=ROW_FOLLOWED,
-            foreground=FG_FOLLOWED,
-            font=("Segoe UI", 9, "bold"),
+            "followed", background=ROW_FOLLOWED, foreground=FG_FOLLOWED, font=("Segoe UI", 9, "bold")
         )
 
         self.tree.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
@@ -182,9 +152,7 @@ class StandingsWidget:
                 continue
 
             # Division header row
-            self.tree.insert(
-                "", tk.END, values=(division.upper(), "", "", ""), tags=("div_header",)
-            )
+            self.tree.insert("", tk.END, values=(division.upper(), "", "", ""), tags=("div_header",))
 
             wins = div_data.get("wins", [])
             losses = div_data.get("losses", [])
@@ -229,18 +197,10 @@ class StandingsWidget:
 
         # Create context menu
         menu = tk.Menu(self.tree, tearoff=0)
-        menu.add_command(
-            label=f"View {team_name} Roster",
-            command=lambda: self._view_team_roster(team_name),
-        )
-        menu.add_command(
-            label=f"Copy {team_name}", command=lambda: self._copy_team_name(team_name)
-        )
+        menu.add_command(label=f"View {team_name} Roster", command=lambda: self._view_team_roster(team_name))
+        menu.add_command(label=f"Copy {team_name}", command=lambda: self._copy_team_name(team_name))
         menu.add_separator()
-        menu.add_command(
-            label=f"Set as Followed Team",
-            command=lambda: self._set_followed_team(team_name),
-        )
+        menu.add_command(label="Set as Followed Team", command=lambda: self._set_followed_team(team_name))
 
         # Show the menu
         try:

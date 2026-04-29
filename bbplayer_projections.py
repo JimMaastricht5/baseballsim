@@ -1,45 +1,16 @@
 """
-Baseball statistics preprocessing and data standardization.
+Copyright (c) 2024 Jim Maastricht
 
-This module handles the cleaning, transformation, and aggregation of raw MLB player
-statistics downloaded from RotoWire/Baseball-Reference. Creates three types of output files:
+Stats preprocessing: cleans raw RotoWire/Baseball-Reference CSVs, calculates derived
+stats, applies age-adjusted projections, and writes three output file types:
 
-1. **Player Projected Files** (for simulation):
-   - Career totals: `{seasons} player-projected-stats-pp-Batting.csv`
-   - Career totals: `{seasons} player-projected-stats-pp-Pitching.csv`
-   - One row per player with age-adjusted projections across all loaded seasons
-   - Indexed by player Hashcode
+1. Player-projected files ({seasons} player-projected-stats-pp-*.csv) — career
+   totals indexed by Hashcode, used by the simulator.
+2. Historical files ({seasons} historical-*.csv) — one row per player per season.
+3. New-season files ({new_season} New-Season-stats-pp-*.csv) — empty template
+   for accumulating sim data.
 
-2. **Historical Files** (for year-by-year analysis):
-   - Year-by-year: `{seasons} historical-Batting.csv`
-   - Year-by-year: `{seasons} historical-Pitching.csv`
-   - One row per player per season
-   - Indexed by Player_Season_Key (Hashcode_Year)
-
-3. **New Season Files** (empty placeholder for simulation):
-   - `{new_season} New-Season-stats-pp-Batting.csv`
-   - `{new_season} New-Season-stats-pp-Pitching.csv`
-   - Empty template that accumulates simulation data during season
-
-Key Features:
-- Handles multi-season data aggregation and de-duplication
-- Removes unwanted columns from raw data
-- Calculates derived statistics (OBP, SLG, OPS, ERA, WHIP, etc.)
-- Supports random league/team/player name generation for testing
-- Weighted Average: Give 2025 the most weight (5:4:3).
-- Bayesian Shrinkage: Use K values to pull low-AB players toward the league mean (stops the 150-HR bench player).
-- Aging Curve: Apply your parabolic formula to the rates.
-- Merges salary data from historical records
-- Filters players by minimum playing time (AB >= 10, IP >= 5)
-- Team name remapping (e.g., OAK → ATH)
-
-Random Data Generation:
-- Randomizes team cities, mascots, and player names
-- Jiggers stats with normal distribution (±10% with scale=2)
-- Creates fictional leagues (ACB, NBL)
-- Maintains statistical relationships and distributions
-
-Contact: JimMaastricht5@gmail.com
+Supports random data generation for testing.
 """
 
 # data clean up and standardization for stats.  handles random generation if requested
@@ -108,9 +79,7 @@ class BaseballStatsPreProcess:
         :param load_pitcher_file: Base filename for raw pitcher CSV files.
         """
         # self.create_hash = lambda text: int(hashlib.sha256(text.encode('utf-8')).hexdigest()[:5], 16)
-        self.jigger_data = lambda x: x + int(
-            np.abs(np.random.normal(loc=x * 0.10, scale=2, size=1))
-        )
+        self.jigger_data = lambda x: x + int(np.abs(np.random.normal(loc=x * 0.10, scale=2, size=1)))
 
         self.numeric_bcols = [
             "G",
@@ -254,9 +223,7 @@ class BaseballStatsPreProcess:
         # self.coeff_age_decline = -0.0059
 
         # load seasons
-        self.load_seasons = (
-            [load_seasons] if not isinstance(load_seasons, list) else load_seasons
-        )  # convert to list
+        self.load_seasons = [load_seasons] if not isinstance(load_seasons, list) else load_seasons  # convert to list
         self.new_season = new_season
         self.min_games_for_trusted = min_games_for_trusted
         self.projection_trusted = True
@@ -268,9 +235,7 @@ class BaseballStatsPreProcess:
         self.new_season_batting_data = None
         self.generate_random_data = generate_random_data
 
-        self.df_salary = salary.retrieve_salary(
-            "mlb-salaries-2000-24.csv", self.create_hash
-        )
+        self.df_salary = salary.retrieve_salary("mlb-salaries-2000-24.csv", self.create_hash)
 
         # Step 1: Load ALL seasons raw data first
         self._load_raw_data(load_batter_file, load_pitcher_file)
@@ -281,9 +246,7 @@ class BaseballStatsPreProcess:
         # Step 3: Process with the appropriate seasons
         self.get_seasons(load_batter_file, load_pitcher_file)
 
-        collision = set(self.batting_data.index).intersection(
-            set(self.pitching_data.index)
-        )
+        collision = set(self.batting_data.index).intersection(set(self.pitching_data.index))
         if collision:
             logger.error(f"Hash Collision Detected: {collision}")
         self.apply_team_remapping()  # apply team name remapping before other processing
@@ -337,20 +300,12 @@ class BaseballStatsPreProcess:
         max_season = max(self.load_seasons)
 
         # Get max games for batters in max season
-        max_season_batters = self.raw_batting_data[
-            self.raw_batting_data["Season"] == max_season
-        ]
-        max_batter_games = (
-            max_season_batters["G"].max() if not max_season_batters.empty else 0
-        )
+        max_season_batters = self.raw_batting_data[self.raw_batting_data["Season"] == max_season]
+        max_batter_games = max_season_batters["G"].max() if not max_season_batters.empty else 0
 
         # Get max games for pitchers in max season
-        max_season_pitchers = self.raw_pitching_data[
-            self.raw_pitching_data["Season"] == max_season
-        ]
-        max_pitcher_games = (
-            max_season_pitchers["G"].max() if not max_season_pitchers.empty else 0
-        )
+        max_season_pitchers = self.raw_pitching_data[self.raw_pitching_data["Season"] == max_season]
+        max_pitcher_games = max_season_pitchers["G"].max() if not max_season_pitchers.empty else 0
 
         max_games_in_season = max(max_batter_games, max_pitcher_games)
 
@@ -392,52 +347,26 @@ class BaseballStatsPreProcess:
             else "player-projected-stats-pp-Batting.csv"
         )
         # New season files do NOT include 'aggr' since they are not aggregated
-        f_pname_new = (
-            "random-stats-pp-Pitching.csv"
-            if self.generate_random_data
-            else "stats-pp-Pitching.csv"
-        )
-        f_bname_new = (
-            "random-stats-pp-Batting.csv"
-            if self.generate_random_data
-            else "stats-pp-Batting.csv"
-        )
+        f_pname_new = "random-stats-pp-Pitching.csv" if self.generate_random_data else "stats-pp-Pitching.csv"
+        f_bname_new = "random-stats-pp-Batting.csv" if self.generate_random_data else "stats-pp-Batting.csv"
         seasons_str = " ".join(str(season) for season in self.load_seasons)
 
         # Save aggregated data (with 'aggr' in filename - for bbstats.py)
-        self.pitching_data.to_csv(
-            f"{seasons_str} {f_pname_aggr}", index=True, header=True
-        )
-        self.batting_data.to_csv(
-            f"{seasons_str} {f_bname_aggr}", index=True, header=True
-        )
-        print(
-            f"Saved aggregated files: {seasons_str} {f_pname_aggr} and {f_bname_aggr}"
-        )
+        self.pitching_data.to_csv(f"{seasons_str} {f_pname_aggr}", index=True, header=True)
+        self.batting_data.to_csv(f"{seasons_str} {f_bname_aggr}", index=True, header=True)
+        print(f"Saved aggregated files: {seasons_str} {f_pname_aggr} and {f_bname_aggr}")
 
         # Save historical year-by-year data (new)
         if self.pitching_data_historical is not None:
-            f_hist_pname = (
-                "random-historical-Pitching.csv"
-                if self.generate_random_data
-                else "historical-Pitching.csv"
-            )
+            f_hist_pname = "random-historical-Pitching.csv" if self.generate_random_data else "historical-Pitching.csv"
             self.pitching_data_historical.index.name = "Player_Season_Key"
-            self.pitching_data_historical.to_csv(
-                f"{seasons_str} {f_hist_pname}", index=True, header=True
-            )
+            self.pitching_data_historical.to_csv(f"{seasons_str} {f_hist_pname}", index=True, header=True)
             print(f"Saved historical pitching data: {seasons_str} {f_hist_pname}")
 
         if self.batting_data_historical is not None:
-            f_hist_bname = (
-                "random-historical-Batting.csv"
-                if self.generate_random_data
-                else "historical-Batting.csv"
-            )
+            f_hist_bname = "random-historical-Batting.csv" if self.generate_random_data else "historical-Batting.csv"
             self.batting_data_historical.index.name = "Player_Season_Key"
-            self.batting_data_historical.to_csv(
-                f"{seasons_str} {f_hist_bname}", index=True, header=True
-            )
+            self.batting_data_historical.to_csv(f"{seasons_str} {f_hist_bname}", index=True, header=True)
             print(f"Saved historical batting data: {seasons_str} {f_hist_bname}")
 
         # Save new season data (no 'aggr' prefix - this is single season data, not aggregated)
@@ -449,29 +378,16 @@ class BaseballStatsPreProcess:
             # Check if existing file has games played - if so, preserve it
             # Only preserve if current data has no valid games (all zeros from failed merge)
             current_games = (
-                self.new_season_batting_data["G"].sum()
-                if "G" in self.new_season_batting_data.columns
-                else 0
+                self.new_season_batting_data["G"].sum() if "G" in self.new_season_batting_data.columns else 0
             )
             if os.path.exists(new_season_batting_file) and current_games == 0:
-                existing_batting = pd.read_csv(
-                    new_season_batting_file, index_col="Hashcode"
-                )
-                existing_games = (
-                    existing_batting["G"].sum()
-                    if "G" in existing_batting.columns
-                    else 0
-                )
+                existing_batting = pd.read_csv(new_season_batting_file, index_col="Hashcode")
+                existing_games = existing_batting["G"].sum() if "G" in existing_batting.columns else 0
                 if existing_games > 0:
                     # Preserve: copy existing stats to new_season_data
                     for col in self.numeric_bcols:
-                        if (
-                            col in self.new_season_batting_data.columns
-                            and col in existing_batting.columns
-                        ):
-                            self.new_season_batting_data[col] = existing_batting[
-                                col
-                            ].fillna(0)
+                        if col in self.new_season_batting_data.columns and col in existing_batting.columns:
+                            self.new_season_batting_data[col] = existing_batting[col].fillna(0)
                     # Preserve non-numeric columns from existing
                     for col in existing_batting.columns:
                         if col not in self.numeric_bcols:
@@ -479,27 +395,14 @@ class BaseballStatsPreProcess:
                     print(f"Preserved existing batting stats ({existing_games} games)")
 
             if os.path.exists(new_season_pitching_file) and (
-                self.new_season_pitching_data["G"].sum() == 0
-                if "G" in self.new_season_pitching_data.columns
-                else True
+                self.new_season_pitching_data["G"].sum() == 0 if "G" in self.new_season_pitching_data.columns else True
             ):
-                existing_pitching = pd.read_csv(
-                    new_season_pitching_file, index_col="Hashcode"
-                )
-                existing_games = (
-                    existing_pitching["G"].sum()
-                    if "G" in existing_pitching.columns
-                    else 0
-                )
+                existing_pitching = pd.read_csv(new_season_pitching_file, index_col="Hashcode")
+                existing_games = existing_pitching["G"].sum() if "G" in existing_pitching.columns else 0
                 if existing_games > 0:
                     for col in self.numeric_pcols:
-                        if (
-                            col in self.new_season_pitching_data.columns
-                            and col in existing_pitching.columns
-                        ):
-                            self.new_season_pitching_data[col] = existing_pitching[
-                                col
-                            ].fillna(0)
+                        if col in self.new_season_pitching_data.columns and col in existing_pitching.columns:
+                            self.new_season_pitching_data[col] = existing_pitching[col].fillna(0)
                     for col in existing_pitching.columns:
                         if col not in self.numeric_pcols:
                             self.new_season_pitching_data[col] = existing_pitching[col]
@@ -507,18 +410,12 @@ class BaseballStatsPreProcess:
 
             self.new_season_pitching_data.index.name = "Hashcode"
             self.new_season_batting_data.index.name = "Hashcode"
-            self.new_season_pitching_data.to_csv(
-                new_season_pitching_file, index=True, header=True
-            )
-            self.new_season_batting_data.to_csv(
-                new_season_batting_file, index=True, header=True
-            )
+            self.new_season_pitching_data.to_csv(new_season_pitching_file, index=True, header=True)
+            self.new_season_batting_data.to_csv(new_season_batting_file, index=True, header=True)
         return
 
     @staticmethod
-    def group_col_to_list(
-        df: DataFrame, key_col: str, col: str, new_col: str
-    ) -> DataFrame:
+    def group_col_to_list(df: DataFrame, key_col: str, col: str, new_col: str) -> DataFrame:
         """
         Aggregate unique values of a column into a list, grouped by a key column.
 
@@ -567,12 +464,8 @@ class BaseballStatsPreProcess:
                 # Handle other types (int, float, etc.)
                 groups[key].add(val)
 
-        df[new_col] = df[key_col].map(
-            groups
-        )  # Create a new column to store grouped unique values
-        df[new_col] = df[new_col].apply(
-            list
-        )  # Convert sets to lists for easier handling in DataFrame
+        df[new_col] = df[key_col].map(groups)  # Create a new column to store grouped unique values
+        df[new_col] = df[new_col].apply(list)  # Convert sets to lists for easier handling in DataFrame
         return df
 
     @staticmethod
@@ -614,13 +507,9 @@ class BaseballStatsPreProcess:
         :param digit_string: String of position digits (e.g. ``"163"``).
         :return: Comma-separated position abbreviation string (e.g. ``"P,SS,1B"``).
         """
-        return "".join(
-            self.digit_pos_map.get(digit, digit) + "," for digit in digit_string
-        ).rstrip(",")
+        return "".join(self.digit_pos_map.get(digit, digit) + "," for digit in digit_string).rstrip(",")
 
-    def calculate_league_averages(
-        self, historical_df: pd.DataFrame, is_pitching: bool = False
-    ) -> dict:
+    def calculate_league_averages(self, historical_df: pd.DataFrame, is_pitching: bool = False) -> dict:
         """
         Calculates weighted league average rates to use as the 'Mean' for Bayesian regression.
 
@@ -642,17 +531,11 @@ class BaseballStatsPreProcess:
             # Use ONLY the most recent season for league averages to reflect current MLB environment
             # This prevents older seasons with different run environments from pulling down projections
             most_recent_season = historical_df["Season"].max()
-            qualified_recent = qualified[
-                qualified["Season"] == most_recent_season
-            ].copy()
+            qualified_recent = qualified[qualified["Season"] == most_recent_season].copy()
 
             total_ip = max(1, qualified_recent["IP"].sum())
             total_g = max(1, qualified_recent["G"].sum())
-            total_pa = (
-                max(1, qualified_recent["PA"].sum())
-                if "PA" in qualified_recent.columns
-                else None
-            )
+            total_pa = max(1, qualified_recent["PA"].sum()) if "PA" in qualified_recent.columns else None
 
             lg_avgs = {
                 "H_per_IP": qualified_recent["H"].sum() / total_ip,
@@ -673,13 +556,7 @@ class BaseballStatsPreProcess:
             if total_pa:
                 lg_avgs["H_per_BIP"] = (
                     qualified_recent["H"].sum()
-                    / (
-                        qualified_recent["PA"]
-                        - qualified_recent["SO"]
-                        - qualified_recent["BB"]
-                    )
-                    .clip(lower=1)
-                    .sum()
+                    / (qualified_recent["PA"] - qualified_recent["SO"] - qualified_recent["BB"]).clip(lower=1).sum()
                 )
                 lg_avgs["H_per_PA"] = qualified_recent["H"].sum() / total_pa
                 lg_avgs["BB_per_PA"] = qualified_recent["BB"].sum() / total_pa
@@ -696,9 +573,7 @@ class BaseballStatsPreProcess:
             # Use ONLY the most recent season for league averages to reflect current MLB environment
             # This prevents older seasons with different run environments from pulling down projections
             most_recent_season = historical_df["Season"].max()
-            qualified_recent = qualified[
-                qualified["Season"] == most_recent_season
-            ].copy()
+            qualified_recent = qualified[qualified["Season"] == most_recent_season].copy()
 
             # Denominator: Total Plate Appearances (from most recent season only)
             total_pa = max(
@@ -709,9 +584,7 @@ class BaseballStatsPreProcess:
                 + qualified_recent.get("SF", 0).sum(),
             )
             total_ab = max(1, qualified_recent["AB"].sum())
-            total_h = max(
-                1, qualified_recent["H"].sum()
-            )  # Use Hits as the denominator for 2b, 3b, and HR
+            total_h = max(1, qualified_recent["H"].sum())  # Use Hits as the denominator for 2b, 3b, and HR
             return {
                 "H_per_PA": qualified_recent["H"].sum() / total_pa,
                 # H_per_AB is the true batting average baseline used by Bayesian regression
@@ -736,12 +609,7 @@ class BaseballStatsPreProcess:
             }
 
     def de_dup_df(
-        self,
-        df: DataFrame,
-        key_name: str,
-        dup_column_names: str,
-        stats_cols_to_sum: List[str],
-        drop_dups: bool = False,
+        self, df: DataFrame, key_name: str, dup_column_names: str, stats_cols_to_sum: List[str], drop_dups: bool = False
     ) -> DataFrame:
         """
         Collapse duplicate rows by summing stat columns, then optionally drop extras.
@@ -766,9 +634,7 @@ class BaseballStatsPreProcess:
         for dfrow_key in dup_hashcodes[key_name].unique():
             df_rows = df.loc[df[key_name] == dfrow_key]
             for dfcol_name in stats_cols_to_sum:
-                df.loc[df[key_name] == dfrow_key, dfcol_name] = df_rows[
-                    dfcol_name
-                ].sum()
+                df.loc[df[key_name] == dfrow_key, dfcol_name] = df_rows[dfcol_name].sum()
         if drop_dups:
             # Use key_name for deduplication, not hardcoded 'Hashcode'
             df = df.drop_duplicates(subset=key_name, keep="last")
@@ -806,9 +672,7 @@ class BaseballStatsPreProcess:
         # Missed 2+ years? They are effectively retired for sim purposes.
         return False
 
-    def get_pitching_seasons(
-        self, pitcher_file: str, load_seasons: List[int], projection_seasons: List[int]
-    ) -> tuple:
+    def get_pitching_seasons(self, pitcher_file: str, load_seasons: List[int], projection_seasons: List[int]) -> tuple:
         """
         Load, clean, and project pitcher data for the specified seasons.
 
@@ -891,50 +755,27 @@ class BaseballStatsPreProcess:
         pitching_data = pitching_data[
             ~((pitching_data["IP"] < 10) & (pitching_data["G"] < 5))
         ]  # remove pos players pitching
-        pitching_data["Player"] = (
-            pitching_data["Player"].str.replace("*", "").str.replace("#", "")
-        )
-        pitching_data["Hashcode"] = pitching_data["Player"].apply(
-            lambda x: self.create_hash(x, "Pitcher")
-        )
+        pitching_data["Player"] = pitching_data["Player"].str.replace("*", "").str.replace("#", "")
+        pitching_data["Hashcode"] = pitching_data["Player"].apply(lambda x: self.create_hash(x, "Pitcher"))
 
         # Filter salary to only Pitchers before merging
         pitcher_salaries = self.df_salary[self.df_salary["Role"] == "Pitcher"]
-        pitching_data = pd.merge(
-            pitching_data, pitcher_salaries, on="Hashcode", how="left"
-        )
-        pitching_data = salary.fill_nan_salary(
-            pitching_data, "Salary"
-        )  # set league min for missing data
+        pitching_data = pd.merge(pitching_data, pitcher_salaries, on="Hashcode", how="left")
+        pitching_data = salary.fill_nan_salary(pitching_data, "Salary")  # set league min for missing data
         # pitching_data = salary.fill_nan_salary(pitching_data, 'MLS', 0)  # set min for missing data
-        pitching_data["Team"] = pitching_data["Team"].apply(
-            lambda x: x if x in self.nl + self.al else ""
-        )
+        pitching_data["Team"] = pitching_data["Team"].apply(lambda x: x if x in self.nl + self.al else "")
         # players with multiple teams have a 2TM or 3TM line that is the total of all stats.  Drop rows since we total
-        pitching_data = pitching_data[
-            pitching_data["Team"] != ""
-        ]  # drop rows without a formal team name
+        pitching_data = pitching_data[pitching_data["Team"] != ""]  # drop rows without a formal team name
         pitching_data["League"] = pitching_data["Team"].apply(
             lambda x: "NL" if x in self.nl else ("AL" if x in self.al else "")
         )
-        pitching_data["Division"] = (
-            pitching_data["Team"].map(self.team_division).fillna("")
-        )
+        pitching_data["Division"] = pitching_data["Team"].map(self.team_division).fillna("")
         # Create Player_Season_Key BEFORE de-duplication
         pitching_data["Player_Season_Key"] = (
-            pitching_data["Hashcode"].astype(str)
-            + "_"
-            + pitching_data["Season"].astype(str)
+            pitching_data["Hashcode"].astype(str) + "_" + pitching_data["Season"].astype(str)
         )
-        outs = (pitching_data["IP"].astype(int) * 3) + np.round(
-            (pitching_data["IP"] % 1) * 10
-        )
-        pitching_data["PA"] = (
-            outs
-            + pitching_data["H"]
-            + pitching_data["BB"]
-            + pitching_data.get("HBP", 0)
-        )
+        outs = (pitching_data["IP"].astype(int) * 3) + np.round((pitching_data["IP"] % 1) * 10)
+        pitching_data["PA"] = outs + pitching_data["H"] + pitching_data["BB"] + pitching_data.get("HBP", 0)
 
         # *** Create HISTORICAL data (year-by-year) - one row per player per season ***
         historical_data = pitching_data.copy()
@@ -942,10 +783,7 @@ class BaseballStatsPreProcess:
             df=historical_data, key_col="Player_Season_Key", col="Team", new_col="Teams"
         )
         historical_data = self.group_col_to_list(
-            df=historical_data,
-            key_col="Player_Season_Key",
-            col="League",
-            new_col="Leagues",
+            df=historical_data, key_col="Player_Season_Key", col="League", new_col="Leagues"
         )
         # For historical, only de-dup within same season (mid-season trades)
         historical_data = self.de_dup_df(
@@ -959,17 +797,13 @@ class BaseballStatsPreProcess:
 
         # *** Create AGGREGATED data (trend-based projections) - one row per player ***
         # Filter to projection_seasons for league averages and projections
-        projection_data = pitching_data[
-            pitching_data["Season"].isin(projection_seasons)
-        ].copy()
+        projection_data = pitching_data[pitching_data["Season"].isin(projection_seasons)].copy()
         max_season = max(load_seasons)
 
         # Identify rookies: players who only appear in max season
         all_seasons_data = pitching_data.copy()
         player_seasons = all_seasons_data.groupby("Hashcode")["Season"].apply(set)
-        rookies = player_seasons[
-            player_seasons.apply(lambda x: len(x) == 1 and max_season in x)
-        ].index.tolist()
+        rookies = player_seasons[player_seasons.apply(lambda x: len(x) == 1 and max_season in x)].index.tolist()
 
         stats_to_project = [
             "G",
@@ -989,9 +823,7 @@ class BaseballStatsPreProcess:
             "BK",
             "WP",
         ]
-        league_averages = self.calculate_league_averages(
-            historical_df=projection_data, is_pitching=True
-        )
+        league_averages = self.calculate_league_averages(historical_df=projection_data, is_pitching=True)
 
         # Filter projection_data to only include players with valid history for projection
         # Players need at least some IP in projection seasons to be projected
@@ -999,23 +831,17 @@ class BaseballStatsPreProcess:
         projection_data_clean = projection_data.copy()
         projection_data_clean = projection_data_clean[projection_data_clean["IP"] >= 1]
         projection_data_clean = projection_data_clean.replace([np.inf, -np.inf], np.nan)
-        projection_data_clean = projection_data_clean.dropna(
-            subset=["IP", "H", "BB", "SO"]
-        )
+        projection_data_clean = projection_data_clean.dropna(subset=["IP", "H", "BB", "SO"])
 
         valid_players = projection_data_clean["Hashcode"].unique()
-        projection_data_filtered = projection_data[
-            projection_data["Hashcode"].isin(valid_players)
-        ]
+        projection_data_filtered = projection_data[projection_data["Hashcode"].isin(valid_players)]
 
         projector = player_projector.PlayerProjector(league_averages)
         pitching_data = projector.calculate_projected_stats(
             history=projection_data_filtered, stats=stats_to_project, is_p=True
         )
         pitching_data = pitching_data.set_index("Hashcode")
-        most_recent_season = (
-            max(projection_seasons) if projection_seasons else max(load_seasons)
-        )
+        most_recent_season = max(projection_seasons) if projection_seasons else max(load_seasons)
         pitching_data["Should_Retain"] = pitching_data.apply(
             lambda row: self.is_active_candidate(
                 row["Years_Included"],
@@ -1042,25 +868,17 @@ class BaseballStatsPreProcess:
         )
         if not self.projection_trusted:
             rookie_count = len([p for p in rookies if p in pitching_data.index])
-            print(
-                f"         {rookie_count} rookies (only in {max_season}) marked as untrusted projections"
-            )
+            print(f"         {rookie_count} rookies (only in {max_season}) marked as untrusted projections")
 
         # Apply random data jigger if needed (to both datasets)
         if self.generate_random_data:
             for stats_col in stats_pcols_sum:
-                pitching_data[stats_col] = pitching_data[stats_col].apply(
-                    self.jigger_data
-                )
-                historical_data[stats_col] = historical_data[stats_col].apply(
-                    self.jigger_data
-                )
+                pitching_data[stats_col] = pitching_data[stats_col].apply(self.jigger_data)
+                historical_data[stats_col] = historical_data[stats_col].apply(self.jigger_data)
 
         # Calculate derived stats for AGGREGATED data
         # 1. Convert .1/.2 format to total outs
-        outs = (pitching_data["IP"].astype(int) * 3) + np.round(
-            (pitching_data["IP"] % 1) * 10
-        )
+        outs = (pitching_data["IP"].astype(int) * 3) + np.round((pitching_data["IP"] % 1) * 10)
         pitching_data["AB"] = outs + pitching_data["H"]
         pitching_data["2B"] = 0
         pitching_data["3B"] = 0
@@ -1068,19 +886,13 @@ class BaseballStatsPreProcess:
         pitching_data["Season"] = str(
             max(projection_seasons) + 1 if projection_seasons else max(load_seasons) + 1
         )  # Projected year (e.g., 2026)
-        pitching_data["OBP"] = pitching_data["WHIP"] / (
-            3 + pitching_data["WHIP"]
-        )  # bat reached / number faced
-        pitching_data["Total_OB"] = (
-            pitching_data["H"] + pitching_data["BB"]
-        )  # + pitching_data['HBP']
+        pitching_data["OBP"] = pitching_data["WHIP"] / (3 + pitching_data["WHIP"])  # bat reached / number faced
+        pitching_data["Total_OB"] = pitching_data["H"] + pitching_data["BB"]  # + pitching_data['HBP']
         pitching_data["Total_Outs"] = pitching_data["IP"] * 3  # 3 outs per inning
         pitching_data = pitching_data[
             pitching_data["IP"] >= 1
         ]  # drop pitchers without any meaningful innings (reduced from 5 to 1)
-        pitching_data["AVG_faced"] = (
-            pitching_data["Total_OB"] + pitching_data["Total_Outs"]
-        ) / pitching_data.G
+        pitching_data["AVG_faced"] = (pitching_data["Total_OB"] + pitching_data["Total_Outs"]) / pitching_data.G
         pitching_data["Game_Fatigue_Factor"] = 0
         pitching_data["Condition"] = 100
         pitching_data["Status"] = "Active"  # DL or active
@@ -1101,14 +913,10 @@ class BaseballStatsPreProcess:
         if "Streak_Adjustment" not in historical_data.columns:
             historical_data["Streak_Adjustment"] = 0.0  # Always 0 for historical data
         if "Projection_Trusted" not in historical_data.columns:
-            historical_data["Projection_Trusted"] = (
-                True  # Historical data is always trusted
-            )
+            historical_data["Projection_Trusted"] = True  # Historical data is always trusted
         return pitching_data, historical_data
 
-    def get_batting_seasons(
-        self, batter_file: str, load_seasons: List[int], projection_seasons: List[int]
-    ) -> tuple:
+    def get_batting_seasons(self, batter_file: str, load_seasons: List[int], projection_seasons: List[int]) -> tuple:
         """
         Load, clean, and project batter data for the specified seasons.
 
@@ -1168,65 +976,30 @@ class BaseballStatsPreProcess:
 
         # drop unwanted cols
         batting_data.drop(
-            [
-                "Rk",
-                "Lg",
-                "OPS+",
-                "rOBA",
-                "Rbat+",
-                "TB",
-                "IBB",
-                "Awards",
-                "Player-additional",
-            ],
-            inplace=True,
-            axis=1,
+            ["Rk", "Lg", "OPS+", "rOBA", "Rbat+", "TB", "IBB", "Awards", "Player-additional"], inplace=True, axis=1
         )
-        batting_data["Player"] = (
-            batting_data["Player"].str.replace("#", "").str.replace("*", "")
-        )
-        batting_data["Hashcode"] = batting_data["Player"].apply(
-            lambda x: self.create_hash(x, "Hitter")
-        )
+        batting_data["Player"] = batting_data["Player"].str.replace("#", "").str.replace("*", "")
+        batting_data["Hashcode"] = batting_data["Player"].apply(lambda x: self.create_hash(x, "Hitter"))
 
         # Filter salary to only Hitters before merging
         hitter_salaries = self.df_salary[self.df_salary["Role"] == "Hitter"]
-        batting_data = pd.merge(
-            batting_data, hitter_salaries, on="Hashcode", how="left"
-        )
-        batting_data = salary.fill_nan_salary(
-            batting_data, "Salary"
-        )  # set league min for missing data
+        batting_data = pd.merge(batting_data, hitter_salaries, on="Hashcode", how="left")
+        batting_data = salary.fill_nan_salary(batting_data, "Salary")  # set league min for missing data
         # batting_data = salary.fill_nan_salary(batting_data, 'MLS', 0)  # set min for missing data
-        batting_data["Pos"] = (
-            batting_data["Pos"].apply(self.remove_non_numeric).apply(self.translate_pos)
-        )
+        batting_data["Pos"] = batting_data["Pos"].apply(self.remove_non_numeric).apply(self.translate_pos)
         # DON'T group by Hashcode yet - we need year-by-year data for historical file
-        batting_data["Team"] = batting_data["Team"].apply(
-            lambda x: x if x in self.nl + self.al else ""
-        )
+        batting_data["Team"] = batting_data["Team"].apply(lambda x: x if x in self.nl + self.al else "")
         batting_data["League"] = batting_data["Team"].apply(
             lambda x: "NL" if x in self.nl else ("AL" if x in self.al else "")
         )
-        batting_data["Division"] = (
-            batting_data["Team"].map(self.team_division).fillna("")
-        )
+        batting_data["Division"] = batting_data["Team"].map(self.team_division).fillna("")
         # players with multiple teams have a 2TM or 3TM line that is the total of all stats.  Drop rows since we total
-        batting_data = batting_data[
-            batting_data["Team"] != ""
-        ]  # drop rows without a formal team name
+        batting_data = batting_data[batting_data["Team"] != ""]  # drop rows without a formal team name
         # Create Player_Season_Key BEFORE de-duplication
         batting_data["Player_Season_Key"] = (
-            batting_data["Hashcode"].astype(str)
-            + "_"
-            + batting_data["Season"].astype(str)
+            batting_data["Hashcode"].astype(str) + "_" + batting_data["Season"].astype(str)
         )
-        batting_data["PA"] = (
-            batting_data["AB"]
-            + batting_data["BB"]
-            + batting_data["HBP"]
-            + batting_data["SF"]
-        )
+        batting_data["PA"] = batting_data["AB"] + batting_data["BB"] + batting_data["HBP"] + batting_data["SF"]
 
         # *** Create HISTORICAL data (year-by-year) - one row per player per season ***
         # Must do this BEFORE grouping by Hashcode to preserve year-by-year data
@@ -1238,10 +1011,7 @@ class BaseballStatsPreProcess:
             df=historical_data, key_col="Player_Season_Key", col="Team", new_col="Teams"
         )
         historical_data = self.group_col_to_list(
-            df=historical_data,
-            key_col="Player_Season_Key",
-            col="League",
-            new_col="Leagues",
+            df=historical_data, key_col="Player_Season_Key", col="League", new_col="Leagues"
         )
         # For historical, only de-dup within same season (mid-season trades)
         historical_data = self.de_dup_df(
@@ -1255,17 +1025,13 @@ class BaseballStatsPreProcess:
 
         # *** Create AGGREGATED data (trend-based projections) - one row per player ***
         # Filter to projection_seasons for league averages and projections
-        projection_data = batting_data[
-            batting_data["Season"].isin(projection_seasons)
-        ].copy()
+        projection_data = batting_data[batting_data["Season"].isin(projection_seasons)].copy()
         max_season = max(load_seasons)
 
         # Identify rookies: players who only appear in max season
         all_seasons_data = batting_data.copy()
         player_seasons = all_seasons_data.groupby("Hashcode")["Season"].apply(set)
-        rookies = player_seasons[
-            player_seasons.apply(lambda x: len(x) == 1 and max_season in x)
-        ].index.tolist()
+        rookies = player_seasons[player_seasons.apply(lambda x: len(x) == 1 and max_season in x)].index.tolist()
 
         stats_to_project = [
             "G",
@@ -1286,25 +1052,19 @@ class BaseballStatsPreProcess:
             "HBP",
             "GIDP",
         ]
-        league_averages = self.calculate_league_averages(
-            projection_data, is_pitching=False
-        )
+        league_averages = self.calculate_league_averages(projection_data, is_pitching=False)
 
         # Filter projection_data to only include players with valid history for projection
         # Players need at least some AB in projection seasons to be projected
         valid_players = projection_data[projection_data["AB"] >= 1]["Hashcode"].unique()
-        projection_data_filtered = projection_data[
-            projection_data["Hashcode"].isin(valid_players)
-        ]
+        projection_data_filtered = projection_data[projection_data["Hashcode"].isin(valid_players)]
 
         projector = player_projector.PlayerProjector(league_averages=league_averages)
         batting_data = projector.calculate_projected_stats(
             history=projection_data_filtered, stats=stats_to_project, is_p=False
         )
 
-        most_recent_season = (
-            max(projection_seasons) if projection_seasons else max(load_seasons)
-        )
+        most_recent_season = max(projection_seasons) if projection_seasons else max(load_seasons)
         # Apply the probability logic instead of the hard 'In_Recent_Season' check
         batting_data["Should_Retain"] = batting_data.apply(
             lambda row: self.is_active_candidate(
@@ -1331,21 +1091,15 @@ class BaseballStatsPreProcess:
         )
         if not self.projection_trusted:
             rookie_count = len([p for p in rookies if p in batting_data.index])
-            print(
-                f"         {rookie_count} rookies (only in {max_season}) marked as untrusted projections"
-            )
+            print(f"         {rookie_count} rookies (only in {max_season}) marked as untrusted projections")
 
         batting_data = batting_data.set_index("Hashcode")
 
         # Apply random data jigger if needed (to both datasets)
         if self.generate_random_data:
             for stats_col in stats_bcols_sum:
-                batting_data[stats_col] = batting_data[stats_col].apply(
-                    self.jigger_data
-                )
-                historical_data[stats_col] = historical_data[stats_col].apply(
-                    self.jigger_data
-                )
+                batting_data[stats_col] = batting_data[stats_col].apply(self.jigger_data)
+                historical_data[stats_col] = historical_data[stats_col].apply(self.jigger_data)
 
         # Calculate derived stats for AGGREGATED data
         batting_data["Season"] = str(
@@ -1355,10 +1109,7 @@ class BaseballStatsPreProcess:
             np.nan_to_num(
                 np.divide(
                     batting_data["H"] + batting_data["BB"] + batting_data["HBP"],
-                    batting_data["AB"]
-                    + batting_data["BB"]
-                    + batting_data["HBP"]
-                    + batting_data.get("SF", 0),
+                    batting_data["AB"] + batting_data["BB"] + batting_data["HBP"] + batting_data.get("SF", 0),
                 ),
                 nan=0.0,
                 posinf=0.0,
@@ -1369,12 +1120,7 @@ class BaseballStatsPreProcess:
         batting_data["SLG"] = self.trunc_col(
             np.nan_to_num(
                 np.divide(
-                    (
-                        batting_data["H"]
-                        - batting_data["2B"]
-                        - batting_data["3B"]
-                        - batting_data["HR"]
-                    )
+                    (batting_data["H"] - batting_data["2B"] - batting_data["3B"] - batting_data["HR"])
                     + batting_data["2B"] * 2
                     + batting_data["3B"] * 3
                     + batting_data["HR"] * 4,
@@ -1386,18 +1132,11 @@ class BaseballStatsPreProcess:
             3,
         )
         batting_data["OPS"] = self.trunc_col(
-            np.nan_to_num(
-                batting_data["OBP"] + batting_data["SLG"], nan=0.0, posinf=0.0
-            ),
-            3,
+            np.nan_to_num(batting_data["OBP"] + batting_data["SLG"], nan=0.0, posinf=0.0), 3
         )
-        batting_data["Total_OB"] = (
-            batting_data["H"] + batting_data["BB"] + batting_data["HBP"]
-        )
+        batting_data["Total_OB"] = batting_data["H"] + batting_data["BB"] + batting_data["HBP"]
         batting_data["Total_Outs"] = batting_data["AB"] - batting_data["H"]
-        batting_data = batting_data[
-            batting_data["AB"] >= 1
-        ]  # drop players without enough AB
+        batting_data = batting_data[batting_data["AB"] >= 1]  # drop players without enough AB
         batting_data["E"] = 0
         batting_data["Game_Fatigue_Factor"] = 0
         batting_data["Condition"] = 100
@@ -1415,12 +1154,8 @@ class BaseballStatsPreProcess:
         historical_data["OBP"] = self.trunc_col(
             np.nan_to_num(
                 np.divide(
-                    historical_data["H"]
-                    + historical_data["BB"]
-                    + historical_data["HBP"],
-                    historical_data["AB"]
-                    + historical_data["BB"]
-                    + historical_data["HBP"],
+                    historical_data["H"] + historical_data["BB"] + historical_data["HBP"],
+                    historical_data["AB"] + historical_data["BB"] + historical_data["HBP"],
                 ),
                 nan=0.0,
                 posinf=0.0,
@@ -1430,12 +1165,7 @@ class BaseballStatsPreProcess:
         historical_data["SLG"] = self.trunc_col(
             np.nan_to_num(
                 np.divide(
-                    (
-                        historical_data["H"]
-                        - historical_data["2B"]
-                        - historical_data["3B"]
-                        - historical_data["HR"]
-                    )
+                    (historical_data["H"] - historical_data["2B"] - historical_data["3B"] - historical_data["HR"])
                     + historical_data["2B"] * 2
                     + historical_data["3B"] * 3
                     + historical_data["HR"] * 4,
@@ -1447,14 +1177,9 @@ class BaseballStatsPreProcess:
             3,
         )
         historical_data["OPS"] = self.trunc_col(
-            np.nan_to_num(
-                historical_data["OBP"] + historical_data["SLG"], nan=0.0, posinf=0.0
-            ),
-            3,
+            np.nan_to_num(historical_data["OBP"] + historical_data["SLG"], nan=0.0, posinf=0.0), 3
         )
-        historical_data["Total_OB"] = (
-            historical_data["H"] + historical_data["BB"] + historical_data["HBP"]
-        )
+        historical_data["Total_OB"] = historical_data["H"] + historical_data["BB"] + historical_data["HBP"]
         historical_data["Total_Outs"] = historical_data["AB"] - historical_data["H"]
         historical_data = historical_data[historical_data["AB"] >= 10]
         historical_data["E"] = 0
@@ -1469,9 +1194,7 @@ class BaseballStatsPreProcess:
         if "Streak_Adjustment" not in historical_data.columns:
             historical_data["Streak_Adjustment"] = 0.0  # Always 0 for historical data
         if "Projection_Trusted" not in historical_data.columns:
-            historical_data["Projection_Trusted"] = (
-                True  # Historical data is always trusted
-            )
+            historical_data["Projection_Trusted"] = True  # Historical data is always trusted
 
         return batting_data, historical_data
 
@@ -1507,17 +1230,13 @@ class BaseballStatsPreProcess:
         # Apply remapping to pitching data (aggregated)
         for old_team, new_team in self.team_remapping.items():
             if old_team in self.pitching_data["Team"].values:
-                self.pitching_data["Team"] = self.pitching_data["Team"].replace(
-                    old_team, new_team
-                )
+                self.pitching_data["Team"] = self.pitching_data["Team"].replace(old_team, new_team)
                 remapped_teams.append(f"Pitching: {old_team} → {new_team}")
 
         # Apply remapping to batting data (aggregated)
         for old_team, new_team in self.team_remapping.items():
             if old_team in self.batting_data["Team"].values:
-                self.batting_data["Team"] = self.batting_data["Team"].replace(
-                    old_team, new_team
-                )
+                self.batting_data["Team"] = self.batting_data["Team"].replace(old_team, new_team)
                 if f"Pitching: {old_team} → {new_team}" not in remapped_teams:
                     remapped_teams.append(f"Batting: {old_team} → {new_team}")
 
@@ -1525,18 +1244,16 @@ class BaseballStatsPreProcess:
         if self.pitching_data_historical is not None:
             for old_team, new_team in self.team_remapping.items():
                 if old_team in self.pitching_data_historical["Team"].values:
-                    self.pitching_data_historical["Team"] = (
-                        self.pitching_data_historical["Team"].replace(
-                            old_team, new_team
-                        )
+                    self.pitching_data_historical["Team"] = self.pitching_data_historical["Team"].replace(
+                        old_team, new_team
                     )
 
         if self.batting_data_historical is not None:
             for old_team, new_team in self.team_remapping.items():
                 if old_team in self.batting_data_historical["Team"].values:
-                    self.batting_data_historical["Team"] = self.batting_data_historical[
-                        "Team"
-                    ].replace(old_team, new_team)
+                    self.batting_data_historical["Team"] = self.batting_data_historical["Team"].replace(
+                        old_team, new_team
+                    )
 
         # Log the remappings that were applied
         if remapped_teams:
@@ -1554,61 +1271,38 @@ class BaseballStatsPreProcess:
             print("No seasons loaded, skipping Def_WAR calculation")
             return
 
-        prior_season = (
-            max(self.projection_seasons)
-            if self.projection_seasons
-            else max(self.load_seasons)
-        )
+        prior_season = max(self.projection_seasons) if self.projection_seasons else max(self.load_seasons)
         print(f"Calculating Def_WAR from {prior_season} season data...")
 
         # === PITCHERS ===
         if self.pitching_data_historical is not None:
-            prior_p = self.pitching_data_historical[
-                self.pitching_data_historical["Season"] == prior_season
-            ].copy()
+            prior_p = self.pitching_data_historical[self.pitching_data_historical["Season"] == prior_season].copy()
             prior_p = prior_p[prior_p["IP"] >= 5].copy()
 
             if not prior_p.empty:
-                prior_p["FIP"] = (
-                    (13 * prior_p["HR"] + 3 * prior_p["BB"] - 2 * prior_p["SO"])
-                    / prior_p["IP"]
-                ) + 3.10
+                prior_p["FIP"] = ((13 * prior_p["HR"] + 3 * prior_p["BB"] - 2 * prior_p["SO"]) / prior_p["IP"]) + 3.10
                 league_fip = prior_p["FIP"].mean()
                 replacement_fip = league_fip + 1.0
-                prior_p["Calculated_Sim_WAR"] = (
-                    ((replacement_fip - prior_p["FIP"]) / 9.0) * prior_p["IP"] / 10.0
-                )
+                prior_p["Calculated_Sim_WAR"] = ((replacement_fip - prior_p["FIP"]) / 9.0) * prior_p["IP"] / 10.0
                 prior_p["Def_WAR"] = prior_p["WAR"] - prior_p["Calculated_Sim_WAR"]
 
                 def_war_p_map = (
-                    prior_p[["Hashcode", "Def_WAR", "WAR"]]
-                    .drop_duplicates("Hashcode")
-                    .set_index("Hashcode")
+                    prior_p[["Hashcode", "Def_WAR", "WAR"]].drop_duplicates("Hashcode").set_index("Hashcode")
                 )
 
                 if "Def_WAR" in self.pitching_data.columns:
                     self.pitching_data.drop("Def_WAR", axis=1, inplace=True)
 
-                self.pitching_data = self.pitching_data.join(
-                    def_war_p_map["Def_WAR"], how="left"
-                )
-                self.pitching_data["Def_WAR"] = self.pitching_data["Def_WAR"].fillna(
-                    0.0
-                )
-                self.pitching_data["WAR"] = def_war_p_map["WAR"].combine_first(
-                    self.pitching_data["WAR"]
-                )
-                print(
-                    f"  Pitchers: Added Def_WAR for {(self.pitching_data['Def_WAR'] != 0).sum()} players"
-                )
+                self.pitching_data = self.pitching_data.join(def_war_p_map["Def_WAR"], how="left")
+                self.pitching_data["Def_WAR"] = self.pitching_data["Def_WAR"].fillna(0.0)
+                self.pitching_data["WAR"] = def_war_p_map["WAR"].combine_first(self.pitching_data["WAR"])
+                print(f"  Pitchers: Added Def_WAR for {(self.pitching_data['Def_WAR'] != 0).sum()} players")
             else:
                 self.pitching_data["Def_WAR"] = 0.0
 
         # === BATTERS ===
         if self.batting_data_historical is not None:
-            prior_b = self.batting_data_historical[
-                self.batting_data_historical["Season"] == prior_season
-            ].copy()
+            prior_b = self.batting_data_historical[self.batting_data_historical["Season"] == prior_season].copy()
             prior_b = prior_b[prior_b["AB"] >= 100].copy()
 
             if not prior_b.empty:
@@ -1624,21 +1318,14 @@ class BaseballStatsPreProcess:
                 )
 
                 # Use PA as denominator for wOBA
-                prior_b["PA_calc"] = (
-                    prior_b["AB"]
-                    + prior_b["BB"]
-                    + prior_b["HBP"]
-                    + prior_b.get("SF", 0)
-                )
+                prior_b["PA_calc"] = prior_b["AB"] + prior_b["BB"] + prior_b["HBP"] + prior_b.get("SF", 0)
                 prior_b["wOBA"] = woba_num / prior_b["PA_calc"].replace(0, 1)
 
                 # 2. Calculate Sim_WAR
                 league_woba = prior_b["wOBA"].mean()
                 replacement_woba = league_woba - 0.020
                 prior_b["Calculated_Sim_WAR"] = (
-                    ((prior_b["wOBA"] - replacement_woba) / 1.15)
-                    * prior_b["PA_calc"]
-                    / 10.0
+                    ((prior_b["wOBA"] - replacement_woba) / 1.15) * prior_b["PA_calc"] / 10.0
                 )
 
                 # 3. Calculate Def_WAR (Baserunning + Defense)
@@ -1646,25 +1333,17 @@ class BaseballStatsPreProcess:
 
                 # 4. Create mapping and Join
                 def_war_b_map = (
-                    prior_b[["Hashcode", "Def_WAR", "WAR"]]
-                    .drop_duplicates("Hashcode")
-                    .set_index("Hashcode")
+                    prior_b[["Hashcode", "Def_WAR", "WAR"]].drop_duplicates("Hashcode").set_index("Hashcode")
                 )
 
                 if "Def_WAR" in self.batting_data.columns:
                     self.batting_data.drop("Def_WAR", axis=1, inplace=True)
 
-                self.batting_data = self.batting_data.join(
-                    def_war_b_map["Def_WAR"], how="left"
-                )
+                self.batting_data = self.batting_data.join(def_war_b_map["Def_WAR"], how="left")
                 self.batting_data["Def_WAR"] = self.batting_data["Def_WAR"].fillna(0.0)
-                self.batting_data["WAR"] = def_war_b_map["WAR"].combine_first(
-                    self.batting_data["WAR"]
-                )
+                self.batting_data["WAR"] = def_war_b_map["WAR"].combine_first(self.batting_data["WAR"])
 
-                print(
-                    f"  Batters: Added Def_WAR for {(self.batting_data['Def_WAR'] != 0).sum()} players"
-                )
+                print(f"  Batters: Added Def_WAR for {(self.batting_data['Def_WAR'] != 0).sum()} players")
             else:
                 self.batting_data["Def_WAR"] = 0.0
 
@@ -1680,13 +1359,8 @@ class BaseballStatsPreProcess:
         self.create_leagues()
         self.randomize_city_names()
         self.randomize_player_names()
-        if (
-            np.min(self.batting_data.index) == 0
-            or np.min(self.pitching_data.index) == 0
-        ):  # last ditch check key error
-            raise Exception(
-                "Index value cannot be zero"
-            )  # screws up bases where 0 is no runner
+        if np.min(self.batting_data.index) == 0 or np.min(self.pitching_data.index) == 0:  # last ditch check key error
+            raise Exception("Index value cannot be zero")  # screws up bases where 0 is no runner
         return
 
     def create_leagues(self):
@@ -1699,51 +1373,30 @@ class BaseballStatsPreProcess:
         column to match.
         """
         # replace AL and NL with random league names, set leagues column to match
-        league_names = [
-            "ACB",
-            "NBL",
-        ]  # Armchair Baseball and Nerd Baseball, Some Other League SOL, No Name NNL
+        league_names = ["ACB", "NBL"]  # Armchair Baseball and Nerd Baseball, Some Other League SOL, No Name NNL
 
         # Update aggregated data
-        self.pitching_data.loc[self.pitching_data["League"] == "AL", "League"] = (
-            league_names[0]
-        )
-        self.pitching_data.loc[self.pitching_data["League"] == "NL", "League"] = (
-            league_names[1]
-        )
-        self.pitching_data["Leagues"] = self.pitching_data["League"].apply(
-            lambda x: [x]
-        )
-        self.batting_data.loc[self.batting_data["League"] == "AL", "League"] = (
-            league_names[0]
-        )
-        self.batting_data.loc[self.batting_data["League"] == "NL", "League"] = (
-            league_names[1]
-        )
+        self.pitching_data.loc[self.pitching_data["League"] == "AL", "League"] = league_names[0]
+        self.pitching_data.loc[self.pitching_data["League"] == "NL", "League"] = league_names[1]
+        self.pitching_data["Leagues"] = self.pitching_data["League"].apply(lambda x: [x])
+        self.batting_data.loc[self.batting_data["League"] == "AL", "League"] = league_names[0]
+        self.batting_data.loc[self.batting_data["League"] == "NL", "League"] = league_names[1]
         self.batting_data["Leagues"] = self.batting_data["League"].apply(lambda x: [x])
 
         # Update historical data
         if self.pitching_data_historical is not None:
-            self.pitching_data_historical.loc[
-                self.pitching_data_historical["League"] == "AL", "League"
-            ] = league_names[0]
-            self.pitching_data_historical.loc[
-                self.pitching_data_historical["League"] == "NL", "League"
-            ] = league_names[1]
-            self.pitching_data_historical["Leagues"] = self.pitching_data_historical[
-                "League"
-            ].apply(lambda x: [x])
+            self.pitching_data_historical.loc[self.pitching_data_historical["League"] == "AL", "League"] = league_names[
+                0
+            ]
+            self.pitching_data_historical.loc[self.pitching_data_historical["League"] == "NL", "League"] = league_names[
+                1
+            ]
+            self.pitching_data_historical["Leagues"] = self.pitching_data_historical["League"].apply(lambda x: [x])
 
         if self.batting_data_historical is not None:
-            self.batting_data_historical.loc[
-                self.batting_data_historical["League"] == "AL", "League"
-            ] = league_names[0]
-            self.batting_data_historical.loc[
-                self.batting_data_historical["League"] == "NL", "League"
-            ] = league_names[1]
-            self.batting_data_historical["Leagues"] = self.batting_data_historical[
-                "League"
-            ].apply(lambda x: [x])
+            self.batting_data_historical.loc[self.batting_data_historical["League"] == "AL", "League"] = league_names[0]
+            self.batting_data_historical.loc[self.batting_data_historical["League"] == "NL", "League"] = league_names[1]
+            self.batting_data_historical["Leagues"] = self.batting_data_historical["League"].apply(lambda x: [x])
 
         return
 
@@ -1760,70 +1413,40 @@ class BaseballStatsPreProcess:
         """
         # create team name and mascots, set teams column to match
         city_dict = {}
-        current_team_names = (
-            self.batting_data.Team.unique()
-        )  # get list of current team names
-        city_abbrev = [
-            str(name[:3]).upper() for name in city.names
-        ]  # city names are imported
+        current_team_names = self.batting_data.Team.unique()  # get list of current team names
+        city_abbrev = [str(name[:3]).upper() for name in city.names]  # city names are imported
         mascots = self.randomize_mascots(len(city.names))
         for ii, team_abbrev in enumerate(city_abbrev):
-            city_dict.update(
-                {city_abbrev[ii]: [city.names[ii], mascots[ii]]}
-            )  # update will use the last unique abbrev
+            city_dict.update({city_abbrev[ii]: [city.names[ii], mascots[ii]]})  # update will use the last unique abbrev
 
         new_teams = list(random.sample(city_abbrev, len(current_team_names)))
-        for ii, team in enumerate(
-            current_team_names
-        ):  # do not use a df merge here resets the index, that is bad
+        for ii, team in enumerate(current_team_names):  # do not use a df merge here resets the index, that is bad
             new_team = new_teams[ii]
             mascot = city_dict[new_team][1]
             city_name = city_dict[new_team][0]
 
             # Update aggregated data
             self.pitching_data.replace([team], [new_team], inplace=True)
-            self.pitching_data.loc[self.pitching_data["Team"] == new_team, "City"] = (
-                city_name
-            )
-            self.pitching_data["Teams"] = self.pitching_data["Team"].apply(
-                lambda x: [x]
-            )
-            self.pitching_data.loc[self.pitching_data["Team"] == new_team, "Mascot"] = (
-                mascot
-            )
+            self.pitching_data.loc[self.pitching_data["Team"] == new_team, "City"] = city_name
+            self.pitching_data["Teams"] = self.pitching_data["Team"].apply(lambda x: [x])
+            self.pitching_data.loc[self.pitching_data["Team"] == new_team, "Mascot"] = mascot
             self.batting_data.replace([team], [new_team], inplace=True)
-            self.batting_data.loc[self.batting_data["Team"] == new_team, "City"] = (
-                city_name
-            )
+            self.batting_data.loc[self.batting_data["Team"] == new_team, "City"] = city_name
             self.batting_data["Teams"] = self.batting_data["Team"].apply(lambda x: [x])
-            self.batting_data.loc[self.batting_data["Team"] == new_team, "Mascot"] = (
-                mascot
-            )
+            self.batting_data.loc[self.batting_data["Team"] == new_team, "Mascot"] = mascot
 
             # Update historical data
             if self.pitching_data_historical is not None:
                 self.pitching_data_historical.replace([team], [new_team], inplace=True)
-                self.pitching_data_historical.loc[
-                    self.pitching_data_historical["Team"] == new_team, "City"
-                ] = city_name
-                self.pitching_data_historical["Teams"] = self.pitching_data_historical[
-                    "Team"
-                ].apply(lambda x: [x])
-                self.pitching_data_historical.loc[
-                    self.pitching_data_historical["Team"] == new_team, "Mascot"
-                ] = mascot
+                self.pitching_data_historical.loc[self.pitching_data_historical["Team"] == new_team, "City"] = city_name
+                self.pitching_data_historical["Teams"] = self.pitching_data_historical["Team"].apply(lambda x: [x])
+                self.pitching_data_historical.loc[self.pitching_data_historical["Team"] == new_team, "Mascot"] = mascot
 
             if self.batting_data_historical is not None:
                 self.batting_data_historical.replace([team], [new_team], inplace=True)
-                self.batting_data_historical.loc[
-                    self.batting_data_historical["Team"] == new_team, "City"
-                ] = city_name
-                self.batting_data_historical["Teams"] = self.batting_data_historical[
-                    "Team"
-                ].apply(lambda x: [x])
-                self.batting_data_historical.loc[
-                    self.batting_data_historical["Team"] == new_team, "Mascot"
-                ] = mascot
+                self.batting_data_historical.loc[self.batting_data_historical["Team"] == new_team, "City"] = city_name
+                self.batting_data_historical["Teams"] = self.batting_data_historical["Team"].apply(lambda x: [x])
+                self.batting_data_historical.loc[self.batting_data_historical["Team"] == new_team, "Mascot"] = mascot
 
         return
 
@@ -1861,34 +1484,20 @@ class BaseballStatsPreProcess:
         first_names = df[0].values.tolist()
         last_names = df[1].values.tolist()
         random_names = []
-        for ii in range(
-            1, (df.shape[0] + 1) * 2
-        ):  # generate twice as many random names as needed
-            random_names.append(
-                random.choice(first_names) + " " + random.choice(last_names)
-            )
+        for ii in range(1, (df.shape[0] + 1) * 2):  # generate twice as many random names as needed
+            random_names.append(random.choice(first_names) + " " + random.choice(last_names))
         random_names = list(set(random_names))  # drop non-unique names
-        random_names = random.sample(
-            random_names, self.batting_data.shape[0] + self.pitching_data.shape[0]
-        )
+        random_names = random.sample(random_names, self.batting_data.shape[0] + self.pitching_data.shape[0])
 
         # load new names and reset hashcode index for AGGREGATED data
-        self.batting_data["Player"] = random_names[
-            : len(self.batting_data)
-        ]  # grab first x rows of list
+        self.batting_data["Player"] = random_names[: len(self.batting_data)]  # grab first x rows of list
         self.batting_data = self.batting_data.reset_index()
-        self.batting_data["Hashcode"] = self.batting_data["Player"].apply(
-            lambda x: self.create_hash(x, "Hitter")
-        )
+        self.batting_data["Hashcode"] = self.batting_data["Player"].apply(lambda x: self.create_hash(x, "Hitter"))
         self.batting_data = self.batting_data.set_index("Hashcode")
 
-        self.pitching_data["Player"] = random_names[
-            -len(self.pitching_data) :
-        ]  # next x rows list
+        self.pitching_data["Player"] = random_names[-len(self.pitching_data) :]  # next x rows list
         self.pitching_data = self.pitching_data.reset_index()
-        self.pitching_data["Hashcode"] = self.pitching_data["Player"].apply(
-            lambda x: self.create_hash(x, "Pitcher")
-        )
+        self.pitching_data["Hashcode"] = self.pitching_data["Player"].apply(lambda x: self.create_hash(x, "Pitcher"))
         self.pitching_data = self.pitching_data.set_index("Hashcode")
 
         # Update HISTORICAL data with same player names (need to map old hashcode to new)
@@ -1897,74 +1506,50 @@ class BaseballStatsPreProcess:
             # Extract hashcode from Player_Season_Key (format: hashcode_season)
             self.batting_data_historical = self.batting_data_historical.reset_index()
             self.batting_data_historical["Old_Hashcode"] = (
-                self.batting_data_historical["Player_Season_Key"]
-                .str.split("_")
-                .str[0]
-                .apply(int)
+                self.batting_data_historical["Player_Season_Key"].str.split("_").str[0].apply(int)
             )
             # Map old hashcode to new player name from aggregated data
             old_to_new_player = dict(
-                zip(
-                    self.batting_data.reset_index()["Hashcode"],
-                    self.batting_data.reset_index()["Player"],
-                )
+                zip(self.batting_data.reset_index()["Hashcode"], self.batting_data.reset_index()["Player"])
             )
-            self.batting_data_historical["Player"] = self.batting_data_historical[
-                "Old_Hashcode"
-            ].map(old_to_new_player)
+            self.batting_data_historical["Player"] = self.batting_data_historical["Old_Hashcode"].map(old_to_new_player)
             # Recalculate hashcode and Player_Season_Key
-            self.batting_data_historical["Hashcode"] = self.batting_data_historical[
-                "Player"
-            ].apply(lambda x: self.create_hash(x, "Hitter"))
+            self.batting_data_historical["Hashcode"] = self.batting_data_historical["Player"].apply(
+                lambda x: self.create_hash(x, "Hitter")
+            )
             self.batting_data_historical["Player_Season_Key"] = (
                 self.batting_data_historical["Hashcode"].astype(str)
                 + "_"
                 + self.batting_data_historical["Season"].astype(str)
             )
-            self.batting_data_historical = self.batting_data_historical.drop(
-                "Old_Hashcode", axis=1
-            )
-            self.batting_data_historical = self.batting_data_historical.set_index(
-                "Player_Season_Key"
-            )
+            self.batting_data_historical = self.batting_data_historical.drop("Old_Hashcode", axis=1)
+            self.batting_data_historical = self.batting_data_historical.set_index("Player_Season_Key")
 
         if self.pitching_data_historical is not None:
             self.pitching_data_historical = self.pitching_data_historical.reset_index()
             self.pitching_data_historical["Old_Hashcode"] = (
-                self.pitching_data_historical["Player_Season_Key"]
-                .str.split("_")
-                .str[0]
-                .apply(int)
+                self.pitching_data_historical["Player_Season_Key"].str.split("_").str[0].apply(int)
             )
             old_to_new_player = dict(
-                zip(
-                    self.pitching_data.reset_index()["Hashcode"],
-                    self.pitching_data.reset_index()["Player"],
-                )
+                zip(self.pitching_data.reset_index()["Hashcode"], self.pitching_data.reset_index()["Player"])
             )
-            self.pitching_data_historical["Player"] = self.pitching_data_historical[
-                "Old_Hashcode"
-            ].map(old_to_new_player)
-            self.pitching_data_historical["Hashcode"] = self.pitching_data_historical[
-                "Player"
-            ].apply(lambda x: self.create_hash(x, "Pitcher"))
+            self.pitching_data_historical["Player"] = self.pitching_data_historical["Old_Hashcode"].map(
+                old_to_new_player
+            )
+            self.pitching_data_historical["Hashcode"] = self.pitching_data_historical["Player"].apply(
+                lambda x: self.create_hash(x, "Pitcher")
+            )
             self.pitching_data_historical["Player_Season_Key"] = (
                 self.pitching_data_historical["Hashcode"].astype(str)
                 + "_"
                 + self.pitching_data_historical["Season"].astype(str)
             )
-            self.pitching_data_historical = self.pitching_data_historical.drop(
-                "Old_Hashcode", axis=1
-            )
-            self.pitching_data_historical = self.pitching_data_historical.set_index(
-                "Player_Season_Key"
-            )
+            self.pitching_data_historical = self.pitching_data_historical.drop("Old_Hashcode", axis=1)
+            self.pitching_data_historical = self.pitching_data_historical.set_index("Player_Season_Key")
 
         return
 
-    def create_new_season_from_existing(
-        self, load_batter_file: str, load_pitcher_file: str
-    ) -> None:
+    def create_new_season_from_existing(self, load_batter_file: str, load_pitcher_file: str) -> None:
         """
         Generate new-season DataFrames with rate stats preserved and counting stats zeroed.
 
@@ -1990,35 +1575,23 @@ class BaseballStatsPreProcess:
         partial_season_data = None
         if max_season not in self.projection_seasons:
             # Max season was excluded from projections, load it for partial stats
-            partial_season_data = self._load_partial_season_data(
-                load_batter_file, load_pitcher_file, max_season
-            )
+            partial_season_data = self._load_partial_season_data(load_batter_file, load_pitcher_file, max_season)
 
         # --- Pitching ---
         self.new_season_pitching_data = self.pitching_data.copy()
-        self.new_season_pitching_data[self.numeric_pcols] = (
-            self.new_season_pitching_data[self.numeric_pcols].astype("int")
+        self.new_season_pitching_data[self.numeric_pcols] = self.new_season_pitching_data[self.numeric_pcols].astype(
+            "int"
         )
         self.new_season_pitching_data["Season"] = str(self.new_season)
 
         # IP can be decimal (e.g., 12.1 = 12 1/3 innings), change column to float
-        self.new_season_pitching_data["IP"] = self.new_season_pitching_data[
-            "IP"
-        ].astype(float)
+        self.new_season_pitching_data["IP"] = self.new_season_pitching_data["IP"].astype(float)
 
         # Calculate projected rate stats from counting stats before zeroing
         pp = self.new_season_pitching_data
-        pp["ERA"] = self.trunc_col(
-            np.nan_to_num(np.divide(pp["ER"] * 9, pp["IP"]), nan=0.0, posinf=0.0), 2
-        )
-        pp["WHIP"] = self.trunc_col(
-            np.nan_to_num(np.divide(pp["BB"] + pp["H"], pp["IP"]), nan=0.0, posinf=0.0),
-            3,
-        )
-        pp["OBP"] = self.trunc_col(
-            np.nan_to_num(np.divide(pp["WHIP"], 3 + pp["WHIP"]), nan=0.0, posinf=0.0),
-            3,
-        )
+        pp["ERA"] = self.trunc_col(np.nan_to_num(np.divide(pp["ER"] * 9, pp["IP"]), nan=0.0, posinf=0.0), 2)
+        pp["WHIP"] = self.trunc_col(np.nan_to_num(np.divide(pp["BB"] + pp["H"], pp["IP"]), nan=0.0, posinf=0.0), 3)
+        pp["OBP"] = self.trunc_col(np.nan_to_num(np.divide(pp["WHIP"], 3 + pp["WHIP"]), nan=0.0, posinf=0.0), 3)
 
         # Merge partial season stats if available
         if partial_season_data is not None and "pitching" in partial_season_data:
@@ -2033,57 +1606,25 @@ class BaseballStatsPreProcess:
                         else pd.notna(g_val)
                     ):
                         # Update team info from partial data (in case of mid-season trades)
-                        if "Team" in partial_row.index and pd.notna(
-                            partial_row.get("Team")
-                        ):
-                            self.new_season_pitching_data.loc[idx, "Team"] = (
-                                partial_row["Team"]
-                            )
-                        if "League" in partial_row.index and pd.notna(
-                            partial_row.get("League")
-                        ):
-                            self.new_season_pitching_data.loc[idx, "League"] = (
-                                partial_row["League"]
-                            )
-                        if "Division" in partial_row.index and pd.notna(
-                            partial_row.get("Division")
-                        ):
-                            self.new_season_pitching_data.loc[idx, "Division"] = (
-                                partial_row["Division"]
-                            )
-                        self.new_season_pitching_data.loc[idx, "G"] = int(
-                            partial_row.get("G", 0)
-                        )
-                        self.new_season_pitching_data.loc[idx, "GS"] = int(
-                            partial_row.get("GS", 0)
-                        )
+                        if "Team" in partial_row.index and pd.notna(partial_row.get("Team")):
+                            self.new_season_pitching_data.loc[idx, "Team"] = partial_row["Team"]
+                        if "League" in partial_row.index and pd.notna(partial_row.get("League")):
+                            self.new_season_pitching_data.loc[idx, "League"] = partial_row["League"]
+                        if "Division" in partial_row.index and pd.notna(partial_row.get("Division")):
+                            self.new_season_pitching_data.loc[idx, "Division"] = partial_row["Division"]
+                        self.new_season_pitching_data.loc[idx, "G"] = int(partial_row.get("G", 0))
+                        self.new_season_pitching_data.loc[idx, "GS"] = int(partial_row.get("GS", 0))
                         ip_val = partial_row.get("IP", 0)
                         if pd.notna(ip_val):
                             self.new_season_pitching_data.at[idx, "IP"] = float(ip_val)
-                        self.new_season_pitching_data.loc[idx, "H"] = int(
-                            partial_row.get("H", 0)
-                        )
-                        self.new_season_pitching_data.loc[idx, "ER"] = int(
-                            partial_row.get("ER", 0)
-                        )
-                        self.new_season_pitching_data.loc[idx, "BB"] = int(
-                            partial_row.get("BB", 0)
-                        )
-                        self.new_season_pitching_data.loc[idx, "SO"] = int(
-                            partial_row.get("SO", 0)
-                        )
-                        self.new_season_pitching_data.loc[idx, "HR"] = int(
-                            partial_row.get("HR", 0)
-                        )
-                        self.new_season_pitching_data.loc[idx, "W"] = int(
-                            partial_row.get("W", 0)
-                        )
-                        self.new_season_pitching_data.loc[idx, "L"] = int(
-                            partial_row.get("L", 0)
-                        )
-                        self.new_season_pitching_data.loc[idx, "SV"] = int(
-                            partial_row.get("SV", 0)
-                        )
+                        self.new_season_pitching_data.loc[idx, "H"] = int(partial_row.get("H", 0))
+                        self.new_season_pitching_data.loc[idx, "ER"] = int(partial_row.get("ER", 0))
+                        self.new_season_pitching_data.loc[idx, "BB"] = int(partial_row.get("BB", 0))
+                        self.new_season_pitching_data.loc[idx, "SO"] = int(partial_row.get("SO", 0))
+                        self.new_season_pitching_data.loc[idx, "HR"] = int(partial_row.get("HR", 0))
+                        self.new_season_pitching_data.loc[idx, "W"] = int(partial_row.get("W", 0))
+                        self.new_season_pitching_data.loc[idx, "L"] = int(partial_row.get("L", 0))
+                        self.new_season_pitching_data.loc[idx, "SV"] = int(partial_row.get("SV", 0))
                     else:
                         # Player in partial data but no valid games - zero out
                         self.new_season_pitching_data.loc[idx, self.numeric_pcols] = 0
@@ -2124,36 +1665,17 @@ class BaseballStatsPreProcess:
             # Recalculate derived stats from partial data
             pp = self.new_season_pitching_data
             pp["ERA"] = self.trunc_col(
-                np.nan_to_num(
-                    np.divide(pp["ER"] * 9, pp["IP"].replace(0, np.nan)),
-                    nan=0.0,
-                    posinf=0.0,
-                ),
-                2,
+                np.nan_to_num(np.divide(pp["ER"] * 9, pp["IP"].replace(0, np.nan)), nan=0.0, posinf=0.0), 2
             )
             pp["WHIP"] = self.trunc_col(
-                np.nan_to_num(
-                    np.divide(pp["BB"] + pp["H"], pp["IP"].replace(0, np.nan)),
-                    nan=0.0,
-                    posinf=0.0,
-                ),
-                3,
+                np.nan_to_num(np.divide(pp["BB"] + pp["H"], pp["IP"].replace(0, np.nan)), nan=0.0, posinf=0.0), 3
             )
-            pp["OBP"] = self.trunc_col(
-                np.nan_to_num(
-                    np.divide(pp["WHIP"], 3 + pp["WHIP"]), nan=0.0, posinf=0.0
-                ),
-                3,
-            )
+            pp["OBP"] = self.trunc_col(np.nan_to_num(np.divide(pp["WHIP"], 3 + pp["WHIP"]), nan=0.0, posinf=0.0), 3)
             pp["Total_OB"] = pp["H"] + pp["BB"]
             pp["Total_Outs"] = pp["IP"] * 3
             pp["AVG_faced"] = self.trunc_col(
                 np.nan_to_num(
-                    np.divide(
-                        pp["Total_OB"] + pp["Total_Outs"], pp["G"].replace(0, np.nan)
-                    ),
-                    nan=0.0,
-                    posinf=0.0,
+                    np.divide(pp["Total_OB"] + pp["Total_Outs"], pp["G"].replace(0, np.nan)), nan=0.0, posinf=0.0
                 ),
                 3,
             )
@@ -2162,28 +1684,13 @@ class BaseballStatsPreProcess:
             # Zero counting stats for simulation tracking (no partial data)
             self.new_season_pitching_data[self.numeric_pcols] = 0
             self.new_season_pitching_data[
-                [
-                    "ERA",
-                    "WHIP",
-                    "OBP",
-                    "AVG_faced",
-                    "Total_OB",
-                    "Total_Outs",
-                    "AB",
-                    "HLD",
-                    "BS",
-                    "Injured Days",
-                ]
+                ["ERA", "WHIP", "OBP", "AVG_faced", "Total_OB", "Total_Outs", "AB", "HLD", "BS", "Injured Days"]
             ] = 0
 
         self.new_season_pitching_data["Condition"] = 100
         self.new_season_pitching_data["Streak_Adjustment"] = 0.0
-        if (
-            self.new_season not in self.load_seasons
-        ):  # add a year to age if it is the next year
-            self.new_season_pitching_data["Age"] = (
-                self.new_season_pitching_data["Age"] + 1
-            )
+        if self.new_season not in self.load_seasons:  # add a year to age if it is the next year
+            self.new_season_pitching_data["Age"] = self.new_season_pitching_data["Age"] + 1
 
         # --- Batting ---
         self.new_season_batting_data = self.batting_data.copy()
@@ -2191,15 +1698,10 @@ class BaseballStatsPreProcess:
 
         # Calculate projected rate stats from counting stats before zeroing
         bp = self.new_season_batting_data
-        bp["AVG"] = self.trunc_col(
-            np.nan_to_num(np.divide(bp["H"], bp["AB"]), nan=0.0, posinf=0.0), 3
-        )
+        bp["AVG"] = self.trunc_col(np.nan_to_num(np.divide(bp["H"], bp["AB"]), nan=0.0, posinf=0.0), 3)
         bp["OBP"] = self.trunc_col(
             np.nan_to_num(
-                np.divide(
-                    bp["H"] + bp["BB"] + bp["HBP"],
-                    bp["AB"] + bp["BB"] + bp["HBP"] + bp.get("SF", 0),
-                ),
+                np.divide(bp["H"] + bp["BB"] + bp["HBP"], bp["AB"] + bp["BB"] + bp["HBP"] + bp.get("SF", 0)),
                 nan=0.0,
                 posinf=0.0,
             ),
@@ -2208,26 +1710,16 @@ class BaseballStatsPreProcess:
         bp["SLG"] = self.trunc_col(
             np.nan_to_num(
                 np.divide(
-                    (bp["H"] - bp["2B"] - bp["3B"] - bp["HR"])
-                    + bp["2B"] * 2
-                    + bp["3B"] * 3
-                    + bp["HR"] * 4,
-                    bp["AB"],
+                    (bp["H"] - bp["2B"] - bp["3B"] - bp["HR"]) + bp["2B"] * 2 + bp["3B"] * 3 + bp["HR"] * 4, bp["AB"]
                 ),
                 nan=0.0,
                 posinf=0.0,
             ),
             3,
         )
-        bp["OPS"] = self.trunc_col(
-            np.nan_to_num(bp["OBP"] + bp["SLG"], nan=0.0, posinf=0.0), 3
-        )
-        if (
-            self.new_season not in self.load_seasons
-        ):  # add a year to age if it is the next year
-            self.new_season_batting_data["Age"] = (
-                self.new_season_batting_data["Age"] + 1
-            )
+        bp["OPS"] = self.trunc_col(np.nan_to_num(bp["OBP"] + bp["SLG"], nan=0.0, posinf=0.0), 3)
+        if self.new_season not in self.load_seasons:  # add a year to age if it is the next year
+            self.new_season_batting_data["Age"] = self.new_season_batting_data["Age"] + 1
 
         # Merge partial season stats if available
         if partial_season_data is not None and "batting" in partial_season_data:
@@ -2241,57 +1733,23 @@ class BaseballStatsPreProcess:
                         if hasattr(pd.notna(g_val), "any")
                         else pd.notna(g_val)
                     ):
-                        self.new_season_batting_data.loc[idx, "G"] = int(
-                            partial_row.get("G", 0)
-                        )
-                        self.new_season_batting_data.loc[idx, "PA"] = int(
-                            partial_row.get("PA", 0)
-                        )
-                        self.new_season_batting_data.loc[idx, "AB"] = int(
-                            partial_row.get("AB", 0)
-                        )
-                        self.new_season_batting_data.loc[idx, "H"] = int(
-                            partial_row.get("H", 0)
-                        )
-                        self.new_season_batting_data.loc[idx, "R"] = int(
-                            partial_row.get("R", 0)
-                        )
-                        self.new_season_batting_data.loc[idx, "HR"] = int(
-                            partial_row.get("HR", 0)
-                        )
-                        self.new_season_batting_data.loc[idx, "RBI"] = int(
-                            partial_row.get("RBI", 0)
-                        )
-                        self.new_season_batting_data.loc[idx, "BB"] = int(
-                            partial_row.get("BB", 0)
-                        )
-                        self.new_season_batting_data.loc[idx, "SO"] = int(
-                            partial_row.get("SO", 0)
-                        )
-                        self.new_season_batting_data.loc[idx, "SB"] = int(
-                            partial_row.get("SB", 0)
-                        )
-                        self.new_season_batting_data.loc[idx, "CS"] = int(
-                            partial_row.get("CS", 0)
-                        )
-                        self.new_season_batting_data.loc[idx, "2B"] = int(
-                            partial_row.get("2B", 0)
-                        )
-                        self.new_season_batting_data.loc[idx, "3B"] = int(
-                            partial_row.get("3B", 0)
-                        )
-                        self.new_season_batting_data.loc[idx, "SH"] = int(
-                            partial_row.get("SH", 0)
-                        )
-                        self.new_season_batting_data.loc[idx, "SF"] = int(
-                            partial_row.get("SF", 0)
-                        )
-                        self.new_season_batting_data.loc[idx, "HBP"] = int(
-                            partial_row.get("HBP", 0)
-                        )
-                        self.new_season_batting_data.loc[idx, "GIDP"] = int(
-                            partial_row.get("GIDP", 0)
-                        )
+                        self.new_season_batting_data.loc[idx, "G"] = int(partial_row.get("G", 0))
+                        self.new_season_batting_data.loc[idx, "PA"] = int(partial_row.get("PA", 0))
+                        self.new_season_batting_data.loc[idx, "AB"] = int(partial_row.get("AB", 0))
+                        self.new_season_batting_data.loc[idx, "H"] = int(partial_row.get("H", 0))
+                        self.new_season_batting_data.loc[idx, "R"] = int(partial_row.get("R", 0))
+                        self.new_season_batting_data.loc[idx, "HR"] = int(partial_row.get("HR", 0))
+                        self.new_season_batting_data.loc[idx, "RBI"] = int(partial_row.get("RBI", 0))
+                        self.new_season_batting_data.loc[idx, "BB"] = int(partial_row.get("BB", 0))
+                        self.new_season_batting_data.loc[idx, "SO"] = int(partial_row.get("SO", 0))
+                        self.new_season_batting_data.loc[idx, "SB"] = int(partial_row.get("SB", 0))
+                        self.new_season_batting_data.loc[idx, "CS"] = int(partial_row.get("CS", 0))
+                        self.new_season_batting_data.loc[idx, "2B"] = int(partial_row.get("2B", 0))
+                        self.new_season_batting_data.loc[idx, "3B"] = int(partial_row.get("3B", 0))
+                        self.new_season_batting_data.loc[idx, "SH"] = int(partial_row.get("SH", 0))
+                        self.new_season_batting_data.loc[idx, "SF"] = int(partial_row.get("SF", 0))
+                        self.new_season_batting_data.loc[idx, "HBP"] = int(partial_row.get("HBP", 0))
+                        self.new_season_batting_data.loc[idx, "GIDP"] = int(partial_row.get("GIDP", 0))
                         # Preserve team info from partial data (handles mid-season trades)
                         team_val = partial_row.get("Team")
                         if pd.notna(team_val):
@@ -2301,9 +1759,7 @@ class BaseballStatsPreProcess:
                             self.new_season_batting_data.loc[idx, "League"] = league_val
                         division_val = partial_row.get("Division")
                         if pd.notna(division_val):
-                            self.new_season_batting_data.loc[idx, "Division"] = (
-                                division_val
-                            )
+                            self.new_season_batting_data.loc[idx, "Division"] = division_val
                     else:
                         # Player in partial data but no valid games - zero out
                         self.new_season_batting_data.loc[idx, self.numeric_bcols] = 0
@@ -2313,24 +1769,16 @@ class BaseballStatsPreProcess:
                 else:
                     # Player not in partial data - zero out (hasn't played yet)
                     self.new_season_batting_data.loc[idx, self.numeric_bcols] = 0
-                    self.new_season_batting_data.loc[
-                        idx, ["AVG", "OBP", "SLG", "OPS", "Total_OB", "Total_Outs"]
-                    ] = 0
+                    self.new_season_batting_data.loc[idx, ["AVG", "OBP", "SLG", "OPS", "Total_OB", "Total_Outs"]] = 0
 
             # Recalculate derived stats from partial data
             bp = self.new_season_batting_data
             bp["AVG"] = self.trunc_col(
-                np.nan_to_num(
-                    np.divide(bp["H"], bp["AB"].replace(0, np.nan)), nan=0.0, posinf=0.0
-                ),
-                3,
+                np.nan_to_num(np.divide(bp["H"], bp["AB"].replace(0, np.nan)), nan=0.0, posinf=0.0), 3
             )
             bp["OBP"] = self.trunc_col(
                 np.nan_to_num(
-                    np.divide(
-                        bp["H"] + bp["BB"] + bp["HBP"],
-                        bp["AB"] + bp["BB"] + bp["HBP"] + bp["SF"].fillna(0),
-                    ),
+                    np.divide(bp["H"] + bp["BB"] + bp["HBP"], bp["AB"] + bp["BB"] + bp["HBP"] + bp["SF"].fillna(0)),
                     nan=0.0,
                     posinf=0.0,
                 ),
@@ -2339,27 +1787,20 @@ class BaseballStatsPreProcess:
             singles = bp["H"] - bp["2B"] - bp["3B"] - bp["HR"]
             bp["SLG"] = self.trunc_col(
                 np.nan_to_num(
-                    np.divide(
-                        singles + bp["2B"] * 2 + bp["3B"] * 3 + bp["HR"] * 4,
-                        bp["AB"].replace(0, np.nan),
-                    ),
+                    np.divide(singles + bp["2B"] * 2 + bp["3B"] * 3 + bp["HR"] * 4, bp["AB"].replace(0, np.nan)),
                     nan=0.0,
                     posinf=0.0,
                 ),
                 3,
             )
-            bp["OPS"] = self.trunc_col(
-                np.nan_to_num(bp["OBP"] + bp["SLG"], nan=0.0, posinf=0.0), 3
-            )
+            bp["OPS"] = self.trunc_col(np.nan_to_num(bp["OBP"] + bp["SLG"], nan=0.0, posinf=0.0), 3)
             bp["Total_OB"] = bp["H"] + bp["BB"] + bp["HBP"]
             bp["Total_Outs"] = bp["AB"] - bp["H"]
 
         else:
             # Zero counting stats for simulation tracking (no partial data)
             self.new_season_batting_data[self.numeric_bcols] = 0
-            self.new_season_batting_data[
-                ["AVG", "OBP", "SLG", "OPS", "Total_OB", "Total_Outs"]
-            ] = 0
+            self.new_season_batting_data[["AVG", "OBP", "SLG", "OPS", "Total_OB", "Total_Outs"]] = 0
 
         self.new_season_batting_data["Condition"] = 100
         self.new_season_batting_data["Streak_Adjustment"] = 0.0
@@ -2371,9 +1812,7 @@ class BaseballStatsPreProcess:
 
         return
 
-    def _load_partial_season_data(
-        self, batter_file: str, pitcher_file: str, season: int
-    ) -> dict:
+    def _load_partial_season_data(self, batter_file: str, pitcher_file: str, season: int) -> dict:
         """
         Load partial season data for merging into new season file.
 
@@ -2385,9 +1824,7 @@ class BaseballStatsPreProcess:
             pdf = pd.read_csv(f"{season} {pitcher_file}")
             pdf["Season"] = season
             pdf["Player"] = pdf["Player"].str.replace("*", "").str.replace("#", "")
-            pdf["Hashcode"] = pdf["Player"].apply(
-                lambda x: self.create_hash(x, "Pitcher")
-            )
+            pdf["Hashcode"] = pdf["Player"].apply(lambda x: self.create_hash(x, "Pitcher"))
             pdf = pdf.set_index("Hashcode")
             partial_data["pitching"] = pdf
         except FileNotFoundError:
@@ -2397,9 +1834,7 @@ class BaseballStatsPreProcess:
             bdf = pd.read_csv(f"{season} {batter_file}")
             bdf["Season"] = season
             bdf["Player"] = bdf["Player"].str.replace("*", "").str.replace("#", "")
-            bdf["Hashcode"] = bdf["Player"].apply(
-                lambda x: self.create_hash(x, "Hitter")
-            )
+            bdf["Hashcode"] = bdf["Player"].apply(lambda x: self.create_hash(x, "Hitter"))
             bdf = bdf.set_index("Hashcode")
             partial_data["batting"] = bdf
         except FileNotFoundError:
@@ -2423,19 +1858,13 @@ class BaseballStatsPreProcess:
             # Add required columns if missing
             for col in ["Streak_Adjustment", "Projection_Trusted"]:
                 if col not in partial_data["pitching"].columns:
-                    partial_data["pitching"][col] = (
-                        0 if col == "Streak_Adjustment" else False
-                    )
+                    partial_data["pitching"][col] = 0 if col == "Streak_Adjustment" else False
             # Fix index: create proper Player_Season_Key format
             partial_data["pitching"]["Player_Season_Key"] = (
                 partial_data["pitching"].index.astype(str) + "_" + str(max_season)
             )
-            partial_data["pitching"] = partial_data["pitching"].set_index(
-                "Player_Season_Key"
-            )
-            self.pitching_data_historical = pd.concat(
-                [self.pitching_data_historical, partial_data["pitching"]], axis=0
-            )
+            partial_data["pitching"] = partial_data["pitching"].set_index("Player_Season_Key")
+            self.pitching_data_historical = pd.concat([self.pitching_data_historical, partial_data["pitching"]], axis=0)
 
         if "batting" in partial_data and not partial_data["batting"].empty:
             # Drop existing rows for the partial season (they'll be replaced)
@@ -2446,19 +1875,13 @@ class BaseballStatsPreProcess:
             # Add required columns if missing
             for col in ["Streak_Adjustment", "Projection_Trusted"]:
                 if col not in partial_data["batting"].columns:
-                    partial_data["batting"][col] = (
-                        0 if col == "Streak_Adjustment" else False
-                    )
+                    partial_data["batting"][col] = 0 if col == "Streak_Adjustment" else False
             # Fix index: create proper Player_Season_Key format
             partial_data["batting"]["Player_Season_Key"] = (
                 partial_data["batting"].index.astype(str) + "_" + str(max_season)
             )
-            partial_data["batting"] = partial_data["batting"].set_index(
-                "Player_Season_Key"
-            )
-            self.batting_data_historical = pd.concat(
-                [self.batting_data_historical, partial_data["batting"]], axis=0
-            )
+            partial_data["batting"] = partial_data["batting"].set_index("Player_Season_Key")
+            self.batting_data_historical = pd.concat([self.batting_data_historical, partial_data["batting"]], axis=0)
 
     @staticmethod
     def trunc_col(df_n: ndarray, d: int = 3) -> ndarray:
@@ -2496,9 +1919,7 @@ def check_batting_integrity(load_seasons: list = None, new_season: int = 2026):
     df_proj["BA"] = df_proj["H"] / df_proj["AB"].replace(0, 1)
     df_proj["BB_Rate"] = df_proj["BB"] / df_proj["PA"].replace(0, 1)
     df_proj["SO_Rate"] = df_proj["SO"] / df_proj["PA"].replace(0, 1)
-    df_proj["OBP"] = (df_proj["H"] + df_proj["BB"] + df_proj.get("HBP", 0)) / df_proj[
-        "PA"
-    ].replace(0, 1)
+    df_proj["OBP"] = (df_proj["H"] + df_proj["BB"] + df_proj.get("HBP", 0)) / df_proj["PA"].replace(0, 1)
 
     lg_ba_23_25 = df_23_25["H"].sum() / df_23_25["AB"].sum()
     lg_obp_23_25 = (df_23_25["H"] + df_23_25["BB"]).sum() / df_23_25["PA"].sum()
@@ -2518,19 +1939,11 @@ def check_batting_integrity(load_seasons: list = None, new_season: int = 2026):
     print("=" * 90)
     print(f"{'HITTER INTEGRITY CHECK: PROJECTION vs HISTORICAL BASELINES':^90}")
     print("=" * 90)
-    print(f"                            2023-2025 Hist    2025 Hist    2026 Proj")
-    print(
-        f"League AVG:                 {lg_ba_23_25:.3f}         {lg_ba_25:.3f}       {lg_ba:.3f}"
-    )
-    print(
-        f"League OBP:                 {lg_obp_23_25:.3f}         {lg_obp_25:.3f}       {lg_obp:.3f}"
-    )
-    print(
-        f"BB Rate (BB/PA):            {lg_bb_23_25:.3f}         {lg_bb_25:.3f}       {lg_bb:.3f}"
-    )
-    print(
-        f"SO Rate (SO/PA):           {lg_so_23_25:.3f}         {lg_so_25:.3f}       {lg_so:.3f}"
-    )
+    print("                            2023-2025 Hist    2025 Hist    2026 Proj")
+    print(f"League AVG:                 {lg_ba_23_25:.3f}         {lg_ba_25:.3f}       {lg_ba:.3f}")
+    print(f"League OBP:                 {lg_obp_23_25:.3f}         {lg_obp_25:.3f}       {lg_obp:.3f}")
+    print(f"BB Rate (BB/PA):            {lg_bb_23_25:.3f}         {lg_bb_25:.3f}       {lg_bb:.3f}")
+    print(f"SO Rate (SO/PA):           {lg_so_23_25:.3f}         {lg_so_25:.3f}       {lg_so:.3f}")
     print(
         f"OBP Spread (OBP - AVG):  {lg_obp_23_25 - lg_ba_23_25:.3f}         {lg_obp_25 - lg_ba_25:.3f}       {lg_obp - lg_ba:.3f}"
     )
@@ -2568,9 +1981,7 @@ def check_pitching_integrity(load_seasons: list = None, new_season: int = 2026):
     df_proj["H_PA"] = df_proj["H"] / df_proj["PA"].replace(0, 1)
     df_proj["BB_PA"] = df_proj["BB"] / df_proj["PA"].replace(0, 1)
     df_proj["SO_PA"] = df_proj["SO"] / df_proj["PA"].replace(0, 1)
-    df_proj["OBP_Against"] = (df_proj["H"] + df_proj["BB"]) / df_proj["PA"].replace(
-        0, 1
-    )
+    df_proj["OBP_Against"] = (df_proj["H"] + df_proj["BB"]) / df_proj["PA"].replace(0, 1)
 
     lg_h_pa_23_25 = df_23_25["H"].sum() / df_23_25["PA"].sum()
     lg_bb_pa_23_25 = df_23_25["BB"].sum() / df_23_25["PA"].sum()
@@ -2590,31 +2001,17 @@ def check_pitching_integrity(load_seasons: list = None, new_season: int = 2026):
     print("\n" + "=" * 90)
     print(f"{'PITCHER INTEGRITY CHECK: PROJECTION vs HISTORICAL BASELINES':^90}")
     print("=" * 90)
-    print(f"                            2023-2025 Hist    2025 Hist    2026 Proj")
-    print(
-        f"League Hits/PA:            {lg_h_pa_23_25:.3f}         {lg_h_pa_25:.3f}       {lg_h_pa:.3f}"
-    )
-    print(
-        f"League Walks/PA:            {lg_bb_pa_23_25:.3f}         {lg_bb_pa_25:.3f}       {lg_bb_pa:.3f}"
-    )
-    print(
-        f"League K/PA:               {lg_so_pa_23_25:.3f}         {lg_so_pa_25:.3f}       {lg_so_pa:.3f}"
-    )
-    print(
-        f"OBP Against:               {lg_obpa_23_25:.3f}         {lg_obpa_25:.3f}       {lg_obpa:.3f}"
-    )
+    print("                            2023-2025 Hist    2025 Hist    2026 Proj")
+    print(f"League Hits/PA:            {lg_h_pa_23_25:.3f}         {lg_h_pa_25:.3f}       {lg_h_pa:.3f}")
+    print(f"League Walks/PA:            {lg_bb_pa_23_25:.3f}         {lg_bb_pa_25:.3f}       {lg_bb_pa:.3f}")
+    print(f"League K/PA:               {lg_so_pa_23_25:.3f}         {lg_so_pa_25:.3f}       {lg_so_pa:.3f}")
+    print(f"OBP Against:               {lg_obpa_23_25:.3f}         {lg_obpa_25:.3f}       {lg_obpa:.3f}")
     print("-" * 90)
 
-    stiflers = df_proj[
-        (df_proj["PA"] > 200) & (df_proj["OBP_Against"] < 0.250)
-    ].sort_values("OBP_Against")
+    stiflers = df_proj[(df_proj["PA"] > 200) & (df_proj["OBP_Against"] < 0.250)].sort_values("OBP_Against")
     if not stiflers.empty:
         print("PITCHERS SUPPRESSING OBP UNREALISTICALLY (< .250 OBP Against):")
-        print(
-            stiflers[["Player", "PA", "H_PA", "BB_PA", "OBP_Against"]]
-            .head(10)
-            .to_string(index=False)
-        )
+        print(stiflers[["Player", "PA", "H_PA", "BB_PA", "OBP_Against"]].head(10).to_string(index=False))
     print("-" * 90)
 
 
@@ -2631,30 +2028,14 @@ def diagnose_power_inflation(load_seasons: list = None, new_season: int = 2026):
     df_hist = pd.read_csv(B_HIST_FILE)
     df_25 = df_hist[df_hist["Season"] == prior_season].copy()
 
-    df_proj["1B"] = (
-        df_proj["H"]
-        - df_proj["2B"].fillna(0)
-        - df_proj["3B"].fillna(0)
-        - df_proj["HR"].fillna(0)
-    )
-    df_25["1B"] = (
-        df_25["H"]
-        - df_25["2B"].fillna(0)
-        - df_25["3B"].fillna(0)
-        - df_25["HR"].fillna(0)
-    )
+    df_proj["1B"] = df_proj["H"] - df_proj["2B"].fillna(0) - df_proj["3B"].fillna(0) - df_proj["HR"].fillna(0)
+    df_25["1B"] = df_25["H"] - df_25["2B"].fillna(0) - df_25["3B"].fillna(0) - df_25["HR"].fillna(0)
 
     df_proj["SLG"] = (
-        df_proj["1B"]
-        + 2 * df_proj["2B"].fillna(0)
-        + 3 * df_proj["3B"].fillna(0)
-        + 4 * df_proj["HR"].fillna(0)
+        df_proj["1B"] + 2 * df_proj["2B"].fillna(0) + 3 * df_proj["3B"].fillna(0) + 4 * df_proj["HR"].fillna(0)
     ) / df_proj["AB"].replace(0, 1)
     df_25["SLG"] = (
-        df_25["1B"]
-        + 2 * df_25["2B"].fillna(0)
-        + 3 * df_25["3B"].fillna(0)
-        + 4 * df_25["HR"].fillna(0)
+        df_25["1B"] + 2 * df_25["2B"].fillna(0) + 3 * df_25["3B"].fillna(0) + 4 * df_25["HR"].fillna(0)
     ) / df_25["AB"].replace(0, 1)
 
     lg_1b_25 = df_25["1B"].sum() / df_25["AB"].sum()
@@ -2672,22 +2053,12 @@ def diagnose_power_inflation(load_seasons: list = None, new_season: int = 2026):
     print("\n" + "=" * 90)
     print(f"{'POWER INFLATION DIAGNOSTIC: 2B, 3B, HR -> SLG':^90}")
     print("=" * 90)
-    print(f"                            2025 Actual    2026 Proj    Delta")
-    print(
-        f"Singles/AB:                {lg_1b_25:.4f}       {lg_1b_26:.4f}    {lg_1b_26 - lg_1b_25:+.4f}"
-    )
-    print(
-        f"Doubles/AB (2B):           {lg_2b_25:.4f}       {lg_2b_26:.4f}    {lg_2b_26 - lg_2b_25:+.4f}"
-    )
-    print(
-        f"Triples/AB (3B):           {lg_3b_25:.4f}       {lg_3b_26:.4f}    {lg_3b_26 - lg_3b_25:+.4f}"
-    )
-    print(
-        f"Home Runs/AB (HR):         {lg_hr_25:.4f}       {lg_hr_26:.4f}    {lg_hr_26 - lg_hr_25:+.4f}"
-    )
-    print(
-        f"League SLG (avg):          {lg_slg_25:.4f}       {lg_slg_26:.4f}    {lg_slg_26 - lg_slg_25:+.4f}"
-    )
+    print("                            2025 Actual    2026 Proj    Delta")
+    print(f"Singles/AB:                {lg_1b_25:.4f}       {lg_1b_26:.4f}    {lg_1b_26 - lg_1b_25:+.4f}")
+    print(f"Doubles/AB (2B):           {lg_2b_25:.4f}       {lg_2b_26:.4f}    {lg_2b_26 - lg_2b_25:+.4f}")
+    print(f"Triples/AB (3B):           {lg_3b_25:.4f}       {lg_3b_26:.4f}    {lg_3b_26 - lg_3b_25:+.4f}")
+    print(f"Home Runs/AB (HR):         {lg_hr_25:.4f}       {lg_hr_26:.4f}    {lg_hr_26 - lg_hr_25:+.4f}")
+    print(f"League SLG (avg):          {lg_slg_25:.4f}       {lg_slg_26:.4f}    {lg_slg_26 - lg_slg_25:+.4f}")
     print("-" * 90)
 
     slg_delta = (lg_slg_26 - lg_slg_25) * 1000
@@ -2724,17 +2095,11 @@ def diagnose_bip_leakage(load_seasons: list = None, new_season: int = 2026):
     print("\n" + "=" * 90)
     print(f"{'BIP LEAKAGE DIAGNOSTIC (BABIP Comparison)':^90}")
     print("=" * 90)
-    print(f"                            2023-2025 Hist    2025 Hist    2026 Proj")
-    print(
-        f"Historical H/BIP:          {p_23_25_h_bip:.4f}         {p_25_h_bip:.4f}       {proj_h_bip:.4f}"
-    )
+    print("                            2023-2025 Hist    2025 Hist    2026 Proj")
+    print(f"Historical H/BIP:          {p_23_25_h_bip:.4f}         {p_25_h_bip:.4f}       {proj_h_bip:.4f}")
     print("-" * 90)
-    print(
-        f"2026 Proj vs 2023-2025 Blend: {(proj_h_bip - p_23_25_h_bip) * 1000:+.1f} points"
-    )
-    print(
-        f"2026 Proj vs 2025 Only:       {(proj_h_bip - p_25_h_bip) * 1000:+.1f} points"
-    )
+    print(f"2026 Proj vs 2023-2025 Blend: {(proj_h_bip - p_23_25_h_bip) * 1000:+.1f} points")
+    print(f"2026 Proj vs 2025 Only:       {(proj_h_bip - p_25_h_bip) * 1000:+.1f} points")
     print("-" * 90)
 
 
@@ -2770,13 +2135,9 @@ def diagnose_h_surplus(load_seasons: list = None, new_season: int = 2026):
     print("\n" + "=" * 90)
     print(f"{'HIT INFLATION DIAGNOSTIC: PROJECTION vs BASELINES':^90}")
     print("=" * 90)
-    print(f"                            2023-2025 Hist    2025 Hist    2026 Proj")
-    print(
-        f"Hitters (H/PA):            {b_23_25_h_rate:.4f}       {b_25_h_rate:.4f}     {b_26_h_rate:.4f}"
-    )
-    print(
-        f"Pitchers (H_Allowed/PA):   {p_23_25_h_rate:.4f}       {p_25_h_rate:.4f}     {p_26_h_rate:.4f}"
-    )
+    print("                            2023-2025 Hist    2025 Hist    2026 Proj")
+    print(f"Hitters (H/PA):            {b_23_25_h_rate:.4f}       {b_25_h_rate:.4f}     {b_26_h_rate:.4f}")
+    print(f"Pitchers (H_Allowed/PA):   {p_23_25_h_rate:.4f}       {p_25_h_rate:.4f}     {p_26_h_rate:.4f}")
     print("-" * 90)
 
     h_vs_blend = (b_26_h_rate - b_23_25_h_rate) * 1000
@@ -2784,12 +2145,8 @@ def diagnose_h_surplus(load_seasons: list = None, new_season: int = 2026):
     p_vs_blend = (p_26_h_rate - p_23_25_h_rate) * 1000
     p_vs_25 = (p_26_h_rate - p_25_h_rate) * 1000
 
-    print(
-        f"2026 Proj vs 2023-2025 Blend: Hitters {h_vs_blend:+.1f} pts | Pitchers {p_vs_blend:+.1f} pts"
-    )
-    print(
-        f"2026 Proj vs 2025 Only:       Hitters {h_vs_25:+.1f} pts | Pitchers {p_vs_25:+.1f} pts"
-    )
+    print(f"2026 Proj vs 2023-2025 Blend: Hitters {h_vs_blend:+.1f} pts | Pitchers {p_vs_blend:+.1f} pts")
+    print(f"2026 Proj vs 2025 Only:       Hitters {h_vs_25:+.1f} pts | Pitchers {p_vs_25:+.1f} pts")
     print("-" * 90)
 
 
@@ -2811,20 +2168,8 @@ def run_player_checks(load_seasons: list = None):
         load_pitcher_file="player-stats-Pitching.csv",
     )
 
-    BATTERS_TO_CHECK = [
-        "Tyler Black",
-        "William Contreras",
-        "Jackson Chourio",
-        "Cal Raleigh",
-        "Will Smith",
-    ]
-    PITCHERS_TO_CHECK = [
-        "Freddy Peralta",
-        "Logan Webb",
-        "Jared Jones",
-        "Tobias Myers",
-        "Will Smith",
-    ]
+    BATTERS_TO_CHECK = ["Tyler Black", "William Contreras", "Jackson Chourio", "Cal Raleigh", "Will Smith"]
+    PITCHERS_TO_CHECK = ["Freddy Peralta", "Logan Webb", "Jared Jones", "Tobias Myers", "Will Smith"]
 
     B_HDR = f"{'Season':<10}{'Team':<6}{'Age':>4}{'G':>5}{'AB':>6}{'H':>5}{'2B':>4}{'3B':>4}{'HR':>4}{'BB':>5}{'SO':>5}{'AVG':>7}{'OBP':>7}{'SLG':>7}{'OPS':>7}  Method"
     P_HDR = f"{'Season':<10}{'Team':<6}{'Age':>4}{'G':>5}{'GS':>5}{'IP':>7}{'H':>5}{'ER':>5}{'BB':>5}{'SO':>5}{'K/9':>7}{'WHIP':>7}{'ERA':>7}  Method"
@@ -2870,11 +2215,7 @@ def run_player_checks(load_seasons: list = None):
         if "Player" not in df.columns:
             return df[df.index.astype(str).str.contains(name, case=False)]
         reset = df.reset_index()
-        return (
-            reset[reset["Player"] == name]
-            if "Player" in reset.columns
-            else pd.DataFrame()
-        )
+        return reset[reset["Player"] == name] if "Player" in reset.columns else pd.DataFrame()
 
     seasons_str = " ".join(str(s) for s in baseball_data.load_seasons)
     try:
@@ -2888,9 +2229,7 @@ def run_player_checks(load_seasons: list = None):
         print(f"\n{SEP}\n  BATTER CHECK: {player_name.upper()}\n{SEP}")
         print(f"--- Historical Actuals ---\n{B_HDR}")
         if not hist_bat_df.empty:
-            p_hist = hist_bat_df[hist_bat_df["Player"] == player_name].sort_values(
-                "Season"
-            )
+            p_hist = hist_bat_df[hist_bat_df["Player"] == player_name].sort_values("Season")
             for _, r in p_hist.iterrows():
                 print(_fmt_batting_row(r))
         player_proj = _find_player(baseball_data.batting_data, player_name)
@@ -2903,9 +2242,7 @@ def run_player_checks(load_seasons: list = None):
         print(f"\n{SEP}\n  PITCHER CHECK: {player_name.upper()}\n{SEP}")
         print(f"--- Historical Actuals ---\n{P_HDR}")
         if not hist_pit_df.empty:
-            p_hist = hist_pit_df[hist_pit_df["Player"] == player_name].sort_values(
-                "Season"
-            )
+            p_hist = hist_pit_df[hist_pit_df["Player"] == player_name].sort_values("Season")
             for _, r in p_hist.iterrows():
                 print(_fmt_pitching_row(r))
         player_proj = _find_player(baseball_data.pitching_data, player_name)

@@ -1,10 +1,7 @@
 """
---- Copyright Notice ---
 Copyright (c) 2024 Jim Maastricht
 
 Playoff widget for baseball season simulation UI.
-
-Displays World Series games with structured data, collapsible sections, and box scores.
 """
 
 import tkinter as tk
@@ -23,23 +20,10 @@ def _get_attr(obj, key, default=None):
 
 
 class PlayoffWidget:
-    """
-    Playoff widget showing playoff games with structured data.
-
-    Features:
-    - Table view of all playoff games
-    - Series score tracking
-    - Score by inning
-    - Box scores for completed games
-    """
+    """Playoff widget showing playoff games with structured data."""
 
     def __init__(self, parent: tk.Widget):
-        """
-        Initialize playoff widget.
-
-        Args:
-            parent: Parent tkinter widget (notebook or frame)
-        """
+        """Initialize playoff widget."""
         self.frame = tk.Frame(parent, bg=BG_PANEL)
         self.ws_active = False
         self.ws_info = {}

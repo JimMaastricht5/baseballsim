@@ -1,12 +1,3 @@
-"""
---- Copyright Notice ---
-Copyright (c) 2024 Jim Maastricht
-
-PySide6 UI package for baseball season simulation.
-
-This package provides a graphical user interface for the baseball simulator,
-replacing terminal output with interactive displays for standings, schedules,
-game results, injuries, and AI GM assessments.
-"""
+"""Tkinter UI package for baseball season simulation."""
 
 __version__ = "1.0.0"

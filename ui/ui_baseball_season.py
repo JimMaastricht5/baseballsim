@@ -1,11 +1,7 @@
 """
---- Copyright Notice ---
 Copyright (c) 2024 Jim Maastricht
 
-UI-aware subclass of BaseballSeason that uses queue-based signals instead of printing.
-
-This class overrides specific methods from BaseballSeason to emit queue-based signals
-for UI updates while preserving all simulation logic.
+UI-aware BaseballSeason subclass that emits queue-based signals instead of printing.
 """
 
 import pandas as pd
@@ -54,10 +50,7 @@ class UIBaseballSeason(bbseason.BaseballSeason):
         # Create play-by-play callback factory for game-level real-time updates
         play_by_play_factory = self._create_play_by_play_callback
         super().__init__(
-            *args,
-            output_handler=output_handler,
-            play_by_play_callback_factory=play_by_play_factory,
-            **kwargs,
+            *args, output_handler=output_handler, play_by_play_callback_factory=play_by_play_factory, **kwargs
         )
         self.signals = signals
         # Track World Series state for play-by-play game numbering
@@ -121,9 +114,7 @@ class UIBaseballSeason(bbseason.BaseballSeason):
 
         return handler
 
-    def _create_play_by_play_callback(
-        self, away_team: str, home_team: str, day_num: int
-    ):
+    def _create_play_by_play_callback(self, away_team: str, home_team: str, day_num: int):
         """
         Create a callback function for emitting play-by-play during game simulation.
 
@@ -141,30 +132,18 @@ class UIBaseballSeason(bbseason.BaseballSeason):
             if self.season_chatty is False:
                 return
 
-            logger.debug(
-                f"Callback invoked for {away_team} @ {home_team}, team_to_follow={self.team_to_follow}"
-            )
+            logger.debug(f"Callback invoked for {away_team} @ {home_team}, team_to_follow={self.team_to_follow}")
             # Only emit if this involves a followed team
-            if not self.team_to_follow or any(
-                team in self.team_to_follow for team in [away_team, home_team]
-            ):
+            if not self.team_to_follow or any(team in self.team_to_follow for team in [away_team, home_team]):
                 logger.debug(f"Emitting play-by-play for {away_team} @ {home_team}")
 
                 # Calculate World Series game number if WS is active
                 ws_game_num = None
                 if self.ws_active and self.ws_al_winner and self.ws_nl_winner:
                     # Total games completed = total new wins by both teams
-                    al_wins = (
-                        self.team_win_loss[self.ws_al_winner][WIN]
-                        - self.ws_al_start_wins
-                    )
-                    nl_wins = (
-                        self.team_win_loss[self.ws_nl_winner][WIN]
-                        - self.ws_nl_start_wins
-                    )
-                    ws_game_num = (
-                        al_wins + nl_wins + 1
-                    )  # +1 for current game in progress
+                    al_wins = self.team_win_loss[self.ws_al_winner][WIN] - self.ws_al_start_wins
+                    nl_wins = self.team_win_loss[self.ws_nl_winner][WIN] - self.ws_nl_start_wins
+                    ws_game_num = al_wins + nl_wins + 1  # +1 for current game in progress
                     logger.info(
                         f"World Series game {ws_game_num}: {self.ws_al_winner} {al_wins}, {self.ws_nl_winner} {nl_wins}"
                     )
@@ -179,7 +158,7 @@ class UIBaseballSeason(bbseason.BaseballSeason):
                     }
                 )
             else:
-                logger.info(f"Skipping play-by-play - teams not in follow list")
+                logger.info("Skipping play-by-play - teams not in follow list")
 
         return callback
 
@@ -200,14 +179,7 @@ class UIBaseballSeason(bbseason.BaseballSeason):
         for result in game_results:
             # Handle both old format (5 elements) and new format (6 elements with structured_game)
             if len(result) == 6:
-                (
-                    match_up,
-                    score,
-                    game_recap,
-                    away_box_score,
-                    home_box_score,
-                    structured_game,
-                ) = result
+                (match_up, score, game_recap, away_box_score, home_box_score, structured_game) = result
             else:
                 match_up, score, game_recap, away_box_score, home_box_score = result
                 structured_game = None
@@ -236,9 +208,7 @@ class UIBaseballSeason(bbseason.BaseballSeason):
             compact_summaries.append(game_data)
 
             # Also track followed team games separately for game_completed signal
-            if self.team_to_follow and any(
-                team in self.team_to_follow for team in [away_team, home_team]
-            ):
+            if self.team_to_follow and any(team in self.team_to_follow for team in [away_team, home_team]):
                 followed_game_data.append(game_data)
 
         # Emit game_completed for followed team games (immediate update for play-by-play widget)
@@ -251,9 +221,7 @@ class UIBaseballSeason(bbseason.BaseballSeason):
         for g in compact_summaries:
             logger.debug(f"  day_completed game: {g['away_team']}@{g['home_team']}")
         self.signals.emit_day_completed(compact_summaries, standings_data, self.season_day_num)
-        logger.debug(
-            f"Emitted day_completed with {len(compact_summaries)} games and standings"
-        )
+        logger.debug(f"Emitted day_completed with {len(compact_summaries)} games and standings")
 
     def check_gm_assessments(self, force: bool = False) -> None:
         """
@@ -295,9 +263,7 @@ class UIBaseballSeason(bbseason.BaseballSeason):
                 should_report = teams_to_print is None or team_name in teams_to_print
 
                 # Run GM assessment (with should_print=False to suppress console output)
-                logger.info(
-                    f"Running GM assessment for {team_name} after {games_played} games"
-                )
+                logger.info(f"Running GM assessment for {team_name} after {games_played} games")
                 assessment = gm.assess_roster(
                     baseball_stats=self.baseball_data,
                     team_record=(wins, losses),
@@ -358,15 +324,11 @@ class UIBaseballSeason(bbseason.BaseballSeason):
         if hasattr(self.baseball_data, "batting_data"):
             cols = self.baseball_data.batting_data.columns
             if "League" in cols and "Division" in cols:
-                team_df = self.baseball_data.batting_data[
-                    ["Team", "League", "Division"]
-                ].drop_duplicates()
+                team_df = self.baseball_data.batting_data[["Team", "League", "Division"]].drop_duplicates()
                 team_league_map = dict(zip(team_df["Team"], team_df["League"]))
                 team_division_map = dict(zip(team_df["Team"], team_df["Division"]))
             elif "League" in cols:
-                team_df = self.baseball_data.batting_data[
-                    ["Team", "League"]
-                ].drop_duplicates()
+                team_df = self.baseball_data.batting_data[["Team", "League"]].drop_duplicates()
                 team_league_map = dict(zip(team_df["Team"], team_df["League"]))
 
         for team in self.team_win_loss:
@@ -378,31 +340,17 @@ class UIBaseballSeason(bbseason.BaseballSeason):
                 leaguel.append(team_league_map.get(team, "AL"))
                 divisionl.append(team_division_map.get(team, "East"))
 
-        df = pd.DataFrame(
-            {
-                "Team": teaml,
-                "W": winl,
-                "L": lossl,
-                "League": leaguel,
-                "Division": divisionl,
-            }
-        )
+        df = pd.DataFrame({"Team": teaml, "W": winl, "L": lossl, "League": leaguel, "Division": divisionl})
         df["Pct"] = (df["W"] / (df["W"] + df["L"])).fillna(0.0)
 
         def calculate_gb(group_df):
             if len(group_df) == 0:
                 return group_df
-            group_df = group_df.sort_values(
-                ["W", "L"], ascending=[False, True]
-            ).reset_index(drop=True)
+            group_df = group_df.sort_values(["W", "L"], ascending=[False, True]).reset_index(drop=True)
             max_wins = group_df["W"].iloc[0]
             leader_losses = group_df["L"].iloc[0]
-            group_df["GB"] = (
-                (max_wins - group_df["W"]) + (group_df["L"] - leader_losses)
-            ) / 2.0
-            group_df["GB"] = group_df["GB"].apply(
-                lambda x: "-" if x == 0 else f"{x:.1f}"
-            )
+            group_df["GB"] = ((max_wins - group_df["W"]) + (group_df["L"] - leader_losses)) / 2.0
+            group_df["GB"] = group_df["GB"].apply(lambda x: "-" if x == 0 else f"{x:.1f}")
             return group_df
 
         result = {}
@@ -411,9 +359,7 @@ class UIBaseballSeason(bbseason.BaseballSeason):
             result[key] = {}
             league_df = df[df["League"] == league]
             for division in ("East", "Central", "West"):
-                div_df = calculate_gb(
-                    league_df[league_df["Division"] == division].copy()
-                )
+                div_df = calculate_gb(league_df[league_df["Division"] == division].copy())
                 result[key][division] = {
                     "teams": div_df["Team"].tolist(),
                     "wins": div_df["W"].tolist(),
@@ -501,7 +447,7 @@ class UIBaseballSeason(bbseason.BaseballSeason):
         """
         # Check if we're in playoffs
         regular_season_days = len(self.schedule_manager._schedule_dates)
-        
+
         if day >= regular_season_days:
             # Use playoff schedule
             playoff_index = day - regular_season_days
@@ -510,6 +456,7 @@ class UIBaseballSeason(bbseason.BaseballSeason):
                 # Get date for playoff day
                 date_str = self.schedule_manager.get_playoff_date(playoff_index)
                 from datetime import datetime
+
                 dt = datetime.strptime(date_str, "%Y-%m-%d")
                 date_display = dt.strftime("%B %d, %Y")
             else:
@@ -518,22 +465,23 @@ class UIBaseballSeason(bbseason.BaseballSeason):
         else:
             # Regular season
             day_obj = self.schedule_manager.get_day(day)
-            if day_obj and hasattr(day_obj, 'games'):
+            if day_obj and hasattr(day_obj, "games"):
                 todays_games = day_obj.games
             else:
                 todays_games = []
             date_str = self.get_date_for_day(day)
             from datetime import datetime
+
             try:
                 dt = datetime.strptime(date_str, "%m/%d/%Y")
                 date_display = dt.strftime("%B %d, %Y")
             except:
                 date_display = date_str
-            
+
         schedule_lines = []
 
         for game in todays_games:
-            if hasattr(game, 'is_off_day') and game.is_off_day:
+            if hasattr(game, "is_off_day") and game.is_off_day:
                 off_team = game.home if game.home != "OFF DAY" else game.away
                 schedule_lines.append(f"{off_team} has an OFF DAY")
             elif game == "OFF DAY" or (isinstance(game, (list, tuple)) and "OFF DAY" in game):
@@ -541,9 +489,9 @@ class UIBaseballSeason(bbseason.BaseballSeason):
                 schedule_lines.append(f"{off_team} has an OFF DAY")
             else:
                 # Handle both formats
-                if hasattr(game, 'away'):
+                if hasattr(game, "away"):
                     # Include round name for playoff games
-                    if hasattr(game, 'round_name'):
+                    if hasattr(game, "round_name"):
                         schedule_lines.append(f"{game.away} @ {game.home} ({game.round_name})")
                     else:
                         schedule_lines.append(f"{game.away} @ {game.home}")

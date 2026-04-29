@@ -1,10 +1,7 @@
 """
---- Copyright Notice ---
 Copyright (c) 2024 Jim Maastricht
 
 GM Assessment Dialog for tkinter UI.
-
-Displays comprehensive AI GM roster assessment in a formatted dialog window.
 """
 
 import tkinter as tk
@@ -15,37 +12,20 @@ from bblogger import logger
 
 
 class GMAssessmentDialog:
-    """
-    Dialog window for displaying AI GM roster assessments.
-
-    Shows team strategy, top players, trade recommendations, and roster moves
-    in a formatted, scrollable text widget. Provides copy-to-clipboard functionality.
-    """
+    """Dialog window for displaying AI GM roster assessments."""
 
     def __init__(self, parent: tk.Tk, assessment_data: Dict[str, Any]):
-        """
-        Initialize and display the GM assessment dialog.
-
-        Args:
-            parent: Parent tkinter window
-            assessment_data: Dictionary containing:
-                - team: Team abbreviation
-                - games_played: Number of games into season
-                - wins: Win count
-                - losses: Loss count
-                - games_back: Games behind leader
-                - assessment: Assessment dict with strategy, roster_values, recommendations
-        """
+        """Initialize and display the GM assessment dialog."""
         self.parent = parent
         self.assessment_data = assessment_data
 
         # Extract key info
-        self.team = assessment_data.get('team', 'Unknown')
-        self.games_played = assessment_data.get('games_played', 0)
-        self.wins = assessment_data.get('wins', 0)
-        self.losses = assessment_data.get('losses', 0)
-        self.games_back = assessment_data.get('games_back', 0.0)
-        self.assessment = assessment_data.get('assessment', {})
+        self.team = assessment_data.get("team", "Unknown")
+        self.games_played = assessment_data.get("games_played", 0)
+        self.wins = assessment_data.get("wins", 0)
+        self.losses = assessment_data.get("losses", 0)
+        self.games_back = assessment_data.get("games_back", 0.0)
+        self.assessment = assessment_data.get("assessment", {})
 
         # Create dialog window
         self.dialog = tk.Toplevel(parent)
@@ -71,24 +51,15 @@ class GMAssessmentDialog:
         main_frame.pack(fill=tk.BOTH, expand=True)
 
         # Header label
-        header_text = (f"{self.team} - After {self.games_played} Games "
-                      f"({self.wins}-{self.losses}, GB: {self.games_back:.1f})")
-        header_label = tk.Label(
-            main_frame,
-            text=header_text,
-            font=("Courier", 12, "bold"),
-            bg="#e0e0e0",
-            pady=5
+        header_text = (
+            f"{self.team} - After {self.games_played} Games ({self.wins}-{self.losses}, GB: {self.games_back:.1f})"
         )
+        header_label = tk.Label(main_frame, text=header_text, font=("Courier", 12, "bold"), bg="#e0e0e0", pady=5)
         header_label.pack(fill=tk.X)
 
         # Scrolled text widget for assessment
         self.text_widget = scrolledtext.ScrolledText(
-            main_frame,
-            font=("Courier", 10),
-            wrap=tk.WORD,
-            width=100,
-            height=35
+            main_frame, font=("Courier", 10), wrap=tk.WORD, width=100, height=35
         )
         self.text_widget.pack(fill=tk.BOTH, expand=True, pady=(5, 0))
 
@@ -103,28 +74,18 @@ class GMAssessmentDialog:
         button_frame.pack(fill=tk.X, pady=(5, 0))
 
         # Copy to Clipboard button
-        copy_btn = tk.Button(
-            button_frame,
-            text="Copy to Clipboard",
-            command=self._copy_to_clipboard,
-            width=20
-        )
+        copy_btn = tk.Button(button_frame, text="Copy to Clipboard", command=self._copy_to_clipboard, width=20)
         copy_btn.pack(side=tk.LEFT, padx=5)
 
         # Close button
-        close_btn = tk.Button(
-            button_frame,
-            text="Close",
-            command=self.dialog.destroy,
-            width=20
-        )
+        close_btn = tk.Button(button_frame, text="Close", command=self.dialog.destroy, width=20)
         close_btn.pack(side=tk.RIGHT, padx=5)
 
     def _display_assessment(self):
         """Format and display the assessment in the text widget."""
-        strategy = self.assessment.get('strategy')
-        roster_values = self.assessment.get('roster_values', {'batters': [], 'pitchers': []})
-        recommendations = self.assessment.get('recommendations', {})
+        strategy = self.assessment.get("strategy")
+        roster_values = self.assessment.get("roster_values", {"batters": [], "pitchers": []})
+        recommendations = self.assessment.get("recommendations", {})
 
         if not strategy:
             self.text_widget.insert(tk.END, "No assessment data available.\n")
@@ -135,10 +96,10 @@ class GMAssessmentDialog:
         self._insert_total_salary(roster_values)
         self._insert_strategy(strategy)
         self._insert_top_players(roster_values)
-        self._insert_trade_candidates(recommendations.get('trade_away', []))
-        self._insert_trade_targets(recommendations.get('trade_targets', []))
-        self._insert_specific_targets(recommendations.get('specific_targets', []))
-        self._insert_release_candidates(recommendations.get('release', []))
+        self._insert_trade_candidates(recommendations.get("trade_away", []))
+        self._insert_trade_targets(recommendations.get("trade_targets", []))
+        self._insert_specific_targets(recommendations.get("specific_targets", []))
+        self._insert_release_candidates(recommendations.get("release", []))
         self._insert_footer()
 
         # Make read-only
@@ -163,9 +124,9 @@ class GMAssessmentDialog:
 
     def _insert_total_salary(self, roster_values):
         """Insert total team salary section."""
-        all_players = roster_values.get('batters', []) + roster_values.get('pitchers', [])
-        total_salary = sum(player.salary for player in all_players if hasattr(player, 'salary'))
-        self.text_widget.insert(tk.END, f"TOTAL TEAM SALARY: ${total_salary/1e6:.1f}M\n", "header")
+        all_players = roster_values.get("batters", []) + roster_values.get("pitchers", [])
+        total_salary = sum(player.salary for player in all_players if hasattr(player, "salary"))
+        self.text_widget.insert(tk.END, f"TOTAL TEAM SALARY: ${total_salary / 1e6:.1f}M\n", "header")
         self.text_widget.insert(tk.END, "\n")
 
     def _insert_top_players(self, roster_values):
@@ -174,7 +135,7 @@ class GMAssessmentDialog:
         self.text_widget.insert(tk.END, "(Value = weighted blend of current season + projected avg WAR)\n\n")
 
         # Combine and sort all players
-        all_players = roster_values.get('batters', []) + roster_values.get('pitchers', [])
+        all_players = roster_values.get("batters", []) + roster_values.get("pitchers", [])
         all_players.sort(key=lambda x: x.total_value, reverse=True)
 
         if not all_players:
@@ -182,11 +143,13 @@ class GMAssessmentDialog:
             return
 
         for i, player in enumerate(all_players[:5], 1):
-            line = (f"{i}. {player.player_name:20s} ({player.position:5s}, Age {player.age:2d}): "
-                   f"Value={player.total_value:5.2f} "
-                   f"(Sim_WAR={player.sim_war:4.2f}, Current={player.immediate_value:4.2f}, "
-                   f"Future Avg={player.future_value:4.2f}/yr) "
-                   f"${player.salary/1e6:6.2f}M\n")
+            line = (
+                f"{i}. {player.player_name:20s} ({player.position:5s}, Age {player.age:2d}): "
+                f"Value={player.total_value:5.2f} "
+                f"(Sim_WAR={player.sim_war:4.2f}, Current={player.immediate_value:4.2f}, "
+                f"Future Avg={player.future_value:4.2f}/yr) "
+                f"${player.salary / 1e6:6.2f}M\n"
+            )
             self.text_widget.insert(tk.END, line, "value")
 
         self.text_widget.insert(tk.END, "\n")
@@ -225,9 +188,11 @@ class GMAssessmentDialog:
         self.text_widget.insert(tk.END, "SPECIFIC PLAYERS TO TARGET:\n", "section")
 
         for i, target in enumerate(specific_targets_list[:5], 1):
-            line = (f"{i}. {target['player']:20s} "
-                   f"({target['team']}, {target['position']:6s}, Age {target['age']:2d}) - "
-                   f"{target['reason']}\n")
+            line = (
+                f"{i}. {target['player']:20s} "
+                f"({target['team']}, {target['position']:6s}, Age {target['age']:2d}) - "
+                f"{target['reason']}\n"
+            )
             self.text_widget.insert(tk.END, line, "value")
 
         self.text_widget.insert(tk.END, "\n")
@@ -240,11 +205,13 @@ class GMAssessmentDialog:
         self.text_widget.insert(tk.END, "RELEASE CANDIDATES:\n", "section")
 
         for i, release in enumerate(release_list[:3], 1):
-            sim_war = release.get('sim_war', 0.0)
-            immediate_value = release.get('immediate_value', 0.0)
-            line = (f"{i}. {release['player']:20s} - "
-                   f"Sim_WAR: {sim_war:4.2f}, Value: {immediate_value:4.2f}\n"
-                   f"   {release['reason']}\n")
+            sim_war = release.get("sim_war", 0.0)
+            immediate_value = release.get("immediate_value", 0.0)
+            line = (
+                f"{i}. {release['player']:20s} - "
+                f"Sim_WAR: {sim_war:4.2f}, Value: {immediate_value:4.2f}\n"
+                f"   {release['reason']}\n"
+            )
             self.text_widget.insert(tk.END, line, "warning")
 
         self.text_widget.insert(tk.END, "\n")
@@ -265,28 +232,14 @@ class GMAssessmentDialog:
             self.dialog.clipboard_append(text_content)
 
             # Show confirmation
-            messagebox.showinfo(
-                "Copied",
-                "Assessment copied to clipboard!",
-                parent=self.dialog
-            )
+            messagebox.showinfo("Copied", "Assessment copied to clipboard!", parent=self.dialog)
             logger.debug("Assessment copied to clipboard")
 
         except Exception as e:
             logger.error(f"Error copying to clipboard: {e}")
-            messagebox.showerror(
-                "Error",
-                f"Failed to copy to clipboard: {str(e)}",
-                parent=self.dialog
-            )
+            messagebox.showerror("Error", f"Failed to copy to clipboard: {str(e)}", parent=self.dialog)
 
 
 def show_gm_assessment(parent: tk.Tk, assessment_data: Dict[str, Any]):
-    """
-    Factory function to create and show GM assessment dialog.
-
-    Args:
-        parent: Parent tkinter window
-        assessment_data: Assessment data dictionary
-    """
+    """Factory function to create and show GM assessment dialog."""
     GMAssessmentDialog(parent, assessment_data)

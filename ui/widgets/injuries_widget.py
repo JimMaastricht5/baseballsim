@@ -1,10 +1,7 @@
 """
---- Copyright Notice ---
 Copyright (c) 2024 Jim Maastricht
 
 Injuries widget for baseball season simulation UI.
-
-Displays league-wide injury list with sorting and team filtering.
 """
 
 import tkinter as tk
@@ -16,23 +13,10 @@ from ui.theme import BG_PANEL, TEXT_PRIMARY, TEXT_HEADING, ROW_IL, ROW_DTD
 
 
 class InjuriesWidget:
-    """
-    Injuries widget showing league-wide IL report.
-
-    Features:
-    - Sortable treeview by any column
-    - Team filter dropdown
-    - Color-coded by injury severity (IL vs Day-to-Day)
-    - Displays player, team, position, injury, and status
-    """
+    """Injuries widget showing league-wide IL report."""
 
     def __init__(self, parent: tk.Widget):
-        """
-        Initialize injuries widget.
-
-        Args:
-            parent: Parent tkinter widget (notebook or frame)
-        """
+        """Initialize injuries widget."""
         self.frame = tk.Frame(parent, bg=BG_PANEL)
 
         # Data caching for sorting/filtering
@@ -45,8 +29,7 @@ class InjuriesWidget:
         injuries_header_frame.pack(fill=tk.X, pady=5)
 
         self.injuries_header_label = tk.Label(
-            injuries_header_frame, text="League IL Report",
-            font=("Segoe UI", 11, "bold"), bg=BG_PANEL, fg=TEXT_HEADING
+            injuries_header_frame, text="League IL Report", font=("Segoe UI", 11, "bold"), bg=BG_PANEL, fg=TEXT_HEADING
         )
         self.injuries_header_label.pack()
 
@@ -54,17 +37,15 @@ class InjuriesWidget:
         injuries_control_frame = tk.Frame(self.frame, bg=BG_PANEL)
         injuries_control_frame.pack(fill=tk.X, padx=10, pady=5)
 
-        tk.Label(injuries_control_frame, text="Team:", font=("Segoe UI", 10, "bold"),
-                 bg=BG_PANEL, fg=TEXT_PRIMARY).pack(side=tk.LEFT, padx=5)
+        tk.Label(
+            injuries_control_frame, text="Team:", font=("Segoe UI", 10, "bold"), bg=BG_PANEL, fg=TEXT_PRIMARY
+        ).pack(side=tk.LEFT, padx=5)
         self.injuries_team_var = tk.StringVar(value="All Teams")
         self.injuries_team_combo = ttk.Combobox(
-            injuries_control_frame,
-            textvariable=self.injuries_team_var,
-            width=15,
-            state="readonly"
+            injuries_control_frame, textvariable=self.injuries_team_var, width=15, state="readonly"
         )
-        self.injuries_team_combo['values'] = ['All Teams']  # Populated later
-        self.injuries_team_combo.bind('<<ComboboxSelected>>', self._on_team_changed)
+        self.injuries_team_combo["values"] = ["All Teams"]  # Populated later
+        self.injuries_team_combo.bind("<<ComboboxSelected>>", self._on_team_changed)
         self.injuries_team_combo.pack(side=tk.LEFT, padx=5)
 
         # Create Treeview for injuries
@@ -79,7 +60,7 @@ class InjuriesWidget:
             columns=("player", "team", "pos", "injury", "status"),
             show="headings",
             height=20,
-            yscrollcommand=injuries_scrollbar.set
+            yscrollcommand=injuries_scrollbar.set,
         )
         injuries_scrollbar.config(command=self.injuries_tree.yview)
 
@@ -119,7 +100,7 @@ class InjuriesWidget:
         # Apply team filter
         selected_team = self.injuries_team_var.get()
         if selected_team != "All Teams":
-            filtered_list = [inj for inj in injury_list if inj['team'] == selected_team]
+            filtered_list = [inj for inj in injury_list if inj["team"] == selected_team]
         else:
             filtered_list = injury_list
 
@@ -136,13 +117,13 @@ class InjuriesWidget:
 
         # Insert injury data
         for injury in filtered_list:
-            days = injury['days_remaining']
+            days = injury["days_remaining"]
 
             # Clean up position formatting (remove brackets and quotes)
-            pos = injury['position']
+            pos = injury["position"]
             if isinstance(pos, list):
-                pos = pos[0] if pos else 'Unknown'
-            pos = str(pos).replace('[', '').replace(']', '').replace("'", '').replace('"', '').strip()
+                pos = pos[0] if pos else "Unknown"
+            pos = str(pos).replace("[", "").replace("]", "").replace("'", "").replace('"', "").strip()
 
             # Create descriptive status based on days remaining
             if days >= 60:
@@ -158,16 +139,7 @@ class InjuriesWidget:
             tags = (tag_status,)  # Use tag status for color coding
 
             self.injuries_tree.insert(
-                "",
-                tk.END,
-                values=(
-                    injury['player'],
-                    injury['team'],
-                    pos,
-                    injury['injury'],
-                    status_text
-                ),
-                tags=tags
+                "", tk.END, values=(injury["player"], injury["team"], pos, injury["injury"], status_text), tags=tags
             )
 
     def populate_team_filter(self, team_names: List[str]):
@@ -177,8 +149,8 @@ class InjuriesWidget:
         Args:
             team_names: List of team abbreviations
         """
-        all_teams = ['All Teams'] + sorted(team_names)
-        self.injuries_team_combo['values'] = all_teams
+        all_teams = ["All Teams"] + sorted(team_names)
+        self.injuries_team_combo["values"] = all_teams
 
     def _sort_injuries(self, column: str):
         """
@@ -204,21 +176,21 @@ class InjuriesWidget:
         # Apply team filter first
         selected_team = self.injuries_team_var.get()
         if selected_team != "All Teams":
-            data = [inj for inj in self.injuries_data_cache if inj['team'] == selected_team]
+            data = [inj for inj in self.injuries_data_cache if inj["team"] == selected_team]
         else:
             data = self.injuries_data_cache.copy()
 
         if column == "player":
-            data.sort(key=lambda x: x['player'], reverse=self.injuries_sort_reverse)
+            data.sort(key=lambda x: x["player"], reverse=self.injuries_sort_reverse)
         elif column == "team":
-            data.sort(key=lambda x: x['team'], reverse=self.injuries_sort_reverse)
+            data.sort(key=lambda x: x["team"], reverse=self.injuries_sort_reverse)
         elif column == "pos":
-            data.sort(key=lambda x: x['position'], reverse=self.injuries_sort_reverse)
+            data.sort(key=lambda x: x["position"], reverse=self.injuries_sort_reverse)
         elif column == "injury":
-            data.sort(key=lambda x: x['injury'], reverse=self.injuries_sort_reverse)
+            data.sort(key=lambda x: x["injury"], reverse=self.injuries_sort_reverse)
         elif column == "status":
             # Sort by days_remaining for status column (since status is now "10-Day IL", "60-Day IL", etc.)
-            data.sort(key=lambda x: x['days_remaining'], reverse=self.injuries_sort_reverse)
+            data.sort(key=lambda x: x["days_remaining"], reverse=self.injuries_sort_reverse)
 
         # Update header with filtered count
         selected_team = self.injuries_team_var.get()
@@ -233,13 +205,13 @@ class InjuriesWidget:
             self.injuries_tree.delete(item)
 
         for injury in data:
-            days = injury['days_remaining']
+            days = injury["days_remaining"]
 
             # Clean up position formatting (remove brackets and quotes)
-            pos = injury['position']
+            pos = injury["position"]
             if isinstance(pos, list):
-                pos = pos[0] if pos else 'Unknown'
-            pos = str(pos).replace('[', '').replace(']', '').replace("'", '').replace('"', '').strip()
+                pos = pos[0] if pos else "Unknown"
+            pos = str(pos).replace("[", "").replace("]", "").replace("'", "").replace('"', "").strip()
 
             # Create descriptive status based on days remaining
             if days >= 60:
@@ -255,16 +227,7 @@ class InjuriesWidget:
             tags = (tag_status,)
 
             self.injuries_tree.insert(
-                "",
-                tk.END,
-                values=(
-                    injury['player'],
-                    injury['team'],
-                    pos,
-                    injury['injury'],
-                    status_text
-                ),
-                tags=tags
+                "", tk.END, values=(injury["player"], injury["team"], pos, injury["injury"], status_text), tags=tags
             )
 
     def _on_team_changed(self, event=None):

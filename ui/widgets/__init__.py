@@ -16,16 +16,16 @@ from .league_leaders_widget import LeagueLeadersWidget
 from .playoff_widget import PlayoffWidget
 
 __all__ = [
-    'ToolbarWidget',
-    'StandingsWidget',
-    'GamesWidget',
-    'ScheduleWidget',
-    'InjuriesWidget',
-    'RosterWidget',
-    'AdminWidget',
-    'GamesPlayedWidget',
-    'GMAssessmentWidget',
-    'LeagueStatsWidget',
-    'LeagueLeadersWidget',
-    'PlayoffWidget',
+    "ToolbarWidget",
+    "StandingsWidget",
+    "GamesWidget",
+    "ScheduleWidget",
+    "InjuriesWidget",
+    "RosterWidget",
+    "AdminWidget",
+    "GamesPlayedWidget",
+    "GMAssessmentWidget",
+    "LeagueStatsWidget",
+    "LeagueLeadersWidget",
+    "PlayoffWidget",
 ]

@@ -1,10 +1,7 @@
 """
---- Copyright Notice ---
 Copyright (c) 2024 Jim Maastricht
 
 Games widget for baseball season simulation UI.
-
-Displays completed game results in a scrollable list (newest first).
 """
 
 import tkinter as tk
@@ -16,14 +13,7 @@ from ui.theme import BG_PANEL, BG_WIDGET, TEXT_PRIMARY, TEXT_HEADING, ACCENT_GOL
 
 
 class GamesWidget:
-    """
-    Games widget showing completed results in scrollable list.
-
-    Features:
-    - Only completed games shown
-    - Newest results at top
-    - Vertical scrollbar for navigation
-    """
+    """Games widget showing completed results in scrollable list."""
 
     def __init__(self, parent: tk.Widget, followed_team: str = None):
         """Initialize games widget."""
@@ -32,8 +22,7 @@ class GamesWidget:
 
         # Header
         header = tk.Label(
-            self.frame, text="Game Results",
-            font=("Segoe UI", 11, "bold"), pady=5, bg=BG_PANEL, fg=TEXT_HEADING
+            self.frame, text="Game Results", font=("Segoe UI", 11, "bold"), pady=5, bg=BG_PANEL, fg=TEXT_HEADING
         )
         header.pack()
 
@@ -47,22 +36,18 @@ class GamesWidget:
             pady=5,
             bg=BG_WIDGET,
             fg=TEXT_PRIMARY,
-            insertbackground=TEXT_PRIMARY
+            insertbackground=TEXT_PRIMARY,
         )
 
         # Configure text tags (matches Schedule widget style)
-        self.results_text.tag_configure("day_header", font=("Segoe UI", 12, "bold"),
-                                        foreground=ACCENT_GOLD, spacing1=5, spacing3=3)
-        self.results_text.tag_configure("rhe_header", font=("Consolas", 9),
-                                        foreground="#888888", lmargin1=10)
-        self.results_text.tag_configure("score", font=("Consolas", 9),
-                                        foreground=TEXT_PRIMARY, lmargin1=5)
-        self.results_text.tag_configure("score_followed", font=("Consolas", 9),
-                                        foreground=ACCENT_GOLD, lmargin1=5)
-        self.results_text.tag_configure("placeholder", font=("Consolas", 9),
-                                        foreground="#666666", lmargin1=5)
-        self.results_text.tag_configure("off_day", font=("Consolas", 9),
-                                        foreground="#666666", lmargin1=5)
+        self.results_text.tag_configure(
+            "day_header", font=("Segoe UI", 12, "bold"), foreground=ACCENT_GOLD, spacing1=5, spacing3=3
+        )
+        self.results_text.tag_configure("rhe_header", font=("Consolas", 9), foreground="#888888", lmargin1=10)
+        self.results_text.tag_configure("score", font=("Consolas", 9), foreground=TEXT_PRIMARY, lmargin1=5)
+        self.results_text.tag_configure("score_followed", font=("Consolas", 9), foreground=ACCENT_GOLD, lmargin1=5)
+        self.results_text.tag_configure("placeholder", font=("Consolas", 9), foreground="#666666", lmargin1=5)
+        self.results_text.tag_configure("off_day", font=("Consolas", 9), foreground="#666666", lmargin1=5)
 
         self.results_text.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
 
@@ -81,12 +66,12 @@ class GamesWidget:
                 if game.completed:
                     key = (day_idx, game.away, game.home)
                     self.completed_games[key] = {
-                        'away_r': game.away_score if game.away_score else 0,
-                        'home_r': game.home_score if game.home_score else 0,
-                        'away_h': 0,
-                        'home_h': 0,
-                        'away_e': 0,
-                        'home_e': 0,
+                        "away_r": game.away_score if game.away_score else 0,
+                        "home_r": game.home_score if game.home_score else 0,
+                        "away_h": 0,
+                        "home_h": 0,
+                        "away_e": 0,
+                        "home_e": 0,
                     }
 
     def set_schedule_dates(self, dates: List[str]):
@@ -109,11 +94,11 @@ class GamesWidget:
         GAMES_PER_ROW = 6
         COLUMN_WIDTH = 15
 
-        if day_index >= len(self.season_schedule) if hasattr(self, 'season_schedule') else True:
+        if day_index >= len(self.season_schedule) if hasattr(self, "season_schedule") else True:
             return []
 
         day_obj = self.season_schedule[day_index]
-        day_games = day_obj.games if hasattr(day_obj, 'games') else []
+        day_games = day_obj.games if hasattr(day_obj, "games") else []
 
         date_str = self._get_date_for_day(day_index)
         lines = [("day_header", f"{date_str}\n")]
@@ -137,7 +122,7 @@ class GamesWidget:
 
         # Process games in chunks
         for chunk_idx in range(0, len(completed_rows), GAMES_PER_ROW):
-            chunk = completed_rows[chunk_idx:chunk_idx + GAMES_PER_ROW]
+            chunk = completed_rows[chunk_idx : chunk_idx + GAMES_PER_ROW]
 
             while len(chunk) < GAMES_PER_ROW:
                 chunk.append((None, None))
@@ -267,20 +252,20 @@ class GamesWidget:
 
     def on_game_completed(self, game_data: Dict[str, Any]):
         """Handle game completion."""
-        day_num = game_data.get('day_num')
+        day_num = game_data.get("day_num")
         if day_num is None:
             day_num = self._current_day
-        away = game_data['away_team']
-        home = game_data['home_team']
+        away = game_data["away_team"]
+        home = game_data["home_team"]
         game_key = (day_num, away, home)
 
         self.completed_games[game_key] = {
-            'away_r': game_data.get('away_r', 0),
-            'home_r': game_data.get('home_r', 0),
-            'away_h': game_data.get('away_h', 0),
-            'home_h': game_data.get('home_h', 0),
-            'away_e': game_data.get('away_e', 0),
-            'home_e': game_data.get('home_e', 0),
+            "away_r": game_data.get("away_r", 0),
+            "home_r": game_data.get("home_r", 0),
+            "away_h": game_data.get("away_h", 0),
+            "home_h": game_data.get("home_h", 0),
+            "away_e": game_data.get("away_e", 0),
+            "home_e": game_data.get("home_e", 0),
         }
 
     def on_day_completed(self, game_results: List[Dict], standings_data: Dict, day_number: int = None):
@@ -289,17 +274,17 @@ class GamesWidget:
 
         # Store all game results
         for game in game_results:
-            day_num = game.get('day_num', update_day)
-            away = game['away_team']
-            home = game['home_team']
+            day_num = game.get("day_num", update_day)
+            away = game["away_team"]
+            home = game["home_team"]
             game_key = (day_num, away, home)
             self.completed_games[game_key] = {
-                'away_r': game.get('away_r', 0),
-                'home_r': game.get('home_r', 0),
-                'away_h': game.get('away_h', 0),
-                'home_h': game.get('home_h', 0),
-                'away_e': game.get('away_e', 0),
-                'home_e': game.get('home_e', 0),
+                "away_r": game.get("away_r", 0),
+                "home_r": game.get("home_r", 0),
+                "away_h": game.get("away_h", 0),
+                "home_h": game.get("home_h", 0),
+                "away_e": game.get("away_e", 0),
+                "home_e": game.get("home_e", 0),
             }
         self._batch_update_day = None
 

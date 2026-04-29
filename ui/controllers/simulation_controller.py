@@ -1,13 +1,9 @@
 """
---- Copyright Notice ---
 Copyright (c) 2024 Jim Maastricht
 
 Simulation controller for baseball season simulation UI.
-
-Manages SeasonWorker lifecycle and simulation state.
 """
 
-import tkinter as tk
 from tkinter import messagebox
 from typing import Callable, Optional
 from ui.season_worker import SeasonWorker
@@ -15,15 +11,7 @@ from bblogger import logger
 
 
 class SimulationController:
-    """
-    Controller for managing season simulation lifecycle.
-
-    Responsibilities:
-    - Create and start SeasonWorker
-    - Control simulation (pause, resume, step)
-    - Manage simulation state
-    - Coordinate initialization callbacks
-    """
+    """Controller for managing season simulation lifecycle."""
 
     def __init__(
         self,
@@ -36,19 +24,7 @@ class SimulationController:
         season_print_lineup_b: bool,
         season_print_box_score_b: bool,
     ):
-        """
-        Initialize simulation controller.
-
-        Args:
-            load_seasons: Years to load stats from
-            new_season: Season year to simulate
-            rotation_len: Pitcher rotation length
-            series_length: Games per series
-            season_length: Games per team
-            season_chatty: Verbose output flag
-            season_print_lineup_b: Print lineup flag
-            season_print_box_score_b: Print box score flag
-        """
+        """Initialize simulation controller."""
         self.load_seasons = load_seasons
         self.new_season = new_season
         self.rotation_len = rotation_len
@@ -80,23 +56,17 @@ class SimulationController:
             bool: True if started successfully, False otherwise
         """
         if self.worker and self.worker.is_alive():
-            messagebox.showwarning(
-                "Already Running", "A season simulation is already running."
-            )
+            messagebox.showwarning("Already Running", "A season simulation is already running.")
             return False
 
         if not selected_team:
-            messagebox.showwarning(
-                "No Team Selected", "Please select a team to follow before starting."
-            )
+            messagebox.showwarning("No Team Selected", "Please select a team to follow before starting.")
             return False
 
         logger.info(f"Starting season simulation, following team: {selected_team}")
 
         # Create worker with simulation parameters (use override if provided)
-        effective_season_length = (
-            season_length if season_length is not None else self.season_length
-        )
+        effective_season_length = season_length if season_length is not None else self.season_length
         self.worker = SeasonWorker(
             self.load_seasons,
             self.new_season,
@@ -186,9 +156,7 @@ class SimulationController:
             return True
         return False
 
-    def run_gm_assessments(
-        self, status_callback: Optional[Callable[[str], None]] = None
-    ) -> bool:
+    def run_gm_assessments(self, status_callback: Optional[Callable[[str], None]] = None) -> bool:
         """
         Force all teams to run GM assessments immediately.
 
@@ -207,8 +175,7 @@ class SimulationController:
                 from tkinter import messagebox
 
                 messagebox.showwarning(
-                    "Pause Required",
-                    "Please pause the simulation before running GM assessments manually.",
+                    "Pause Required", "Please pause the simulation before running GM assessments manually."
                 )
                 if status_callback:
                     status_callback("Pause simulation first to run GM assessments")
@@ -226,9 +193,7 @@ class SimulationController:
                 messagebox.showerror("Error", f"Failed to run GM assessments: {e}")
                 return False
         else:
-            messagebox.showwarning(
-                "Warning", "Simulation must be started before running GM assessments."
-            )
+            messagebox.showwarning("Warning", "Simulation must be started before running GM assessments.")
             return False
 
     def get_worker(self) -> Optional[SeasonWorker]:

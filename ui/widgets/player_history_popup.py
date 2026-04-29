@@ -1,11 +1,7 @@
 """
---- Copyright Notice ---
 Copyright (c) 2024 Jim Maastricht
 
---- File Context and Purpose ---
-SHARED MODULE: Player history popup functionality
-Displays player historical stats, projected stats, and current season stats in a popup.
-Used by roster_widget.py and league_stats_widget.py.
+Player history popup functionality. Used by roster_widget.py and league_stats_widget.py.
 """
 
 import tkinter as tk
@@ -22,21 +18,7 @@ def show_history_popup(
     current_season_row=None,
     current_season: int = None,
 ):
-    """
-    Open a popup window showing player stats:
-    - Projected row at top (from projection files)
-    - Current season accumulated stats
-    - Historical seasons below
-
-    Args:
-        parent: Parent window (for tk.Toplevel)
-        player_name: Player name for window title
-        historical_df: DataFrame with historical stats (excluding current season)
-        is_batter: True for batting columns, False for pitching columns
-        projected_row: Optional Series with projected new-season stats
-        current_season_row: Optional Series with current season accumulated stats
-        current_season: Current season year (e.g., 2026)
-    """
+    """Open a popup window showing player projected, current season, and historical stats."""
     popup = tk.Toplevel(parent)
     popup.title(f"{player_name} - Historical Stats")
     popup.geometry("1100x350")
@@ -90,13 +72,7 @@ def show_history_popup(
     scrollbar = ttk.Scrollbar(tree_frame, orient=tk.VERTICAL)
     scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
 
-    tree = ttk.Treeview(
-        tree_frame,
-        columns=columns,
-        show="headings",
-        height=8,
-        yscrollcommand=scrollbar.set,
-    )
+    tree = ttk.Treeview(tree_frame, columns=columns, show="headings", height=8, yscrollcommand=scrollbar.set)
     scrollbar.config(command=tree.yview)
     tree.tag_configure("projected", foreground="#d4a017")
 

@@ -1,12 +1,7 @@
 """
---- Copyright Notice ---
 Copyright (c) 2024 Jim Maastricht
 
 Dark theme configuration for the baseball simulation UI.
-
-Defines the full color palette and exposes setup_dark_theme() which configures
-all ttk styles globally in a single call.  Individual tk.* widgets still need
-bg/fg set by hand; ttk.* widgets inherit the global styles.
 """
 
 import tkinter as tk
@@ -56,16 +51,7 @@ ROW_DTD = "#2e2a00"  # Dark yellow for day-to-day players
 
 
 def setup_dark_theme(root: tk.Tk) -> None:
-    """
-    Apply the dark theme globally to a tkinter root window.
-
-    Configures the root window background and all ttk styles in one call.
-    Call this before creating any widgets so that the styles are available
-    when widgets are instantiated.
-
-    Args:
-        root: The root tkinter window
-    """
+    """Apply the dark theme globally to a tkinter root window."""
     root.configure(bg=BG_DARK)
 
     style = ttk.Style(root)
@@ -74,11 +60,7 @@ def setup_dark_theme(root: tk.Tk) -> None:
     # ── Notebook (tabs) ───────────────────────────────────────────────────────
     style.configure("TNotebook", background=BG_DARK, borderwidth=0)
     style.configure(
-        "TNotebook.Tab",
-        background=BG_PANEL,
-        foreground=TEXT_SECONDARY,
-        padding=[12, 6],
-        font=("Segoe UI", 10, "bold"),
+        "TNotebook.Tab", background=BG_PANEL, foreground=TEXT_SECONDARY, padding=[12, 6], font=("Segoe UI", 10, "bold")
     )
     style.map(
         "TNotebook.Tab",
@@ -96,26 +78,12 @@ def setup_dark_theme(root: tk.Tk) -> None:
         font=("Segoe UI", 9),
     )
     style.configure(
-        "Treeview.Heading",
-        background=BG_PANEL,
-        foreground=ACCENT_BLUE,
-        font=("Segoe UI", 9, "bold"),
-        relief="flat",
+        "Treeview.Heading", background=BG_PANEL, foreground=ACCENT_BLUE, font=("Segoe UI", 9, "bold"), relief="flat"
     )
-    style.map(
-        "Treeview",
-        background=[("selected", ROW_SELECTED)],
-        foreground=[("selected", TEXT_HEADING)],
-    )
+    style.map("Treeview", background=[("selected", ROW_SELECTED)], foreground=[("selected", TEXT_HEADING)])
 
     # ── Scrollbar ─────────────────────────────────────────────────────────────
-    style.configure(
-        "TScrollbar",
-        background=BG_PANEL,
-        troughcolor=BG_DARK,
-        arrowcolor=TEXT_SECONDARY,
-        borderwidth=0,
-    )
+    style.configure("TScrollbar", background=BG_PANEL, troughcolor=BG_DARK, arrowcolor=TEXT_SECONDARY, borderwidth=0)
 
     # ── Progressbar ───────────────────────────────────────────────────────────
     style.configure("TProgressbar", background=ACCENT_BLUE, troughcolor=BG_DARK)

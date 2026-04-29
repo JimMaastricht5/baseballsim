@@ -1,28 +1,15 @@
 """
---- Copyright Notice ---
 Copyright (c) 2024 Jim Maastricht
 
 Games Played widget for baseball season simulation UI.
-
-Displays formatted game summaries for followed team games using structured data.
 """
 
 import tkinter as tk
 from tkinter import ttk
-from typing import Dict, List, Tuple, Optional, Any
+from typing import List, Tuple, Optional, Any
 from bblogger import logger
 
-from ui.theme import (
-    BG_PANEL,
-    BG_WIDGET,
-    BG_WIDGET_ALT,
-    TEXT_PRIMARY,
-    TEXT_SECONDARY,
-    ACCENT_BLUE,
-    ACCENT_GOLD,
-    TEXT_HEADING,
-)
-from ui.models.game_data import AWAY, HOME, InningScore
+from ui.theme import BG_PANEL, BG_WIDGET, BG_WIDGET_ALT, TEXT_PRIMARY, TEXT_SECONDARY, ACCENT_BLUE, ACCENT_GOLD
 
 
 def _get_attr(obj, key, default=None):

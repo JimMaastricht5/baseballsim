@@ -1,36 +1,22 @@
 """
---- Copyright Notice ---
 Copyright (c) 2024 Jim Maastricht
 
 Schedule widget for baseball season simulation UI.
-
-Displays upcoming games in a formatted text view.
 """
 
 import tkinter as tk
 from tkinter import scrolledtext
 from datetime import datetime
-from typing import List, Tuple, Dict, Any
+from typing import List, Dict, Any
 
 from ui.theme import BG_PANEL, BG_WIDGET, TEXT_PRIMARY, TEXT_HEADING, ACCENT_GOLD
 
 
 class ScheduleWidget:
-    """
-    Schedule widget showing upcoming games.
-
-    Displays next 14 days of games in a scrollable text widget with
-    current day highlighting and formatted matchups.
-    """
+    """Schedule widget showing upcoming games."""
 
     def __init__(self, parent: tk.Widget, followed_team: str = None):
-        """
-        Initialize schedule widget.
-
-        Args:
-            parent: Parent tkinter widget (notebook or frame)
-            followed_team: Team abbreviation to highlight (e.g., 'MIL', 'NYM')
-        """
+        """Initialize schedule widget."""
         self.frame = tk.Frame(parent, bg=BG_PANEL)
         self.followed_team = followed_team
         self.schedule_times = {}  # {(away, home): "7:10 PM"}
@@ -39,8 +25,12 @@ class ScheduleWidget:
 
         # Header
         schedule_header = tk.Label(
-            self.frame, text="Upcoming Games (Next 14 Days)",
-            font=("Segoe UI", 11, "bold"), pady=5, bg=BG_PANEL, fg=TEXT_HEADING
+            self.frame,
+            text="Upcoming Games (Next 14 Days)",
+            font=("Segoe UI", 11, "bold"),
+            pady=5,
+            bg=BG_PANEL,
+            fg=TEXT_HEADING,
         )
         schedule_header.pack()
 
@@ -54,28 +44,35 @@ class ScheduleWidget:
             pady=5,
             bg=BG_WIDGET,
             fg=TEXT_PRIMARY,
-            insertbackground=TEXT_PRIMARY
+            insertbackground=TEXT_PRIMARY,
         )
 
         # Configure text tags for formatting
-        self.schedule_text.tag_configure("day_header", font=("Segoe UI", 12, "bold"),
-                                        foreground=ACCENT_GOLD, spacing1=5, spacing3=3)
-        self.schedule_text.tag_configure("current_day", background="#1f3010",
-                                        font=("Segoe UI", 12, "bold"), foreground=ACCENT_GOLD,
-                                        spacing1=5, spacing3=3)
-        self.schedule_text.tag_configure("matchup", font=("Consolas", 9),
-                                        lmargin1=20, lmargin2=20)
-        self.schedule_text.tag_configure("bold_team", font=("Consolas", 10, "bold"),
-                                        lmargin1=20, lmargin2=20, foreground=ACCENT_GOLD)
-        self.schedule_text.tag_configure("time", font=("Consolas", 9),
-                                        foreground="#888888")  # Gray for times
-        self.schedule_text.tag_configure("score", font=("Consolas", 9, "bold"),
-                                        foreground=ACCENT_GOLD)  # Gold for scores
+        self.schedule_text.tag_configure(
+            "day_header", font=("Segoe UI", 12, "bold"), foreground=ACCENT_GOLD, spacing1=5, spacing3=3
+        )
+        self.schedule_text.tag_configure(
+            "current_day",
+            background="#1f3010",
+            font=("Segoe UI", 12, "bold"),
+            foreground=ACCENT_GOLD,
+            spacing1=5,
+            spacing3=3,
+        )
+        self.schedule_text.tag_configure("matchup", font=("Consolas", 9), lmargin1=20, lmargin2=20)
+        self.schedule_text.tag_configure(
+            "bold_team", font=("Consolas", 10, "bold"), lmargin1=20, lmargin2=20, foreground=ACCENT_GOLD
+        )
+        self.schedule_text.tag_configure("time", font=("Consolas", 9), foreground="#888888")  # Gray for times
+        self.schedule_text.tag_configure(
+            "score", font=("Consolas", 9, "bold"), foreground=ACCENT_GOLD
+        )  # Gold for scores
 
         self.schedule_text.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
 
-    def update_schedule(self, current_day: int, schedule: List,
-                   schedule_times: Dict = None, schedule_dates: List = None):
+    def update_schedule(
+        self, current_day: int, schedule: List, schedule_times: Dict = None, schedule_dates: List = None
+    ):
         """
         Update the schedule display to show upcoming games.
 

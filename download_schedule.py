@@ -1,15 +1,7 @@
 """
---- Copyright Notice ---
 Copyright (c) 2024 Jim Maastricht
 
---- File Context and Purpose ---
-DESCRIPTION: Downloads MLB schedule from Baseball Reference and saves as CSV.
-The schedule includes game dates, teams, and final scores for each game.
-This can be used to replace randomly generated schedules in the simulation
-with actual MLB schedules for realism.
-
-DEPENDENCIES: requests, pandas, beautifulsoup4
-Contact: JimMaastricht5@gmail.com
+Download and parse MLB schedules from Baseball Reference.
 """
 
 import requests
@@ -21,30 +13,16 @@ from bblogger import logger
 
 
 class ScheduleDownloader:
-    """Downloads and parses MLB schedule from Baseball Reference.
-
-    Attributes:
-        season: Year of the schedule to download
-        schedule_url: URL for the MLB schedule page
-        output_file: Filename for the saved CSV
-    """
+    """Download and parse MLB schedules from Baseball Reference."""
 
     def __init__(self, season: int = 2026):
-        """Initialize the schedule downloader.
-
-        Args:
-            season: Year to download schedule for (default 2026)
-        """
+        """Initialize downloader for a given season."""
         self.season = season
-        self.schedule_url = f"https://www.baseball-reference.com/leagues/MLB-schedule.shtml"
+        self.schedule_url = "https://www.baseball-reference.com/leagues/MLB-schedule.shtml"
         self.output_file = f"{season} MLB Schedule.csv"
 
     def download(self) -> str:
-        """Download the schedule HTML from Baseball Reference.
-
-        Returns:
-            HTML content as string, or None if download failed
-        """
+        """Download schedule HTML from Baseball Reference."""
         try:
             logger.info(f"Downloading {self.season} MLB schedule...")
             headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
@@ -57,18 +35,7 @@ class ScheduleDownloader:
             return None
 
     def parse(self, html: str) -> pd.DataFrame:
-        """Parse schedule HTML into a DataFrame with game data.
-
-        Args:
-            html: HTML content from Baseball Reference schedule page
-
-        Returns:
-            DataFrame with columns: Date, Time, Away_Team, Home_Team, Away_Score, Home_Score
-
-        Note:
-            Completed games have no time data in the HTML. Only future games
-            (shown as "Preview") include start times.
-        """
+        """Parse schedule HTML into a DataFrame with game data."""
         soup = BeautifulSoup(html, "html.parser")
         games = []
         current_date = None
@@ -132,14 +99,7 @@ class ScheduleDownloader:
         return df
 
     def _normalize_time(self, time_str: str) -> str:
-        """Convert time string to 24-hour format (e.g., "6:40 PM").
-
-        Args:
-            time_str: Time string like "6:40 pm" or "3:05 p.m."
-
-        Returns:
-            Time in 24-hour format
-        """
+        """Convert time string to 24-hour format."""
         time_str = time_str.lower().replace(".", "").replace(" ", "")
         try:
             dt = datetime.strptime(time_str, "%I:%M%p")
@@ -148,14 +108,7 @@ class ScheduleDownloader:
             return time_str
 
     def _normalize_team(self, team_name: str) -> str:
-        """Convert full team names to three-letter abbreviations.
-
-        Args:
-            team_name: Full team name from Baseball Reference
-
-        Returns:
-            Three-letter team abbreviation
-        """
+        """Convert full team names to three-letter abbreviations."""
         team_map = {
             "Arizona Diamondbacks": "ARI",
             "Arizona D'Backs": "ARI",
@@ -195,14 +148,7 @@ class ScheduleDownloader:
         return team_map.get(team_name, team_name[:3].upper())
 
     def save(self, df: pd.DataFrame) -> bool:
-        """Save schedule DataFrame to CSV file.
-
-        Args:
-            df: DataFrame with schedule data
-
-        Returns:
-            True if saved successfully, False otherwise
-        """
+        """Save schedule DataFrame to CSV file."""
         try:
             df.to_csv(self.output_file, index=False)
             logger.info(f"Saved schedule to {self.output_file}")

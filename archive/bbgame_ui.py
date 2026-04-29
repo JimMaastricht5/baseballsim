@@ -83,26 +83,18 @@ class BaseballUI:
         self.base_distance = 120
 
         # UI areas - improved layout with clearer sections
-        self.scoreboard_rect = pygame.Rect(
-            20, 20, WINDOW_WIDTH - 40, 100
-        )  # Reduced height
-        self.field_rect = pygame.Rect(
-            20, 140, WINDOW_WIDTH // 2 - 10, 380
-        )  # Adjusted size and position
+        self.scoreboard_rect = pygame.Rect(20, 20, WINDOW_WIDTH - 40, 100)  # Reduced height
+        self.field_rect = pygame.Rect(20, 140, WINDOW_WIDTH // 2 - 10, 380)  # Adjusted size and position
         self.lineup_rect = pygame.Rect(
             WINDOW_WIDTH // 2 + 10, 140, WINDOW_WIDTH // 2 - 30, 380
         )  # Adjusted size and position
-        self.outcome_rect = pygame.Rect(
-            20, 540, WINDOW_WIDTH - 40, 240
-        )  # Increased height for more space
+        self.outcome_rect = pygame.Rect(20, 540, WINDOW_WIDTH - 40, 240)  # Increased height for more space
 
         # Load diamond background image
         try:
             self.diamond_img = pygame.image.load("diamond.png")
             # Scale the image to fit the field_rect
-            self.diamond_img = pygame.transform.scale(
-                self.diamond_img, (self.field_rect.width, self.field_rect.height)
-            )
+            self.diamond_img = pygame.transform.scale(self.diamond_img, (self.field_rect.width, self.field_rect.height))
         except pygame.error:
             logger.warning("Could not load diamond.png")
             self.diamond_img = None
@@ -134,12 +126,8 @@ class BaseballUI:
 
         # Make sure we have a proper batter visualization immediately at game start
         batter_num = self.game.batting_num[self.game.team_hitting()]
-        batter_index = self.game.teams[self.game.team_hitting()].batter_index_in_lineup(
-            batter_num
-        )
-        batter_stats = self.game.teams[self.game.team_hitting()].batter_stats_in_lineup(
-            batter_index
-        )
+        batter_index = self.game.teams[self.game.team_hitting()].batter_index_in_lineup(batter_num)
+        batter_stats = self.game.teams[self.game.team_hitting()].batter_stats_in_lineup(batter_index)
 
         # Set up the next batter
         self.game.bases.baserunners[0] = batter_index
@@ -155,9 +143,7 @@ class BaseballUI:
 
         # Keep only the last max_outcome_lines
         if len(self.current_outcome_text) > self.max_outcome_lines:
-            self.current_outcome_text = self.current_outcome_text[
-                -self.max_outcome_lines :
-            ]
+            self.current_outcome_text = self.current_outcome_text[-self.max_outcome_lines :]
 
     def draw_scoreboard(self):
         """Draw the game scoreboard with detailed information"""
@@ -167,27 +153,17 @@ class BaseballUI:
         title_text = f"{self.away_team} vs {self.home_team}"
         title_surface = FONT_TITLE.render(title_text, True, BLACK)
         self.screen.blit(
-            title_surface,
-            (
-                self.scoreboard_rect.centerx - title_surface.get_width() // 2,
-                self.scoreboard_rect.y + 10,
-            ),
+            title_surface, (self.scoreboard_rect.centerx - title_surface.get_width() // 2, self.scoreboard_rect.y + 10)
         )
 
         # Draw inning labels (1-9)
         inning_col_width = 30
-        inning_start_x = (
-            self.scoreboard_rect.x + 150
-        )  # Start position for inning columns
+        inning_start_x = self.scoreboard_rect.x + 150  # Start position for inning columns
 
         # Draw column headers (inning numbers)
         for i in range(1, 10):  # 9 innings
             inning_label = FONT_SMALL.render(str(i), True, BLACK)
-            x_pos = (
-                inning_start_x
-                + (i - 1) * inning_col_width
-                + (inning_col_width - inning_label.get_width()) // 2
-            )
+            x_pos = inning_start_x + (i - 1) * inning_col_width + (inning_col_width - inning_label.get_width()) // 2
             self.screen.blit(inning_label, (x_pos, self.scoreboard_rect.y + 35))
 
         # Draw R, H, E labels
@@ -215,52 +191,40 @@ class BaseballUI:
 
         for i in range(1, 10):  # 9 innings
             # Away team inning score - handle both list and dict formats
-            if i <= current_inning or (
-                i == current_inning and self.game.top_bottom == 1
-            ):
+            if i <= current_inning or (i == current_inning and self.game.top_bottom == 1):
                 away_score = "0"
                 # Check if inning_score is a list (original format) or dict (our new format)
-                if isinstance(self.game.inning_score, list) and i < len(
-                    self.game.inning_score
-                ):
+                if isinstance(self.game.inning_score, list) and i < len(self.game.inning_score):
                     # Original format: list of lists [inning_num, away_score, home_score]
                     try:
                         if self.game.inning_score[i][1] != "":
                             away_score = str(self.game.inning_score[i][1])
-                    except (IndexError, TypeError):
+                    except IndexError, TypeError:
                         # Handle any index errors gracefully
                         pass
 
                 away_score_label = FONT_SMALL.render(away_score, True, BLACK)
                 x_pos = (
-                    inning_start_x
-                    + (i - 1) * inning_col_width
-                    + (inning_col_width - away_score_label.get_width()) // 2
+                    inning_start_x + (i - 1) * inning_col_width + (inning_col_width - away_score_label.get_width()) // 2
                 )
                 self.screen.blit(away_score_label, (x_pos, away_y))
 
             # Home team inning score (only if that inning has been played)
-            if i < current_inning or (
-                i == current_inning and self.game.top_bottom == 1
-            ):
+            if i < current_inning or (i == current_inning and self.game.top_bottom == 1):
                 home_score = "0"
                 # Check if inning_score is a list or dict
-                if isinstance(self.game.inning_score, list) and i < len(
-                    self.game.inning_score
-                ):
+                if isinstance(self.game.inning_score, list) and i < len(self.game.inning_score):
                     # Original format
                     try:
                         if self.game.inning_score[i][2] != "":
                             home_score = str(self.game.inning_score[i][2])
-                    except (IndexError, TypeError):
+                    except IndexError, TypeError:
                         # Handle any index errors gracefully
                         pass
 
                 home_score_label = FONT_SMALL.render(home_score, True, BLACK)
                 x_pos = (
-                    inning_start_x
-                    + (i - 1) * inning_col_width
-                    + (inning_col_width - home_score_label.get_width()) // 2
+                    inning_start_x + (i - 1) * inning_col_width + (inning_col_width - home_score_label.get_width()) // 2
                 )
                 self.screen.blit(home_score_label, (x_pos, home_y))
 
@@ -305,14 +269,10 @@ class BaseballUI:
 
             if i < self.game.outs:
                 # Filled circle for recorded outs
-                pygame.draw.circle(
-                    self.screen, RED, (circle_x, circle_y), circle_radius
-                )
+                pygame.draw.circle(self.screen, RED, (circle_x, circle_y), circle_radius)
             else:
                 # Empty circle for remaining outs
-                pygame.draw.circle(
-                    self.screen, BLACK, (circle_x, circle_y), circle_radius, 1
-                )
+                pygame.draw.circle(self.screen, BLACK, (circle_x, circle_y), circle_radius, 1)
 
     def draw_field(self):
         """Draw the baseball field with runners and fielders"""
@@ -326,11 +286,7 @@ class BaseballUI:
         balls_strikes_text = f"Count: {self.balls}-{self.strikes}"
         count_surface = FONT_MEDIUM.render(balls_strikes_text, True, BLACK)
         self.screen.blit(
-            count_surface,
-            (
-                self.field_rect.right - count_surface.get_width() - 10,
-                self.field_rect.y + 10,
-            ),
+            count_surface, (self.field_rect.right - count_surface.get_width() - 10, self.field_rect.y + 10)
         )
 
         # Draw ball indicators (open/filled circles)
@@ -341,29 +297,16 @@ class BaseballUI:
 
         # Draw "Balls:" label
         balls_label = FONT_SMALL.render("Balls:", True, BLACK)
-        self.screen.blit(
-            balls_label, (ball_x - balls_label.get_width() - 5, ball_y - 2)
-        )
+        self.screen.blit(balls_label, (ball_x - balls_label.get_width() - 5, ball_y - 2))
 
         # Draw ball indicators
         for i in range(4):  # 4 balls
             if i < self.balls:
                 # Filled circle for balls
-                pygame.draw.circle(
-                    self.screen,
-                    GREEN,
-                    (ball_x + (i * ball_spacing), ball_y),
-                    ball_radius,
-                )
+                pygame.draw.circle(self.screen, GREEN, (ball_x + (i * ball_spacing), ball_y), ball_radius)
             else:
                 # Empty circle for remaining balls
-                pygame.draw.circle(
-                    self.screen,
-                    BLACK,
-                    (ball_x + (i * ball_spacing), ball_y),
-                    ball_radius,
-                    1,
-                )
+                pygame.draw.circle(self.screen, BLACK, (ball_x + (i * ball_spacing), ball_y), ball_radius, 1)
 
         # Draw strike indicators
         strike_x = self.field_rect.right - 80
@@ -373,36 +316,21 @@ class BaseballUI:
 
         # Draw "Strikes:" label
         strikes_label = FONT_SMALL.render("Strikes:", True, BLACK)
-        self.screen.blit(
-            strikes_label, (strike_x - strikes_label.get_width() - 5, strike_y - 2)
-        )
+        self.screen.blit(strikes_label, (strike_x - strikes_label.get_width() - 5, strike_y - 2))
 
         # Draw strike indicators
         for i in range(3):  # 3 strikes
             if i < self.strikes:
                 # Filled circle for strikes
-                pygame.draw.circle(
-                    self.screen,
-                    RED,
-                    (strike_x + (i * strike_spacing), strike_y),
-                    strike_radius,
-                )
+                pygame.draw.circle(self.screen, RED, (strike_x + (i * strike_spacing), strike_y), strike_radius)
             else:
                 # Empty circle for remaining strikes
-                pygame.draw.circle(
-                    self.screen,
-                    BLACK,
-                    (strike_x + (i * strike_spacing), strike_y),
-                    strike_radius,
-                    1,
-                )
+                pygame.draw.circle(self.screen, BLACK, (strike_x + (i * strike_spacing), strike_y), strike_radius, 1)
 
         # Add pitcher fatigue indicator
         team_pitching = self.game.team_pitching()
         pitcher_index = self.game.teams[team_pitching].cur_pitcher_index
-        pitcher_game_stats = self.game.teams[team_pitching].box_score.box_pitching.loc[
-            pitcher_index
-        ]
+        pitcher_game_stats = self.game.teams[team_pitching].box_score.box_pitching.loc[pitcher_index]
 
         # Calculate fatigue based on innings pitched - use a scale of 0-100%
         innings_pitched = pitcher_game_stats["IP"]
@@ -414,9 +342,7 @@ class BaseballUI:
         # Draw fatigue meter
         fatigue_text = "Pitcher Fatigue:"
         fatigue_label = FONT_SMALL.render(fatigue_text, True, BLACK)
-        self.screen.blit(
-            fatigue_label, (self.field_rect.x + 10, self.field_rect.y + 10)
-        )
+        self.screen.blit(fatigue_label, (self.field_rect.x + 10, self.field_rect.y + 10))
 
         # Draw fatigue bar
         meter_width = 100
@@ -425,12 +351,7 @@ class BaseballUI:
         meter_y = self.field_rect.y + 30
 
         # Background bar
-        pygame.draw.rect(
-            self.screen,
-            GRAY,
-            (meter_x, meter_y, meter_width, meter_height),
-            border_radius=3,
-        )
+        pygame.draw.rect(self.screen, GRAY, (meter_x, meter_y, meter_width, meter_height), border_radius=3)
 
         # Determine color based on fatigue level
         if fatigue_percent < 33:
@@ -442,12 +363,7 @@ class BaseballUI:
 
         # Filled portion representing fatigue
         filled_width = int(meter_width * (fatigue_percent / 100))
-        pygame.draw.rect(
-            self.screen,
-            fatigue_color,
-            (meter_x, meter_y, filled_width, meter_height),
-            border_radius=3,
-        )
+        pygame.draw.rect(self.screen, fatigue_color, (meter_x, meter_y, filled_width, meter_height), border_radius=3)
 
         # Define base coordinates for the diamond.png image first
         base_size = 12  # Size of the diamond from center to point (slightly smaller)
@@ -546,15 +462,9 @@ class BaseballUI:
             # Shortstop on the dirt between second and third
             "SS": (field_center_x - 100, field_center_y - 110),
             # Outfielders in the outfield
-            "LF": (
-                field_center_x - self.base_distance - 40,
-                field_center_y - self.base_distance - 40,
-            ),
+            "LF": (field_center_x - self.base_distance - 40, field_center_y - self.base_distance - 40),
             "CF": (field_center_x, field_center_y - self.base_distance - 40),
-            "RF": (
-                field_center_x + self.base_distance + 40,
-                field_center_y - self.base_distance - 40,
-            ),
+            "RF": (field_center_x + self.base_distance + 40, field_center_y - self.base_distance - 40),
         }
 
         # Draw the fielders and their names
@@ -569,9 +479,7 @@ class BaseballUI:
         pitcher_stats = fielding_team.cur_pitcher_stats()
         position_to_player["P"] = pitcher_stats.Player
         # Add pitcher's stats (IP, H, ER)
-        position_to_stats["P"] = fielding_team.box_score.box_pitching.loc[
-            fielding_team.cur_pitcher_index
-        ]
+        position_to_stats["P"] = fielding_team.box_score.box_pitching.loc[fielding_team.cur_pitcher_index]
 
         # Then get the position players from the lineup
         for i in range(1, 10):  # 9 batters
@@ -583,9 +491,7 @@ class BaseballUI:
                     continue
                 position_to_player[batting_stats.Pos] = batting_stats.Player
                 # Get in-game stats for the player
-                position_to_stats[batting_stats.Pos] = (
-                    fielding_team.box_score.box_batting.loc[batting_index]
-                )
+                position_to_stats[batting_stats.Pos] = fielding_team.box_score.box_batting.loc[batting_index]
             except:
                 # If there's any error, just continue
                 continue
@@ -598,13 +504,7 @@ class BaseballUI:
             # Show position with larger font and in white for better visibility
             pos_text = FONT_SMALL.render(pos, True, WHITE)
             # Center position text in the fielder circle
-            self.screen.blit(
-                pos_text,
-                (
-                    coords[0] - pos_text.get_width() // 2,
-                    coords[1] - pos_text.get_height() // 2,
-                ),
-            )
+            self.screen.blit(pos_text, (coords[0] - pos_text.get_width() // 2, coords[1] - pos_text.get_height() // 2))
 
             # Show player name and in-game stats if we have them
             if pos in position_to_player:
@@ -613,9 +513,7 @@ class BaseballUI:
                 # Format player name (first initial + last name)
                 player_parts = player_name.split()
                 formatted_player_name = (
-                    f"{player_parts[0][0]}. {' '.join(player_parts[1:])}"
-                    if len(player_parts) > 0
-                    else player_name
+                    f"{player_parts[0][0]}. {' '.join(player_parts[1:])}" if len(player_parts) > 0 else player_name
                 )
 
                 # Truncate long names
@@ -631,10 +529,7 @@ class BaseballUI:
                     self.screen.blit(name_text, (coords[0] + 20, coords[1] - 5))
                 else:
                     # Position name below other fielders with more space
-                    self.screen.blit(
-                        name_text,
-                        (coords[0] - name_text.get_width() // 2, coords[1] + 15),
-                    )
+                    self.screen.blit(name_text, (coords[0] - name_text.get_width() // 2, coords[1] + 15))
 
                 # No in-game stats displayed next to fielders as requested
 
@@ -644,12 +539,8 @@ class BaseballUI:
         # Draw runners on bases using blue circles with player initials
         # First get batter info for display
         batter_num = self.game.batting_num[self.game.team_hitting()]
-        batter_index = self.game.teams[self.game.team_hitting()].batter_index_in_lineup(
-            batter_num
-        )
-        batter_stats = self.game.teams[self.game.team_hitting()].batter_stats_in_lineup(
-            batter_index
-        )
+        batter_index = self.game.teams[self.game.team_hitting()].batter_index_in_lineup(batter_num)
+        batter_stats = self.game.teams[self.game.team_hitting()].batter_stats_in_lineup(batter_index)
 
         # Show the current batter with a circle and name to the right of home plate
         batter_name = batter_stats.Player
@@ -677,26 +568,19 @@ class BaseballUI:
         batter_text = FONT_SMALL.render(batter_initial, True, BLACK)
         self.screen.blit(
             batter_text,
-            (
-                batter_circle_x - batter_text.get_width() // 2,
-                batter_circle_y - batter_text.get_height() // 2,
-            ),
+            (batter_circle_x - batter_text.get_width() // 2, batter_circle_y - batter_text.get_height() // 2),
         )
 
         # Display the full batter name to the right of the circle
         formatted_batter_name = (
-            f"{batter_parts[0][0]}. {' '.join(batter_parts[1:])}"
-            if len(batter_parts) > 0
-            else batter_name
+            f"{batter_parts[0][0]}. {' '.join(batter_parts[1:])}" if len(batter_parts) > 0 else batter_name
         )
         name_text = FONT_SMALL.render(formatted_batter_name[:10], True, BLACK)
         self.screen.blit(name_text, (batter_circle_x + 20, batter_circle_y - 10))
 
         # Draw runners on the bases if present
         if self.game.bases.is_runner_on_base_num(1):  # Runner on first
-            runner_name = self.game.bases.baserunners_names[
-                self.game.bases.baserunners[1]
-            ]
+            runner_name = self.game.bases.baserunners_names[self.game.bases.baserunners[1]]
             runner_parts = runner_name.split()
             runner_initial = runner_parts[0][0] if len(runner_parts) > 0 else "R"
 
@@ -706,29 +590,18 @@ class BaseballUI:
             # Draw runner initial in black
             runner_text = FONT_SMALL.render(runner_initial, True, BLACK)
             self.screen.blit(
-                runner_text,
-                (
-                    first_base_x - runner_text.get_width() // 2,
-                    first_base_y - runner_text.get_height() // 2,
-                ),
+                runner_text, (first_base_x - runner_text.get_width() // 2, first_base_y - runner_text.get_height() // 2)
             )
 
             # Display runner name below the circle
             formatted_name = (
-                f"{runner_parts[0][0]}. {' '.join(runner_parts[1:])}"
-                if len(runner_parts) > 0
-                else runner_name
+                f"{runner_parts[0][0]}. {' '.join(runner_parts[1:])}" if len(runner_parts) > 0 else runner_name
             )
             name_text = FONT_SMALL.render(formatted_name[:10], True, BLACK)
-            self.screen.blit(
-                name_text,
-                (first_base_x - name_text.get_width() // 2, first_base_y + 20),
-            )
+            self.screen.blit(name_text, (first_base_x - name_text.get_width() // 2, first_base_y + 20))
 
         if self.game.bases.is_runner_on_base_num(2):  # Runner on second
-            runner_name = self.game.bases.baserunners_names[
-                self.game.bases.baserunners[2]
-            ]
+            runner_name = self.game.bases.baserunners_names[self.game.bases.baserunners[2]]
             runner_parts = runner_name.split()
             runner_initial = runner_parts[0][0] if len(runner_parts) > 0 else "R"
 
@@ -739,28 +612,18 @@ class BaseballUI:
             runner_text = FONT_SMALL.render(runner_initial, True, BLACK)
             self.screen.blit(
                 runner_text,
-                (
-                    second_base_x - runner_text.get_width() // 2,
-                    second_base_y - runner_text.get_height() // 2,
-                ),
+                (second_base_x - runner_text.get_width() // 2, second_base_y - runner_text.get_height() // 2),
             )
 
             # Display runner name below
             formatted_name = (
-                f"{runner_parts[0][0]}. {' '.join(runner_parts[1:])}"
-                if len(runner_parts) > 0
-                else runner_name
+                f"{runner_parts[0][0]}. {' '.join(runner_parts[1:])}" if len(runner_parts) > 0 else runner_name
             )
             name_text = FONT_SMALL.render(formatted_name[:10], True, BLACK)
-            self.screen.blit(
-                name_text,
-                (second_base_x - name_text.get_width() // 2, second_base_y + 20),
-            )
+            self.screen.blit(name_text, (second_base_x - name_text.get_width() // 2, second_base_y + 20))
 
         if self.game.bases.is_runner_on_base_num(3):  # Runner on third
-            runner_name = self.game.bases.baserunners_names[
-                self.game.bases.baserunners[3]
-            ]
+            runner_name = self.game.bases.baserunners_names[self.game.bases.baserunners[3]]
             runner_parts = runner_name.split()
             runner_initial = runner_parts[0][0] if len(runner_parts) > 0 else "R"
 
@@ -770,24 +633,15 @@ class BaseballUI:
             # Draw runner initial in black
             runner_text = FONT_SMALL.render(runner_initial, True, BLACK)
             self.screen.blit(
-                runner_text,
-                (
-                    third_base_x - runner_text.get_width() // 2,
-                    third_base_y - runner_text.get_height() // 2,
-                ),
+                runner_text, (third_base_x - runner_text.get_width() // 2, third_base_y - runner_text.get_height() // 2)
             )
 
             # Display runner name below the circle
             formatted_name = (
-                f"{runner_parts[0][0]}. {' '.join(runner_parts[1:])}"
-                if len(runner_parts) > 0
-                else runner_name
+                f"{runner_parts[0][0]}. {' '.join(runner_parts[1:])}" if len(runner_parts) > 0 else runner_name
             )
             name_text = FONT_SMALL.render(formatted_name[:10], True, BLACK)
-            self.screen.blit(
-                name_text,
-                (third_base_x - name_text.get_width() // 2, third_base_y + 20),
-            )
+            self.screen.blit(name_text, (third_base_x - name_text.get_width() // 2, third_base_y + 20))
 
     def draw_lineup(self):
         """Draw the batting lineup display"""
@@ -797,11 +651,7 @@ class BaseballUI:
         title_text = f"{self.game.team_names[self.game.team_hitting()]} Batting Lineup"
         title_surface = FONT_LARGE.render(title_text, True, BLACK)
         self.screen.blit(
-            title_surface,
-            (
-                self.lineup_rect.centerx - title_surface.get_width() // 2,
-                self.lineup_rect.y + 10,
-            ),
+            title_surface, (self.lineup_rect.centerx - title_surface.get_width() // 2, self.lineup_rect.y + 10)
         )
 
         # Current pitcher info with game stats
@@ -811,74 +661,49 @@ class BaseballUI:
 
         # Get pitcher's game stats
         pitcher_index = self.game.teams[self.game.team_pitching()].cur_pitcher_index
-        pitcher_game_stats = self.game.teams[
-            self.game.team_pitching()
-        ].box_score.box_pitching.loc[pitcher_index]
+        pitcher_game_stats = self.game.teams[self.game.team_pitching()].box_score.box_pitching.loc[pitcher_index]
 
         # Format pitcher name (first initial + last name)
         pitcher_parts = pitcher_name.split()
         formatted_pitcher_name = (
-            f"{pitcher_parts[0][0]}. {' '.join(pitcher_parts[1:])}"
-            if len(pitcher_parts) > 0
-            else pitcher_name
+            f"{pitcher_parts[0][0]}. {' '.join(pitcher_parts[1:])}" if len(pitcher_parts) > 0 else pitcher_name
         )
 
         # Format pitcher with ERA and stats
         pitcher_text = f"Pitcher: {formatted_pitcher_name} ({pitcher_team}) {pitcher_stats.ERA:.2f} ERA, IP: {pitcher_game_stats['IP']:.1f}"
         pitcher_surface = FONT_MEDIUM.render(pitcher_text, True, BLACK)
-        self.screen.blit(
-            pitcher_surface, (self.lineup_rect.x + 20, self.lineup_rect.y + 40)
-        )
+        self.screen.blit(pitcher_surface, (self.lineup_rect.x + 20, self.lineup_rect.y + 40))
 
         # Current batter
         batter_num = self.game.batting_num[self.game.team_hitting()]
-        batter_index = self.game.teams[self.game.team_hitting()].batter_index_in_lineup(
-            batter_num
-        )
-        batter_stats = self.game.teams[self.game.team_hitting()].batter_stats_in_lineup(
-            batter_index
-        )
+        batter_index = self.game.teams[self.game.team_hitting()].batter_index_in_lineup(batter_num)
+        batter_stats = self.game.teams[self.game.team_hitting()].batter_stats_in_lineup(batter_index)
 
         # Format batter name (first initial + last name)
         batter_parts = batter_stats.Player.split()
         formatted_batter_name = (
-            f"{batter_parts[0][0]}. {' '.join(batter_parts[1:])}"
-            if len(batter_parts) > 0
-            else batter_stats.Player
+            f"{batter_parts[0][0]}. {' '.join(batter_parts[1:])}" if len(batter_parts) > 0 else batter_stats.Player
         )
 
         # Get the in-game stats for current batter
-        batter_game_stats = self.game.teams[
-            self.game.team_hitting()
-        ].box_score.box_batting.loc[batter_index]
+        batter_game_stats = self.game.teams[self.game.team_hitting()].box_score.box_batting.loc[batter_index]
 
         # Format current batter with AVG and in-game hits/plate appearances
         plate_appearances = (
-            batter_game_stats["AB"]
-            + batter_game_stats["BB"]
-            + batter_game_stats["HBP"]
-            + batter_game_stats["SF"]
+            batter_game_stats["AB"] + batter_game_stats["BB"] + batter_game_stats["HBP"] + batter_game_stats["SF"]
         )
         batter_text = f"At Bat: {formatted_batter_name} {batter_stats.Pos} (#{batter_num}) {batter_stats.AVG:.3f} AVG, {batter_game_stats['H']}-{plate_appearances}"
         batter_surface = FONT_MEDIUM.render(batter_text, True, BLACK)
-        self.screen.blit(
-            batter_surface, (self.lineup_rect.x + 20, self.lineup_rect.y + 70)
-        )
+        self.screen.blit(batter_surface, (self.lineup_rect.x + 20, self.lineup_rect.y + 70))
 
         # Batting lineup
         lineup_y = self.lineup_rect.y + 110
         for i in range(1, 10):  # 9 batters
-            batting_index = self.game.teams[
-                self.game.team_hitting()
-            ].batter_index_in_lineup(i)
-            batting_stats = self.game.teams[
-                self.game.team_hitting()
-            ].batter_stats_in_lineup(batting_index)
+            batting_index = self.game.teams[self.game.team_hitting()].batter_index_in_lineup(i)
+            batting_stats = self.game.teams[self.game.team_hitting()].batter_stats_in_lineup(batting_index)
 
             # Get the in-game stats for this batter
-            game_stats = self.game.teams[
-                self.game.team_hitting()
-            ].box_score.box_batting.loc[batting_index]
+            game_stats = self.game.teams[self.game.team_hitting()].box_score.box_batting.loc[batting_index]
 
             # Highlight current batter with orange instead of red
             text_color = ORANGE if i == batter_num else BLACK
@@ -886,25 +711,14 @@ class BaseballUI:
             # Format player name (first initial + last name)
             player_parts = batting_stats.Player.split()
             formatted_player_name = (
-                f"{player_parts[0][0]}. {' '.join(player_parts[1:])}"
-                if len(player_parts) > 0
-                else batting_stats.Player
+                f"{player_parts[0][0]}. {' '.join(player_parts[1:])}" if len(player_parts) > 0 else batting_stats.Player
             )
 
             # Format as requested: Player Name Position AVG, hits-plate appearances
-            plate_appearances = (
-                game_stats["AB"]
-                + game_stats["BB"]
-                + game_stats["HBP"]
-                + game_stats["SF"]
-            )
-            stats_text = (
-                f" {batting_stats.AVG:.3f} AVG, {game_stats['H']}-{plate_appearances}"
-            )
+            plate_appearances = game_stats["AB"] + game_stats["BB"] + game_stats["HBP"] + game_stats["SF"]
+            stats_text = f" {batting_stats.AVG:.3f} AVG, {game_stats['H']}-{plate_appearances}"
 
-            lineup_text = (
-                f"{i}. {formatted_player_name} {batting_stats.Pos}{stats_text}"
-            )
+            lineup_text = f"{i}. {formatted_player_name} {batting_stats.Pos}{stats_text}"
             lineup_surface = FONT_MEDIUM.render(lineup_text, True, text_color)
             self.screen.blit(lineup_surface, (self.lineup_rect.x + 20, lineup_y))
 
@@ -915,15 +729,13 @@ class BaseballUI:
         pygame.draw.rect(self.screen, GRAY, self.outcome_rect, border_radius=5)
 
         # Title with inning information included
-        inning_text = f"{'Top' if self.game.top_bottom == 0 else 'Bottom'} of Inning {self.game.inning[self.game.team_hitting()]}"
+        inning_text = (
+            f"{'Top' if self.game.top_bottom == 0 else 'Bottom'} of Inning {self.game.inning[self.game.team_hitting()]}"
+        )
         title_text = f"Game Play-by-Play ({inning_text})"
         title_surface = FONT_LARGE.render(title_text, True, BLACK)
         self.screen.blit(
-            title_surface,
-            (
-                self.outcome_rect.centerx - title_surface.get_width() // 2,
-                self.outcome_rect.y + 10,
-            ),
+            title_surface, (self.outcome_rect.centerx - title_surface.get_width() // 2, self.outcome_rect.y + 10)
         )
 
         # Display outcome text with smaller font in a single column
@@ -950,10 +762,7 @@ class BaseballUI:
             if text_y > self.outcome_rect.bottom - 20:
                 # If we're running out of space, show indicator that there are more lines
                 more_text = FONT_SMALL.render("...", True, BLACK)
-                self.screen.blit(
-                    more_text,
-                    (self.outcome_rect.right - 50, self.outcome_rect.bottom - 20),
-                )
+                self.screen.blit(more_text, (self.outcome_rect.right - 50, self.outcome_rect.bottom - 20))
                 break
 
     def sim_next_at_bat(self):
@@ -978,8 +787,7 @@ class BaseballUI:
         # Simulate one at-bat
         pitch_switch = False
         pitch_switch = self.game.pitching_sit(
-            self.game.teams[self.game.team_pitching()].cur_pitcher_stats(),
-            pitch_switch=pitch_switch,
+            self.game.teams[self.game.team_pitching()].cur_pitcher_stats(), pitch_switch=pitch_switch
         )
         self.game.stolen_base_sit()
 
@@ -1000,9 +808,7 @@ class BaseballUI:
                     if players != ""
                     else self.game.bases.player_scored[player_id]
                 )
-            self.add_outcome_text(
-                f"Scored {self.game.bases.runs_scored} run(s)! ({players})", BLACK
-            )
+            self.add_outcome_text(f"Scored {self.game.bases.runs_scored} run(s)! ({players})", BLACK)
             self.add_outcome_text(
                 f"The score is {self.game.team_names[0]} {self.game.total_score[0]} to {self.game.team_names[1]} {self.game.total_score[1]}",
                 BLACK,
@@ -1037,8 +843,7 @@ class BaseballUI:
             self.game.bases.clear_bases()
             top_or_bottom = "top" if self.game.top_bottom == 0 else "bottom"
             self.add_outcome_text(
-                f"Completed {top_or_bottom} half of inning {self.game.inning[self.game.team_hitting()]}",
-                BLACK,
+                f"Completed {top_or_bottom} half of inning {self.game.inning[self.game.team_hitting()]}", BLACK
             )
             self.add_outcome_text(
                 f"The score is {self.game.team_names[0]} {self.game.total_score[0]} to {self.game.team_names[1]} {self.game.total_score[1]}",
@@ -1059,8 +864,7 @@ class BaseballUI:
             else:
                 top_or_bottom = "top" if self.game.top_bottom == 0 else "bottom"
                 self.add_outcome_text(
-                    f"Starting the {top_or_bottom} of inning {self.game.inning[self.game.team_hitting()]}",
-                    BLACK,
+                    f"Starting the {top_or_bottom} of inning {self.game.inning[self.game.team_hitting()]}", BLACK
                 )
 
     def sim_half_inning(self):
@@ -1113,19 +917,13 @@ class BaseballUI:
 
             # Draw keyboard shortcuts legend at the bottom of the screen
             legend_height = 20
-            legend_rect = pygame.Rect(
-                0, WINDOW_HEIGHT - legend_height, WINDOW_WIDTH, legend_height
-            )
+            legend_rect = pygame.Rect(0, WINDOW_HEIGHT - legend_height, WINDOW_WIDTH, legend_height)
             pygame.draw.rect(self.screen, BLACK, legend_rect)
 
             legend_text = "Controls: [SPACE] Next At-Bat  |  [ENTER] Next Half-Inning  |  [N] New Game  |  [ESC] Exit"
             legend_surface = FONT_SMALL.render(legend_text, True, WHITE)
             self.screen.blit(
-                legend_surface,
-                (
-                    WINDOW_WIDTH // 2 - legend_surface.get_width() // 2,
-                    WINDOW_HEIGHT - legend_height + 5,
-                ),
+                legend_surface, (WINDOW_WIDTH // 2 - legend_surface.get_width() // 2, WINDOW_HEIGHT - legend_height + 5)
             )
 
             # Update display

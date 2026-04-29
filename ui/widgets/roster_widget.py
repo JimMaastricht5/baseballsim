@@ -1,10 +1,7 @@
 """
---- Copyright Notice ---
 Copyright (c) 2024 Jim Maastricht
 
 Roster widget for baseball season simulation UI.
-
-Displays team roster with position players and pitchers in separate tabs.
 """
 
 import tkinter as tk
@@ -15,13 +12,10 @@ from bblogger import logger
 from ui.theme import (
     BG_PANEL,
     BG_ELEVATED,
-    ACCENT_BLUE,
     ACCENT_GOLD,
     TEXT_PRIMARY,
     TEXT_SECONDARY,
     TEXT_HEADING,
-    ROW_EVEN,
-    ROW_ODD,
     ROW_DTD,
     ROW_IL,
     STREAK_HOT,
@@ -48,7 +42,7 @@ def get_streak_indicator(streak_value) -> tuple:
 
     try:
         streak = float(streak_value)
-    except (ValueError, TypeError):
+    except ValueError, TypeError:
         return ("-", STREAK_NORMAL)
 
     if streak >= 0.025:
@@ -157,16 +151,10 @@ class RosterWidget:
         batting_control_frame.pack(fill=tk.X, padx=5, pady=5)
 
         # Player search
-        tk.Label(
-            batting_control_frame,
-            text="Find Player:",
-            font=("Segoe UI", 10),
-            bg=BG_PANEL,
-            fg=TEXT_PRIMARY,
-        ).pack(side=tk.LEFT, padx=(0, 5))
-        self.batting_search_var.trace(
-            "w", lambda *args: self._apply_filter(is_batter=True)
+        tk.Label(batting_control_frame, text="Find Player:", font=("Segoe UI", 10), bg=BG_PANEL, fg=TEXT_PRIMARY).pack(
+            side=tk.LEFT, padx=(0, 5)
         )
+        self.batting_search_var.trace("w", lambda *args: self._apply_filter(is_batter=True))
         batting_search_entry = tk.Entry(
             batting_control_frame,
             textvariable=self.batting_search_var,
@@ -189,13 +177,9 @@ class RosterWidget:
         clear_btn.pack(side=tk.LEFT, padx=5)
 
         # Toggle button
-        tk.Label(
-            batting_control_frame,
-            text="  |  View:",
-            font=("Segoe UI", 10),
-            bg=BG_PANEL,
-            fg=TEXT_PRIMARY,
-        ).pack(side=tk.LEFT, padx=(10, 5))
+        tk.Label(batting_control_frame, text="  |  View:", font=("Segoe UI", 10), bg=BG_PANEL, fg=TEXT_PRIMARY).pack(
+            side=tk.LEFT, padx=(10, 5)
+        )
         self.batting_comparison_btn = tk.Button(
             batting_control_frame,
             text="Show Difference from 2025",
@@ -209,26 +193,18 @@ class RosterWidget:
         )
         self.batting_comparison_btn.pack(side=tk.LEFT, padx=5)
 
-        self.pos_players_tree = self._create_roster_treeview(
-            pos_players_frame, is_batter=True
-        )
+        self.pos_players_tree = self._create_roster_treeview(pos_players_frame, is_batter=True)
 
         # Add team batting totals section
         separator = ttk.Separator(pos_players_frame, orient=tk.HORIZONTAL)
         separator.pack(fill=tk.X, padx=5, pady=10)
 
         totals_label = tk.Label(
-            pos_players_frame,
-            text="Team Batting Totals",
-            font=("Segoe UI", 11, "bold"),
-            bg=BG_PANEL,
-            fg=TEXT_HEADING,
+            pos_players_frame, text="Team Batting Totals", font=("Segoe UI", 11, "bold"), bg=BG_PANEL, fg=TEXT_HEADING
         )
         totals_label.pack(padx=5, pady=(0, 5))
 
-        self.batting_totals_frame = tk.Frame(
-            pos_players_frame, bg=BG_PANEL, relief=tk.FLAT, borderwidth=0
-        )
+        self.batting_totals_frame = tk.Frame(pos_players_frame, bg=BG_PANEL, relief=tk.FLAT, borderwidth=0)
         self.batting_totals_frame.pack(fill=tk.X, padx=5, pady=5)
 
         self.batting_totals_labels = {}  # Store label references for updating
@@ -242,16 +218,10 @@ class RosterWidget:
         pitching_control_frame.pack(fill=tk.X, padx=5, pady=5)
 
         # Player search
-        tk.Label(
-            pitching_control_frame,
-            text="Find Player:",
-            font=("Segoe UI", 10),
-            bg=BG_PANEL,
-            fg=TEXT_PRIMARY,
-        ).pack(side=tk.LEFT, padx=(0, 5))
-        self.pitching_search_var.trace(
-            "w", lambda *args: self._apply_filter(is_batter=False)
+        tk.Label(pitching_control_frame, text="Find Player:", font=("Segoe UI", 10), bg=BG_PANEL, fg=TEXT_PRIMARY).pack(
+            side=tk.LEFT, padx=(0, 5)
         )
+        self.pitching_search_var.trace("w", lambda *args: self._apply_filter(is_batter=False))
         pitching_search_entry = tk.Entry(
             pitching_control_frame,
             textvariable=self.pitching_search_var,
@@ -274,13 +244,9 @@ class RosterWidget:
         clear_btn.pack(side=tk.LEFT, padx=5)
 
         # Toggle button
-        tk.Label(
-            pitching_control_frame,
-            text="  |  View:",
-            font=("Segoe UI", 10),
-            bg=BG_PANEL,
-            fg=TEXT_PRIMARY,
-        ).pack(side=tk.LEFT, padx=(10, 5))
+        tk.Label(pitching_control_frame, text="  |  View:", font=("Segoe UI", 10), bg=BG_PANEL, fg=TEXT_PRIMARY).pack(
+            side=tk.LEFT, padx=(10, 5)
+        )
         self.pitching_comparison_btn = tk.Button(
             pitching_control_frame,
             text="Show Difference from 2025",
@@ -294,35 +260,25 @@ class RosterWidget:
         )
         self.pitching_comparison_btn.pack(side=tk.LEFT, padx=5)
 
-        self.pitchers_tree = self._create_roster_treeview(
-            pitchers_frame, is_batter=False
-        )
+        self.pitchers_tree = self._create_roster_treeview(pitchers_frame, is_batter=False)
 
         # Add team pitching totals section
         separator = ttk.Separator(pitchers_frame, orient=tk.HORIZONTAL)
         separator.pack(fill=tk.X, padx=5, pady=10)
 
         totals_label = tk.Label(
-            pitchers_frame,
-            text="Team Pitching Totals",
-            font=("Segoe UI", 11, "bold"),
-            bg=BG_PANEL,
-            fg=TEXT_HEADING,
+            pitchers_frame, text="Team Pitching Totals", font=("Segoe UI", 11, "bold"), bg=BG_PANEL, fg=TEXT_HEADING
         )
         totals_label.pack(padx=5, pady=(0, 5))
 
-        self.pitching_totals_frame = tk.Frame(
-            pitchers_frame, bg=BG_PANEL, relief=tk.FLAT, borderwidth=0
-        )
+        self.pitching_totals_frame = tk.Frame(pitchers_frame, bg=BG_PANEL, relief=tk.FLAT, borderwidth=0)
         self.pitching_totals_frame.pack(fill=tk.X, padx=5, pady=5)
 
         self.pitching_totals_labels = {}  # Store label references for updating
 
         # Historical stats are shown in a popup window when a player is clicked
 
-    def _create_roster_treeview(
-        self, parent: tk.Widget, is_batter: bool = True
-    ) -> ttk.Treeview:
+    def _create_roster_treeview(self, parent: tk.Widget, is_batter: bool = True) -> ttk.Treeview:
         """
         Create Treeview for roster data.
 
@@ -391,13 +347,7 @@ class RosterWidget:
         # Configure columns
         for col in columns:
             # Bind heading click to sort function
-            tree.heading(
-                col,
-                text=col,
-                command=lambda c=col, t=tree, b=is_batter: self._sort_by_column(
-                    t, c, b
-                ),
-            )
+            tree.heading(col, text=col, command=lambda c=col, t=tree, b=is_batter: self._sort_by_column(t, c, b))
 
             if col == "Player":
                 tree.column(col, width=150, anchor=tk.W)
@@ -442,9 +392,7 @@ class RosterWidget:
         tree.pack(fill=tk.BOTH, expand=True)
 
         # Configure tags for injury highlighting (dark-theme colours)
-        tree.tag_configure(
-            "day_to_day", background=ROW_DTD
-        )  # Dark amber for day-to-day (<10 days)
+        tree.tag_configure("day_to_day", background=ROW_DTD)  # Dark amber for day-to-day (<10 days)
         tree.tag_configure("injured", background=ROW_IL)  # Dark red for IL (>=10 days)
 
         # Configure tags for streak highlighting
@@ -462,23 +410,12 @@ class RosterWidget:
         return tree
 
     def _show_history_popup(
-        self,
-        player_name: str,
-        historical_df,
-        is_batter: bool,
-        projected_row=None,
-        current_season_row=None,
+        self, player_name: str, historical_df, is_batter: bool, projected_row=None, current_season_row=None
     ):
         """Wrapper around shared show_history_popup."""
         current_season = getattr(self.baseball_data, "new_season", None)
         show_history_popup(
-            self.frame,
-            player_name,
-            historical_df,
-            is_batter,
-            projected_row,
-            current_season_row,
-            current_season,
+            self.frame, player_name, historical_df, is_batter, projected_row, current_season_row, current_season
         )
 
     def update_roster(self, team: str, baseball_data, team_win_loss: dict = None):
@@ -522,30 +459,19 @@ class RosterWidget:
 
             # Check if user had a custom sort applied, and reapply it
             tree_id = str(id(self.pos_players_tree))
-            if (
-                tree_id in self.sort_state
-                and self.sort_state[tree_id]["column"] is not None
-            ):
+            if tree_id in self.sort_state and self.sort_state[tree_id]["column"] is not None:
                 # Reapply user's sort
                 sort_state = self.sort_state[tree_id]
                 sorted_batters = self._apply_sort(
-                    sorted_batters,
-                    sort_state["column"],
-                    sort_state["ascending"],
-                    is_batter=True,
+                    sorted_batters, sort_state["column"], sort_state["ascending"], is_batter=True
                 )
                 self.batters_df = sorted_batters.copy()
 
             # Update position players tree
-            self._update_roster_tree(
-                self.pos_players_tree, sorted_batters, is_batter=True
-            )
+            self._update_roster_tree(self.pos_players_tree, sorted_batters, is_batter=True)
 
             # Update sort indicators if there was a custom sort
-            if (
-                tree_id in self.sort_state
-                and self.sort_state[tree_id]["column"] is not None
-            ):
+            if tree_id in self.sort_state and self.sort_state[tree_id]["column"] is not None:
                 self._update_sort_indicators(
                     self.pos_players_tree,
                     self.sort_state[tree_id]["column"],
@@ -557,41 +483,26 @@ class RosterWidget:
             if "IP" in pitching_df.columns and pitching_df["IP"].sum() > 0:
                 sorted_pitchers = pitching_df.sort_values("IP", ascending=False)
             else:
-                sorted_pitchers = (
-                    pitching_df.sort_values("Player")
-                    if "Player" in pitching_df.columns
-                    else pitching_df
-                )
+                sorted_pitchers = pitching_df.sort_values("Player") if "Player" in pitching_df.columns else pitching_df
 
             # Store DataFrames for sorting
             self.pitchers_df = sorted_pitchers.copy()
 
             # Check if user had a custom sort applied, and reapply it
             tree_id = str(id(self.pitchers_tree))
-            if (
-                tree_id in self.sort_state
-                and self.sort_state[tree_id]["column"] is not None
-            ):
+            if tree_id in self.sort_state and self.sort_state[tree_id]["column"] is not None:
                 # Reapply user's sort
                 sort_state = self.sort_state[tree_id]
                 sorted_pitchers = self._apply_sort(
-                    sorted_pitchers,
-                    sort_state["column"],
-                    sort_state["ascending"],
-                    is_batter=False,
+                    sorted_pitchers, sort_state["column"], sort_state["ascending"], is_batter=False
                 )
                 self.pitchers_df = sorted_pitchers.copy()
 
             # Update pitchers tree
-            self._update_roster_tree(
-                self.pitchers_tree, sorted_pitchers, is_batter=False
-            )
+            self._update_roster_tree(self.pitchers_tree, sorted_pitchers, is_batter=False)
 
             # Update sort indicators if there was a custom sort
-            if (
-                tree_id in self.sort_state
-                and self.sort_state[tree_id]["column"] is not None
-            ):
+            if tree_id in self.sort_state and self.sort_state[tree_id]["column"] is not None:
                 self._update_sort_indicators(
                     self.pitchers_tree,
                     self.sort_state[tree_id]["column"],
@@ -603,9 +514,7 @@ class RosterWidget:
             self._update_totals_display(is_batter=True)
             self._update_totals_display(is_batter=False)
 
-            logger.info(
-                f"Roster updated for {team}: {len(batting_df)} batters, {len(pitching_df)} pitchers"
-            )
+            logger.info(f"Roster updated for {team}: {len(batting_df)} batters, {len(pitching_df)} pitchers")
 
         except Exception as e:
             logger.error(f"Error updating roster: {e}")
@@ -635,9 +544,7 @@ class RosterWidget:
         else:
             return "Fatigued"
 
-    def _update_roster_tree(
-        self, tree: ttk.Treeview, data_df: pd.DataFrame, is_batter: bool = True
-    ):
+    def _update_roster_tree(self, tree: ttk.Treeview, data_df: pd.DataFrame, is_batter: bool = True):
         """
         Update roster Treeview with data (Phase 5: Supports comparison mode).
 
@@ -652,9 +559,7 @@ class RosterWidget:
 
         # Handle empty DataFrame
         if data_df.empty:
-            logger.debug(
-                f"Empty roster data for {'batter' if is_batter else 'pitcher'}"
-            )
+            logger.debug(f"Empty roster data for {'batter' if is_batter else 'pitcher'}")
             return
 
         # Check comparison mode and calculate differences if needed
@@ -672,23 +577,14 @@ class RosterWidget:
                 if injured_days > 0:
                     condition_display = "Injured"
                 else:
-                    condition_display = self._condition_to_text(
-                        int(row.get("Condition", 100))
-                    )
+                    condition_display = self._condition_to_text(int(row.get("Condition", 100)))
 
                 if is_batter:
                     # Clean up position formatting (remove brackets and quotes)
                     pos = row.get("Pos", "Unknown")
                     if isinstance(pos, list):
                         pos = pos[0] if pos else "Unknown"
-                    pos = (
-                        str(pos)
-                        .replace("[", "")
-                        .replace("]", "")
-                        .replace("'", "")
-                        .replace('"', "")
-                        .strip()
-                    )
+                    pos = str(pos).replace("[", "").replace("]", "").replace("'", "").replace('"', "").strip()
 
                     # Get salary and calculate years remaining
                     salary = row.get("Salary", LEAGUE_MIN_SALARY)
@@ -698,9 +594,7 @@ class RosterWidget:
 
                     if mode == "difference":
                         # Format with +/- prefix for difference mode
-                        streak_text, _ = get_streak_indicator(
-                            row.get("Streak_Adjustment")
-                        )
+                        streak_text, _ = get_streak_indicator(row.get("Streak_Adjustment"))
                         values = (
                             row.get("Player", "Unknown"),
                             row.get("Team", ""),
@@ -727,9 +621,7 @@ class RosterWidget:
                         )
                     else:
                         # Standard format for current stats
-                        streak_text, _ = get_streak_indicator(
-                            row.get("Streak_Adjustment")
-                        )
+                        streak_text, _ = get_streak_indicator(row.get("Streak_Adjustment"))
                         values = (
                             row.get("Player", "Unknown"),
                             row.get("Team", ""),
@@ -763,9 +655,7 @@ class RosterWidget:
 
                     if mode == "difference":
                         # Format with +/- prefix for difference mode
-                        streak_text, _ = get_streak_indicator(
-                            row.get("Streak_Adjustment")
-                        )
+                        streak_text, _ = get_streak_indicator(row.get("Streak_Adjustment"))
                         values = (
                             row.get("Player", "Unknown"),
                             self._format_diff_value(row.get("G", 0)),
@@ -790,9 +680,7 @@ class RosterWidget:
                         )
                     else:
                         # Standard format for current stats
-                        streak_text, _ = get_streak_indicator(
-                            row.get("Streak_Adjustment")
-                        )
+                        streak_text, _ = get_streak_indicator(row.get("Streak_Adjustment"))
                         values = (
                             row.get("Player", "Unknown"),
                             int(row.get("G", 0)),
@@ -834,7 +722,7 @@ class RosterWidget:
                             streak_tag = ("streak_hot",)
                         elif streak <= -0.025:
                             streak_tag = ("streak_cold",)
-                    except (ValueError, TypeError):
+                    except ValueError, TypeError:
                         pass
 
                 # Combine tags
@@ -845,13 +733,9 @@ class RosterWidget:
 
                 tree.insert("", tk.END, values=values, tags=tags)
             except Exception as e:
-                logger.warning(
-                    f"Error inserting roster row for {row.get('Player', 'Unknown')}: {e}"
-                )
+                logger.warning(f"Error inserting roster row for {row.get('Player', 'Unknown')}: {e}")
 
-    def _apply_sort(
-        self, df: pd.DataFrame, column: str, ascending: bool, is_batter: bool
-    ) -> pd.DataFrame:
+    def _apply_sort(self, df: pd.DataFrame, column: str, ascending: bool, is_batter: bool) -> pd.DataFrame:
         """
         Apply sort to a DataFrame.
 
@@ -910,23 +794,15 @@ class RosterWidget:
                 if column in numeric_cols or df_column in numeric_cols:
                     # Convert to numeric, handling any non-numeric values
                     sorted_df = df.copy()
-                    sorted_df[df_column] = pd.to_numeric(
-                        sorted_df[df_column], errors="coerce"
-                    )
-                    sorted_df = sorted_df.sort_values(
-                        df_column, ascending=ascending, na_position="last"
-                    )
+                    sorted_df[df_column] = pd.to_numeric(sorted_df[df_column], errors="coerce")
+                    sorted_df = sorted_df.sort_values(df_column, ascending=ascending, na_position="last")
                 else:
                     # Text sorting
-                    sorted_df = df.sort_values(
-                        df_column, ascending=ascending, na_position="last"
-                    )
+                    sorted_df = df.sort_values(df_column, ascending=ascending, na_position="last")
 
                 return sorted_df
             else:
-                logger.warning(
-                    f"Column {column} (mapped to {df_column}) not found in DataFrame"
-                )
+                logger.warning(f"Column {column} (mapped to {df_column}) not found in DataFrame")
                 return df
 
         except Exception as e:
@@ -984,13 +860,9 @@ class RosterWidget:
         # Map display column names to DataFrame column names for logging
         column_mapping = {"K": "SO"}
         df_column = column_mapping.get(column, column)
-        logger.debug(
-            f"Sorted by {column} (DataFrame column: {df_column}), ascending={ascending}"
-        )
+        logger.debug(f"Sorted by {column} (DataFrame column: {df_column}), ascending={ascending}")
 
-    def _update_sort_indicators(
-        self, tree: ttk.Treeview, sorted_column: str, ascending: bool, is_batter: bool
-    ):
+    def _update_sort_indicators(self, tree: ttk.Treeview, sorted_column: str, ascending: bool, is_batter: bool):
         """
         Update column heading text to show sort indicators.
 
@@ -1048,17 +920,11 @@ class RosterWidget:
                 # Add sort indicator to sorted column
                 indicator = " ↑" if ascending else " ↓"
                 tree.heading(
-                    col,
-                    text=f"{col}{indicator}",
-                    command=lambda c=col: self._sort_by_column(tree, c, is_batter),
+                    col, text=f"{col}{indicator}", command=lambda c=col: self._sort_by_column(tree, c, is_batter)
                 )
             else:
                 # Remove indicator from other columns
-                tree.heading(
-                    col,
-                    text=col,
-                    command=lambda c=col: self._sort_by_column(tree, c, is_batter),
-                )
+                tree.heading(col, text=col, command=lambda c=col: self._sort_by_column(tree, c, is_batter))
 
     def _on_player_click(self, tree: ttk.Treeview, is_batter: bool):
         """
@@ -1089,38 +955,28 @@ class RosterWidget:
 
         # Fetch historical and projected data, then show in popup
         try:
-            historical_df = self.baseball_data.get_player_historical_data(
-                player_name, is_batter
-            )
+            historical_df = self.baseball_data.get_player_historical_data(player_name, is_batter)
 
             if historical_df.empty:
                 logger.info(f"No historical data found for {player_name}")
                 return
 
-            projected_row = self.baseball_data.get_player_projected_data(
-                player_name, is_batter
-            )
+            projected_row = self.baseball_data.get_player_projected_data(player_name, is_batter)
 
             # Get current season stats (partial + simulation accumulated)
             current_season_row = None
             if is_batter:
-                batting_df = self.baseball_data.get_batting_data(
-                    team_name=None, prior_season=False
-                )
+                batting_df = self.baseball_data.get_batting_data(team_name=None, prior_season=False)
                 matches = batting_df[batting_df["Player"] == player_name]
                 if not matches.empty:
                     current_season_row = matches.iloc[0]
             else:
-                pitching_df = self.baseball_data.get_pitching_data(
-                    team_name=None, prior_season=False
-                )
+                pitching_df = self.baseball_data.get_pitching_data(team_name=None, prior_season=False)
                 matches = pitching_df[pitching_df["Player"] == player_name]
                 if not matches.empty:
                     current_season_row = matches.iloc[0]
 
-            self._show_history_popup(
-                player_name, historical_df, is_batter, projected_row, current_season_row
-            )
+            self._show_history_popup(player_name, historical_df, is_batter, projected_row, current_season_row)
 
         except Exception as e:
             logger.error(f"Error fetching historical data for {player_name}: {e}")
@@ -1136,9 +992,7 @@ class RosterWidget:
             search_text = self.batting_search_var.get().lower()
             if search_text:
                 filtered_df = self.batters_df_full[
-                    self.batters_df_full["Player"]
-                    .str.lower()
-                    .str.contains(search_text, na=False)
+                    self.batters_df_full["Player"].str.lower().str.contains(search_text, na=False)
                 ]
             else:
                 filtered_df = self.batters_df_full
@@ -1151,9 +1005,7 @@ class RosterWidget:
             search_text = self.pitching_search_var.get().lower()
             if search_text:
                 filtered_df = self.pitchers_df_full[
-                    self.pitchers_df_full["Player"]
-                    .str.lower()
-                    .str.contains(search_text, na=False)
+                    self.pitchers_df_full["Player"].str.lower().str.contains(search_text, na=False)
                 ]
             else:
                 filtered_df = self.pitchers_df_full
@@ -1177,29 +1029,17 @@ class RosterWidget:
         # Update button appearance and text (dark-theme appropriate colours)
         if new_mode == "difference":
             self.batting_comparison_btn.config(
-                text="Show Current Stats",
-                bg="#3d2d00",
-                fg=ACCENT_GOLD,
-                relief=tk.SUNKEN,
+                text="Show Current Stats", bg="#3d2d00", fg=ACCENT_GOLD, relief=tk.SUNKEN
             )
             self.pitching_comparison_btn.config(
-                text="Show Current Stats",
-                bg="#3d2d00",
-                fg=ACCENT_GOLD,
-                relief=tk.SUNKEN,
+                text="Show Current Stats", bg="#3d2d00", fg=ACCENT_GOLD, relief=tk.SUNKEN
             )
         else:
             self.batting_comparison_btn.config(
-                text="Show Difference from 2025",
-                bg=BG_ELEVATED,
-                fg=TEXT_PRIMARY,
-                relief=tk.RAISED,
+                text="Show Difference from 2025", bg=BG_ELEVATED, fg=TEXT_PRIMARY, relief=tk.RAISED
             )
             self.pitching_comparison_btn.config(
-                text="Show Difference from 2025",
-                bg=BG_ELEVATED,
-                fg=TEXT_PRIMARY,
-                relief=tk.RAISED,
+                text="Show Difference from 2025", bg=BG_ELEVATED, fg=TEXT_PRIMARY, relief=tk.RAISED
             )
 
         # Refresh display
@@ -1224,9 +1064,7 @@ class RosterWidget:
         if self.baseball_data is None:
             return
 
-        batting_2025, pitching_2025 = self.baseball_data.calculate_prorated_2025_stats(
-            team_name, games_played
-        )
+        batting_2025, pitching_2025 = self.baseball_data.calculate_prorated_2025_stats(team_name, games_played)
 
         self.team_batting_2025 = batting_2025
         self.team_pitching_2025 = pitching_2025
@@ -1235,9 +1073,7 @@ class RosterWidget:
             f"Loaded 2025 team data for {team_name}: {len(batting_2025)} batters, {len(pitching_2025)} pitchers"
         )
 
-    def _calculate_difference_df(
-        self, current_df: pd.DataFrame, is_batter: bool
-    ) -> pd.DataFrame:
+    def _calculate_difference_df(self, current_df: pd.DataFrame, is_batter: bool) -> pd.DataFrame:
         """
         Calculate current - prorated 2025 for team players (Phase 5: Stats Enhancement).
 
@@ -1251,9 +1087,7 @@ class RosterWidget:
         # Load 2025 data if not cached (always recalculate to get correct proration)
         if self.current_team and self.baseball_data:
             if hasattr(self.baseball_data, "team_games_played"):
-                games_played = self.baseball_data.team_games_played.get(
-                    self.current_team, 0
-                )
+                games_played = self.baseball_data.team_games_played.get(self.current_team, 0)
                 if games_played > 0:
                     # Always reload to get correct prorated values for current games_played
                     self._load_team_2025_data(self.current_team, games_played)
@@ -1274,45 +1108,26 @@ class RosterWidget:
             idx_str = str(idx)
             if idx_str in hist_index_str:
                 # Find the matching row in hist_df
-                hist_row = hist_df.loc[
-                    hist_df.index[hist_df.index.astype(str) == idx_str]
-                ].iloc[0]
+                hist_row = hist_df.loc[hist_df.index[hist_df.index.astype(str) == idx_str]].iloc[0]
 
                 # Counting stats: absolute difference
                 if is_batter:
                     count_cols = ["AB", "R", "H", "2B", "3B", "HR", "RBI", "BB", "SO"]
                     rate_cols = ["AVG", "OBP", "SLG", "OPS"]
                 else:
-                    count_cols = [
-                        "G",
-                        "GS",
-                        "W",
-                        "L",
-                        "IP",
-                        "H",
-                        "R",
-                        "ER",
-                        "HR",
-                        "BB",
-                        "SO",
-                        "SV",
-                    ]
+                    count_cols = ["G", "GS", "W", "L", "IP", "H", "R", "ER", "HR", "BB", "SO", "SV"]
                     rate_cols = ["ERA", "WHIP"]
 
                 for col in count_cols:
                     if col in diff_df.columns and col in hist_row.index:
                         diff_df[col] = diff_df[col].astype(float)
-                        diff_df.at[idx, col] = float(diff_df.at[idx, col]) - float(
-                            hist_row[col]
-                        )
+                        diff_df.at[idx, col] = float(diff_df.at[idx, col]) - float(hist_row[col])
 
                 # Rate stats: difference
                 for col in rate_cols:
                     if col in diff_df.columns and col in hist_row.index:
                         diff_df[col] = diff_df[col].astype(float)
-                        diff_df.at[idx, col] = float(diff_df.at[idx, col]) - float(
-                            hist_row[col]
-                        )
+                        diff_df.at[idx, col] = float(diff_df.at[idx, col]) - float(hist_row[col])
 
         return diff_df
 
@@ -1358,12 +1173,7 @@ class RosterWidget:
             frame = self.pitching_totals_frame
             labels_dict = self.pitching_totals_labels
 
-        if (
-            df is None
-            or df.empty
-            or self.baseball_data is None
-            or self.current_team is None
-        ):
+        if df is None or df.empty or self.baseball_data is None or self.current_team is None:
             return
 
         # Clear existing widgets
@@ -1394,23 +1204,7 @@ class RosterWidget:
             # Override G with actual team games played
             if games_played > 0:
                 current_totals["G"] = games_played
-            columns = [
-                "",
-                "G",
-                "AB",
-                "R",
-                "H",
-                "2B",
-                "3B",
-                "HR",
-                "RBI",
-                "BB",
-                "SO",
-                "AVG",
-                "OBP",
-                "SLG",
-                "OPS",
-            ]
+            columns = ["", "G", "AB", "R", "H", "2B", "3B", "HR", "RBI", "BB", "SO", "AVG", "OBP", "SLG", "OPS"]
         else:
             current_totals = bbstats.team_pitching_totals(df)
             # For pitching, sum G (total pitcher appearances) and override with team games
@@ -1420,23 +1214,7 @@ class RosterWidget:
                 # Option 2: Team games played (more meaningful for comparison)
                 if games_played > 0:
                     current_totals["G"] = games_played
-            columns = [
-                "",
-                "G",
-                "GS",
-                "W",
-                "L",
-                "IP",
-                "H",
-                "R",
-                "ER",
-                "HR",
-                "BB",
-                "SO",
-                "ERA",
-                "WHIP",
-                "SV",
-            ]
+            columns = ["", "G", "GS", "W", "L", "IP", "H", "R", "ER", "HR", "BB", "SO", "ERA", "WHIP", "SV"]
 
         # Create treeview for totals
         totals_tree = ttk.Treeview(frame, columns=columns, show="headings", height=3)
@@ -1458,10 +1236,7 @@ class RosterWidget:
             team_name=self.current_team, current_games_played=games_played
         )
 
-        if games_played > 0 and (
-            (is_batter and not batting_2025.empty)
-            or (not is_batter and not pitching_2025.empty)
-        ):
+        if games_played > 0 and ((is_batter and not batting_2025.empty) or (not is_batter and not pitching_2025.empty)):
             # Calculate 2025 totals
             if is_batter:
                 prorated_totals = bbstats.team_batting_totals(batting_2025)
@@ -1476,22 +1251,14 @@ class RosterWidget:
             diff_totals = current_totals.copy()
             for col in columns[1:]:  # Skip empty label column
                 if col in current_totals.columns and col in prorated_totals.columns:
-                    diff_totals[col] = (
-                        current_totals[col].values[0] - prorated_totals[col].values[0]
-                    )
+                    diff_totals[col] = current_totals[col].values[0] - prorated_totals[col].values[0]
 
             # Create labels with game counts
-            current_label = (
-                f"2026 ({games_played} games)" if games_played > 0 else "Current"
-            )
+            current_label = f"2026 ({games_played} games)" if games_played > 0 else "Current"
             if games_played >= 162:
                 season_label = f"2025 (prorated {games_played} games)"
             else:
-                season_label = (
-                    f"2025 (prorated {games_played} games)"
-                    if games_played > 0
-                    else "2025 (Prorated)"
-                )
+                season_label = f"2025 (prorated {games_played} games)" if games_played > 0 else "2025 (Prorated)"
 
             # Insert three rows
             row_data = [
@@ -1504,25 +1271,17 @@ class RosterWidget:
                 values = [label]
                 for col in columns[1:]:
                     if col in data.columns:
-                        values.append(
-                            self._format_total_value(data[col].values[0], col, is_diff)
-                        )
+                        values.append(self._format_total_value(data[col].values[0], col, is_diff))
                     else:
                         values.append("")
                 totals_tree.insert("", tk.END, values=tuple(values))
         else:
             # No 2025 data or no games played, show current only
-            current_label = (
-                f"2026 ({games_played} games)" if games_played > 0 else "Current"
-            )
+            current_label = f"2026 ({games_played} games)" if games_played > 0 else "Current"
             values = [current_label]
             for col in columns[1:]:
                 if col in current_totals.columns:
-                    values.append(
-                        self._format_total_value(
-                            current_totals[col].values[0], col, False
-                        )
-                    )
+                    values.append(self._format_total_value(current_totals[col].values[0], col, False))
                 else:
                     values.append("")
             totals_tree.insert("", tk.END, values=tuple(values))
@@ -1530,12 +1289,8 @@ class RosterWidget:
         totals_tree.pack(fill=tk.BOTH, expand=False, padx=5, pady=5)
 
         # Right-click and Ctrl+C to copy rows
-        totals_tree.bind(
-            "<Button-3>", lambda e, t=totals_tree: self._show_copy_menu(e, t)
-        )
-        totals_tree.bind(
-            "<Control-c>", lambda e, t=totals_tree: self._copy_selected_rows(t)
-        )
+        totals_tree.bind("<Button-3>", lambda e, t=totals_tree: self._show_copy_menu(e, t))
+        totals_tree.bind("<Control-c>", lambda e, t=totals_tree: self._copy_selected_rows(t))
 
     def _format_total_value(self, value, col_name: str, is_difference: bool = False):
         """Format a total value for display."""
@@ -1564,9 +1319,7 @@ class RosterWidget:
             return
         columns = tree["columns"]
         header = "\t".join(columns)
-        rows = [
-            "\t".join(str(v) for v in tree.item(item, "values")) for item in selected
-        ]
+        rows = ["\t".join(str(v) for v in tree.item(item, "values")) for item in selected]
         tree.clipboard_clear()
         tree.clipboard_append(header + "\n" + "\n".join(rows))
 
@@ -1587,18 +1340,10 @@ class RosterWidget:
         is_batter = tree == self.pos_players_tree
 
         menu = tk.Menu(tree, tearoff=0)
-        menu.add_command(
-            label=f"View {player_name} History",
-            command=lambda: self._on_player_click(tree, is_batter),
-        )
+        menu.add_command(label=f"View {player_name} History", command=lambda: self._on_player_click(tree, is_batter))
         menu.add_separator()
-        menu.add_command(
-            label="Copy Player Name",
-            command=lambda: self._copy_to_clipboard(player_name),
-        )
-        menu.add_command(
-            label="Copy Full Row", command=lambda: self._copy_selected_rows(tree)
-        )
+        menu.add_command(label="Copy Player Name", command=lambda: self._copy_to_clipboard(player_name))
+        menu.add_command(label="Copy Full Row", command=lambda: self._copy_selected_rows(tree))
 
         try:
             menu.tk_popup(event.x_root, event.y_root)

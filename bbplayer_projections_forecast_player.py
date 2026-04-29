@@ -1,47 +1,20 @@
 """
-PLAYER PROJECTOR MODULE
------------------------
-Multi-strategy statistical engine for projecting MLB player performance.
-Rather than a one-size-fits-all formula, the engine selects a projection
-strategy per player based on career trajectory, sample size, and age.
+Copyright (c) 2024 Jim Maastricht
 
-Core Philosophies:
-1. BAYESIAN SHRINKAGE: Low-sample players are regressed toward a computed
-   league mean. K-values per stat control the strength of the pull.
-2. TREND RECOGNITION: Players with a consistent monotonic rate history use
-   linear regression, dampened by career volume and proven-player status.
-3. INJURY SMOOTHING: V-shaped volume patterns can be smoothed via
-   _project_with_injury_smoothing to prevent a shortened year from anchoring
-   the projection (available utility; not called in the main flow).
-4. AGE FLOORS: Young players (<=25) and prime-age players (27-32) use the
-   higher of the trend or weighted average, preventing unfair downward slopes.
-5. AGING CURVE: A parabolic multiplier (Growth/Prime/Decline) is applied
-   based on the player's projected age, dampened by career volume trust.
+Multi-strategy engine for projecting MLB player performance using Bayesian
+shrinkage, trend recognition, injury smoothing, and aging curves.
 """
 
 import numpy as np
 import pandas as pd
-from typing import Dict, List, Optional
+from typing import Dict, List
 
 
 class PlayerProjector:
-    """
-    Multi-strategy statistical engine for projecting MLB player performance.
-
-    Selects a projection strategy per player based on career length, sample
-    size, and age. Applies Bayesian shrinkage, linear trend detection, age
-    floors, and an aging curve. Entry point is calculate_projected_stats.
-    """
+    """Multi-strategy statistical engine for projecting MLB player performance."""
 
     def __init__(self, league_averages: Dict[str, float], gate_pa: int = 400):
-        """
-        Initialize the projector with league context.
-
-        :param league_averages: Dict of league-average rates keyed as
-            '{stat}_per_{vol_col}' (e.g. 'H_per_PA', 'SO_per_PA').
-        :param gate_pa: PA threshold at which full trust in player data is
-            granted for aging-curve dampening. Default 400.
-        """
+        """Initialize the projector with league context."""
         self.lg_avgs = league_averages
         self.gate = gate_pa
 
@@ -65,9 +38,7 @@ class PlayerProjector:
             "default": 250,
         }
 
-    def calculate_projected_stats(
-        self, history: pd.DataFrame, stats: List[str], is_p: bool
-    ) -> pd.DataFrame:
+    def calculate_projected_stats(self, history: pd.DataFrame, stats: List[str], is_p: bool) -> pd.DataFrame:
         """
         Project stats for every player in the historical DataFrame.
 
@@ -86,9 +57,7 @@ class PlayerProjector:
 
         for h_code in unique_players:
             # .copy() is vital here to prevent cross-contamination
-            player_history = (
-                history[history["Hashcode"] == h_code].sort_values("Season").copy()
-            )
+            player_history = history[history["Hashcode"] == h_code].sort_values("Season").copy()
 
             # Ensure we aren't projecting someone who has 0 volume
             if player_history["PA"].sum() == 0:
@@ -100,9 +69,7 @@ class PlayerProjector:
         # Return a full DataFrame ready for bbstats_preprocess
         return pd.DataFrame(all_projections)
 
-    def _get_projection_batter(
-        self, player_history: pd.DataFrame, stat_col: str, vol_col: str
-    ) -> float:
+    def _get_projection_batter(self, player_history: pd.DataFrame, stat_col: str, vol_col: str) -> float:
         """
         Project a single per-vol rate for a batter and apply aging/tax.
 
@@ -130,19 +97,12 @@ class PlayerProjector:
 
         # 1. STRATEGY SELECTION - Get player's raw rate
         if num_years == 1 and career_vol >= 300:
-            player_rate = self._project_single_year_starter(
-                player_history, stat_col, vol_col
-            )
+            player_rate = self._project_single_year_starter(player_history, stat_col, vol_col)
         elif (career_vol / num_years) < 100 or num_years < 2:
             player_rate = self._regress_to_mean(player_history, stat_col, vol_col)
-        elif (
-            self._is_consistent_trend(player_history, stat_col, vol_col)
-            and num_years >= 2
-        ):
+        elif self._is_consistent_trend(player_history, stat_col, vol_col) and num_years >= 2:
             trend_rate = self._linear_regression(player_history, stat_col, vol_col)
-            w_avg_rate = self._weighted_career_average(
-                player_history, stat_col, vol_col
-            )
+            w_avg_rate = self._weighted_career_average(player_history, stat_col, vol_col)
             # For proven power hitters, use weighted average instead of linear regression
             # to better capture breakout seasons (Eugenio Suarez, Cal Raleigh)
             is_proven = num_years >= 3 and career_vol >= 1000
@@ -155,13 +115,9 @@ class PlayerProjector:
             else:
                 player_rate = trend_rate
         else:
-            player_rate = self._weighted_career_average(
-                player_history, stat_col, vol_col
-            )
+            player_rate = self._weighted_career_average(player_history, stat_col, vol_col)
             if 27 <= age_2026 <= 33 and career_vol >= 600 and stat_col in ["H", "BB"]:
-                recent_rate = player_history.iloc[-1][stat_col] / max(
-                    1, player_history.iloc[-1][vol_col]
-                )
+                recent_rate = player_history.iloc[-1][stat_col] / max(1, player_history.iloc[-1][vol_col])
                 player_rate = max(player_rate, recent_rate * 0.93)
 
         # 2. Apply AGING to player's rate (before regression)
@@ -173,34 +129,22 @@ class PlayerProjector:
 
         # 3. Apply UNPROVEN TAX to player's rate (before regression)
         unproven_factor = np.clip(1.0 - (career_vol / 500), 0, 1)
-        tax = (
-            1.0 - (0.04 * unproven_factor)
-            if stat_col != "SO"
-            else 1.0 + (0.06 * unproven_factor)
-        )
+        tax = 1.0 - (0.04 * unproven_factor) if stat_col != "SO" else 1.0 + (0.06 * unproven_factor)
         player_rate = player_rate * tax
 
         # 4. BAYESIAN REGRESSION - Now regress the adjusted player rate toward league avg
         k = self.k_vals_batter.get(stat_col, self.k_vals_batter["default"])
         lg_rate = self.lg_avgs.get(
             f"{stat_col}_per_{vol_col}",
-            self.lg_avgs.get("H_per_AB", 0.258)
-            if stat_col == "H" and vol_col == "AB"
-            else 0.240,
+            self.lg_avgs.get("H_per_AB", 0.258) if stat_col == "H" and vol_col == "AB" else 0.240,
         )
         final_rate = (player_rate * career_vol + k * lg_rate) / (career_vol + k)
 
         return self._apply_sanity_caps(
-            float(np.clip(final_rate, 0, 0.480)),
-            stat_col,
-            is_p=False,
-            player_history=player_history,
-            vol_col=vol_col,
+            float(np.clip(final_rate, 0, 0.480)), stat_col, is_p=False, player_history=player_history, vol_col=vol_col
         )
 
-    def _get_projection_pitcher(
-        self, player_history: pd.DataFrame, stat_col: str, vol_col: str
-    ) -> float:
+    def _get_projection_pitcher(self, player_history: pd.DataFrame, stat_col: str, vol_col: str) -> float:
         """
         Project a single per-vol rate for a pitcher and apply aging/tax.
 
@@ -237,9 +181,7 @@ class PlayerProjector:
             player_rate = self._regress_to_mean(player_history, stat_col, vol_col)
         else:
             trend_rate = self._linear_regression(player_history, stat_col, vol_col)
-            w_avg_rate = self._weighted_career_average(
-                player_history, stat_col, vol_col
-            )
+            w_avg_rate = self._weighted_career_average(player_history, stat_col, vol_col)
             if stat_col == "SO" and is_proven:
                 player_rate = w_avg_rate
             else:
@@ -260,11 +202,7 @@ class PlayerProjector:
 
         # 3. Apply UNPROVEN TAX to player's rate (before regression)
         unproven_factor = np.clip(1.0 - (career_vol / 250), 0, 1)
-        tax = (
-            1.0 + (0.05 * unproven_factor)
-            if stat_col in ["H", "BB", "ER"]
-            else 1.0 - (0.05 * unproven_factor)
-        )
+        tax = 1.0 + (0.05 * unproven_factor) if stat_col in ["H", "BB", "ER"] else 1.0 - (0.05 * unproven_factor)
         player_rate = player_rate * tax
 
         # 4. OBP Anchor (before regression)
@@ -295,16 +233,10 @@ class PlayerProjector:
                 final_rate = max(final_rate, lg_er_per_ip * 0.4)
 
         return self._apply_sanity_caps(
-            float(final_rate),
-            stat_col,
-            is_p=True,
-            player_history=player_history,
-            vol_col=vol_col,
+            float(final_rate), stat_col, is_p=True, player_history=player_history, vol_col=vol_col
         )
 
-    def _project_single_player(
-        self, history: pd.DataFrame, stats: List[str], is_p: bool
-    ) -> dict:
+    def _project_single_player(self, history: pd.DataFrame, stats: List[str], is_p: bool) -> dict:
         """
         Route one player's history to the correct projection engine.
 
@@ -322,11 +254,7 @@ class PlayerProjector:
         if "Pitcher" in role:
             result = {s: 0.0 for s in stats}
             result["PA"] = history["PA"].iloc[-1]
-            result["AB"], result["SO"], result["AVG"] = (
-                result["PA"],
-                result["PA"] * 0.50,
-                0.0,
-            )
+            result["AB"], result["SO"], result["AVG"] = (result["PA"], result["PA"] * 0.50, 0.0)
             result["Projection_Method"] = "Pitcher-Hitting"
             return result
 
@@ -369,9 +297,7 @@ class PlayerProjector:
         result["SO"] = self._get_projection_batter(history, "SO", "PA") * proj_vol
 
         # B. Sync AB/Hits to avoid the 7-point leak
-        result["AB"] = proj_vol - (
-            result.get("BB", 0) + result.get("HBP", 0) + result.get("SF", 0)
-        )
+        result["AB"] = proj_vol - (result.get("BB", 0) + result.get("HBP", 0) + result.get("SF", 0))
         proj_ba = self._get_projection_batter(history, "H", "AB")
         result["H"] = result["AB"] * proj_ba
 
@@ -420,9 +346,7 @@ class PlayerProjector:
         ip_per_year = self._get_projection_pitcher(history, "IP", "Season")
         if is_workhorse:
             raw_ip = history["IP_Dec"].iloc[-1]
-            proj_ip_true = max(
-                150, min(raw_ip * 1.02, 210)
-            )  # Workhorses project higher
+            proj_ip_true = max(150, min(raw_ip * 1.02, 210))  # Workhorses project higher
         else:
             raw_ip = history["IP_Dec"].iloc[-1]
             proj_ip_true = max(50, min(raw_ip, 170))
@@ -464,9 +388,7 @@ class PlayerProjector:
         er_per_ip = self._get_projection_pitcher(history, "ER", "IP")
         er_per_ip = max(er_per_ip, lg_era_per_ip * 0.35)
 
-        result["ER"] = (
-            er_per_ip * result["IP"] / 9
-        )  # Divide by 9 because lg_avgs stores ERA*9
+        result["ER"] = er_per_ip * result["IP"] / 9  # Divide by 9 because lg_avgs stores ERA*9
 
         # 10. FINAL DISPLAY FORMATTING
         result["IP_True"] = result["IP"]  # Keep true decimal for internal use
@@ -480,9 +402,7 @@ class PlayerProjector:
 
         return result
 
-    def _project_single_year_starter(
-        self, history: pd.DataFrame, stat_col: str, vol_col: str
-    ) -> float:
+    def _project_single_year_starter(self, history: pd.DataFrame, stat_col: str, vol_col: str) -> float:
         """
         Project a player with exactly one qualifying season (>= 300 vol).
 
@@ -565,9 +485,7 @@ class PlayerProjector:
     #         return lg_rate
     #
     #     return (career_total + k * lg_rate) / (career_vol + k)
-    def _regress_to_mean(
-        self, history: pd.DataFrame, stat_col: str, vol_col: str
-    ) -> float:
+    def _regress_to_mean(self, history: pd.DataFrame, stat_col: str, vol_col: str) -> float:
         career_total = history[stat_col].sum()
         career_vol = history[vol_col].sum()
         is_p = "IP" in history.columns
@@ -596,9 +514,7 @@ class PlayerProjector:
                 lg_ratio = fallbacks.get(stat_col, 0.10)
 
             # Use a tighter K for ratios to preserve player uniqueness
-            k_ratio = (
-                10  # Reduced from 15 to boost HR projections and capture breakouts
-            )
+            k_ratio = 10  # Reduced from 15 to boost HR projections and capture breakouts
             reg_ratio = (career_total + k_ratio * lg_ratio) / (career_h + k_ratio)
             return float(reg_ratio)
 
@@ -617,9 +533,7 @@ class PlayerProjector:
 
         return (career_total + k * lg_rate) / (career_vol + k)
 
-    def _linear_regression(
-        self, history: pd.DataFrame, stat_col: str, vol_col: str
-    ) -> float:
+    def _linear_regression(self, history: pd.DataFrame, stat_col: str, vol_col: str) -> float:
         """
         Project via linear regression of per-vol rates across seasons.
 
@@ -826,9 +740,7 @@ class PlayerProjector:
         diffs = np.diff(rates)
         return all(d >= 0 for d in diffs) or all(d <= 0 for d in diffs)
 
-    def _apply_sanity_caps(
-        self, rate, stat_col, is_p, player_history=None, vol_col=None
-    ):
+    def _apply_sanity_caps(self, rate, stat_col, is_p, player_history=None, vol_col=None):
         """
         Clamp a projected per-vol rate to physically realistic bounds.
 
@@ -856,10 +768,7 @@ class PlayerProjector:
             if stat_col == "HR" and player_history is not None:
                 h = player_history["H"].sum()
                 tb = (
-                    player_history["H"]
-                    + player_history["2B"]
-                    + 2 * player_history["3B"]
-                    + 3 * player_history["HR"]
+                    player_history["H"] + player_history["2B"] + 2 * player_history["3B"] + 3 * player_history["HR"]
                 ).sum()
                 ab = player_history["AB"].sum()
                 career_iso = (tb - h) / max(1, ab)
@@ -1020,20 +929,14 @@ if __name__ == "__main__":
     df_ready = pd.DataFrame(processed_rows)
 
     # 4. RUN PROJECTIONS
-    h_proj = projector.calculate_projected_stats(
-        df_ready[~df_ready["is_pitcher"]], [], is_p=False
-    )
-    p_proj = projector.calculate_projected_stats(
-        df_ready[df_ready["is_pitcher"]], [], is_p=True
-    )
+    h_proj = projector.calculate_projected_stats(df_ready[~df_ready["is_pitcher"]], [], is_p=False)
+    p_proj = projector.calculate_projected_stats(df_ready[df_ready["is_pitcher"]], [], is_p=True)
 
     # 5. DIAGNOSTIC OUTPUT: HITTERS (OBP Focus)
     print("\n" + "=" * 115)
     print(f"{'HITTER OBP INTEGRITY DIAGNOSIS':^115}")
     print("=" * 115)
-    print(
-        f"{'Player':<18} | {'PA':<5} | {'BA':<6} | {'BB/PA':<6} | {'OBP':<6} | {'HR':<5} | {'25 OBP':<6} | {'Delta'}"
-    )
+    print(f"{'Player':<18} | {'PA':<5} | {'BA':<6} | {'BB/PA':<6} | {'OBP':<6} | {'HR':<5} | {'25 OBP':<6} | {'Delta'}")
     print("-" * 115)
     for _, row in h_proj.iterrows():
         p_25 = df_ready[df_ready["Player"] == row["Player"]].iloc[-1]

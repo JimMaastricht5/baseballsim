@@ -1,11 +1,7 @@
 """
---- Copyright Notice ---
 Copyright (c) 2024 Jim Maastricht
 
-Worker thread for running baseball season simulation.
-
-This threading.Thread wraps the BaseballSeason simulation, running it in a
-background thread and putting messages on queues to update the UI.
+Worker thread for running baseball season simulation in background.
 """
 
 import queue
@@ -17,55 +13,29 @@ from ui.ui_baseball_season import UIBaseballSeason
 
 
 class SeasonWorker(threading.Thread):
-    """
-    Background worker thread for season simulation.
-
-    Runs the baseball season simulation in a separate thread from the UI,
-    putting messages on queues for all state changes. Supports pause/resume and
-    day-by-day stepping controls.
-
-    Attributes:
-        signals (SeasonSignals): Queue-based signal emitter for UI updates
-        season: BaseballSeason instance (None until run())
-        _paused (bool): Pause flag
-        _step_mode (bool): Single-step mode flag
-        _stopped (bool): Stop flag for termination
-        _pause_lock (threading.Lock): Lock for pause state synchronization
-        _pause_event (threading.Event): Event for waiting when paused
-    """
+    """Background worker thread for season simulation."""
 
     def __init__(
-            self,
-            load_seasons=None,
-            new_season=2026,
-            rotation_len=5,
-            series_length=3,
-            season_length=162,
-            season_chatty=False,
-            season_print_lineup_b=False,
-            season_print_box_score_b=False,
-            team_to_follow=None,
-            start_paused=False,
-            obp_adjustment=0.0,
+        self,
+        load_seasons=None,
+        new_season=2026,
+        rotation_len=5,
+        series_length=3,
+        season_length=162,
+        season_chatty=False,
+        season_print_lineup_b=False,
+        season_print_box_score_b=False,
+        team_to_follow=None,
+        start_paused=False,
+        obp_adjustment=0.0,
     ):
-        """
-        Initialize season worker with simulation parameters.
-
-        Args:
-            load_seasons (list): Years to load stats from (e.g., [2023, 2024, 2025])
-            new_season (int): Season year to simulate
-            team_to_follow (list): Teams to follow in detail (e.g., ['NYM', 'LAD'])
-            rotation_len (int): Pitcher rotation length (default 5)
-            season_length (int): Number of games per team (default 162)
-        """
+        """Initialize season worker with simulation parameters."""
         super().__init__()
 
         # Store simulation parameters
         self.load_seasons = load_seasons or [2023, 2024, 2025]
         self.new_season = new_season
-        self.team_to_follow = (
-                team_to_follow or "MIL"
-        )  # Single string, defaults to 'MIL'
+        self.team_to_follow = team_to_follow or "MIL"  # Single string, defaults to 'MIL'
         self.random_data = False
         self.rotation_len = rotation_len
         self.series_length = series_length
@@ -99,13 +69,7 @@ class SeasonWorker(threading.Thread):
         self._run_playoffs = False
 
     def run(self):
-        """
-        Main thread execution method.
-
-        Runs the season simulation loop, checking pause/step flags and
-        emitting signals for UI updates. This method runs in the worker
-        thread, not the main UI thread.
-        """
+        """Main thread execution method. Runs the season simulation loop."""
         try:
             logger.info(f"Starting season simulation: {self.new_season}")
 
@@ -123,9 +87,7 @@ class SeasonWorker(threading.Thread):
                 season_print_lineup_b=self.season_print_lineup_b,  # Suppress console output
                 season_print_box_score_b=self.season_print_box_score_b,  # Suppress console output
                 season_chatty=self.season_chatty,  # Suppress verbose output
-                season_team_to_follow=[
-                    self.team_to_follow
-                ],  # Convert single string to single-element list
+                season_team_to_follow=[self.team_to_follow],  # Convert single string to single-element list
                 load_batter_file="player-projected-stats-pp-Batting.csv",
                 load_pitcher_file="player-projected-stats-pp-Pitching.csv",
                 load_schedule_file=f"{self.new_season} MLB Schedule.csv",  # Load from downloaded schedule
@@ -202,9 +164,7 @@ class SeasonWorker(threading.Thread):
                         logger.info("Running playoffs")
                         self.season.run_playoffs()
                 else:
-                    logger.info(
-                        "World Series not eligible (single league or short season)"
-                    )
+                    logger.info("World Series not eligible (single league or short season)")
 
                 # Emit final simulation complete
                 self.signals.emit_simulation_complete()
@@ -218,12 +178,7 @@ class SeasonWorker(threading.Thread):
             self.signals.emit_error(error_msg)
 
     def _handle_pause(self):
-        """
-        Handle pause state by waiting on event.
-
-        This method blocks the worker thread when paused until resume()
-        or step_one_day() is called.
-        """
+        """Handle pause state by waiting on event."""
         with self._pause_lock:
             if self._paused and not self._stopped:
                 logger.debug("Worker thread paused, waiting...")

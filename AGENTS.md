@@ -3,14 +3,11 @@
 ## Quick Commands
 
 ```bash
-# Run season simulation (uses uv)
-python run.py
+# Run season simulation with UI (Tkinter)
+uv run bbseason_ui.py --team MIL --games 162 --seasons 2023,2024,2025,2026 --new-season 2026
 
-# With custom args
+# Or use the convenience wrapper (uses uv internally)
 python run.py --team NYM --games 81 --seasons 2024,2025 --new-season 2026
-
-# Run individual scripts directly
-uv run bbseason_ui.py --team MIL --games 162 --seasons 2023,2024,2025,2026
 
 # Run data preprocessing
 uv run bbplayer_projections.py
@@ -18,8 +15,8 @@ uv run bbplayer_projections.py
 
 ## Environment
 
-- **Python 3.14 (free-threaded)** - Required for multi-threading
-- **uv** - Package manager. Use `uv run` or `uv sync`, NOT direct venv paths
+- **Python 3.14+ freethreaded** - Required for multi-threading
+- **uv** - Package manager. Use `uv run`, NOT direct venv paths
 - `.venv/` - Local uv virtual environment
 
 ## Linting
@@ -35,7 +32,7 @@ pyproject.toml: line-length=120, ignores COM812/ISC001
 
 - `run.py` - Entry point for season UI
 - `bbseason.py` / `bbgame.py` - Core simulation
-- `bbat_bat.py` - At-bat odds-ratio engine (note: file is `bbat_bat.py`, not `at_bat.py`)
+- `bbat_bat.py` - At-bat odds-ratio engine (file is `bbat_bat.py`, NOT `at_bat.py`)
 - `bbstats.py` - Stats caching (29x speedup), injured/fatigue tracking
 - `bbinjuries.py` - Injury durations 5-270 days
 - `bbbaserunners.py` - Base advancement logic
@@ -56,3 +53,8 @@ pyproject.toml: line-length=120, ignores COM812/ISC001
 ## Testing
 
 Self-contained with `__main__` blocks. Run individual modules directly.
+
+## Also See
+
+- **[CLAUDE.md](CLAUDE.md)** - Detailed architecture guide (CLI commands, data flow, optimization details)
+- **[ui/ui_claude.md](ui/ui_claude.md)** - UI widget reference

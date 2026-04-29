@@ -1,60 +1,48 @@
 # AGENTS.md
 
-## Quick Commands
+## Critical Setup
 
 ```bash
-# Run season simulation with UI (Tkinter)
-uv run bbseason_ui.py --team MIL --games 162 --seasons 2023,2024,2025,2026 --new-season 2026
-
-# Or use the convenience wrapper (uses uv internally)
-python run.py --team NYM --games 81 --seasons 2024,2025 --new-season 2026
-
-# Run data preprocessing
-uv run bbplayer_projections.py
+# First-time setup (MUST DO)
+uv python install 3.14.0  # Freethreaded REQUIRED - regular build fails
+uv sync
 ```
 
-## Environment
-
-- **Python 3.14+ freethreaded** - Required for multi-threading
-- **uv** - Package manager. Use `uv run`, NOT direct venv paths
-- `.venv/` - Local uv virtual environment
-
-## Linting
+## Essential Commands
 
 ```bash
+# Season simulation with UI (Tkinter) - RECOMMENDED
+uv run bbseason_ui.py --team MIL --games 162 --seasons 2023,2024,2025,2026 --new-season 2026
+
+# Convenience wrapper (same as above)
+python run.py [--team TEAM --games N --seasons YEAR,YEAR --new-season YEAR]
+
+# Visual game simulation (Pygame)
+uv run bbgame_ui.py
+
+# Single game (CLI)
+uv run bbgame.py
+
+# Full season (CLI)
+uv run bbseason.py
+
+# Data preprocessing (after downloading stats)
+uv run bbplayer_projections.py
+
+# Download fresh stats from RotoWire
+uv run download_stats.py
+
+# Linting
 uv run ruff check .
 uv run ruff format .
 ```
 
-pyproject.toml: line-length=120, ignores COM812/ISC001
+## Critical Notes
 
-## Architecture Notes
-
-- `run.py` - Entry point for season UI
-- `bbseason.py` / `bbgame.py` - Core simulation
-- `bbat_bat.py` - At-bat odds-ratio engine (file is `bbat_bat.py`, NOT `at_bat.py`)
-- `bbstats.py` - Stats caching (29x speedup), injured/fatigue tracking
-- `bbinjuries.py` - Injury durations 5-270 days
-- `bbbaserunners.py` - Base advancement logic
-- `ui/` - Tkinter UI components
-
-## Data Files
-
-- `player-projected-stats-pp-*.csv` - Age-adjusted projections for simulation
-- `historical-*.csv` - Year-by-year data
-- `New-Season-stats-pp-*.csv` - Empty placeholder for accumulating season data
-
-## Performance
-
-- DEBUG logging in `odds_ratio()` adds 38% overhead - keep at INFO for production
-- Cached RNG in `bbstats.py` provides 29x speedup
-- League totals cache provides 2-3x speedup
-
-## Testing
-
-Self-contained with `__main__` blocks. Run individual modules directly.
-
-## Also See
-
-- **[CLAUDE.md](CLAUDE.md)** - Detailed architecture guide (CLI commands, data flow, optimization details)
-- **[ui/ui_claude.md](ui/ui_claude.md)** - UI widget reference
+- **Python 3.14 freethreaded REQUIRED** - Regular build causes threading failures
+- **ONLY use `uv run`** - Never direct `.venv/` paths
+- **Entry point**: `run.py` (wrapper for `bbseason_ui.py`)
+- **Core engine**: `bbat_bat.py` - odds-ratio calculations
+- **Performance**: DEBUG logging adds 38% overhead in `odds_ratio()` - keep at INFO
+- **Data flow**: download → preprocess → stats → at-bat → game → season
+- **Testing**: `uv run <module>.py` for self-tests via `__main__` blocks

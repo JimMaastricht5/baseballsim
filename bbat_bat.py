@@ -8,15 +8,17 @@ Classes:
     SimAB - Calculates event probabilities for batter/pitcher matchups.
 """
 
-import numpy as np
 import warnings
-import bbstats
+from typing import Union
+
+import numpy as np
+import pandas as pd
 from numpy import bool_, float64
 from pandas.core.series import Series
-from typing import Union
-from bblogger import logger
+
+import bbstats
 from bblogger import configure_logger
-import pandas as pd
+from bblogger import logger
 
 
 class OutCome:
@@ -129,7 +131,7 @@ class SimAB:
         self.league_batting_Total_2B = self.league_batting_totals_df.at[0, "2B"]
         self.league_Total_outs = self.baseball_data.league_total_outs
         self.league_K_rate_per_AB = self.baseball_data.league_k_rate_per_ab
-        # Historical 2025 league baselines for accurate event rate targets
+        # Historical prior_year league baselines for accurate event rate targets
         self._load_historical_baselines()
         # League 2B/3B rates per OBP (used as pitcher baseline in odds ratio)
         self.league_2b_pitcher_rate = self.baseball_data.league_2b_rate
@@ -142,7 +144,7 @@ class SimAB:
         self.BB_adjustment = 0.0  # shift bb to h with neg number
         self.HBP_rate = 0.0143  # 1.4% of AB in 2022
         self.HBP_adjustment = (
-            self.HBP_rate * 0
+                self.HBP_rate * 0
         )  # adjustment to shift more to or from hbp league avg is 1.4%, results 1/4 of
         self.HR_adjustment = 0.0  # adjust for higher HR rate with new 2023 pitching rules
         self.DBL_adjustment = 0.0  # adjust for higher 2B rate with new 2023 pitching rules
@@ -155,17 +157,17 @@ class SimAB:
         return
 
     def _load_historical_baselines(self) -> None:
-        """Load 2025 league baselines for accurate event rate targets."""
-        self.baseball_data._ensure_2025_historical_loaded()
-        h25 = self.baseball_data.historical_2025_batting
+        """Load prior_year league baselines for accurate event rate targets."""
+        self.baseball_data._ensure_prior_year_historical_loaded()
+        h25 = self.baseball_data.historical_prior_year_batting
 
         if h25 is not None and not h25.empty:
             self.hist_ab = h25["AB"].sum()
             self.hist_pa = (
-                self.hist_ab
-                + h25["BB"].sum()
-                + h25.get("HBP", pd.Series([0])).sum()
-                + h25.get("SF", pd.Series([0])).sum()
+                    self.hist_ab
+                    + h25["BB"].sum()
+                    + h25.get("HBP", pd.Series([0])).sum()
+                    + h25.get("SF", pd.Series([0])).sum()
             )
             self.hist_hr = h25["HR"].sum()
             self.hist_bb = h25["BB"].sum()
@@ -185,7 +187,7 @@ class SimAB:
             self.hist_singles = self.hist_h - self.hist_hr - self.hist_2b - self.hist_3b
             self.hist_singles_rate = self.hist_singles / self.hist_ab
         else:
-            raise ValueError("Failed to load 2025 historical batting data")
+            raise ValueError("Failed to load prior_year historical batting data")
 
     def onbase(self, current_team_def_war: float) -> bool:
         """Calculate if batter reaches base, adjusting for defense via Def_WAR."""
@@ -195,11 +197,11 @@ class SimAB:
         # 2. Pitcher & Defense Adjustments
         defense_mod = current_team_def_war * 0.0015
         p_obp = (
-            self.pitching.OBP
-            + self.pitching.Game_Fatigue_Factor
-            - self.pitching.Injury_Perf_Adj
-            - self.pitching.Streak_Adjustment
-            - defense_mod
+                self.pitching.OBP
+                + self.pitching.Game_Fatigue_Factor
+                - self.pitching.Injury_Perf_Adj
+                - self.pitching.Streak_Adjustment
+                - defense_mod
         )
 
         # 3. Environment (Apply OBP_adjustment ONLY to the baseline)
@@ -352,14 +354,14 @@ class SimAB:
         return score_book_cd
 
     def ab_outcome(
-        self,
-        pitching: Series,
-        batting: Series,
-        outcomes: OutCome,
-        outs: int = 0,
-        runner_on_first: bool = False,
-        runner_on_third: bool = False,
-        lineup_def_war: float = 0,
+            self,
+            pitching: Series,
+            batting: Series,
+            outcomes: OutCome,
+            outs: int = 0,
+            runner_on_first: bool = False,
+            runner_on_third: bool = False,
+            lineup_def_war: float = 0,
     ) -> None:
         """Determine at-bat outcome via sequential probability gates (on-base → event type → out type)."""
         self.pitching = pitching
@@ -419,16 +421,16 @@ class SimAB:
             # Use HISTORICAL baselines for accurate league rates (BB%, HR%, 2B%, 3B%)
             weights = {
                 "BB": self.hist_bb_rate
-                * get_mult_hist("BB", batting.BB, pa_batter, pitching.BB, pa_pitcher, self.hist_bb, self.hist_pa),
+                      * get_mult_hist("BB", batting.BB, pa_batter, pitching.BB, pa_pitcher, self.hist_bb, self.hist_pa),
                 "HR": self.hist_hr_rate
-                * get_mult_hist("HR", batting.HR, pa_batter, pitching.HR, pa_pitcher, self.hist_hr, self.hist_ab),
+                      * get_mult_hist("HR", batting.HR, pa_batter, pitching.HR, pa_pitcher, self.hist_hr, self.hist_ab),
                 "3B": self.hist_3b_rate
-                * get_mult_hist("3B", batting["3B"], pa_batter, 0, 1, self.hist_3b, self.hist_ab),
+                      * get_mult_hist("3B", batting["3B"], pa_batter, 0, 1, self.hist_3b, self.hist_ab),
                 "2B": self.hist_2b_rate
-                * get_mult_hist("2B", batting["2B"], pa_batter, 0, 1, self.hist_2b, self.hist_ab),
+                      * get_mult_hist("2B", batting["2B"], pa_batter, 0, 1, self.hist_2b, self.hist_ab),
                 "HBP": self.hist_hbp / self.hist_pa,
                 "H": self.hist_singles_rate
-                * get_mult_hist(
+                     * get_mult_hist(
                     "H",
                     (batting.H - batting.HR - batting["2B"] - batting["3B"]),
                     pa_batter,
@@ -507,11 +509,11 @@ class SimAB:
         return
 
     def odds_ratio(
-        self,
-        hitter_stat: Union[float, float64],
-        pitcher_stat: Union[float, float64],
-        league_stat: float64,
-        stat_type: str = "",
+            self,
+            hitter_stat: Union[float, float64],
+            pitcher_stat: Union[float, float64],
+            league_stat: float64,
+            stat_type: str = "",
     ) -> float64:
         """Convert hitter/pitcher/league rates to a matchup probability via odds ratio."""
         if self.debug_b:
@@ -521,7 +523,7 @@ class SimAB:
         # PERFORMANCE: Warning filter set once in __init__ instead of context manager here (~3% speedup)
         try:
             odds = ((hitter_stat / (1 - hitter_stat)) * (pitcher_stat / (1 - pitcher_stat))) / (
-                league_stat / (1 - league_stat)
+                    league_stat / (1 - league_stat)
             )
         except (ZeroDivisionError, RuntimeWarning) as e:
             if isinstance(e, ZeroDivisionError):
@@ -599,8 +601,8 @@ class MockBaseballStats:
     def __init__(self):
         import pandas as pd
 
-        # Define a standard league baseline matching 2025 rates
-        # Historical 2025 targets: BB%=8.4%, K%=24.8%, H%=24.5%, HR%=3.5%, 2B%=4.7%, 3B%=0.4%
+        # Define a standard league baseline matching prior_year rates
+        # Historical prior_year targets: BB%=8.4%, K%=24.8%, H%=24.5%, HR%=3.5%, 2B%=4.7%, 3B%=0.4%
         # Per player (550 AB, ~607 PA): H=135, BB=51, HBP=7, SO=150, HR=19, 2B=26, 3B=2, SF=3
         self.batting_data = pd.DataFrame(
             {
@@ -639,22 +641,22 @@ class MockBaseballStats:
         self.league_2b_rate = self.league_batting_totals.at[0, "2B"] / self.league_batting_total_ob
         self.league_3b_rate = self.league_batting_totals.at[0, "3B"] / self.league_batting_total_ob
 
-        # Historical 2025 data for baseline rates (matching 2025 MLB actuals)
+        # Historical prior_year data for baseline rates (matching prior_year MLB actuals)
         # BB%=8.4%, K%=24.8%, H%=24.5%, HR%=3.5%, 2B%=4.7%, 3B%=0.4%
-        self.historical_2025_batting = self.batting_data.copy()
-        self.historical_2025_batting["AB"] = [550] * 10
-        self.historical_2025_batting["BB"] = [51] * 10
-        self.historical_2025_batting["HBP"] = [7] * 10
-        self.historical_2025_batting["SO"] = [150] * 10
-        self.historical_2025_batting["2B"] = [26] * 10
-        self.historical_2025_batting["3B"] = [2] * 10
-        self.historical_2025_batting["HR"] = [19] * 10
-        self.historical_2025_batting["SF"] = [3] * 10
+        self.historical_prior_year_batting = self.batting_data.copy()
+        self.historical_prior_year_batting["AB"] = [550] * 10
+        self.historical_prior_year_batting["BB"] = [51] * 10
+        self.historical_prior_year_batting["HBP"] = [7] * 10
+        self.historical_prior_year_batting["SO"] = [150] * 10
+        self.historical_prior_year_batting["2B"] = [26] * 10
+        self.historical_prior_year_batting["3B"] = [2] * 10
+        self.historical_prior_year_batting["HR"] = [19] * 10
+        self.historical_prior_year_batting["SF"] = [3] * 10
 
-        def _ensure_2025_historical_loaded(self):
+        def _ensure_prior_year_historical_loaded(self):
             pass  # No-op for mock
 
-        self._ensure_2025_historical_loaded = _ensure_2025_historical_loaded.__get__(self)
+        self._ensure_prior_year_historical_loaded = _ensure_prior_year_historical_loaded.__get__(self)
 
 
 # =================================================================
@@ -758,7 +760,7 @@ if __name__ == "__main__":
 
     # 1. Initialize BaseballStats
     stats = bbstats.BaseballStats(
-        load_seasons=[2023, 2024, 2025],
+        load_seasons=[2023, 2024, 2025, 2026],
         new_season=2026,
         load_batter_file="player-projected-stats-pp-Batting.csv",
         load_pitcher_file="player-projected-stats-pp-Pitching.csv",
@@ -783,20 +785,20 @@ if __name__ == "__main__":
     test_pitcher = qualified_pitchers.sort_values("OBP", ascending=False).iloc[median_p_idx]
 
     # 3. Pull Historical Comparison
-    stats._ensure_2025_historical_loaded()
-    h25 = stats.historical_2025_batting
+    stats._ensure_prior_year_historical_loaded()
+    h25 = stats.historical_prior_year_batting
 
-    # Get 2025 actual OBP for these players
-    batter_2025 = h25[h25["Player"] == test_batter["Player"]]
-    pitcher_2025 = h25[h25["Player"] == test_pitcher["Player"]]
+    # Get prior_year actual OBP for these players
+    batter_prior_year = h25[h25["Player"] == test_batter["Player"]]
+    pitcher_prior_year = h25[h25["Player"] == test_pitcher["Player"]]
 
-    batter_2025_obp = batter_2025["OBP"].iloc[0] if not batter_2025.empty else test_batter.OBP
-    pitcher_2025_obp = pitcher_2025["OBP"].iloc[0] if not pitcher_2025.empty else test_pitcher.OBP
+    batter_prior_year_obp = batter_prior_year["OBP"].iloc[0] if not batter_prior_year.empty else test_batter.OBP
+    pitcher_prior_year_obp = pitcher_prior_year["OBP"].iloc[0] if not pitcher_prior_year.empty else test_pitcher.OBP
 
     # Calculate expected OBP for this matchup using odds ratio
     league_obp = stats.league_batting_obp
-    b_odds = batter_2025_obp / (1 - batter_2025_obp)
-    p_odds = pitcher_2025_obp / (1 - pitcher_2025_obp)
+    b_odds = batter_prior_year_obp / (1 - batter_prior_year_obp)
+    p_odds = pitcher_prior_year_obp / (1 - pitcher_prior_year_obp)
     l_odds = league_obp / (1 - league_obp)
     expected_matchup_obp = (b_odds * p_odds) / l_odds / (1 + (b_odds * p_odds) / l_odds)
 
@@ -810,12 +812,12 @@ if __name__ == "__main__":
     print("-" * 75)
     print(f"TEST MATCHUP (Median 2026 Projected Stats):")
     print(
-        f"  Hitter: {str(test_batter.Player)[:20].ljust(20)} | 2026 OBP: {test_batter.OBP:.3f} | 2025 OBP: {batter_2025_obp:.3f}"
+        f"  Hitter: {str(test_batter.Player)[:20].ljust(20)} | 2026 OBP: {test_batter.OBP:.3f} | prior_year OBP: {batter_prior_year_obp:.3f}"
     )
     print(
-        f"  Pitcher: {str(test_pitcher.Player)[:19].ljust(19)} | 2026 OBP: {test_pitcher.OBP:.3f} | 2025 OBP: {pitcher_2025_obp:.3f}"
+        f"  Pitcher: {str(test_pitcher.Player)[:19].ljust(19)} | 2026 OBP: {test_pitcher.OBP:.3f} | prior_year OBP: {pitcher_prior_year_obp:.3f}"
     )
-    print(f"  Expected Matchup OBP (2025 actuals): {expected_matchup_obp:.3f}")
+    print(f"  Expected Matchup OBP (prior_year actuals): {expected_matchup_obp:.3f}")
     print("-" * 75)
 
     # 5. Run 10,000 Simuation Cycles
@@ -861,6 +863,7 @@ if __name__ == "__main__":
     print(" DEFENSIVE IMPACT STRESS TEST (Elite vs. Terrible Defense) ".center(75))
     print("=" * 75)
 
+
     def run_def_test(def_war_value):
         ob_count = 0
         for _ in range(5000):
@@ -868,6 +871,7 @@ if __name__ == "__main__":
             if outcome.on_base_b:
                 ob_count += 1
         return ob_count / 5000
+
 
     elite_obp = run_def_test(15.0)  # Elite defense (+15 Def_WAR)
     bad_obp = run_def_test(-15.0)  # Terrible defense (-15 Def_WAR)

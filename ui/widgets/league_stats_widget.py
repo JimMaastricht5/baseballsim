@@ -6,11 +6,12 @@ League stats widget for baseball season simulation UI.
 
 import tkinter as tk
 from tkinter import ttk
-import pandas as pd
-from bblogger import logger
-import bbstats
-from bbstats import calculate_stats_difference
 
+import pandas as pd
+
+import bbstats
+from bblogger import logger
+from bbstats import calculate_stats_difference
 from ui.theme import (
     BG_PANEL,
     BG_ELEVATED,
@@ -962,7 +963,7 @@ class LeagueStatsWidget:
             logger.error(traceback.format_exc())
 
     def _show_history_popup(
-        self, player_name: str, historical_df, is_batter: bool, projected_row=None, current_season_row=None
+            self, player_name: str, historical_df, is_batter: bool, projected_row=None, current_season_row=None
     ):
         """Wrapper around shared show_history_popup."""
         current_season = getattr(self.baseball_data, "new_season", None)
@@ -1018,7 +1019,7 @@ class LeagueStatsWidget:
             )
 
         # Calculate prorated 2025 stats for league-wide view (no team filter)
-        self.batters_df_2025, self.pitchers_df_2025 = self.baseball_data.calculate_prorated_2025_stats(
+        self.batters_df_2025, self.pitchers_df_2025 = self.baseball_data.calculate_prorated_prior_year_stats(
             team_name=None, current_games_played=games_played if games_played > 0 else None
         )
 
@@ -1142,7 +1143,7 @@ class LeagueStatsWidget:
             )
 
         # Get prorated 2025 stats for league (explicitly pass games_played so we know the proration basis)
-        batting_2025, pitching_2025 = self.baseball_data.calculate_prorated_2025_stats(
+        batting_2025, pitching_2025 = self.baseball_data.calculate_prorated_prior_year_stats(
             team_name=None, current_games_played=games_played if games_played > 0 else None
         )
 

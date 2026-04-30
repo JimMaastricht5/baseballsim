@@ -52,9 +52,9 @@ class BaseballStats:
     ) -> None:
         """Load aggregated and new-season player data, compute league totals."""
         # Add caches for prior season historical data (Phase 1: Stats Enhancement)
-        self.historical_2025_batting = None  # Lazy-loaded cache
-        self.historical_2025_pitching = None  # Lazy-loaded cache
-        self.prorated_2025_cache = {}  # {team_name_games: (batting_df, pitching_df)}
+        self.historical_prior_year_batting = None  # Lazy-loaded cache
+        self.historical_prior_year_pitching = None  # Lazy-loaded cache
+        self.prorated_prior_year_cache = {}  # {team_name_games: (batting_df, pitching_df)}
 
         self.suppress_console_output = suppress_console_output
         self.thread_lock = threading.Lock()  # one thread can update games stats at a time
@@ -157,13 +157,13 @@ class BaseballStats:
 
         # PERFORMANCE: Cache league totals for at-bat calculations (avoids recalculating 162 times per season)
         # Use historical batting data for league baselines to reflect current MLB environment
-        self._ensure_2025_historical_loaded()
+        self._ensure_prior_year_historical_loaded()
 
-        if not getattr(self, "historical_2025_batting", pd.DataFrame()).empty:
+        if not getattr(self, "historical_prior_year_batting", pd.DataFrame()).empty:
             # Use the most recent season's actual data for league baselines
             # This ensures the simulation uses current MLB rates, not aggregated multi-year rates
-            self.league_batting_totals = team_batting_totals(self.historical_2025_batting)
-            b_totals = self.historical_2025_batting[["AB", "H", "BB", "HBP", "SO", "SF", "SH"]].sum()
+            self.league_batting_totals = team_batting_totals(self.historical_prior_year_batting)
+            b_totals = self.historical_prior_year_batting[["AB", "H", "BB", "HBP", "SO", "SF", "SH"]].sum()
         else:
             # Fallback to aggregated data if historical data not available
             self.league_batting_totals = team_batting_totals(self.batting_data)
@@ -187,10 +187,10 @@ class BaseballStats:
         self.league_total_outs = (b_totals["AB"] - b_totals["H"]) + b_totals["SF"] + b_totals["SH"]
 
         # --- 2. PITCHER LEAGUE TOTALS (The Pitcher Baseline) ---
-        # Use historical 2025 data for consistency with batting (actual MLB rates)
-        if not getattr(self, "historical_2025_pitching", pd.DataFrame()).empty:
-            self.league_pitching_totals = team_pitching_totals(self.historical_2025_pitching)
-            p_totals = self.historical_2025_pitching[["IP", "H", "BB", "HBP", "SO", "HR"]].sum()
+        # Use historical prior_year data for consistency with batting (actual MLB rates)
+        if not getattr(self, "historical_prior_year_pitching", pd.DataFrame()).empty:
+            self.league_pitching_totals = team_pitching_totals(self.historical_prior_year_pitching)
+            p_totals = self.historical_prior_year_pitching[["IP", "H", "BB", "HBP", "SO", "HR"]].sum()
         else:
             # Fallback to projected data if historical not available
             p_totals = self.pitching_data[["IP", "H", "BB", "HBP", "SO", "HR"]].sum()
@@ -416,51 +416,51 @@ class BaseballStats:
 
         return team_win_loss
 
-    def _ensure_2025_historical_loaded(self):
-        """Lazy load 2025 historical data if not already cached."""
-        if self.historical_2025_batting is None:
+    def _ensure_prior_year_historical_loaded(self):
+        """Lazy load prior_year historical data if not already cached."""
+        if self.historical_prior_year_batting is None:
             try:
                 seasons_str = " ".join(str(s) for s in self.load_seasons)
                 hist_batting_file = f"{seasons_str} historical-Batting.csv"
                 hist_pitching_file = f"{seasons_str} historical-Pitching.csv"
 
-                logger.debug(f"Loading 2025 historical data from {hist_batting_file} and {hist_pitching_file}")
+                logger.debug(f"Loading prior_year historical data from {hist_batting_file} and {hist_pitching_file}")
 
                 full_hist_b = pd.read_csv(hist_batting_file, index_col="Player_Season_Key")
                 full_hist_p = pd.read_csv(hist_pitching_file, index_col="Player_Season_Key")
 
-                # Filter to 2025 season only
-                self.historical_2025_batting = full_hist_b[full_hist_b["Season"] == 2025].copy()
-                self.historical_2025_pitching = full_hist_p[full_hist_p["Season"] == 2025].copy()
+                # Filter to prior_year season only
+                self.historical_prior_year_batting = full_hist_b[full_hist_b["Season"] == self.new_season - 1].copy()
+                self.historical_prior_year_pitching = full_hist_p[full_hist_p["Season"] == self.new_season - 1].copy()
 
                 logger.debug(
-                    f"Loaded {len(self.historical_2025_batting)} batting records and "
-                    f"{len(self.historical_2025_pitching)} pitching records from 2025"
+                    f"Loaded {len(self.historical_prior_year_batting)} batting records and "
+                    f"{len(self.historical_prior_year_pitching)} pitching records from prior_year"
                 )
 
             except FileNotFoundError as e:
-                logger.error(f"Historical data file not found for 2025 data: {e}")
+                logger.error(f"Historical data file not found for prior_year data: {e}")
                 # Create empty DataFrames to prevent repeated load attempts
-                self.historical_2025_batting = pd.DataFrame()
-                self.historical_2025_pitching = pd.DataFrame()
+                self.historical_prior_year_batting = pd.DataFrame()
+                self.historical_prior_year_pitching = pd.DataFrame()
             except Exception as e:
-                logger.error(f"Error loading 2025 historical data: {e}")
-                self.historical_2025_batting = pd.DataFrame()
-                self.historical_2025_pitching = pd.DataFrame()
+                logger.error(f"Error loading prior_year historical data: {e}")
+                self.historical_prior_year_batting = pd.DataFrame()
+                self.historical_prior_year_pitching = pd.DataFrame()
 
     def _log_historical_baselines(self) -> None:
-        """Logs league-wide totals from 2025 to compare against 2026 projections."""
-        self._ensure_2025_historical_loaded()
+        """Logs league-wide totals from prior_year to compare against 2026 projections."""
+        self._ensure_prior_year_historical_loaded()
 
-        if not self.historical_2025_batting.empty:
-            # 1. Total Raw 2025 Data (Everyone in the file)
-            raw_ab = self.historical_2025_batting["AB"].sum()
-            raw_h = self.historical_2025_batting["H"].sum()
-            raw_hr = self.historical_2025_batting["HR"].sum()
-            raw_so = self.historical_2025_batting.get("SO", pd.Series([0])).sum()
-            raw_bb = self.historical_2025_batting["BB"].sum()
-            raw_hbp = self.historical_2025_batting.get("HBP", pd.Series([0])).sum()
-            raw_sf = self.historical_2025_batting.get("SF", pd.Series([0])).sum()
+        if not self.historical_prior_year_batting.empty:
+            # 1. Total Raw prior_year Data (Everyone in the file)
+            raw_ab = self.historical_prior_year_batting["AB"].sum()
+            raw_h = self.historical_prior_year_batting["H"].sum()
+            raw_hr = self.historical_prior_year_batting["HR"].sum()
+            raw_so = self.historical_prior_year_batting.get("SO", pd.Series([0])).sum()
+            raw_bb = self.historical_prior_year_batting["BB"].sum()
+            raw_hbp = self.historical_prior_year_batting.get("HBP", pd.Series([0])).sum()
+            raw_sf = self.historical_prior_year_batting.get("SF", pd.Series([0])).sum()
             raw_pa = raw_ab + raw_bb + raw_hbp + raw_sf
             raw_hr_rate = raw_hr / raw_ab if raw_ab > 0 else 0
             # raw_h_per_hr = raw_h / raw_hr if raw_hr > 0 else 0
@@ -469,8 +469,8 @@ class BaseballStats:
 
             # 2. Survival Data (Only players who made it into your 2026 Sim)
             active_hashes = self.new_season_batting_data.index.astype(str)
-            survivor_df = self.historical_2025_batting[
-                self.historical_2025_batting["Hashcode"].astype(str).isin(active_hashes)
+            survivor_df = self.historical_prior_year_batting[
+                self.historical_prior_year_batting["Hashcode"].astype(str).isin(active_hashes)
             ]
 
             surv_ab = survivor_df["AB"].sum()
@@ -496,9 +496,9 @@ class BaseballStats:
             # proj_k_rate = proj_so / proj_ab if proj_ab > 0 else 0
             # proj_bb_rate = proj_bb / proj_pa if proj_pa > 0 else 0
 
-            logger.info("=== LEAGUE HISTORICAL BASELINE (2025) from bbstats _log_historical_baselines ===")
+            logger.info("=== LEAGUE HISTORICAL BASELINE (prior_year) from bbstats _log_historical_baselines ===")
             logger.info(
-                f"RAW 2025 (Full File):  AB: {raw_ab:,} | H: {raw_h:,} | HR: {raw_hr:,} | K: {raw_so:,} | BB: {raw_bb:,} | K%: {raw_k_rate:.3f} | BB%: {raw_bb_rate:.3f}"
+                f"RAW prior_year (Full File):  AB: {raw_ab:,} | H: {raw_h:,} | HR: {raw_hr:,} | K: {raw_so:,} | BB: {raw_bb:,} | K%: {raw_k_rate:.3f} | BB%: {raw_bb_rate:.3f}"
             )
             logger.info(
                 f"SURVIVORS (2026 Rosters): AB: {surv_ab:,} | H: {surv_h:,} | HR: {surv_hr:,} | K%: {surv_k_rate:.3f} | BB%: {surv_bb_rate:.3f}"
@@ -514,12 +514,12 @@ class BaseballStats:
                     f"SIGNIFICANT HR RATE DISCREPANCY: {hr_rate_diff:+.4f}. Check preprocessor K-values or AB-gates."
                 )
 
-        if not self.historical_2025_pitching.empty:
-            raw_ip = self.historical_2025_pitching["IP"].apply(lambda x: int(x) + (x % 1 * 10 / 3)).sum()
-            logger.info(f"RAW 2025 PITCHING IP: {raw_ip:,.1f}")
+        if not self.historical_prior_year_pitching.empty:
+            raw_ip = self.historical_prior_year_pitching["IP"].apply(lambda x: int(x) + (x % 1 * 10 / 3)).sum()
+            logger.info(f"RAW prior_year PITCHING IP: {raw_ip:,.1f}")
         return
 
-    def calculate_prorated_2025_stats(
+    def calculate_prorated_prior_year_stats(
             self, team_name: Optional[str] = None, current_games_played: Optional[int] = None
     ) -> tuple:
         """
@@ -539,10 +539,10 @@ class BaseballStats:
 
             # Cache check (unchanged)
             cache_key = f"{team_name if team_name else 'LEAGUE'}_{current_games_played}"
-            if cache_key in self.prorated_2025_cache:
-                return self.prorated_2025_cache[cache_key]
+            if cache_key in self.prorated_prior_year_cache:
+                return self.prorated_prior_year_cache[cache_key]
 
-            self._ensure_2025_historical_loaded()
+            self._ensure_prior_year_historical_loaded()
             prorate_factor = current_games_played / 162.0
 
             # 2. Vectorized Filtering
@@ -550,29 +550,29 @@ class BaseballStats:
                 # TEAM VIEW: Only include players currently on this team's 2026 roster
                 mask_b = self.new_season_batting_data["Team"] == team_name
                 hashes_b = self.new_season_batting_data[mask_b].index.astype(str)
-                df_b = self.historical_2025_batting[
-                    self.historical_2025_batting["Hashcode"].astype(str).isin(hashes_b)
+                df_b = self.historical_prior_year_batting[
+                    self.historical_prior_year_batting["Hashcode"].astype(str).isin(hashes_b)
                 ].copy()
 
                 mask_p = self.new_season_pitching_data["Team"] == team_name
                 hashes_p = self.new_season_pitching_data[mask_p].index.astype(str)
-                df_p = self.historical_2025_pitching[
-                    self.historical_2025_pitching["Hashcode"].astype(str).isin(hashes_p)
+                df_p = self.historical_prior_year_pitching[
+                    self.historical_prior_year_pitching["Hashcode"].astype(str).isin(hashes_p)
                 ].copy()
             else:
-                df_b = self.historical_2025_batting.copy()
-                df_p = self.historical_2025_pitching.copy()
+                df_b = self.historical_prior_year_batting.copy()
+                df_p = self.historical_prior_year_pitching.copy()
 
             # 3. Batting Proration (Vectorized)
             if not df_b.empty:
-                # Aggregating by Hashcode captures all segments of a traded player's 2025 season
+                # Aggregating by Hashcode captures all segments of a traded player's prior_year season
                 bat_cols = ["G", "AB", "R", "H", "2B", "3B", "HR", "RBI", "SB", "CS", "BB", "SO", "SF", "SH", "HBP"]
                 df_b = df_b.groupby("Hashcode")[bat_cols].sum()
 
                 # Keep as floats for accurate comparison - only round when displaying
                 df_b[bat_cols] = df_b[bat_cols] * prorate_factor
 
-                # Calculate rate stats from FULL 2025 season (not prorated) for accurate comparison
+                # Calculate rate stats from FULL prior_year season (not prorated) for accurate comparison
                 # First get the full season totals
                 full_bat_cols = [
                     "G",
@@ -597,9 +597,9 @@ class BaseballStats:
                 )  # undo proration to get full season
                 df_b_full = team_batting_stats(df_b_full, filter_stats=False)
 
-                # Now apply proration to counting stats but keep original 2025 rate stats
+                # Now apply proration to counting stats but keep original prior_year rate stats
                 df_b = team_batting_stats(df_b, filter_stats=False)
-                # Use the actual 2025 rate stats, not recalculated from prorated counts
+                # Use the actual prior_year rate stats, not recalculated from prorated counts
                 df_b["AVG"] = df_b_full["AVG"]
                 df_b["OBP"] = df_b_full["OBP"]
                 df_b["SLG"] = df_b_full["SLG"]
@@ -637,7 +637,7 @@ class BaseballStats:
                 # Group by Hashcode to combine traded player rows
                 df_p = df_p.groupby("Hashcode").agg(agg_dict)
 
-                # Calculate rate stats from FULL 2025 season (not prorated) for accurate comparison
+                # Calculate rate stats from FULL prior_year season (not prorated) for accurate comparison
                 df_p_full = df_p.copy()
                 df_p_full["IP"] = (
                         df_p_full["Total_Outs_Calc"].apply(lambda x: int(x) + (round(x % 1 * 3) / 10)) / prorate_factor
@@ -657,11 +657,11 @@ class BaseballStats:
                 df_p[existing_pitch_cols] = df_p[existing_pitch_cols] * prorate_factor  # Prorate without rounding
                 df_p = team_pitching_stats(df_p, filter_stats=False)
 
-                # Use the actual 2025 rate stats, not recalculated from prorated counts
+                # Use the actual prior_year rate stats, not recalculated from prorated counts
                 df_p["ERA"] = df_p_full["ERA"]
                 df_p["WHIP"] = df_p_full["WHIP"]
 
-            self.prorated_2025_cache[cache_key] = (df_b, df_p)
+            self.prorated_prior_year_cache[cache_key] = (df_b, df_p)
             return df_b, df_p
 
     def get_seasons(self, batter_file: str, pitcher_file: str) -> None:
@@ -873,17 +873,17 @@ class BaseballStats:
                     pitcher_indices, "Injured Days"
                 ].astype("int64")
 
-            # Invalidate prorated 2025 cache for team that played (Phase 1: Stats Enhancement)
+            # Invalidate prorated prior_year cache for team that played (Phase 1: Stats Enhancement)
             team = box_score_class.team_name
             # Clear cached prorated stats for this team
-            keys_to_remove = [k for k in self.prorated_2025_cache.keys() if k.startswith(f"{team}_")]
+            keys_to_remove = [k for k in self.prorated_prior_year_cache.keys() if k.startswith(f"{team}_")]
             for key in keys_to_remove:
-                del self.prorated_2025_cache[key]
+                del self.prorated_prior_year_cache[key]
 
             # Also invalidate league-wide cache since a game was played
-            league_keys_to_remove = [k for k in self.prorated_2025_cache.keys() if k.startswith("LEAGUE_")]
+            league_keys_to_remove = [k for k in self.prorated_prior_year_cache.keys() if k.startswith("LEAGUE_")]
             for key in league_keys_to_remove:
-                del self.prorated_2025_cache[key]
+                del self.prorated_prior_year_cache[key]
 
         return
 
@@ -1637,7 +1637,7 @@ class BaseballStats:
             teams: List[str],
             summary_only_b: bool = False,
             condition_text: bool = True,
-            show_2025_comparison: bool = False,
+            show_prior_year_comparison: bool = False,
     ) -> None:
         """
         print a season either in flight or prior season, called from current and prior season methods
@@ -1646,7 +1646,7 @@ class BaseballStats:
         :param teams: list of team names
         :param summary_only_b: print team totals or entire roster stats
         :param condition_text: print the condition of the player as text
-        :param show_2025_comparison: If True, show three-row format with 2025 prorated and difference
+        :param show_prior_year_comparison: If True, show three-row format with prior_year prorated and difference
         :return:
         """
         if condition_text:
@@ -1689,20 +1689,21 @@ class BaseballStats:
                     print(f"\n{team} Batters:")
                     print(df_b_team[self.bcols_to_print].to_string(justify="right", index_names=False))
 
-            # Display team totals with optional 2025 comparison
-            if show_2025_comparison and hasattr(self, "team_games_played"):
+            # Display team totals with optional prior_year comparison
+            if show_prior_year_comparison and hasattr(self, "team_games_played"):
                 games_played = self.team_games_played.get(team, 0)
 
                 if games_played > 0:
-                    # Get prorated 2025 stats
-                    batting_2025, pitching_2025 = self.calculate_prorated_2025_stats(team, games_played)
+                    # Get prorated prior_year stats
+                    batting_prior_year, pitching_prior_year = self.calculate_prorated_prior_year_stats(team,
+                                                                                                       games_played)
 
                     # Calculate totals for all three rows
                     current_p_totals = team_pitching_totals(df_p_team)
                     current_b_totals = team_batting_totals(df_b_team)
 
-                    if len(pitching_2025) > 0:
-                        prorated_p_totals = team_pitching_totals(pitching_2025)
+                    if len(pitching_prior_year) > 0:
+                        prorated_p_totals = team_pitching_totals(pitching_prior_year)
                         diff_p_totals = self._calculate_difference_row(
                             current_p_totals, prorated_p_totals, is_batting=False
                         )
@@ -1710,15 +1711,16 @@ class BaseballStats:
                         # Display three-row format for pitching
                         print(f"\n{team} Pitching Totals (Games: {games_played}):")
                         print("Current:        ", current_p_totals[self.numeric_pcols_to_print].to_string(index=False))
-                        print("2025 (Prorated):", prorated_p_totals[self.numeric_pcols_to_print].to_string(index=False))
+                        print("prior_year (Prorated):",
+                              prorated_p_totals[self.numeric_pcols_to_print].to_string(index=False))
                         print("Difference:     ", diff_p_totals[self.numeric_pcols_to_print].to_string(index=False))
                     else:
-                        # No 2025 data available for pitchers
+                        # No prior_year data available for pitchers
                         print(f"\n{team} Pitching Totals (Games: {games_played}):")
                         print(current_p_totals[self.numeric_pcols_to_print].to_string(index=False))
 
-                    if len(batting_2025) > 0:
-                        prorated_b_totals = team_batting_totals(batting_2025)
+                    if len(batting_prior_year) > 0:
+                        prorated_b_totals = team_batting_totals(batting_prior_year)
                         diff_b_totals = self._calculate_difference_row(
                             current_b_totals, prorated_b_totals, is_batting=True
                         )
@@ -1726,10 +1728,11 @@ class BaseballStats:
                         # Display three-row format for batting
                         print(f"\n{team} Batting Totals (Games: {games_played}):")
                         print("Current:        ", current_b_totals[self.numeric_bcols_to_print].to_string(index=False))
-                        print("2025 (Prorated):", prorated_b_totals[self.numeric_bcols_to_print].to_string(index=False))
+                        print("prior_year (Prorated):",
+                              prorated_b_totals[self.numeric_bcols_to_print].to_string(index=False))
                         print("Difference:     ", diff_b_totals[self.numeric_bcols_to_print].to_string(index=False))
                     else:
-                        # No 2025 data available for batters
+                        # No prior_year data available for batters
                         print(f"\n{team} Batting Totals (Games: {games_played}):")
                         print(current_b_totals[self.numeric_bcols_to_print].to_string(index=False))
 
@@ -2125,24 +2128,25 @@ if __name__ == "__main__":
         print(baseball_data.get_batting_data(team_name=team, prior_season=True).to_string())
         print(baseball_data.get_batting_data(team_name=team, prior_season=False).to_string())
 
-    # Load the full 2025 historical file
-    # (assuming you've called _ensure_2025_historical_loaded)
-    hist_2025_sum = baseball_data.get_batting_data(prior_season=True)["AB"].sum()
-    print(hist_2025_sum)
+    # Load the full prior_year historical file
+    # (assuming you've called _ensure_prior_year_historical_loaded)
+    hist_prior_year_sum = baseball_data.get_batting_data(prior_season=True)["AB"].sum()
+    print(hist_prior_year_sum)
 
     # Get the list of players actually in your 2026 sim
     active_2026_hashes = baseball_data.new_season_batting_data.index
-    active_2025_hashes = baseball_data.get_batting_data(prior_season=True).index
-    print(active_2025_hashes)
+    active_prior_year_hashes = baseball_data.get_batting_data(prior_season=True).index
+    print(active_prior_year_hashes)
 
-    # Sum 2025 ABs ONLY for players who are in the 2026 sim
-    historical_2025_batting = baseball_data.get_batting_data(prior_season=True)
-    surviving_2025_sum = historical_2025_batting[historical_2025_batting.index.isin(active_2026_hashes)]["AB"].sum()
+    # Sum prior_year ABs ONLY for players who are in the 2026 sim
+    historical_prior_year_batting = baseball_data.get_batting_data(prior_season=True)
+    surviving_prior_year_sum = \
+        historical_prior_year_batting[historical_prior_year_batting.index.isin(active_2026_hashes)]["AB"].sum()
 
-    print(f"Total 2025 AB in File: {hist_2025_sum}")
-    print(f"2025 AB from players who kept their jobs in 2026: {surviving_2025_sum}")
-    print(f"Missing (Retired/Free Agent) AB: {hist_2025_sum - surviving_2025_sum}")
+    print(f"Total prior_year AB in File: {hist_prior_year_sum}")
+    print(f"prior_year AB from players who kept their jobs in 2026: {surviving_prior_year_sum}")
+    print(f"Missing (Retired/Free Agent) AB: {hist_prior_year_sum - surviving_prior_year_sum}")
 
-    df_b, df_p = baseball_data.calculate_prorated_2025_stats(team_name=None, current_games_played=162)
+    df_b, df_p = baseball_data.calculate_prorated_prior_year_stats(team_name=None, current_games_played=162)
     print("*****")
     print(df_b["AB"].sum())

@@ -6,9 +6,10 @@ Roster widget for baseball season simulation UI.
 
 import tkinter as tk
 from tkinter import ttk
-import pandas as pd
-from bblogger import logger
 
+import pandas as pd
+
+from bblogger import logger
 from ui.theme import (
     BG_PANEL,
     BG_ELEVATED,
@@ -124,9 +125,9 @@ class RosterWidget:
         self.batters_df = None
         self.pitchers_df = None
 
-        # Cached 2025 prorated data for comparison (Phase 5: Stats Enhancement)
-        self.team_batting_2025 = None
-        self.team_pitching_2025 = None
+        # Cached prior_year prorated data for comparison (Phase 5: Stats Enhancement)
+        self.team_batting_prior_year = None
+        self.team_pitching_prior_year = None
         self.current_team = None  # Track currently displayed team
 
         # Track sort state for each tree: {tree_id: {'column': str, 'ascending': bool}}
@@ -182,7 +183,7 @@ class RosterWidget:
         )
         self.batting_comparison_btn = tk.Button(
             batting_control_frame,
-            text="Show Difference from 2025",
+            text="Show Difference from Prior Year",
             command=self._toggle_comparison_mode,
             bg=BG_ELEVATED,
             fg=TEXT_PRIMARY,
@@ -249,7 +250,7 @@ class RosterWidget:
         )
         self.pitching_comparison_btn = tk.Button(
             pitching_control_frame,
-            text="Show Difference from 2025",
+            text="Show Difference from Prior Year",
             command=self._toggle_comparison_mode,
             bg=BG_ELEVATED,
             fg=TEXT_PRIMARY,
@@ -410,7 +411,7 @@ class RosterWidget:
         return tree
 
     def _show_history_popup(
-        self, player_name: str, historical_df, is_batter: bool, projected_row=None, current_season_row=None
+            self, player_name: str, historical_df, is_batter: bool, projected_row=None, current_season_row=None
     ):
         """Wrapper around shared show_history_popup."""
         current_season = getattr(self.baseball_data, "new_season", None)
@@ -1036,10 +1037,10 @@ class RosterWidget:
             )
         else:
             self.batting_comparison_btn.config(
-                text="Show Difference from 2025", bg=BG_ELEVATED, fg=TEXT_PRIMARY, relief=tk.RAISED
+                text="Show Difference from Prior Year", bg=BG_ELEVATED, fg=TEXT_PRIMARY, relief=tk.RAISED
             )
             self.pitching_comparison_btn.config(
-                text="Show Difference from 2025", bg=BG_ELEVATED, fg=TEXT_PRIMARY, relief=tk.RAISED
+                text="Show Difference from Prior Year", bg=BG_ELEVATED, fg=TEXT_PRIMARY, relief=tk.RAISED
             )
 
         # Refresh display
@@ -1053,9 +1054,9 @@ class RosterWidget:
         if self.current_team and self.baseball_data:
             self.update_roster(self.current_team, self.baseball_data)
 
-    def _load_team_2025_data(self, team_name: str, games_played: int):
+    def _load_team_prior_year_data(self, team_name: str, games_played: int):
         """
-        Load and cache 2025 data for specific team (Phase 5: Stats Enhancement).
+        Load and cache prior_year data for specific team (Phase 5: Stats Enhancement).
 
         Args:
             team_name: Team abbreviation
@@ -1064,18 +1065,19 @@ class RosterWidget:
         if self.baseball_data is None:
             return
 
-        batting_2025, pitching_2025 = self.baseball_data.calculate_prorated_2025_stats(team_name, games_played)
+        batting_prior_year, pitching_prior_year = self.baseball_data.calculate_prorated_prior_year_stats(team_name,
+                                                                                                         games_played)
 
-        self.team_batting_2025 = batting_2025
-        self.team_pitching_2025 = pitching_2025
+        self.team_batting_prior_year = batting_prior_year
+        self.team_pitching_prior_year = pitching_prior_year
 
         logger.debug(
-            f"Loaded 2025 team data for {team_name}: {len(batting_2025)} batters, {len(pitching_2025)} pitchers"
+            f"Loaded prior_year team data for {team_name}: {len(batting_prior_year)} batters, {len(pitching_prior_year)} pitchers"
         )
 
     def _calculate_difference_df(self, current_df: pd.DataFrame, is_batter: bool) -> pd.DataFrame:
         """
-        Calculate current - prorated 2025 for team players (Phase 5: Stats Enhancement).
+        Calculate current - prorated prior_year for team players (Phase 5: Stats Enhancement).
 
         Args:
             current_df: Current season DataFrame
@@ -1084,18 +1086,18 @@ class RosterWidget:
         Returns:
             DataFrame with difference values
         """
-        # Load 2025 data if not cached (always recalculate to get correct proration)
+        # Load prior_year data if not cached (always recalculate to get correct proration)
         if self.current_team and self.baseball_data:
             if hasattr(self.baseball_data, "team_games_played"):
                 games_played = self.baseball_data.team_games_played.get(self.current_team, 0)
                 if games_played > 0:
                     # Always reload to get correct prorated values for current games_played
-                    self._load_team_2025_data(self.current_team, games_played)
+                    self._load_team_prior_year_data(self.current_team, games_played)
 
-        hist_df = self.team_batting_2025 if is_batter else self.team_pitching_2025
+        hist_df = self.team_batting_prior_year if is_batter else self.team_pitching_prior_year
 
         if hist_df is None or hist_df.empty:
-            logger.warning(f"No 2025 historical data available for {self.current_team}")
+            logger.warning(f"No prior_year historical data available for {self.current_team}")
             return current_df
 
         diff_df = current_df.copy()
@@ -1157,7 +1159,7 @@ class RosterWidget:
 
     def _update_totals_display(self, is_batter: bool = True):
         """
-        Update the team totals display with three-row format (Current / 2025 Prorated / Difference).
+        Update the team totals display with three-row format (Current / prior_year Prorated / Difference).
 
         Args:
             is_batter: True for batting totals, False for pitching totals
@@ -1231,19 +1233,20 @@ class RosterWidget:
             else:
                 totals_tree.column(col, width=45, anchor=tk.CENTER)
 
-        # Get prorated 2025 stats for team
-        batting_2025, pitching_2025 = self.baseball_data.calculate_prorated_2025_stats(
+        # Get prorated prior_year stats for team
+        batting_prior_year, pitching_prior_year = self.baseball_data.calculate_prorated_prior_year_stats(
             team_name=self.current_team, current_games_played=games_played
         )
 
-        if games_played > 0 and ((is_batter and not batting_2025.empty) or (not is_batter and not pitching_2025.empty)):
-            # Calculate 2025 totals
+        if games_played > 0 and (
+                (is_batter and not batting_prior_year.empty) or (not is_batter and not pitching_prior_year.empty)):
+            # Calculate prior_year totals
             if is_batter:
-                prorated_totals = bbstats.team_batting_totals(batting_2025)
+                prorated_totals = bbstats.team_batting_totals(batting_prior_year)
                 # Override G with actual team games played
                 prorated_totals["G"] = games_played
             else:
-                prorated_totals = bbstats.team_pitching_totals(pitching_2025)
+                prorated_totals = bbstats.team_pitching_totals(pitching_prior_year)
                 # Override G with team games played for consistency
                 prorated_totals["G"] = games_played
 
@@ -1256,9 +1259,9 @@ class RosterWidget:
             # Create labels with game counts
             current_label = f"2026 ({games_played} games)" if games_played > 0 else "Current"
             if games_played >= 162:
-                season_label = f"2025 (prorated {games_played} games)"
+                season_label = f"Prior Year (prorated {games_played} games)"
             else:
-                season_label = f"2025 (prorated {games_played} games)" if games_played > 0 else "2025 (Prorated)"
+                season_label = f"Prior Year (prorated {games_played} games)" if games_played > 0 else "Prior Year (Prorated)"
 
             # Insert three rows
             row_data = [
@@ -1276,7 +1279,7 @@ class RosterWidget:
                         values.append("")
                 totals_tree.insert("", tk.END, values=tuple(values))
         else:
-            # No 2025 data or no games played, show current only
+            # No prior_year data or no games played, show current only
             current_label = f"2026 ({games_played} games)" if games_played > 0 else "Current"
             values = [current_label]
             for col in columns[1:]:

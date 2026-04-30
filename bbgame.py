@@ -953,8 +953,11 @@ class Game:
 
     def _build_structured_game_recap(self) -> GameRecap:
         """Build structured GameRecap from accumulated game data at game end."""
-        # Update final score
-        self.structured_game.final_score = (self.total_score[AWAY], self.total_score[HOME])
+        # Update final score (cast to int to avoid object refs leaking into logs)
+        self.structured_game.final_score = (
+            int(self.total_score[AWAY]),
+            int(self.total_score[HOME]),
+        )
 
         # Update inning scores - use InningRow directly
         self.structured_game.inning_scores = [

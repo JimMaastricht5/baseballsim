@@ -26,7 +26,20 @@ class ScrollableFrame(ttk.Frame):
         super().__init__(parent, *args, **kwargs)
 
         self.canvas = tk.Canvas(self, bg=BG_WIDGET, highlightthickness=0)
-        self.scrollbar = ttk.Scrollbar(self, orient=tk.VERTICAL, command=self.canvas.yview)
+        # Configure scrollbar style BEFORE creating the scrollbar to avoid startup errors
+        style = ttk.Style()
+        # A darker thumb and contrasting trough for better visibility on dark themes
+        style.configure("WSVertical.TScrollbar", background="#6b6b6b", troughcolor=BG_WIDGET, lightcolor="#6b6b6b", darkcolor="#6b6b6b")
+        # Fallback style for environments where WSVertical.TScrollbar might not be registered
+        style.configure("Vertical.TScrollbar", background="#6b6b6b", troughcolor=BG_WIDGET, lightcolor="#6b6b6b", darkcolor="#6b6b6b")
+        # Use the configured style for the scrollbar, with fallbacks in case the style isn't registered
+        try:
+            self.scrollbar = ttk.Scrollbar(self, orient=tk.VERTICAL, command=self.canvas.yview, style="WSVertical.TScrollbar")
+        except Exception:
+            try:
+                self.scrollbar = ttk.Scrollbar(self, orient=tk.VERTICAL, command=self.canvas.yview, style="Vertical.TScrollbar")
+            except Exception:
+                self.scrollbar = ttk.Scrollbar(self, orient=tk.VERTICAL, command=self.canvas.yview)
         self.canvas.config(yscrollcommand=self.scrollbar.set)
 
         self.scrollable_frame = ttk.Frame(self.canvas, style="Scrollable.TFrame")
@@ -35,6 +48,10 @@ class ScrollableFrame(ttk.Frame):
 
         self.canvas.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
         self.scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+
+        # Ensure mouse wheel scroll works regardless of where the cursor sits within the frame
+        self.canvas.bind("<Enter>", lambda e: self._bind_mousewheel())
+        self.canvas.bind("<Leave>", lambda e: self._unbind_mousewheel())
 
         self.canvas.bind("<Configure>", self._on_canvas_configure)
         self.scrollable_frame.bind("<Configure>", self._on_frame_configure)
@@ -60,6 +77,17 @@ class ScrollableFrame(ttk.Frame):
             self.canvas.yview_scroll(3, "units")
         else:
             self.canvas.yview_scroll(int(-1 * (event.delta / 120)), "units")
+
+    def _bind_mousewheel(self):
+        # Bind to all mouse wheel events so scrolling works no matter where the cursor is
+        self.canvas.bind_all("<MouseWheel>", self._on_mousewheel)
+        self.canvas.bind_all("<Button-4>", self._on_mousewheel)
+        self.canvas.bind_all("<Button-5>", self._on_mousewheel)
+
+    def _unbind_mousewheel(self):
+        self.canvas.unbind_all("<MouseWheel>")
+        self.canvas.unbind_all("<Button-4>")
+        self.canvas.unbind_all("<Button-5>")
 
     def see(self, widget):
         """Scroll to make widget visible."""

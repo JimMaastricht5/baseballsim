@@ -9,14 +9,30 @@ Usage:
     python bbseason_ui.py --seasons 2024,2025    # Load specific seasons
 """
 
+import argparse
+import datetime
+import sys
 import tkinter as tk
 from tkinter import ttk, messagebox
-import datetime
-import argparse
-import sys
 
-from ui.main_window_tk import SeasonMainWindow
 from bblogger import logger
+from ui.main_window_tk import SeasonMainWindow
+
+
+def _init_global_styles():
+    """Initialize shared ttk styles before any widgets are created.
+
+    This helps avoid errors like Layout Vertical.WSVertical.TScrollbar not found
+    by ensuring the WSVertical.TScrollbar style exists early.
+    """
+    style = ttk.Style()
+    style.configure(
+        "WSVertical.TScrollbar",
+        background="#6b6b6b",
+        troughcolor="#2f2f2f",
+        lightcolor="#6b6b6b",
+        darkcolor="#6b6b6b",
+    )
 
 
 class StartupDialog:
@@ -162,16 +178,16 @@ class StartupDialog:
 
 
 def main(
-    load_seasons=None,
-    new_season=2026,
-    season_length=162,
-    series_length=3,
-    rotation_len=5,
-    season_chatty=True,
-    season_print_lineup_b=True,
-    season_print_box_score_b=True,
-    season_team_to_follow="MIL",
-    show_startup_dialog=False,
+        load_seasons=None,
+        new_season=2026,
+        season_length=162,
+        series_length=3,
+        rotation_len=5,
+        season_chatty=True,
+        season_print_lineup_b=True,
+        season_print_box_score_b=True,
+        season_team_to_follow="MIL",
+        show_startup_dialog=False,
 ):
     """
     Main entry point for the UI application.
@@ -192,12 +208,14 @@ def main(
         show_startup_dialog: Show startup dialog (default False)
     """
     if load_seasons is None:
-        load_seasons = [2023, 2024, 2025]
+        load_seasons = [2023, 2024, 2025, 2026]
 
     logger.info("Starting Baseball Season Simulator UI (tkinter)")
 
     root = tk.Tk()
     root.state("zoomed")
+    # Ensure global styles are registered on the same Tk instance used by the UI
+    _init_global_styles()
 
     try:
         window = SeasonMainWindow(

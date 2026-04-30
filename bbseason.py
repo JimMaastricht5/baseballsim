@@ -1010,8 +1010,19 @@ class BaseballSeason:
             # Log playoff game result
             home_wins = self.team_win_loss[home][WIN] - start_wins[home]
             away_wins = self.team_win_loss[away][WIN] - start_wins[away]
+            # Safely log scores. Some paths can yield non-int values for away_score/home_score
+            # when structured_game is present. Prefer values from structured_game.final_score
+            # if available to avoid phantom object references.
+            log_away_score = away_score
+            log_home_score = home_score
+            if structured_game is not None and isinstance(structured_game.final_score, (list, tuple)):
+                try:
+                    log_away_score = int(structured_game.final_score[0])
+                    log_home_score = int(structured_game.final_score[1])
+                except Exception:
+                    pass
             logger.info(
-                f"[{round_name}] {away} {away_score} @ {home} {home_score} "
+                f"[{round_name}] {away} {log_away_score} @ {home} {log_home_score} "
                 f"(Series: {away} {away_wins}-{home_wins} {home})"
             )
 

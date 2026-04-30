@@ -104,7 +104,6 @@ class BaseballStats:
         pd.set_option("display.max_columns", None)  # Show all columns
         pd.set_option("display.width", None)  # Adjust the display width
         pd.set_option("display.precision", 3)  # Set the number of decimal places
-        pd.set_option("future.no_silent_downcasting", True)  # Opt-in to future pandas behavior
 
         # ***************** game to game stats and settings for injury and rest
         # condition and injury odds
@@ -2107,29 +2106,24 @@ if __name__ == "__main__":
 
     my_teams = []
     baseball_data = BaseballStats(
-        load_seasons=[2023, 2024, 2025],
+        load_seasons=[2023, 2024, 2025, 2026],
         new_season=2026,
         include_leagues=["AL", "NL"],
         load_batter_file="player-projected-stats-pp-Batting.csv",
         load_pitcher_file="player-projected-stats-pp-Pitching.csv",
     )
-    # print(*baseball_data.pitching_data.columns)
+    print(*baseball_data.pitching_data.columns)
     print(*baseball_data.batting_data.columns)
     print(baseball_data.get_all_team_names())
     print(baseball_data.get_all_team_city_names())
-    # print(baseball_data.pitching_data.to_string())
-    # baseball_data.print_prior_season()
-    # baseball_data.print_prior_season(teams=[baseball_data.get_all_team_names()[0]])
-    # print(baseball_data.get_pitching_data(team_name=baseball_data.get_all_team_names()[0]).to_string())
+    baseball_data.print_prior_season()
     my_teams.append("MIL" if "MIL" in baseball_data.get_all_team_names() else baseball_data.get_all_team_names()[0])
     for team in my_teams:
         print(team)
-        # print(baseball_data.get_pitching_data(team_name=team, prior_season=True).to_string())
-    #     print(baseball_data.get_pitching_data(team_name=team, prior_season=False).to_string())
-    #     print(baseball_data.get_batting_data(team_name=team, prior_season=True).to_string())
-    #     print(baseball_data.get_batting_data(team_name=team, prior_season=False).to_string())
-
-    # print(baseball_data.get_batting_data(prior_season=True)['AB'].sum())
+        print(baseball_data.get_pitching_data(team_name=team, prior_season=True).to_string())
+        print(baseball_data.get_pitching_data(team_name=team, prior_season=False).to_string())
+        print(baseball_data.get_batting_data(team_name=team, prior_season=True).to_string())
+        print(baseball_data.get_batting_data(team_name=team, prior_season=False).to_string())
 
     # Load the full 2025 historical file
     # (assuming you've called _ensure_2025_historical_loaded)

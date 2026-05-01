@@ -114,27 +114,27 @@ LOSS = 1
 
 class BaseballSeason:
     def __init__(
-        self,
-        load_seasons: List[int],
-        new_season: int,
-        team_list: Optional[list] = None,
-        season_length: int = 14,
-        series_length: int = 3,
-        rotation_len: int = 5,
-        include_leagues: list = None,
-        season_interactive: bool = False,
-        season_print_lineup_b: bool = False,
-        season_print_box_score_b: bool = False,
-        season_chatty: bool = False,
-        season_team_to_follow: Optional[List[str]] = None,
-        load_batter_file: str = "player-projected-stats-pp-Batting.csv",
-        load_pitcher_file: str = "player-projected-stats-pp-Pitching.csv",
-        schedule: list = None,
-        load_schedule_file: str = None,
-        suppress_console_output: bool = False,
-        obp_adjustment: float = None,
-        output_handler: Optional[OutputHandlerType] = None,
-        play_by_play_callback_factory: Optional[PlayByPlayCallbackFactory] = None,
+            self,
+            load_seasons: List[int],
+            new_season: int,
+            team_list: Optional[list] = None,
+            season_length: int = 14,
+            series_length: int = 3,
+            rotation_len: int = 5,
+            include_leagues: list = None,
+            season_interactive: bool = False,
+            season_print_lineup_b: bool = False,
+            season_print_box_score_b: bool = False,
+            season_chatty: bool = False,
+            season_team_to_follow: Optional[List[str]] = None,
+            load_batter_file: str = "player-projected-stats-pp-Batting.csv",
+            load_pitcher_file: str = "player-projected-stats-pp-Pitching.csv",
+            schedule: list = None,
+            load_schedule_file: str = None,
+            suppress_console_output: bool = False,
+            obp_adjustment: float = None,
+            output_handler: Optional[OutputHandlerType] = None,
+            play_by_play_callback_factory: Optional[PlayByPlayCallbackFactory] = None,
     ) -> None:
         """Initialize season with data loading, schedule creation, and GM setup."""
         self.standings_lock = threading.Lock()  # safely modify standings in a threaded environment
@@ -319,7 +319,7 @@ class BaseballSeason:
         if games:
             games_per_line = 5
             for i in range(0, len(games), games_per_line):
-                line_games = games[i : i + games_per_line]
+                line_games = games[i: i + games_per_line]
                 schedule_str += "   ".join(line_games) + "\n"
 
         # Print off day at the end
@@ -360,8 +360,8 @@ class BaseballSeason:
         teams_per_col = (n_teams + 2) // 3  # Round up to distribute evenly
 
         col1 = display_df.iloc[:teams_per_col].reset_index(drop=True)
-        col2 = display_df.iloc[teams_per_col : teams_per_col * 2].reset_index(drop=True)
-        col3 = display_df.iloc[teams_per_col * 2 :].reset_index(drop=True)
+        col2 = display_df.iloc[teams_per_col: teams_per_col * 2].reset_index(drop=True)
+        col3 = display_df.iloc[teams_per_col * 2:].reset_index(drop=True)
 
         # Build standings text
         standings_text = f"{'Team':<5} {'W-L':<8} {'Pct':<6} {'GB':<5}   {'Team':<5} {'W-L':<8} {'Pct':<6} {'GB':<5}   {'Team':<5} {'W-L':<8} {'Pct':<6} {'GB':<5}\n"
@@ -1154,8 +1154,8 @@ class BaseballSeason:
         # loop over every day and every game scheduled that day and check if season limit set to end early
         team = self.team_to_follow[0] if self.team_to_follow else "MIL"  # Mil if teams to follow is none
         while (
-            self.season_day_num <= (len(self.schedule) - 1)
-            and self.team_win_loss[team][0] + self.team_win_loss[team][1] < self.season_length
+                self.season_day_num <= (len(self.schedule) - 1)
+                and self.team_win_loss[team][0] + self.team_win_loss[team][1] < self.season_length
         ):
             self.sim_next_day()
 
@@ -1168,23 +1168,23 @@ class BaseballSeason:
 
 class MultiBaseballSeason:
     def __init__(
-        self,
-        load_seasons: List[int],
-        new_season: int,
-        team_lists: Optional[list] = None,
-        season_length: int = 6,
-        series_length: int = 3,
-        rotation_len: int = 5,
-        majors_minors: list = None,
-        season_interactive: bool = False,
-        season_print_lineup_b: bool = False,
-        season_print_box_score_b: bool = False,
-        season_chatty: bool = False,
-        season_team_to_follow: Optional[List[str]] = None,
-        load_batter_file: str = "stats-pp-Batting.csv",
-        load_pitcher_file: str = "stats-pp-Pitching.csv",
-        output_handler: Optional[OutputHandlerType] = None,
-        play_by_play_callback_factory: Optional[PlayByPlayCallbackFactory] = None,
+            self,
+            load_seasons: List[int],
+            new_season: int,
+            team_lists: Optional[list] = None,
+            season_length: int = 6,
+            series_length: int = 3,
+            rotation_len: int = 5,
+            majors_minors: list = None,
+            season_interactive: bool = False,
+            season_print_lineup_b: bool = False,
+            season_print_box_score_b: bool = False,
+            season_chatty: bool = False,
+            season_team_to_follow: Optional[List[str]] = None,
+            load_batter_file: str = "stats-pp-Batting.csv",
+            load_pitcher_file: str = "stats-pp-Pitching.csv",
+            output_handler: Optional[OutputHandlerType] = None,
+            play_by_play_callback_factory: Optional[PlayByPlayCallbackFactory] = None,
     ) -> None:
         """
         :param load_seasons: list of seasons to load for stats, can blend multiple seasons
@@ -1336,7 +1336,7 @@ if __name__ == "__main__":
     if fantasy:
         my_team_to_follow = ["AUG"]  # List of teams to follow
         bbseasonMS = MultiBaseballSeason(
-            load_seasons=[2023, 2024, 2025],
+            load_seasons=[2020, 2021, 2022, 2023, 2024, 2025],
             new_season=2026,
             season_length=num_games,
             series_length=3,
@@ -1364,7 +1364,7 @@ if __name__ == "__main__":
         #                    [['TOR', 'LAD']], [['TOR', 'LAD']],
         #                    [['TOR', 'LAD']], [['LAD', 'TOR']],[['LAD', 'TOR']]]
         bbseasonSS = BaseballSeason(
-            load_seasons=[2023, 2024, 2025, 2026],
+            load_seasons=[2020, 2021, 2022, 2023, 2024, 2025, 2026],
             new_season=2026,
             season_length=num_games,
             series_length=3,

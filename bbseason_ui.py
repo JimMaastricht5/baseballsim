@@ -208,7 +208,7 @@ def main(
         show_startup_dialog: Show startup dialog (default False)
     """
     if load_seasons is None:
-        load_seasons = [2023, 2024, 2025, 2026]
+        load_seasons = [2020, 2021, 2022, 2023, 2024, 2025, 2026]
 
     logger.info("Starting Baseball Season Simulator UI (tkinter)")
 
@@ -264,8 +264,8 @@ Examples:
         "--seasons",
         "-s",
         type=str,
-        default="2023,2024,2025,2026",
-        help="Years to load stats from (default: 2023,2024,2025,2026)",
+        default="2020, 2021, 2022, 2023,2024,2025,2026",
+        help="Years to load stats from (default: 2020, 2021, 2022, 2023,2024,2025,2026)",
     )
     parser.add_argument("--new-season", "-n", type=int, default=2026, help="Season to simulate (default: 2026)")
 

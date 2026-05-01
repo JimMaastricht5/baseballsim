@@ -308,27 +308,27 @@ class GameRecap(BaseModel):
 
 class Game:
     def __init__(
-        self,
-        away_team_name: str = "",
-        home_team_name: str = "",
-        baseball_data=None,
-        game_num: int = 1,
-        rotation_len: int = 5,
-        print_lineup: bool = False,
-        chatty: bool = False,
-        print_box_score_b: bool = False,
-        team_to_follow: Optional[List[str]] = None,
-        load_seasons: List[int] = 2025,
-        new_season: int = 2026,
-        starting_pitchers: None = None,
-        starting_lineups: None = None,
-        load_batter_file: str = "player-stats-Batters.csv",
-        load_pitcher_file: str = "player-stats-Pitching.csv",
-        interactive: bool = False,
-        show_bench: bool = False,
-        debug: bool = False,
-        play_by_play_callback=None,
-        obp_adjustment=None,
+            self,
+            away_team_name: str = "",
+            home_team_name: str = "",
+            baseball_data=None,
+            game_num: int = 1,
+            rotation_len: int = 5,
+            print_lineup: bool = False,
+            chatty: bool = False,
+            print_box_score_b: bool = False,
+            team_to_follow: Optional[List[str]] = None,
+            load_seasons: List[int] = 2025,
+            new_season: int = 2026,
+            starting_pitchers: None = None,
+            starting_lineups: None = None,
+            load_batter_file: str = "player-stats-Batters.csv",
+            load_pitcher_file: str = "player-stats-Pitching.csv",
+            interactive: bool = False,
+            show_bench: bool = False,
+            debug: bool = False,
+            play_by_play_callback=None,
+            obp_adjustment=None,
     ) -> None:
         """Initialize a game between two teams with the given configuration."""
         self.game_recap = ""
@@ -476,9 +476,9 @@ class Game:
     def save_sit(self) -> bool:
         """Return True if current pitching situation qualifies for a save."""
         return (
-            self.score_diff() > 0
-            and (self.score_diff() <= self.bases.count_runners() + 2)
-            and self.inning[self.team_hitting()] >= 8
+                self.score_diff() > 0
+                and (self.score_diff() <= self.bases.count_runners() + 2)
+                and self.inning[self.team_hitting()] >= 8
         )
 
     def close_game(self) -> bool:
@@ -500,9 +500,9 @@ class Game:
 
         # pitcher of record tracking, look for lead change
         if (
-            self.total_score[self.team_hitting()]
-            <= self.total_score[self.team_pitching()]
-            < (self.total_score[self.team_hitting()] + self.bases.runs_scored)
+                self.total_score[self.team_hitting()]
+                <= self.total_score[self.team_pitching()]
+                < (self.total_score[self.team_hitting()] + self.bases.runs_scored)
         ):
             self.winning_pitcher = self.teams[self.team_hitting()].is_pitching_index()
             self.losing_pitcher = self.teams[self.team_pitching()].is_pitching_index()
@@ -572,7 +572,7 @@ class Game:
         output = ""
 
         for i in range(0, len(game_summaries), games_per_line):
-            batch = game_summaries[i : i + games_per_line]
+            batch = game_summaries[i: i + games_per_line]
 
             # Header line with R H E repeated
             header_parts = []
@@ -601,7 +601,7 @@ class Game:
     def pitching_sit(self, pitching: Series, pitch_switch: bool) -> bool:
         """Switch pitchers if fatigued or game situation demands it (save/close game)."""
         if (self.teams[self.team_pitching()].is_pitcher_fatigued(pitching.Condition) and self.outs < 3) or (
-            pitch_switch is False and (self.close_game() or self.save_sit())
+                pitch_switch is False and (self.close_game() or self.save_sit())
         ):
             prior_pitcher = self.teams[self.team_pitching()].is_pitching_index()
             self.teams[self.team_pitching()].pitching_change(
@@ -893,9 +893,9 @@ class Game:
         return (
             False
             if self.inning[AWAY] <= 9
-            or self.inning[HOME] <= 8
-            or (self.inning[AWAY] != self.inning[HOME] and self.total_score[AWAY] >= self.total_score[HOME])
-            or self.total_score[AWAY] == self.total_score[HOME]
+               or self.inning[HOME] <= 8
+               or (self.inning[AWAY] != self.inning[HOME] and self.total_score[AWAY] >= self.total_score[HOME])
+               or self.total_score[AWAY] == self.total_score[HOME]
             else True
         )
 
@@ -1200,7 +1200,7 @@ if __name__ == "__main__":
             chatty=True,
             print_lineup=True,
             print_box_score_b=True,
-            load_seasons=[2023, 2024, 2025],
+            load_seasons=[2020, 2021, 2022, 2023, 2024, 2025],
             new_season=2026,
             # load_batter_file='random-player-projected-stats-pp-Batting.csv',
             # load_pitcher_file='random-player-projected-stats-pp-Pitching.csv',

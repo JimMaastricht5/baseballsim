@@ -2109,7 +2109,7 @@ if __name__ == "__main__":
 
     my_teams = []
     baseball_data = BaseballStats(
-        load_seasons=[2023, 2024, 2025, 2026],
+        load_seasons=[2020, 2021, 2022, 2023, 2024, 2025, 2026],
         new_season=2026,
         include_leagues=["AL", "NL"],
         load_batter_file="player-projected-stats-pp-Batting.csv",

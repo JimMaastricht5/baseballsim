@@ -13,19 +13,21 @@ stats, applies age-adjusted projections, and writes three output file types:
 Supports random data generation for testing.
 """
 
+import hashlib
 # data clean up and standardization for stats.  handles random generation if requested
 # data imported from https://www.rotowire.com/baseball/stats.php
 import os
-import pandas as pd
 import random
-import city_names as city
-import bbplayer_projections_forecast_player as player_projector
-import hashlib
-import salary
+from typing import List, Optional
+
 import numpy as np
+import pandas as pd
 from numpy import ndarray
 from pandas.core.frame import DataFrame
-from typing import List, Optional
+
+import bbplayer_projections_forecast_player as player_projector
+import city_names as city
+import salary
 from bblogger import logger
 
 
@@ -49,13 +51,13 @@ class BaseballStatsPreProcess:
     """
 
     def __init__(
-        self,
-        load_seasons: List[int],
-        new_season: Optional[int] = None,
-        generate_random_data: bool = False,
-        min_games_for_trusted: int = 80,
-        load_batter_file: str = "player-stats-Batters.csv",
-        load_pitcher_file: str = "player-stats-Pitching.csv",
+            self,
+            load_seasons: List[int],
+            new_season: Optional[int] = None,
+            generate_random_data: bool = False,
+            min_games_for_trusted: int = 80,
+            load_batter_file: str = "player-stats-Batters.csv",
+            load_pitcher_file: str = "player-stats-Pitching.csv",
     ) -> None:
         """
         Load and preprocess baseball statistics for the specified seasons.
@@ -395,7 +397,8 @@ class BaseballStatsPreProcess:
                     print(f"Preserved existing batting stats ({existing_games} games)")
 
             if os.path.exists(new_season_pitching_file) and (
-                self.new_season_pitching_data["G"].sum() == 0 if "G" in self.new_season_pitching_data.columns else True
+                    self.new_season_pitching_data[
+                        "G"].sum() == 0 if "G" in self.new_season_pitching_data.columns else True
             ):
                 existing_pitching = pd.read_csv(new_season_pitching_file, index_col="Hashcode")
                 existing_games = existing_pitching["G"].sum() if "G" in existing_pitching.columns else 0
@@ -555,8 +558,8 @@ class BaseballStatsPreProcess:
             # which inflates all pitcher walk rates by ~2x.
             if total_pa:
                 lg_avgs["H_per_BIP"] = (
-                    qualified_recent["H"].sum()
-                    / (qualified_recent["PA"] - qualified_recent["SO"] - qualified_recent["BB"]).clip(lower=1).sum()
+                        qualified_recent["H"].sum()
+                        / (qualified_recent["PA"] - qualified_recent["SO"] - qualified_recent["BB"]).clip(lower=1).sum()
                 )
                 lg_avgs["H_per_PA"] = qualified_recent["H"].sum() / total_pa
                 lg_avgs["BB_per_PA"] = qualified_recent["BB"].sum() / total_pa
@@ -609,7 +612,8 @@ class BaseballStatsPreProcess:
             }
 
     def de_dup_df(
-        self, df: DataFrame, key_name: str, dup_column_names: str, stats_cols_to_sum: List[str], drop_dups: bool = False
+            self, df: DataFrame, key_name: str, dup_column_names: str, stats_cols_to_sum: List[str],
+            drop_dups: bool = False
     ) -> DataFrame:
         """
         Collapse duplicate rows by summing stat columns, then optionally drop extras.
@@ -772,7 +776,7 @@ class BaseballStatsPreProcess:
         pitching_data["Division"] = pitching_data["Team"].map(self.team_division).fillna("")
         # Create Player_Season_Key BEFORE de-duplication
         pitching_data["Player_Season_Key"] = (
-            pitching_data["Hashcode"].astype(str) + "_" + pitching_data["Season"].astype(str)
+                pitching_data["Hashcode"].astype(str) + "_" + pitching_data["Season"].astype(str)
         )
         outs = (pitching_data["IP"].astype(int) * 3) + np.round((pitching_data["IP"] % 1) * 10)
         pitching_data["PA"] = outs + pitching_data["H"] + pitching_data["BB"] + pitching_data.get("HBP", 0)
@@ -891,7 +895,7 @@ class BaseballStatsPreProcess:
         pitching_data["Total_Outs"] = pitching_data["IP"] * 3  # 3 outs per inning
         pitching_data = pitching_data[
             pitching_data["IP"] >= 1
-        ]  # drop pitchers without any meaningful innings (reduced from 5 to 1)
+            ]  # drop pitchers without any meaningful innings (reduced from 5 to 1)
         pitching_data["AVG_faced"] = (pitching_data["Total_OB"] + pitching_data["Total_Outs"]) / pitching_data.G
         pitching_data["Game_Fatigue_Factor"] = 0
         pitching_data["Condition"] = 100
@@ -997,7 +1001,7 @@ class BaseballStatsPreProcess:
         batting_data = batting_data[batting_data["Team"] != ""]  # drop rows without a formal team name
         # Create Player_Season_Key BEFORE de-duplication
         batting_data["Player_Season_Key"] = (
-            batting_data["Hashcode"].astype(str) + "_" + batting_data["Season"].astype(str)
+                batting_data["Hashcode"].astype(str) + "_" + batting_data["Season"].astype(str)
         )
         batting_data["PA"] = batting_data["AB"] + batting_data["BB"] + batting_data["HBP"] + batting_data["SF"]
 
@@ -1309,12 +1313,12 @@ class BaseballStatsPreProcess:
                 # 1. Calculate wOBA (Simulated Offensive Value)
                 singles = prior_b["H"] - prior_b["2B"] - prior_b["3B"] - prior_b["HR"]
                 woba_num = (
-                    0.69 * prior_b["BB"]
-                    + 0.72 * prior_b["HBP"]
-                    + 0.88 * singles
-                    + 1.24 * prior_b["2B"]
-                    + 1.56 * prior_b["3B"]
-                    + 1.95 * prior_b["HR"]
+                        0.69 * prior_b["BB"]
+                        + 0.72 * prior_b["HBP"]
+                        + 0.88 * singles
+                        + 1.24 * prior_b["2B"]
+                        + 1.56 * prior_b["3B"]
+                        + 1.95 * prior_b["HR"]
                 )
 
                 # Use PA as denominator for wOBA
@@ -1325,7 +1329,7 @@ class BaseballStatsPreProcess:
                 league_woba = prior_b["wOBA"].mean()
                 replacement_woba = league_woba - 0.020
                 prior_b["Calculated_Sim_WAR"] = (
-                    ((prior_b["wOBA"] - replacement_woba) / 1.15) * prior_b["PA_calc"] / 10.0
+                        ((prior_b["wOBA"] - replacement_woba) / 1.15) * prior_b["PA_calc"] / 10.0
                 )
 
                 # 3. Calculate Def_WAR (Baserunning + Defense)
@@ -1495,7 +1499,7 @@ class BaseballStatsPreProcess:
         self.batting_data["Hashcode"] = self.batting_data["Player"].apply(lambda x: self.create_hash(x, "Hitter"))
         self.batting_data = self.batting_data.set_index("Hashcode")
 
-        self.pitching_data["Player"] = random_names[-len(self.pitching_data) :]  # next x rows list
+        self.pitching_data["Player"] = random_names[-len(self.pitching_data):]  # next x rows list
         self.pitching_data = self.pitching_data.reset_index()
         self.pitching_data["Hashcode"] = self.pitching_data["Player"].apply(lambda x: self.create_hash(x, "Pitcher"))
         self.pitching_data = self.pitching_data.set_index("Hashcode")
@@ -1518,9 +1522,9 @@ class BaseballStatsPreProcess:
                 lambda x: self.create_hash(x, "Hitter")
             )
             self.batting_data_historical["Player_Season_Key"] = (
-                self.batting_data_historical["Hashcode"].astype(str)
-                + "_"
-                + self.batting_data_historical["Season"].astype(str)
+                    self.batting_data_historical["Hashcode"].astype(str)
+                    + "_"
+                    + self.batting_data_historical["Season"].astype(str)
             )
             self.batting_data_historical = self.batting_data_historical.drop("Old_Hashcode", axis=1)
             self.batting_data_historical = self.batting_data_historical.set_index("Player_Season_Key")
@@ -1540,9 +1544,9 @@ class BaseballStatsPreProcess:
                 lambda x: self.create_hash(x, "Pitcher")
             )
             self.pitching_data_historical["Player_Season_Key"] = (
-                self.pitching_data_historical["Hashcode"].astype(str)
-                + "_"
-                + self.pitching_data_historical["Season"].astype(str)
+                    self.pitching_data_historical["Hashcode"].astype(str)
+                    + "_"
+                    + self.pitching_data_historical["Season"].astype(str)
             )
             self.pitching_data_historical = self.pitching_data_historical.drop("Old_Hashcode", axis=1)
             self.pitching_data_historical = self.pitching_data_historical.set_index("Player_Season_Key")
@@ -1601,9 +1605,9 @@ class BaseballStatsPreProcess:
                     partial_row = partial_pitch.loc[idx]
                     g_val = partial_row["G"] if "G" in partial_row.index else None
                     if (
-                        g_val is not None and pd.notna(g_val).any()
-                        if hasattr(pd.notna(g_val), "any")
-                        else pd.notna(g_val)
+                            g_val is not None and pd.notna(g_val).any()
+                            if hasattr(pd.notna(g_val), "any")
+                            else pd.notna(g_val)
                     ):
                         # Update team info from partial data (in case of mid-season trades)
                         if "Team" in partial_row.index and pd.notna(partial_row.get("Team")):
@@ -1729,9 +1733,9 @@ class BaseballStatsPreProcess:
                     partial_row = partial_bat.loc[idx]
                     g_val = partial_row["G"] if "G" in partial_row.index else None
                     if (
-                        g_val is not None and pd.notna(g_val).any()
-                        if hasattr(pd.notna(g_val), "any")
-                        else pd.notna(g_val)
+                            g_val is not None and pd.notna(g_val).any()
+                            if hasattr(pd.notna(g_val), "any")
+                            else pd.notna(g_val)
                     ):
                         self.new_season_batting_data.loc[idx, "G"] = int(partial_row.get("G", 0))
                         self.new_season_batting_data.loc[idx, "PA"] = int(partial_row.get("PA", 0))
@@ -1854,14 +1858,14 @@ class BaseballStatsPreProcess:
             if "Season" in self.pitching_data_historical.columns:
                 self.pitching_data_historical = self.pitching_data_historical[
                     self.pitching_data_historical["Season"] != max_season
-                ]
+                    ]
             # Add required columns if missing
             for col in ["Streak_Adjustment", "Projection_Trusted"]:
                 if col not in partial_data["pitching"].columns:
                     partial_data["pitching"][col] = 0 if col == "Streak_Adjustment" else False
             # Fix index: create proper Player_Season_Key format
             partial_data["pitching"]["Player_Season_Key"] = (
-                partial_data["pitching"].index.astype(str) + "_" + str(max_season)
+                    partial_data["pitching"].index.astype(str) + "_" + str(max_season)
             )
             partial_data["pitching"] = partial_data["pitching"].set_index("Player_Season_Key")
             self.pitching_data_historical = pd.concat([self.pitching_data_historical, partial_data["pitching"]], axis=0)
@@ -1871,14 +1875,14 @@ class BaseballStatsPreProcess:
             if "Season" in self.batting_data_historical.columns:
                 self.batting_data_historical = self.batting_data_historical[
                     self.batting_data_historical["Season"] != max_season
-                ]
+                    ]
             # Add required columns if missing
             for col in ["Streak_Adjustment", "Projection_Trusted"]:
                 if col not in partial_data["batting"].columns:
                     partial_data["batting"][col] = 0 if col == "Streak_Adjustment" else False
             # Fix index: create proper Player_Season_Key format
             partial_data["batting"]["Player_Season_Key"] = (
-                partial_data["batting"].index.astype(str) + "_" + str(max_season)
+                    partial_data["batting"].index.astype(str) + "_" + str(max_season)
             )
             partial_data["batting"] = partial_data["batting"].set_index("Player_Season_Key")
             self.batting_data_historical = pd.concat([self.batting_data_historical, partial_data["batting"]], axis=0)
@@ -1895,7 +1899,7 @@ class BaseballStatsPreProcess:
         :param d: Number of decimal places to keep. Default 3.
         :return: Array of the same shape with values truncated to ``d`` decimals.
         """
-        return (df_n * 10**d).astype(int) / 10**d
+        return (df_n * 10 ** d).astype(int) / 10 ** d
 
 
 # =============================================================================
@@ -2032,11 +2036,13 @@ def diagnose_power_inflation(load_seasons: list = None, new_season: int = 2026):
     df_25["1B"] = df_25["H"] - df_25["2B"].fillna(0) - df_25["3B"].fillna(0) - df_25["HR"].fillna(0)
 
     df_proj["SLG"] = (
-        df_proj["1B"] + 2 * df_proj["2B"].fillna(0) + 3 * df_proj["3B"].fillna(0) + 4 * df_proj["HR"].fillna(0)
-    ) / df_proj["AB"].replace(0, 1)
+                             df_proj["1B"] + 2 * df_proj["2B"].fillna(0) + 3 * df_proj["3B"].fillna(0) + 4 * df_proj[
+                         "HR"].fillna(0)
+                     ) / df_proj["AB"].replace(0, 1)
     df_25["SLG"] = (
-        df_25["1B"] + 2 * df_25["2B"].fillna(0) + 3 * df_25["3B"].fillna(0) + 4 * df_25["HR"].fillna(0)
-    ) / df_25["AB"].replace(0, 1)
+                           df_25["1B"] + 2 * df_25["2B"].fillna(0) + 3 * df_25["3B"].fillna(0) + 4 * df_25["HR"].fillna(
+                       0)
+                   ) / df_25["AB"].replace(0, 1)
 
     lg_1b_25 = df_25["1B"].sum() / df_25["AB"].sum()
     lg_2b_25 = df_25["2B"].sum() / df_25["AB"].sum()
@@ -2261,7 +2267,7 @@ if __name__ == "__main__":
 
     print("\n[1/3] Running preprocessing to generate projection files...")
     baseball_data = BaseballStatsPreProcess(
-        load_seasons=[2023, 2024, 2025, 2026],
+        load_seasons=[2020, 2021, 2022, 2023, 2024, 2025, 2026],
         new_season=2026,
         generate_random_data=False,
         min_games_for_trusted=80,

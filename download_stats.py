@@ -6,16 +6,18 @@ Download MLB player statistics from Baseball Reference using Selenium.
 WARNING: Requires manual intervention to click "Share & Export" -> "Get Table as CSV".
 """
 
-import pandas as pd
-import sys
 import os
-from typing import Optional, List
+import sys
 import time
+from typing import Optional, List
+
+import pandas as pd
 from selenium import webdriver
-from selenium.webdriver.common.by import By
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.chrome.service import Service
+from selenium.webdriver.common.by import By
 from webdriver_manager.chrome import ChromeDriverManager
+
 from bblogger import logger
 
 

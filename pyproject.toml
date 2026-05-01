@@ -13,6 +13,7 @@ dependencies = [
     "webdriver-manager>=4.0.0",
     "pydantic==2.13.0b3",
     "ruff>=0.15.10",
+    "beautifulsoup4>=4.14.3",
 ]
 
 [tool.uv.workspace]

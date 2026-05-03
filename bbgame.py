@@ -949,47 +949,57 @@ class Game:
         logger.debug("Calling _build_structured_game_recap")
         self._build_structured_game_recap()
 
-        return (list(self.total_score), self.inning, self.win_loss, self.game_recap, self.structured_game)
+        # Return a deep copy to ensure no shared state with this Game instance
+        return (list(self.total_score), self.inning, self.win_loss, self.game_recap, self.structured_game.model_copy(deep=True))
 
     def _build_structured_game_recap(self) -> GameRecap:
         """Build structured GameRecap from accumulated game data at game end."""
-        # Update final score (cast to int to avoid object refs leaking into logs)
-        self.structured_game.final_score = (
-            int(self.total_score[AWAY]),
-            int(self.total_score[HOME]),
-        )
-
-        # Update inning scores - use InningRow directly
-        self.structured_game.inning_scores = [
+        # Create a fresh GameRecap to ensure no state leaks between games
+        inning_scores = [
             InningScore(inning=row.number, away_runs=row.away_runs, home_runs=row.home_runs)
             for row in self.inning_score
         ]
-        # Check for extra innings
-        self.structured_game.is_extra_innings = len(self.structured_game.inning_scores) > 9
-        self.structured_game.final_inning = len(self.structured_game.inning_scores)
+        is_extra = len(inning_scores) > 9
 
-        # Build lineups from team DataFrames
-        self.structured_game.away_lineup = self._build_team_lineup(self.teams[AWAY])
-        self.structured_game.home_lineup = self._build_team_lineup(self.teams[HOME])
+        away_lineup = self._build_team_lineup(self.teams[AWAY])
+        home_lineup = self._build_team_lineup(self.teams[HOME])
 
-        # Build box scores from team box_score objects
         logger.debug("About to build away_box_score")
-        self.structured_game.away_box_score = self._build_team_box_score(self.teams[AWAY], AWAY)
-        logger.debug(f"Away box_score built: team={self.structured_game.away_box_score.team}")
+        away_box_score = self._build_team_box_score(self.teams[AWAY], AWAY)
+        logger.debug(f"Away box_score built: team={away_box_score.team}")
         logger.debug("About to build home_box_score")
-        self.structured_game.home_box_score = self._build_team_box_score(self.teams[HOME], HOME)
-        logger.debug(f"Home box_score built: team={self.structured_game.home_box_score.team}")
+        home_box_score = self._build_team_box_score(self.teams[HOME], HOME)
+        logger.debug(f"Home box_score built: team={home_box_score.team}")
 
-        # Find winning/losing pitcher names from box scores
-        for box_score in [self.structured_game.away_box_score, self.structured_game.home_box_score]:
+        winning_pitcher = None
+        losing_pitcher = None
+        save_pitcher = None
+        for box_score in [away_box_score, home_box_score]:
             if box_score and box_score.pitchers:
                 for pitcher in box_score.pitchers:
-                    if pitcher.stats.W > 0 and self.structured_game.winning_pitcher is None:
-                        self.structured_game.winning_pitcher = pitcher.name
-                    if pitcher.stats.L > 0 and self.structured_game.losing_pitcher is None:
-                        self.structured_game.losing_pitcher = pitcher.name
+                    if pitcher.stats.W > 0 and winning_pitcher is None:
+                        winning_pitcher = pitcher.name
+                    if pitcher.stats.L > 0 and losing_pitcher is None:
+                        losing_pitcher = pitcher.name
                     if pitcher.stats.SV > 0:
-                        self.structured_game.save_pitcher = pitcher.name
+                        save_pitcher = pitcher.name
+
+        self.structured_game = GameRecap(
+            away_team=self.team_names[AWAY],
+            home_team=self.team_names[HOME],
+            final_score=(int(self.total_score[AWAY]), int(self.total_score[HOME])),
+            final_inning=len(inning_scores),
+            is_extra_innings=is_extra,
+            away_lineup=away_lineup,
+            home_lineup=home_lineup,
+            innings=self.structured_game.innings,
+            inning_scores=inning_scores,
+            away_box_score=away_box_score,
+            home_box_score=home_box_score,
+            winning_pitcher=winning_pitcher,
+            losing_pitcher=losing_pitcher,
+            save_pitcher=save_pitcher,
+        )
 
         return self.structured_game
 

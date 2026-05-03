@@ -987,10 +987,9 @@ class BaseballSeason:
             self.baseball_data.game_results_to_season(box_score_class=home_box_score)
 
             # Emit game result for UI routing (playoff widget)
-            away_score = home_score = None
-            if structured_game:
-                away_score = int(structured_game.final_score[0])
-                home_score = int(structured_game.final_score[1])
+            # Use the 'score' list (copy of total_score) as the authoritative source
+            log_away_score = int(score[0])
+            log_home_score = int(score[1])
             self.output_handler(
                 OutputCategory.GAME_RESULT_FULL,
                 game_recap,
@@ -1001,25 +1000,18 @@ class BaseballSeason:
                     "round_name": round_name,
                     "away_team": game.away,
                     "home_team": game.home,
-                    "away_r": away_score,
-                    "home_r": home_score,
+                    "away_r": log_away_score,
+                    "home_r": log_home_score,
                 },
             )
 
             # Log playoff game result
             home_wins = self.team_win_loss[home][WIN] - start_wins[home]
             away_wins = self.team_win_loss[away][WIN] - start_wins[away]
-            # Safely log scores. Some paths can yield non-int values for away_score/home_score
-            # when structured_game is present. Prefer values from structured_game.final_score
-            # if available to avoid phantom object references.
-            log_away_score = away_score
-            log_home_score = home_score
-            if structured_game is not None and isinstance(structured_game.final_score, (list, tuple)):
-                try:
-                    log_away_score = int(structured_game.final_score[0])
-                    log_home_score = int(structured_game.final_score[1])
-                except Exception:
-                    pass
+            logger.debug(
+                f"[{round_name}] score id={id(score)} structured_game id={id(structured_game)} "
+                f"score={score}"
+            )
             logger.info(
                 f"[{round_name}] {game.away} {log_away_score} @ {game.home} {log_home_score} "
                 f"(Series: {away} {away_wins}-{home_wins} {home})"

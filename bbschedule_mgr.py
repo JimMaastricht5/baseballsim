@@ -4,10 +4,11 @@ Copyright (c) 2024 Jim Maastricht
 Schedule management: CSV loading, random generation, date calculations, and playoff brackets.
 """
 
-import os
 import datetime
-import pandas as pd
+import os
 from typing import Dict, List, Optional
+
+import pandas as pd
 
 from bblogger import logger
 
@@ -82,7 +83,7 @@ class ScheduleManager:
 
                 # Check if game already played (has score or no time)
                 is_completed = (pd.isna(row["Time"]) or not row["Time"]) or (
-                    row["Away_Score"] > 0 or row["Home_Score"] > 0
+                        row["Away_Score"] > 0 or row["Home_Score"] > 0
                 )
 
                 # Get time for future games
@@ -467,6 +468,7 @@ class ScheduleManager:
                 current_home, current_away = (home, away) if game_num in [1, 2, 5] else (away, home)
             else:  # LCS/WS: 2-3-2
                 current_home, current_away = (home, away) if game_num in [1, 2, 6, 7] else (away, home)
+            logger.info(f"built game {game_num} for {current_away} vs {current_home}")
 
             game = PlayoffMatchup(
                 home=current_home,
@@ -484,8 +486,11 @@ class ScheduleManager:
             self._playoff_schedule.append(day)
             self._playoff_dates.append(date_str)
             day_offset += 1
+            logger.info(f"built  {game.away} vs {game.home} on {date_str} for {round_name} best of {best_of}")
 
-        logger.debug(f"Built {round_name}: {away} @ {home} ({best_of} games)")
+        logger.info(f"Built {round_name}: {away} @ {home} ({best_of} games)")
+
+        return
 
     def set_series_winner(self, away: str, home: str, winner: str):
         """Mark series as complete with winner.
@@ -511,84 +516,84 @@ class ScheduleManager:
         """
         return self._series_winners.get((away, home))
 
-    def build_full_playoff_bracket(self, al_seeds: List[str], nl_seeds: List[str]):
-        """Build entire playoff schedule at start of playoffs.
-
-        Creates all playoff games upfront with correct home/away based on MLB format:
-        - Wild Card: Best of 3, all games at higher seed
-        - Division Series: Best of 5, 2-2-1 format
-        - LCS: Best of 7, 2-3-2 format
-        - World Series: Best of 7, 2-3-2 format
-
-        Args:
-            al_seeds: List of 6 AL team abbreviations in seed order (1-6)
-            nl_seeds: List of 6 NL team abbreviations in seed order (1-6)
-        """
-        self.clear_playoffs()
-
-        # Day offset tracker
-        day_offset = 0
-
-        def add_series_games(home: str, away: str, best_of: int, round_name: str):
-            """Add all games for a series."""
-            nonlocal day_offset
-            games_to_add = []
-
-            for game_num in range(1, best_of + 1):
-                # Determine home team based on MLB format
-                if best_of == 3:  # WC: all at higher seed
-                    current_home, current_away = home, away
-                elif best_of == 5:  # DS: 2-2-1
-                    current_home, current_away = (home, away) if game_num in [1, 2, 5] else (away, home)
-                else:  # LCS/WS: 2-3-2
-                    current_home, current_away = (home, away) if game_num in [1, 2, 6, 7] else (away, home)
-
-                game = PlayoffMatchup(
-                    home=current_home,
-                    away=current_away,
-                    round_name=round_name,
-                    game_num=game_num,
-                    series_game_index=game_num,
-                )
-                games_to_add.append(game)
-
-            # Add games to schedule (one day per game for playoffs)
-            for game in games_to_add:
-                date_str = self.get_playoff_date(day_offset)
-                day = ScheduleDay(date_str, [game])
-                self._playoff_schedule.append(day)
-                self._playoff_dates.append(date_str)
-                day_offset += 1
-
-            return games_to_add
-
-        # Build Wild Card Round (2 days - 3 games each league)
-        # AL: Seed 6 @ Seed 3 (WC1), Seed 5 @ Seed 4 (WC2)
-        # Note: Using seeds as placeholders - actual winners determined after games
-        add_series_games(al_seeds[2], al_seeds[5], 3, "AL Wild Card A")
-        add_series_games(al_seeds[3], al_seeds[4], 3, "AL Wild Card B")
-        # NL: Seed 6 @ Seed 3 (WC1), Seed 5 @ Seed 4 (WC2)
-        add_series_games(nl_seeds[2], nl_seeds[5], 3, "NL Wild Card A")
-        add_series_games(nl_seeds[3], nl_seeds[4], 3, "NL Wild Card B")
-
-        # Division Series (4 series per league = 20 games max)
-        # DS1: Seed 1 vs WC2 Winner, DS2: Seed 2 vs WC1 Winner
-        # Using seed numbers as placeholders - will be replaced with actual winners
-        add_series_games(al_seeds[0], al_seeds[4], 5, "ALDS A")  # Seed 1 vs WC2 (placeholder)
-        add_series_games(al_seeds[1], al_seeds[5], 5, "ALDS B")  # Seed 2 vs WC1 (placeholder)
-        add_series_games(nl_seeds[0], nl_seeds[4], 5, "NLDS A")
-        add_series_games(nl_seeds[1], nl_seeds[5], 5, "NLDS B")
-
-        # League Championship Series (2 series per league = 14 games max)
-        add_series_games(al_seeds[0], al_seeds[1], 7, "ALCS")  # Placeholders
-        add_series_games(nl_seeds[0], nl_seeds[1], 7, "NLCS")
-
-        # World Series (7 games max)
-        add_series_games("AL", "NL", 7, "World Series")
-
-        logger.info(
-            f"Built playoff schedule: {day_offset} days, {sum(len(d.games) for d in self._playoff_schedule)} games"
-        )
+    # def build_full_playoff_bracket(self, al_seeds: List[str], nl_seeds: List[str]):
+    #     """Build entire playoff schedule at start of playoffs.
+    #
+    #     Creates all playoff games upfront with correct home/away based on MLB format:
+    #     - Wild Card: Best of 3, all games at higher seed
+    #     - Division Series: Best of 5, 2-2-1 format
+    #     - LCS: Best of 7, 2-3-2 format
+    #     - World Series: Best of 7, 2-3-2 format
+    #
+    #     Args:
+    #         al_seeds: List of 6 AL team abbreviations in seed order (1-6)
+    #         nl_seeds: List of 6 NL team abbreviations in seed order (1-6)
+    #     """
+    #     self.clear_playoffs()
+    #
+    #     # Day offset tracker
+    #     day_offset = 0
+    #
+    #     def add_series_games(home: str, away: str, best_of: int, round_name: str):
+    #         """Add all games for a series."""
+    #         nonlocal day_offset
+    #         games_to_add = []
+    #
+    #         for game_num in range(1, best_of + 1):
+    #             # Determine home team based on MLB format
+    #             if best_of == 3:  # WC: all at higher seed
+    #                 current_home, current_away = home, away
+    #             elif best_of == 5:  # DS: 2-2-1
+    #                 current_home, current_away = (home, away) if game_num in [1, 2, 5] else (away, home)
+    #             else:  # LCS/WS: 2-3-2
+    #                 current_home, current_away = (home, away) if game_num in [1, 2, 6, 7] else (away, home)
+    #
+    #             game = PlayoffMatchup(
+    #                 home=current_home,
+    #                 away=current_away,
+    #                 round_name=round_name,
+    #                 game_num=game_num,
+    #                 series_game_index=game_num,
+    #             )
+    #             games_to_add.append(game)
+    #
+    #         # Add games to schedule (one day per game for playoffs)
+    #         for game in games_to_add:
+    #             date_str = self.get_playoff_date(day_offset)
+    #             day = ScheduleDay(date_str, [game])
+    #             self._playoff_schedule.append(day)
+    #             self._playoff_dates.append(date_str)
+    #             day_offset += 1
+    #
+    #         return games_to_add
+    #
+    #     # Build Wild Card Round (2 days - 3 games each league)
+    #     # AL: Seed 6 @ Seed 3 (WC1), Seed 5 @ Seed 4 (WC2)
+    #     # Note: Using seeds as placeholders - actual winners determined after games
+    #     add_series_games(al_seeds[2], al_seeds[5], 3, "AL Wild Card A")
+    #     add_series_games(al_seeds[3], al_seeds[4], 3, "AL Wild Card B")
+    #     # NL: Seed 6 @ Seed 3 (WC1), Seed 5 @ Seed 4 (WC2)
+    #     add_series_games(nl_seeds[2], nl_seeds[5], 3, "NL Wild Card A")
+    #     add_series_games(nl_seeds[3], nl_seeds[4], 3, "NL Wild Card B")
+    #
+    #     # Division Series (4 series per league = 20 games max)
+    #     # DS1: Seed 1 vs WC2 Winner, DS2: Seed 2 vs WC1 Winner
+    #     # Using seed numbers as placeholders - will be replaced with actual winners
+    #     add_series_games(al_seeds[0], al_seeds[4], 5, "ALDS A")  # Seed 1 vs WC2 (placeholder)
+    #     add_series_games(al_seeds[1], al_seeds[5], 5, "ALDS B")  # Seed 2 vs WC1 (placeholder)
+    #     add_series_games(nl_seeds[0], nl_seeds[4], 5, "NLDS A")
+    #     add_series_games(nl_seeds[1], nl_seeds[5], 5, "NLDS B")
+    #
+    #     # League Championship Series (2 series per league = 14 games max)
+    #     add_series_games(al_seeds[0], al_seeds[1], 7, "ALCS")  # Placeholders
+    #     add_series_games(nl_seeds[0], nl_seeds[1], 7, "NLCS")
+    #
+    #     # World Series (7 games max)
+    #     add_series_games("AL", "NL", 7, "World Series")
+    #
+    #     logger.info(
+    #         f"Built playoff schedule: {day_offset} days, {sum(len(d.games) for d in self._playoff_schedule)} games"
+    #     )
 
 
 class GameMatchup:

@@ -981,6 +981,7 @@ class BaseballSeason:
             else:
                 (score, inning, win_loss_list, away_box_score, home_box_score, game_recap) = result
 
+            logger.info(f"{away} vs {home} result {score})")
             # Update team win/loss records
             self.update_win_loss(away_team_name=game.away, home_team_name=game.home, win_loss=win_loss_list)
             self.baseball_data.game_results_to_season(box_score_class=away_box_score)

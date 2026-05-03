@@ -278,7 +278,7 @@ class GameRecap(BaseModel):
                         lines.append(f"\tScored {len(play.runs_scored)} run(s)!  ({scored_str})")
 
                     if play.is_pitching_change and play.new_pitcher_name:
-                        lines.append(f"\tManager has made the call to the bull pen.  Pitching change....")
+                        lines.append("\tManager has made the call to the bull pen.  Pitching change....")
                         lines.append(f"\t{play.new_pitcher_name} has entered the game for {half_data.batting_team}")
 
                     if play.is_steal_attempt and play.stolen_base:
@@ -300,7 +300,7 @@ class GameRecap(BaseModel):
             pass
 
         # Final score table
-        lines.append(f"\nFinal")
+        lines.append("\nFinal")
         # Add score table...
 
         return "\n".join(lines)
@@ -612,7 +612,7 @@ class Game:
                 pitch_switch = True  # we switched pitcher this inning
                 self.is_save_sit[self.team_pitching()] = self.save_sit()
                 if self.chatty and pitch_switch:
-                    play_text = f"Manager has made the call to the bull pen.  Pitching change....\n"
+                    play_text = "Manager has made the call to the bull pen.  Pitching change....\n"
                     self.game_recap += play_text
                     if self.play_by_play_callback:
                         self.play_by_play_callback(play_text)
@@ -936,7 +936,7 @@ class Game:
         while self.is_game_end() is False:
             self.sim_half_inning()
         self.end_game()
-        return self.total_score, self.inning, self.win_loss, self.game_recap
+        return list(self.total_score), self.inning, self.win_loss, self.game_recap
 
     def sim_game_structured(self) -> Tuple[List[int], List[int], List[List[int]], str, GameRecap]:
         """Simulate full game and return both legacy string and structured GameRecap."""
@@ -949,7 +949,7 @@ class Game:
         logger.debug("Calling _build_structured_game_recap")
         self._build_structured_game_recap()
 
-        return (self.total_score, self.inning, self.win_loss, self.game_recap, self.structured_game)
+        return (list(self.total_score), self.inning, self.win_loss, self.game_recap, self.structured_game)
 
     def _build_structured_game_recap(self) -> GameRecap:
         """Build structured GameRecap from accumulated game data at game end."""
@@ -1233,7 +1233,7 @@ if __name__ == "__main__":
             f"Innings: {structured_game.final_inning}"
             + (" (Extra Innings)" if structured_game.is_extra_innings else "")
         )
-        print(f"\nInning Scores:")
+        print("\nInning Scores:")
         for inn in structured_game.inning_scores:
             print(
                 f"  Inning {inn.inning}: {structured_game.away_team} {inn.away_runs} - {structured_game.home_team} {inn.home_runs}"
@@ -1252,7 +1252,7 @@ if __name__ == "__main__":
             print(f"  Pitchers: {len(structured_game.home_box_score.pitchers)}")
 
         # Show sample batter stats
-        print(f"\nSample Batting Entry (first batter):")
+        print("\nSample Batting Entry (first batter):")
         if structured_game.away_box_score and structured_game.away_box_score.batters:
             batter = structured_game.away_box_score.batters[0]
             print(f"  Name: {batter.name}")
@@ -1262,7 +1262,7 @@ if __name__ == "__main__":
                 f"  AVG: {batter.stats.AVG:.3f}, OBP: {batter.stats.OBP:.3f}, SLG: {batter.stats.SLG:.3f}, OPS: {batter.stats.OPS:.3f}"
             )
 
-        print(f"\nStructured game model (JSON):")
+        print("\nStructured game model (JSON):")
         print(
             structured_game.model_dump_json(indent=2)[:2000] + "..."
             if len(structured_game.model_dump_json()) > 2000

@@ -957,8 +957,8 @@ class BaseballSeason:
         for game in series_games:
             # Simulate the playoff game directly (same pattern as sim_day_threaded)
             game_sim = bbgame.Game(
-                away_team_name=away,
-                home_team_name=home,
+                away_team_name=game.away,
+                home_team_name=game.home,
                 baseball_data=self.baseball_data,
                 game_num=self.season_day_num,
                 rotation_len=self.rotation_len,
@@ -970,8 +970,7 @@ class BaseballSeason:
                 obp_adjustment=self.obp_adjustment,
             )
             q = queue.Queue()
-            is_followed = (not self.team_to_follow) or away in self.team_to_follow or home in self.team_to_follow
-            thread = threading.Thread(target=game_sim.sim_game_threaded, args=(q, is_followed))
+            thread = threading.Thread(target=game_sim.sim_game_threaded, args=(q, True))
             thread.start()
             thread.join()
             result = q.get()
@@ -983,7 +982,7 @@ class BaseballSeason:
                 (score, inning, win_loss_list, away_box_score, home_box_score, game_recap) = result
 
             # Update team win/loss records
-            self.update_win_loss(away_team_name=away, home_team_name=home, win_loss=win_loss_list)
+            self.update_win_loss(away_team_name=game.away, home_team_name=game.home, win_loss=win_loss_list)
             self.baseball_data.game_results_to_season(box_score_class=away_box_score)
             self.baseball_data.game_results_to_season(box_score_class=home_box_score)
 
@@ -1000,8 +999,8 @@ class BaseballSeason:
                     "structured_game": structured_game,
                     "is_playoff": True,
                     "round_name": round_name,
-                    "away_team": away,
-                    "home_team": home,
+                    "away_team": game.away,
+                    "home_team": game.home,
                     "away_r": away_score,
                     "home_r": home_score,
                 },
@@ -1022,8 +1021,15 @@ class BaseballSeason:
                 except Exception:
                     pass
             logger.info(
-                f"[{round_name}] {away} {log_away_score} @ {home} {log_home_score} "
+                f"[{round_name}] {game.away} {log_away_score} @ {game.home} {log_home_score} "
                 f"(Series: {away} {away_wins}-{home_wins} {home})"
+            )
+
+            # Print game result to console for debugging
+            game_num = home_wins + away_wins
+            self.output_handler(
+                OutputCategory.SIM_PROGRESS,
+                f"[{round_name}] Game {game_num}: {game.away} {log_away_score} - {game.home} {log_home_score}  (Series: {away_wins}-{home_wins})\n",
             )
 
             # Check if series is over
@@ -1328,7 +1334,7 @@ if __name__ == "__main__":
     start_time = datetime.datetime.now()
 
     # full season 162 games
-    num_games = 162
+    num_games = 28
     interactive = True
     fantasy = False
 

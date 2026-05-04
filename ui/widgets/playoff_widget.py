@@ -775,8 +775,6 @@ class PlayoffWidget:
             self.ws_active = True
             self.ws_info = ws_data
             self.series_score = {al: 0, nl: 0}
-            self.game_number = 0
-            self.games_data = {}
             self.header_label.config(text=f"{season} World Series: {al} vs {nl}")
 
     def add_play_by_play(self, play_data: Dict[str, Any]):

@@ -137,6 +137,7 @@ class SeasonMainWindow:
     def _load_partial_season_data(self):
         """Load partial season data and display standings at startup."""
         import bbstats
+        import bbschedule_mgr
 
         try:
             # Create BaseballStats instance to load partial season data
@@ -149,18 +150,45 @@ class SeasonMainWindow:
             )
             # Get partial season standings
             partial_standings = baseball_data.populate_standings_from_partial_season()
-            # Calculate current day from max games played
-            current_day = 0
-            if partial_standings:
-                current_day = max(w + l for w, l in partial_standings.values())
+            # Calculate next game number from followed team's win/loss record
+            games_played = 0
+            if partial_standings and self.season_team_to_follow in partial_standings:
+                w, l = partial_standings[self.season_team_to_follow]
+                games_played = w + l
+            elif partial_standings:
+                games_played = max(w + l for w, l in partial_standings.values())
+            # Load schedule and get date for the next game
+            date_str = ""
+            sched_mgr = None
+            sched_idx = 0
+            try:
+                sched_mgr = bbschedule_mgr.ScheduleManager(baseball_data, self.new_season)
+                sched_mgr.load_from_csv()
+                sched_idx = sched_mgr.find_start_day(partial_standings, [self.season_team_to_follow])
+                date_str = sched_mgr.get_date_for_index(sched_idx)
+            except Exception:
+                pass
             # Extract standings for UI (build same structure as extract_standings)
             standings_data = self._build_standings_data(partial_standings, baseball_data)
             # Update standings widget
             self.standings.update_standings(standings_data, self.season_team_to_follow)
             # Update day label
-            self.day_label.config(text=f"Day: {current_day + 1} / {self.season_length}")
-            self.current_day = current_day + 1
-            logger.debug(f"Loaded partial season standings: day {current_day + 1}")
+            prefix = f"{date_str} " if date_str else ""
+            self.day_label.config(text=f"{prefix}Game {games_played + 1} of {self.season_length}")
+            self.current_day = games_played + 1
+            # Populate schedule widget
+            if sched_mgr and sched_mgr.schedule:
+                self.schedule_widget.update_schedule(
+                    sched_idx,
+                    sched_mgr.schedule,
+                    sched_mgr.schedule_times,
+                    sched_mgr.schedule_dates,
+                )
+            # Populate league stats, roster, and league leaders widgets
+            self.league_stats_widget.update_stats(baseball_data, partial_standings)
+            self.roster_widget.update_roster(self.season_team_to_follow, baseball_data, partial_standings)
+            self.league_leaders_widget.update_leaders(baseball_data, games_played=games_played)
+            logger.debug(f"Loaded partial season standings: game {games_played + 1}")
         except Exception as e:
             logger.warning(f"Could not load partial season data: {e}")
 
@@ -362,7 +390,7 @@ F1     - Show this help"""
         # Day counter label
         self.day_label = tk.Label(
             status_frame,
-            text=f"Day: 0 / {self.season_length}",
+            text=f"Game 1 of {self.season_length}",
             font=("Segoe UI", 10),
             anchor=tk.W,
             bg=BG_DARK,
@@ -572,7 +600,6 @@ F1     - Show this help"""
             self.current_day = 0
             self.progress_bar["value"] = 0
             self.progress_label.config(text="0%")
-            self.day_label.config(text=f"Day: 0 / {self.season_length}")
 
             # Update season_team_to_follow
             self.season_team_to_follow = selected_team
@@ -645,7 +672,6 @@ F1     - Show this help"""
         # Update season_length and progress bar to reflect selected games
         self.season_length = num_games
         self.progress_bar.config(maximum=num_games)
-        self.day_label.config(text=f"Day: 0 / {num_games}")
 
         if self.controller.start_season(
             selected_team,
@@ -856,7 +882,7 @@ F1     - Show this help"""
                 # Update day label to reflect partial season start
                 date_str = worker.season.get_date_for_day(start_day)
                 game_num = worker.season.get_game_number()
-                self.day_label.config(text=f"{date_str} Day {game_num} of {self.season_length}")
+                self.day_label.config(text=f"{date_str} Game {game_num + 1} of {self.season_length}")
                 # Show partial season standings
                 standings_data = worker.season.extract_standings()
                 followed_team = worker.team_to_follow
@@ -923,7 +949,7 @@ F1     - Show this help"""
             date_str = worker.season.get_date_for_day(sched_idx)
             # Use team's actual game number (wins + losses)
             game_num = worker.season.get_game_number()
-            self.day_label.config(text=f"{date_str} Day {game_num} of {self.season_length}")
+            self.day_label.config(text=f"{date_str} Game {game_num + 1} of {self.season_length}")
 
         # Update ETA
         if self.simulation_start_time is not None and day_num > 0:

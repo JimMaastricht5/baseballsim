@@ -511,6 +511,17 @@ class Game:
                 self.teams[self.team_pitching()].box_score.pitching_blown_save(cur_pitcher)
 
         self.total_score[self.team_hitting()] += number_of_runs  # update total score
+        # Sanity check: flag suspiciously large scores to help trace corruption
+        if self.total_score[self.team_hitting()] > 50:
+            import traceback
+            logger.warning(
+                f"update_inning_score: SUSPICIOUS score detected! "
+                f"{self.team_names[AWAY]} vs {self.team_names[HOME]} "
+                f"total_score={self.total_score} number_of_runs={number_of_runs} "
+                f"inning={self.inning} team_hitting={self.team_hitting()} "
+                f"runs_scored={self.bases.runs_scored}\n"
+                + "".join(traceback.format_stack())
+            )
         return
 
     def print_inning_score(self, final: bool = False) -> None:
@@ -674,8 +685,8 @@ class Game:
                     else:
                         self.teams[self.team_hitting()].box_score.steal_result(runner_key, False)  # caught stealing
                         self.bases.remove_runner(1)  # runner was on first and never made it to second on the out
+                        self.outs += 1  # caught stealing is always an out, regardless of chatty mode
                         if self.chatty:
-                            self.outs += 1  # this could result in the third out
                             play_text = f"\t{runner_stats.Player} was caught stealing for out number {self.outs}\n"
                             self.game_recap += play_text
                             if self.play_by_play_callback:
@@ -799,7 +810,23 @@ class Game:
             if self.play_by_play_callback:
                 self.play_by_play_callback(play_text)
         self.extra_innings()  # set runner on second if it is extra innings
+        ab_count = 0  # safety counter to detect runaway innings
         while self.outs < 3:
+            ab_count += 1
+            if ab_count % 30 == 0:
+                logger.warning(
+                    f"LONG_INNING: {ab_count} at-bats in inning {self.inning[self.team_hitting()]} "
+                    f"({self.team_names[AWAY]} vs {self.team_names[HOME]}) "
+                    f"outs={self.outs} score={self.total_score}"
+                )
+            if ab_count > 24:
+                logger.error(
+                    f"RUNAWAY_INNING: force-ending after {ab_count} at-bats, inning "
+                    f"{self.inning[self.team_hitting()]} "
+                    f"({self.team_names[AWAY]} vs {self.team_names[HOME]}) "
+                    f"score={self.total_score}"
+                )
+                break
             # check for pitching change due to fatigue or game sit
             pitch_switch = self.pitching_sit(
                 self.teams[self.team_pitching()].cur_pitcher_stats(), pitch_switch=pitch_switch
@@ -949,6 +976,12 @@ class Game:
         logger.debug("Calling _build_structured_game_recap")
         self._build_structured_game_recap()
 
+        # Log score before deep copy to catch corruption at the source
+        logger.info(
+            f"sim_game_structured RETURNING: {self.team_names[AWAY]} vs {self.team_names[HOME]} "
+            f"total_score={self.total_score} structured_final_score={self.structured_game.final_score} "
+            f"total_score_id={id(self.total_score)}"
+        )
         # Return a deep copy to ensure no shared state with this Game instance
         return (list(self.total_score), self.inning, self.win_loss, self.game_recap, self.structured_game.model_copy(deep=True))
 
@@ -1155,6 +1188,12 @@ class Game:
         """Run game simulation and put results on queue for multi-threading."""
         if use_structured:
             g_score, g_innings, g_win_loss, final_game_recap, structured_game = self.sim_game_structured()
+            logger.info(
+                f"sim_game_threaded PRE-PUT: {self.team_names[AWAY]} vs {self.team_names[HOME]} "
+                f"g_score={g_score} g_score_id={id(g_score)} "
+                f"structured_final={structured_game.final_score} "
+                f"away_box_id={id(self.teams[AWAY].box_score)} home_box_id={id(self.teams[HOME].box_score)}"
+            )
             q.put(
                 (
                     g_score,
@@ -1168,6 +1207,7 @@ class Game:
             )
         else:
             g_score, g_innings, g_win_loss, final_game_recap = self.sim_game()
+            logger.debug(f"sim_game_threaded: putting score={g_score} on queue")
             q.put(
                 (
                     g_score,

@@ -209,13 +209,16 @@ class SimAB:
         league_baseline = self.league_batting_obp + self.OBP_adjustment
 
         # 4. Odds Ratio with Safety Clipping
-        # Clipping prevents infinity errors when stats approach 1.0 or 0.0
+        # Input clipping prevents infinity errors when stats approach 1.0 or 0.0
         prob = self.odds_ratio(
             hitter_stat=np.clip(h_obp, 0.001, 0.999),
             pitcher_stat=np.clip(p_obp, 0.001, 0.999),
             league_stat=np.clip(league_baseline, 0.001, 0.999),
             stat_type="obp",
         )
+        # Output clip: even the worst pitcher allows at least 15% outs (no real pitcher
+        # has ever allowed 85%+ OBP; this prevents infinite innings from any future bug)
+        prob = min(prob, 0.85)
 
         return self.rng() < prob
 

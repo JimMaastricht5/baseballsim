@@ -106,6 +106,7 @@ class Team:
         self.relievers_df = None  # df of 2 best closers
         self.middle_relievers_df = None  # remaining pitchers sorted by IP descending
         self.unavailable_pitchers_df = None
+        self.used_pitcher_indices: set = set()  # tracks all pitchers used in this game
         self.box_score = None
         self.game_num = game_num
         self.rotation_len = rotation_len
@@ -138,6 +139,7 @@ class Team:
         self.relievers_df = None  # df of 2 best closers
         self.middle_relievers_df = None  # remaining pitchers sorted by IP descending
         self.unavailable_pitchers_df = None
+        self.used_pitcher_indices: set = set()  # reset for new game
 
         self.load_team_data()
         return
@@ -374,6 +376,7 @@ class Team:
             self.cur_pitcher_index = (
                 self.gameplay_pitching_df.index[0] if force_starting_pitcher is None else force_starting_pitcher
             )
+            self.used_pitcher_indices.add(self.cur_pitcher_index)
             self.new_season_pitching_df = (
                 self.baseball_data.new_season_pitching_data.loc[self.cur_pitcher_index].to_frame().T
             )
@@ -459,8 +462,10 @@ class Team:
         :return: None
         """
         try:
-            # Get starting condition pre-game
-            starting_condition = self.gameplay_pitching_df.Condition
+            # Get starting condition pre-game — defensive scalar extraction
+            # gameplay_pitching_df may be a DataFrame (starting pitchers use iloc[[n]])
+            # or a Series (relievers use loc[index]); ensure we always get a scalar
+            starting_condition = float(np.asarray(self.gameplay_pitching_df["Condition"]).flat[0])
 
             # Calculate additional fatigue from current outing
             # Reduce condition when facing more than fatigue_start_perc (70%) of average batters
@@ -468,8 +473,8 @@ class Team:
             workload_fatigue = max(0, (cur_ratio - self.fatigue_start_perc) * 1.0)
 
             # New condition = starting condition minus workload fatigue
-            new_condition = max(0, starting_condition - workload_fatigue)
-            self.gameplay_pitching_df.Condition = new_condition
+            new_condition = float(max(0, starting_condition - workload_fatigue))
+            self.gameplay_pitching_df["Condition"] = new_condition
         except Exception as e:
             logger.error("Error in set_pitching_condition bbteam.py: {}", e)
             logger.error("Gameplay pitching dataframe:\n{}", self.gameplay_pitching_df)
@@ -485,10 +490,12 @@ class Team:
         :return: returns the impact to obp for pitcher fatigue, if tired they give up more hits
                 also returns the new cur_ratio
         """
-        # 1. Data Extraction
-        cur_game_faced = self.box_score.batters_faced(cur_pitching_index)
-        avg_faced = float(self.gameplay_pitching_df["AVG_faced"])
-        current_cond = float(self.gameplay_pitching_df["Condition"])
+        # 1. Data Extraction — defensive scalar extraction
+        # gameplay_pitching_df may be a DataFrame (starting pitchers use iloc[[n]]) or a Series
+        # (relievers use loc[index]); np.asarray().flat[0] handles both without ambiguity
+        cur_game_faced = float(np.asarray(self.box_score.batters_faced(cur_pitching_index)).flat[0])
+        avg_faced = float(np.asarray(self.gameplay_pitching_df["AVG_faced"]).flat[0])
+        current_cond = float(np.asarray(self.gameplay_pitching_df["Condition"]).flat[0])
 
         if avg_faced <= 0:
             avg_faced = 25.0  # Increased default to ~6 innings
@@ -523,7 +530,17 @@ class Team:
 
             dynamic_rate = self.fatigue_rate * condition_multiplier
             # Scale back the raw OBP impact (e.g., .005 * factor)
-            in_game_fatigue = curve_factor * dynamic_rate * 100
+            # NOTE: removed the erroneous * 100 which caused runaway OBP (p_obp clipping to 0.999
+            # after ~38 batters, creating infinite innings). Cap at 0.15 as additional safety net.
+            in_game_fatigue = min(curve_factor * dynamic_rate, 0.15)
+
+            if in_game_fatigue > 0.05:
+                logger.warning(
+                    f"HIGH_FATIGUE: pitcher faced {cur_game_faced} batters (avg={avg_faced:.1f}), "
+                    f"ratio={cur_ratio_raw:.2f}, condition={current_cond:.0f}, "
+                    f"condition_multiplier={condition_multiplier:.2f}, "
+                    f"in_game_fatigue={in_game_fatigue:.4f}"
+                )
 
         # Update state
         self.set_pitching_condition(cur_ratio_pct)
@@ -578,13 +595,30 @@ class Team:
             self.gameplay_pitching_df = self.relievers_df.loc[self.cur_pitcher_index]  # should be a series
             self.box_score.add_pitcher_to_box(self.relievers_df.loc[self.cur_pitcher_index])
             self.relievers_df = self.relievers_df.drop(self.cur_pitcher_index, axis=0)  # remove from pen
+            self.used_pitcher_indices.add(self.cur_pitcher_index)
         elif len(self.middle_relievers_df) >= 1:  # grab the next best middle reliever
             self.cur_pitcher_index = self.middle_relievers_df.index[0]  # make sure to drop the same index below
             self.gameplay_pitching_df = self.middle_relievers_df.loc[self.cur_pitcher_index]  # should be a series
             self.box_score.add_pitcher_to_box(self.middle_relievers_df.loc[self.cur_pitcher_index])
             self.middle_relievers_df = self.middle_relievers_df.drop(self.cur_pitcher_index, axis=0)  # remove from pen
-        else:  # no change
-            pass
+            self.used_pitcher_indices.add(self.cur_pitcher_index)
+        else:
+            # Emergency: all designated relievers exhausted — use any available pitcher not yet used
+            available = self.gameplay_pitchers_df[
+                (~self.gameplay_pitchers_df.index.isin(self.used_pitcher_indices))
+                & (self.gameplay_pitchers_df["Condition"] > self.fatigue_unavailable)
+                & (self.gameplay_pitchers_df["Injured Days"] == 0)
+            ]
+            if len(available) >= 1:
+                self.cur_pitcher_index = available.sort_values("ERA").index[0]
+                self.gameplay_pitching_df = available.loc[self.cur_pitcher_index]
+                self.box_score.add_pitcher_to_box(available.loc[self.cur_pitcher_index])
+                self.used_pitcher_indices.add(self.cur_pitcher_index)
+                logger.info(
+                    f"Emergency pitching change: {available.loc[self.cur_pitcher_index]['Player']} "
+                    f"called from full staff (all designated relievers used)"
+                )
+            # else: truly no one available — keep current pitcher
         return self.cur_pitcher_index
 
     def is_pitcher_fatigued(self, condition: Union[int, int64, float64]) -> Union[bool, bool_]:

@@ -53,9 +53,8 @@ class PlayoffWidget:
         # Configure styles
         self._configure_styles()
 
-        # Frame to host per-series status labels (initialized to fix missing attribute bug)
+        # Frame to host per-series status labels (not displayed; kept to avoid attribute errors)
         self.series_status_frame = tk.Frame(self.frame, bg=BG_PANEL)
-        self.series_status_frame.pack(fill=tk.X, padx=5, pady=(0, 5))
 
         # Scrollable frame for game display
         self.scrollable_frame = ScrollableFrame(self.frame, style="Scrollable.TFrame")

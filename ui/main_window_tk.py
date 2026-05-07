@@ -79,6 +79,7 @@ class SeasonMainWindow:
         self.saved_standings = None  # Save regular season standings during playoffs
         self.world_series_teams = set()  # Track which teams are in World Series
         self.simulation_start_time = None  # Track simulation start time for elapsed time
+        self._sim_start_day = None  # Schedule day index when simulation began (for ETA)
 
         self.root.title("Baseball Season Simulator")
         self.root.geometry("1500x900")
@@ -221,7 +222,7 @@ class SeasonMainWindow:
                 if i == 0:
                     gb = "-"
                 else:
-                    gb_calc = ((leader_wins - wins) + (leader_losses - losses)) / 2.0
+                    gb_calc = ((leader_wins - wins) + (losses - leader_losses)) / 2.0
                     gb = f"{gb_calc:.1f}"
                 standings_data[league_key][division]["teams"].append(team)
                 standings_data[league_key][division]["wins"].append(wins)
@@ -469,26 +470,22 @@ F1     - Show this help"""
         except Exception as e:
             logger.debug(f"Error selecting highest day: {e}")
 
-    def _update_eta(self, elapsed_seconds: float, progress: float):
+    def _update_eta(self, remaining_seconds: float):
         """Update estimated time remaining display.
 
         Args:
-            elapsed_seconds: Time elapsed so far
-            progress: Progress percentage (0-1)
+            remaining_seconds: Estimated seconds until simulation complete
         """
-        if progress <= 0:
+        if remaining_seconds <= 0:
             self.eta_label.config(text="")
             return
 
-        estimated_total = elapsed_seconds / progress
-        remaining = estimated_total - elapsed_seconds
-
-        if remaining < 60:
-            eta_text = f"ETA: {int(remaining)}s"
-        elif remaining < 3600:
-            eta_text = f"ETA: {int(remaining // 60)}m {int(remaining % 60)}s"
+        if remaining_seconds < 60:
+            eta_text = f"ETA: {int(remaining_seconds)}s"
+        elif remaining_seconds < 3600:
+            eta_text = f"ETA: {int(remaining_seconds // 60)}m {int(remaining_seconds % 60)}s"
         else:
-            eta_text = f"ETA: {int(remaining // 3600)}h {int((remaining % 3600) // 60)}m"
+            eta_text = f"ETA: {int(remaining_seconds // 3600)}h {int((remaining_seconds % 3600) // 60)}m"
 
         self.eta_label.config(text=eta_text)
 
@@ -587,6 +584,7 @@ F1     - Show this help"""
 
         # Track simulation start time
         self.simulation_start_time = time.time()
+        self._sim_start_day = None  # reset so first day_started sets the anchor
 
         def on_started():
             """Callback after worker starts."""
@@ -937,27 +935,30 @@ F1     - Show this help"""
                 worker.season.schedule_manager.schedule_dates,
             )
 
-        # Update progress bar
-        self.progress_bar["value"] = day_num + 1
-        progress_pct = int((day_num + 1) / self.season_length * 100)
-        self.progress_label.config(text=f"{progress_pct}%")
-        # Update day label with date and games played
+        # Update progress bar and ETA using team W+L vs season_length
         worker = self.controller.get_worker()
         if worker and worker.season:
-            # Use schedule index for calendar date
+            games_played = worker.season.get_game_number()  # W+L for followed team
+            progress_pct = min(100, int(games_played / self.season_length * 100))
+            self.progress_bar["value"] = games_played
+            self.progress_label.config(text=f"{progress_pct}%")
+
+            # Update day label with date and games played
             sched_idx = worker.season.get_current_schedule_index()
             date_str = worker.season.get_date_for_day(sched_idx)
-            # Use team's actual game number (wins + losses)
-            game_num = worker.season.get_game_number()
-            self.day_label.config(text=f"{date_str} Game {game_num + 1} of {self.season_length}")
+            self.day_label.config(text=f"{date_str} Game {games_played + 1} of {self.season_length}")
 
-        # Update ETA
-        if self.simulation_start_time is not None and day_num > 0:
-            import time
-
-            elapsed = time.time() - self.simulation_start_time
-            progress = (day_num + 1) / self.season_length
-            self._update_eta(elapsed, progress)
+            # ETA: time-per-schedule-day × days remaining
+            if self.simulation_start_time is not None:
+                import time
+                if self._sim_start_day is None:
+                    self._sim_start_day = day_num
+                days_simulated = max(1, day_num - self._sim_start_day + 1)
+                elapsed = time.time() - self.simulation_start_time
+                time_per_day = elapsed / days_simulated
+                total_days = len(worker.season.schedule)
+                days_remaining = total_days - day_num - 1
+                self._update_eta(time_per_day * days_remaining)
 
     def _on_game_completed(self, game_data: dict):
         """Handle game_completed message."""

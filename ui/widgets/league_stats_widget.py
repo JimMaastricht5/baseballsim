@@ -19,39 +19,36 @@ from ui.theme import (
     TEXT_SECONDARY,
     TEXT_HEADING,
     ACCENT_GOLD,
-    STREAK_HOT,
-    STREAK_COLD,
-    STREAK_NORMAL,
 )
 from ui.widgets.player_history_popup import show_history_popup
 
 LEAGUE_MIN_SALARY = 740000
 
 
-def get_streak_indicator(streak_value) -> tuple:
+def get_streak_indicator(streak_value) -> str:
     """
-    Generate streak indicator text and color based on streak value.
+    Generate streak indicator text based on streak value.
 
     Args:
         streak_value: The Streak_Adjustment value (float from -0.10 to 0.10)
 
     Returns:
-        Tuple of (display_text, color)
+        Display text with colored arrow emoji for hot/cold streaks
     """
     if pd.isna(streak_value):
-        return ("-", STREAK_NORMAL)
+        return "-"
 
     try:
         streak = float(streak_value)
-    except ValueError, TypeError:
-        return ("-", STREAK_NORMAL)
+    except (ValueError, TypeError):
+        return "-"
 
     if streak >= 0.025:
-        return ("▲", STREAK_HOT)
+        return "▲"
     elif streak <= -0.025:
-        return ("▼", STREAK_COLD)
+        return "▼"
     else:
-        return ("-", STREAK_NORMAL)
+        return "-"
 
 
 def estimate_years_remaining(age: int, salary: float, is_pitcher: bool = False) -> int:
@@ -432,11 +429,6 @@ class LeagueStatsWidget:
         scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
         tree.pack(fill=tk.BOTH, expand=True)
 
-        # Configure tags for streak highlighting
-        tree.tag_configure("streak_hot", foreground=STREAK_HOT)
-        tree.tag_configure("streak_cold", foreground=STREAK_COLD)
-        tree.tag_configure("streak_normal", foreground=STREAK_NORMAL)
-
         # Bind double-click to open history popup (single click just highlights)
         tree.bind("<Double-Button-1>", lambda e, t=tree, b=is_batter: self._on_player_click(t, b))
 
@@ -617,7 +609,7 @@ class LeagueStatsWidget:
 
                     if mode == "difference":
                         # Format with +/- prefix for difference mode
-                        streak_text, _ = get_streak_indicator(row.get("Streak_Adjustment"))
+                        streak_text = get_streak_indicator(row.get("Streak_Adjustment"))
                         values = (
                             row.get("Player", "Unknown"),
                             row.get("Team", ""),
@@ -642,7 +634,7 @@ class LeagueStatsWidget:
                         )
                     else:
                         # Standard format for current stats
-                        streak_text, _ = get_streak_indicator(row.get("Streak_Adjustment"))
+                        streak_text = get_streak_indicator(row.get("Streak_Adjustment"))
                         values = (
                             row.get("Player", "Unknown"),
                             row.get("Team", ""),
@@ -674,7 +666,7 @@ class LeagueStatsWidget:
 
                     if mode == "difference":
                         # Format with +/- prefix for difference mode
-                        streak_text, _ = get_streak_indicator(row.get("Streak_Adjustment"))
+                        streak_text = get_streak_indicator(row.get("Streak_Adjustment"))
                         values = (
                             row.get("Player", "Unknown"),
                             row.get("Team", ""),
@@ -698,7 +690,7 @@ class LeagueStatsWidget:
                         )
                     else:
                         # Standard format for current stats
-                        streak_text, _ = get_streak_indicator(row.get("Streak_Adjustment"))
+                        streak_text = get_streak_indicator(row.get("Streak_Adjustment"))
                         values = (
                             row.get("Player", "Unknown"),
                             row.get("Team", ""),
@@ -721,20 +713,7 @@ class LeagueStatsWidget:
                             streak_text,
                         )
 
-                # Determine streak tag
-                streak_value = row.get("Streak_Adjustment")
-                streak_tag = ()
-                if streak_value is not None:
-                    try:
-                        streak = float(streak_value)
-                        if streak >= 0.025:
-                            streak_tag = ("streak_hot",)
-                        elif streak <= -0.025:
-                            streak_tag = ("streak_cold",)
-                    except ValueError, TypeError:
-                        pass
-
-                tree.insert("", tk.END, values=values, tags=streak_tag)
+                tree.insert("", tk.END, values=values)
             except Exception as e:
                 logger.warning(f"Error inserting stats row for {row.get('Player', 'Unknown')}: {e}")
 

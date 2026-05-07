@@ -186,41 +186,21 @@ class ScheduleManager:
                     break
 
     def find_start_day(self, team_win_loss: Dict, team_to_follow: List[str]) -> int:
-        """Calculate starting position in schedule.
-
-        Logic:
-        1. Find the first day that has games NOT yet completed
-        2. Calculate team position: wins + losses for followed team
-        3. Use MAX of both to ensure we start at or after actual position
+        """Return the index of the first scheduled day that has unplayed games.
 
         Args:
-            team_win_loss: Dict mapping team to [wins, losses]
-            team_to_follow: List of teams to follow
+            team_win_loss: Dict mapping team to [wins, losses] (unused, kept for API compatibility)
+            team_to_follow: List of teams to follow (unused, kept for API compatibility)
 
         Returns:
             Day number (index) to start simulation
         """
-        # Find the first day that has upcoming (not completed) games
-        start_day = 0
-
         for idx, day in enumerate(self.schedule):
             if day.has_upcoming_games():
-                start_day = idx
-                break
-        else:
-            # All games completed, start from last day
-            start_day = len(self.schedule) - 1
+                return idx
 
-        # Calculate team's position (wins + losses)
-        team_day = 0
-        if team_to_follow:
-            team = team_to_follow[0]
-            if team in team_win_loss:
-                wins, losses = team_win_loss[team]
-                team_day = wins + losses
-
-        # Use MAX to ensure we start at or after both positions
-        return max(start_day, team_day)
+        # All games already marked completed — start from last day
+        return len(self.schedule) - 1
 
     def get_date_for_index(self, idx: int) -> str:
         """Get formatted date for schedule index.

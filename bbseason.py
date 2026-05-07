@@ -333,22 +333,34 @@ class BaseballSeason:
         for team in self.team_win_loss:
             if team != "OFF DAY":
                 win_loss = self.team_win_loss[team]
-                teaml.append(team)  # Use abbreviation only for compact display
+                teaml.append(team)
                 winl.append(win_loss[0])
                 lossl.append(win_loss[1])
 
         # Create DataFrame and calculate stats
         df = pd.DataFrame({"Team": teaml, "W": winl, "L": lossl})
         df["Pct"] = df["W"] / (df["W"] + df["L"])
-        # Replace NaN (0-0 teams) with 0.000
         df["Pct"] = df["Pct"].fillna(0.0)
-        df = df.sort_values("W", ascending=False).reset_index(drop=True)
 
-        # Calculate Games Back from leader
-        max_wins = df["W"].iloc[0]
-        leader_losses = df["L"].iloc[0]
-        df["GB"] = ((max_wins - df["W"]) + (df["L"] - leader_losses)) / 2.0
-        df["GB"] = df["GB"].apply(lambda x: "-" if x == 0 else f"{x:.1f}")
+        # Attach division info so GB is calculated within each division
+        bd = getattr(self.baseball_data, "batting_data", None)
+        if bd is not None and "Division" in bd.columns and "League" in bd.columns:
+            div_map = bd[["Team", "League", "Division"]].drop_duplicates().set_index("Team")
+            df["League"] = df["Team"].map(div_map["League"]).fillna("?")
+            df["Division"] = df["Team"].map(div_map["Division"]).fillna("?")
+        else:
+            df["League"] = "?"
+            df["Division"] = "?"
+
+        # Sort so division leaders are always row 0 within their group, then compute GB
+        df = df.sort_values(["League", "Division", "W", "L"], ascending=[True, True, False, True]).reset_index(drop=True)
+        gb = []
+        for _, row in df.iterrows():
+            peers = df[(df["League"] == row["League"]) & (df["Division"] == row["Division"])]
+            leader = peers.iloc[0]
+            g = ((leader["W"] - row["W"]) + (row["L"] - leader["L"])) / 2.0
+            gb.append("-" if g == 0 else f"{g:.1f}")
+        df["GB"] = gb
 
         # Format for display
         df["W-L"] = df["W"].astype(str) + "-" + df["L"].astype(str)
@@ -454,53 +466,56 @@ class BaseballSeason:
 
     def calculate_games_back(self, team_name: str) -> float:
         """
-        Calculate how many games back a team is from the division/league leader.
+        Calculate how many games back a team is from its division leader.
 
         Args:
             team_name: Team to calculate games back for
 
         Returns:
-            Games back (negative if team is leading, 0.0 if tied for lead)
+            Games back from division leader (negative means team is leading)
         """
-        team_data = []
         if team_name == "OFF DAY":
             return 0.0
 
-        # Get team's league
+        # Resolve the team's division; fall back to league, then all teams
+        team_division = None
         team_league = None
-        if hasattr(self.baseball_data, "batting_data") and "League" in self.baseball_data.batting_data.columns:
-            team_data = (self.baseball_data.batting_data)[self.baseball_data.batting_data["Team"] == team_name]
-        if not team_data.empty:
-            team_league = team_data["League"].iloc[0]
+        bd = getattr(self.baseball_data, "batting_data", None)
+        if bd is not None and "Division" in bd.columns and "League" in bd.columns:
+            row = bd[bd["Team"] == team_name]
+            if not row.empty:
+                team_division = row["Division"].iloc[0]
+                team_league = row["League"].iloc[0]
 
-        # If league not found, fall back to old behavior (all teams)
-        if team_league is None:
-            logger.warning(f"Could not determine league for {team_name}, calculating GB across all teams")
+        if team_division is None:
+            logger.warning(f"Could not determine division for {team_name}, calculating GB across all teams")
+
+        # Build the set of peer teams (same division, or same league, or all)
+        peer_teams = set()
+        for other_team in self.team_win_loss:
+            if other_team == "OFF DAY":
+                continue
+            if team_division is not None:
+                other_row = bd[bd["Team"] == other_team]
+                if not other_row.empty and other_row["Division"].iloc[0] == team_division and other_row["League"].iloc[0] == team_league:
+                    peer_teams.add(other_team)
+            else:
+                peer_teams.add(other_team)
+
+        if not peer_teams:
+            peer_teams = {t for t in self.team_win_loss if t != "OFF DAY"}
 
         # Get team's record
-        team_record = self.team_win_loss[team_name]
-        team_wins = team_record[0]
-        team_losses = team_record[1]
+        team_wins, team_losses = self.team_win_loss[team_name]
 
-        # Find leader (most wins)
-        max_wins = 0
-        leader_losses = 0
+        # Find division leader (most wins; fewest losses as tiebreaker)
+        max_wins, leader_losses = 0, 0
+        for other_team in peer_teams:
+            w, l = self.team_win_loss[other_team]
+            if w > max_wins or (w == max_wins and l < leader_losses):
+                max_wins, leader_losses = w, l
 
-        for other_team, record in self.team_win_loss.items():
-            if other_team != "OFF DAY":
-                other_wins = record[0]
-                other_losses = record[1]
-
-                # Update leader if this team has more wins
-                # If tied in wins, use fewer losses as tiebreaker
-                if other_wins > max_wins or (other_wins == max_wins and other_losses < leader_losses):
-                    max_wins = other_wins
-                    leader_losses = other_losses
-
-        # Games back formula: ((Leader W - Team W) + (Team L - Leader L)) / 2
-        games_back = ((max_wins - team_wins) + (team_losses - leader_losses)) / 2.0
-
-        return games_back
+        return ((max_wins - team_wins) + (team_losses - leader_losses)) / 2.0
 
     def should_run_playoffs(self) -> bool:
         """
@@ -1179,12 +1194,15 @@ class BaseballSeason:
         # Perform initial GM assessments at start of season
         self.check_gm_assessments()
 
-        # loop over every day and every game scheduled that day and check if season limit set to end early
-        team = self.team_to_follow[0] if self.team_to_follow else "MIL"  # Mil if teams to follow is none
-        while (
-                self.season_day_num <= (len(self.schedule) - 1)
-                and self.team_win_loss[team][0] + self.team_win_loss[team][1] < self.season_length
-        ):
+        # loop over every day in the schedule; for a full 162-game season play every scheduled day,
+        # for a shorter test season stop once the followed team has played the requested number of games
+        team = self.team_to_follow[0] if self.team_to_follow else "MIL"
+        full_season = self.season_length >= 162
+        while self.season_day_num <= (len(self.schedule) - 1):
+            if not full_season:
+                games_played = self.team_win_loss[team][0] + self.team_win_loss[team][1]
+                if games_played >= self.season_length:
+                    break
             self.sim_next_day()
 
         self.sim_end()

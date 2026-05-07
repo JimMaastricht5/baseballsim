@@ -88,6 +88,7 @@ class TeamBoxScore:
         self.rnd_condition_chg = lambda: abs(
             np.random.normal(loc=self.condition_change_per_day, scale=self.condition_change_per_day / 2, size=1)[0]
         )
+        self.condition_cost_per_out = 12  # post-game cost per out recorded; 36/IP keeps relievers at ~75 games/season
         self.lock = threading.Lock()
         return
 
@@ -165,7 +166,9 @@ class TeamBoxScore:
                 Total_Outs=0,
                 Condition=100.0,
             )
-            self.box_pitching = pd.concat([self.box_pitching, new_pitcher], ignore_index=False)
+            pitcher_idx = new_pitcher.index[0]
+            if pitcher_idx not in self.box_pitching.index:
+                self.box_pitching = pd.concat([self.box_pitching, new_pitcher], ignore_index=False)
         return
 
     def pitching_win_loss_save(self, pitcher_index: int64, win_b: bool, save_b: bool) -> None:
@@ -271,6 +274,18 @@ class TeamBoxScore:
                 lambda row: row["Condition"] - self.rnd_condition_chg(), axis=1
             )
             self.box_batting["Condition"] = self.box_batting["Condition"].clip(lower=0, upper=100)
+        return
+
+    def set_box_pitching_condition(self) -> None:
+        """Apply post-game condition penalty based on outs recorded this game.
+
+        12 points per out (36 per IP) means a 1-IP reliever drops ~41 points total
+        (including in-game fatigue), forcing roughly one unavailable day per appearance
+        and capping natural usage near 70-80 games per season.
+        """
+        with self.lock:
+            penalty = self.box_pitching["Total_Outs"] * self.condition_cost_per_out
+            self.box_pitching["Condition"] = (self.box_pitching["Condition"] - penalty).clip(lower=0, upper=100)
         return
 
     def totals(self) -> None:

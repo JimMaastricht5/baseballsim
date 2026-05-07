@@ -108,11 +108,19 @@ class SeasonWorker(threading.Thread):
             total_days = len(self.season.schedule)
             logger.info(f"Season has {total_days} days scheduled")
 
-            while self.season.season_day_num < total_days and self.season.season_day_num < self.season.season_length:
+            full_season = self.season.season_length >= 162
+
+            while self.season.season_day_num < total_days:
                 # Check if stopped
                 if self._stopped:
                     logger.info("Season simulation stopped by user")
                     break
+
+                # For short test seasons, stop once the followed team reaches the target W+L count
+                if not full_season and self.team_to_follow:
+                    wl = self.season.team_win_loss.get(self.team_to_follow, [0, 0])
+                    if wl[0] + wl[1] >= self.season.season_length:
+                        break
 
                 # Handle pause
                 self._handle_pause()

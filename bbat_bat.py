@@ -314,19 +314,6 @@ class SimAB:
             stat_type="2B",
         )
 
-    def k(self) -> bool:
-        """Return True if the at-bat resulted in a strikeout."""
-        batter_pa = self.batting.get(
-            "PA", self.batting.get("AB", 0) + self.batting.get("BB", 0) + self.batting.get("HBP", 0)
-        )
-        pitcher_pa = self.pitching.get(
-            "PA", self.pitching.get("AB", 0) + self.pitching.get("BB", 0) + self.pitching.get("HBP", 0)
-        )
-        batter_k_rate = (self.batting["SO"] / batter_pa) if batter_pa > 0 else self.hist_k_rate
-        pitcher_k_rate = (self.pitching["SO"] / pitcher_pa) if pitcher_pa > 0 else self.hist_k_rate
-
-        return self.rng() < self.odds_ratio(batter_k_rate, pitcher_k_rate, self.hist_k_rate, stat_type="SO")
-
     def gb_fo_lo(self, outs: int = 0, runner_on_first: bool = False, runner_on_third: bool = False) -> str:
         """Resolve ground balls, fly outs, and line drives (includes DP/SF logic)."""
         self.dice_roll = self.rng()
@@ -457,41 +444,29 @@ class SimAB:
 
             outcomes.set_score_book_cd("FO")  # fall back if no option is selected
         else:
-            # 3. OUT RESOLUTION - Use weighted selection with odds ratio for K
-            # Use historical K rate (0.248) for accurate K% calibration
+            # 3. OUT RESOLUTION - K vs BIP using matchup-specific odds ratio
             lg_k = self.hist_k_rate
             lg_bip = 1 - lg_k
 
             batter_k_rate = batting["SO"] / pa_batter if pa_batter > 0 else lg_k
             pitcher_k_rate = pitching["SO"] / pa_pitcher if pa_pitcher > 0 else lg_k
 
-            # K uses odds ratio since we have batter/pitcher specific rates
+            # Personalized K probability for this matchup via odds ratio
             k_odds = self.odds_ratio(batter_k_rate, pitcher_k_rate, lg_k, stat_type="SO")
 
-            # BIP breakdown using league rates (no batter/pitcher specific data)
+            # BIP breakdown using league rates
             gb_prob = lg_bip * self.league_GB
             fb_prob = lg_bip * self.league_FB
             lo_prob = lg_bip * self.league_LD
+            S = gb_prob + fb_prob + lo_prob
 
-            # Scale K odds to achieve target K% of ALL at-bats
-            # Historical target: K% = 0.248 (24.8% of all ABs)
-            target_k_pct_ab = self.hist_k_rate
+            # Scale the league-calibrated K weight by how much this matchup deviates from average.
+            # For a league-average matchup odds_ratio(lg_k, lg_k, lg_k) == lg_k, so k_relative == 1.0.
             out_rate = 1 - self.league_batting_obp
-            target_k_pct_outs = target_k_pct_ab / out_rate if out_rate > 0 else 0.5
-
-            # Calculate non-K odds sum
-            gb_odds = self.odds_ratio(self.league_GB, self.league_GB, self.league_GB, stat_type="GB")
-            fb_odds = self.odds_ratio(self.league_FB, self.league_FB, self.league_FB, stat_type="FB")
-            lo_odds = self.odds_ratio(self.league_LD, self.league_LD, self.league_LD, stat_type="LD")
-            S = gb_prob + fb_prob + lo_prob  # Non-K BIP weights
-
-            # Boost k_odds to achieve target K% of outs
-            # k_odds / (k_odds + S) = target_k_pct_outs
-            # k_odds = target_k_pct_outs * S / (1 - target_k_pct_outs)
-            if k_odds > 0 and target_k_pct_outs < 1:
-                k_prob = (target_k_pct_outs * S) / (1 - target_k_pct_outs)
-            else:
-                k_prob = k_odds
+            target_k_pct_outs = lg_k / out_rate if out_rate > 0 else 0.5
+            target_k_prob_base = (target_k_pct_outs * S) / (1 - target_k_pct_outs) if target_k_pct_outs < 1 else S
+            k_relative = k_odds / lg_k if lg_k > 0 else 1.0
+            k_prob = target_k_prob_base * k_relative
 
             weights = {"SO": k_prob, "GB": gb_prob, "FB": fb_prob, "LO": lo_prob}
 

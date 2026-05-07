@@ -949,6 +949,8 @@ class Game:
         """Finalize game: update conditions, W/L records, box scores, and print results."""
         self.teams[AWAY].set_batting_condition()
         self.teams[HOME].set_batting_condition()
+        self.teams[AWAY].set_pitching_condition_post_game()
+        self.teams[HOME].set_pitching_condition_post_game()
         self.win_loss_record()
         self.teams[AWAY].box_score.totals()
         self.teams[HOME].box_score.totals()
@@ -976,12 +978,6 @@ class Game:
         logger.debug("Calling _build_structured_game_recap")
         self._build_structured_game_recap()
 
-        # Log score before deep copy to catch corruption at the source
-        logger.info(
-            f"sim_game_structured RETURNING: {self.team_names[AWAY]} vs {self.team_names[HOME]} "
-            f"total_score={self.total_score} structured_final_score={self.structured_game.final_score} "
-            f"total_score_id={id(self.total_score)}"
-        )
         # Return a deep copy to ensure no shared state with this Game instance
         return (list(self.total_score), self.inning, self.win_loss, self.game_recap, self.structured_game.model_copy(deep=True))
 
@@ -1188,12 +1184,6 @@ class Game:
         """Run game simulation and put results on queue for multi-threading."""
         if use_structured:
             g_score, g_innings, g_win_loss, final_game_recap, structured_game = self.sim_game_structured()
-            logger.info(
-                f"sim_game_threaded PRE-PUT: {self.team_names[AWAY]} vs {self.team_names[HOME]} "
-                f"g_score={g_score} g_score_id={id(g_score)} "
-                f"structured_final={structured_game.final_score} "
-                f"away_box_id={id(self.teams[AWAY].box_score)} home_box_id={id(self.teams[HOME].box_score)}"
-            )
             q.put(
                 (
                     g_score,

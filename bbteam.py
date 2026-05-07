@@ -555,6 +555,11 @@ class Team:
         self.box_score.set_box_batting_condition()
         return
 
+    def set_pitching_condition_post_game(self) -> None:
+        """Apply post-game fatigue penalty to pitchers based on outs recorded."""
+        self.box_score.set_box_pitching_condition()
+        return
+
     def batter_stats_in_lineup(self, lineup_order_num: int = 0) -> Series:
         """
         return a pandas series containing the stats for the batter with the position in the lineup provided
@@ -604,18 +609,20 @@ class Team:
             self.used_pitcher_indices.add(self.cur_pitcher_index)
         else:
             # Emergency: all designated relievers exhausted — use any available pitcher not yet used
+            already_in_game = set(self.box_score.box_pitching.index) | self.used_pitcher_indices
             available = self.gameplay_pitchers_df[
-                (~self.gameplay_pitchers_df.index.isin(self.used_pitcher_indices))
+                (~self.gameplay_pitchers_df.index.isin(already_in_game))
                 & (self.gameplay_pitchers_df["Condition"] > self.fatigue_unavailable)
                 & (self.gameplay_pitchers_df["Injured Days"] == 0)
             ]
             if len(available) >= 1:
                 self.cur_pitcher_index = available.sort_values("ERA").index[0]
-                self.gameplay_pitching_df = available.loc[self.cur_pitcher_index]
-                self.box_score.add_pitcher_to_box(available.loc[self.cur_pitcher_index])
+                pitcher_row = available.loc[[self.cur_pitcher_index]].iloc[[0]]
+                self.gameplay_pitching_df = pitcher_row
+                self.box_score.add_pitcher_to_box(pitcher_row)
                 self.used_pitcher_indices.add(self.cur_pitcher_index)
                 logger.info(
-                    f"Emergency pitching change: {available.loc[self.cur_pitcher_index]['Player']} "
+                    f"Emergency pitching change: {pitcher_row['Player'].iloc[0]} "
                     f"called from full staff (all designated relievers used)"
                 )
             # else: truly no one available — keep current pitcher
@@ -735,89 +742,6 @@ class Team:
             df_players = eligible_subset.sort_values(stat_criteria, ascending=False)
 
         return df_players.index[0]
-
-        # df_players, df_criteria = None, None
-        # logger.debug('Searching for position: {}', position)
-        # logger.debug('Gameplay position players:\n{}', self.gameplay_pos_players_df.head(10).to_string())
-        # try:
-        #     df_player_num = None
-        #     # Note to AI: do not mess with this logic
-        #     # 1. Define availability
-        #     if ignore_exhaustion:
-        #         not_exhausted = True
-        #     else:
-        #         not_exhausted = ~(self.gameplay_pos_players_df['Condition'] <= self.fatigue_unavailable)
-        #     not_injured = (self.gameplay_pos_players_df['Injured Days'] == 0)
-        #     not_in_lineup = ~self.gameplay_pos_players_df.index.isin(lineup_index_list)
-        #
-        #     # 2. Define Position Filter
-        #     # Only bypass the position filter if the search is specifically for 'DH'
-        #     if position == 'DH':
-        #         is_at_position = True  # DH can be anyone
-        #     else:
-        #         def check_pos(x):
-        #             # If it's a real list: ['1B', 'C']
-        #             if isinstance(x, list):
-        #                 return position in x
-        #             # If it's a string that looks like a list: "['1B', 'C']"
-        #             # or a slash string: "1B/C"
-        #             if isinstance(x, str):
-        #                 import re
-        #                 return bool(re.search(fr'\b{position}\b', x))
-        #             return False
-        #
-        #         is_at_position = self.gameplay_pos_players_df['Pos'].apply(check_pos)
-        #
-        #     # 3. Combine
-        #     df_criteria = not_in_lineup & is_at_position & not_exhausted & not_injured
-        #
-        #     # 4. Execute Search
-        #     # Create a temporary view of filtered players to calculate virtual stats if needed
-        #     eligible_subset = self.gameplay_pos_players_df[df_criteria].copy()
-        #
-        #     if stat_criteria == 'DEF_ADJ_OPS':
-        #         # Weighting Logic: 0.100 turns a +2.0 Def_WAR into a +.200 OPS boost.
-        #         # This allows a defensive wizard with a .650 OPS to beat out
-        #         # a defensive liability with an .840 OPS.
-        #         eligible_subset['DEF_ADJ_OPS'] = eligible_subset['OPS'] + (eligible_subset['Def_WAR'] * 0.100)
-        #         df_players = eligible_subset.sort_values('DEF_ADJ_OPS', ascending=False)
-        #     else:
-        #         # Standard sort for existing columns (OPS, AVG, SLG, etc.)
-        #         df_players = eligible_subset.sort_values(stat_criteria, ascending=False)
-        #
-        #     # 5. Fallback logic
-        #     if df_players.empty:
-        #         if not ignore_exhaustion:
-        #             # Try again for the SAME position, but allow tired players
-        #             logger.debug("No fresh players for {}. Retrying with fatigue ignored.", position)
-        #             return self.search_for_pos(position, lineup_index_list, stat_criteria, ignore_exhaustion=True)
-        #
-        #         if position != 'DH':
-        #             # If still nothing at that specific position, search for ANY available hitter
-        #             logger.debug("No one at {}. Searching for best available DH.", position)
-        #             return self.search_for_pos('DH', lineup_index_list, stat_criteria, ignore_exhaustion=True)
-        #         else:
-        #             # Absolute last resort: Grab anyone not in the lineup, sorted by condition
-        #             # We still respect 'not_injured' here because an injured player literally cannot play.
-        #             df_players = self.gameplay_pos_players_df[not_in_lineup & not_injured].sort_values('Condition',
-        #                                                                                                ascending=False)
-        #
-        #     logger.debug('Top player at position {}: {}',
-        #                position, df_players.head(1).index[0] if df_player_num is None else df_player_num)
-        # except IndexError:
-        #     logger.error('Error in bbteam.py search_for_pos with pos {}', position)
-        #     logger.error('With criteria: {}', df_criteria)
-        #     logger.error('Available players:\n{}', df_players)
-        #     logger.error('Gameplay dataframe:\n{}', self.gameplay_pos_players_df)
-        #     exit(1)
-        #
-        # # pick top player at pos
-        # top_index = df_players.index[0] if not df_players.empty else None
-        # if top_index is None:
-        #     logger.warning("No players found for position {} even after fallbacks!", position)
-        #
-        # # return df_players.head(1).index[0] if df_player_num is None else df_player_num  # pick top player at pos
-        # return top_index
 
     def best_at_stat(
         self,

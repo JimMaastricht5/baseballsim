@@ -4,15 +4,17 @@ Copyright (c) 2024 Jim Maastricht
 In-game box score tracking and accumulation for batting and pitching statistics.
 """
 
-import pandas as pd
-import bbstats
+import threading
+from typing import Dict, Union
+
 import numpy as np
-from bbat_bat import OutCome
+import pandas as pd
 from numpy import float64, int32, int64
 from pandas.core.frame import DataFrame
 from pandas.core.series import Series
-from typing import Dict, Union
-import threading
+
+import bbstats
+from bbat_bat import OutCome
 
 
 class TeamBoxScore:
@@ -34,7 +36,8 @@ class TeamBoxScore:
         game_pitching_stats: Copy of box_pitching without totals row
     """
 
-    def __init__(self, lineup: DataFrame, pitching: DataFrame, team_name: str) -> None:
+    def __init__(self, lineup: DataFrame, pitching: DataFrame, team_name: str,
+                 condition_cost_per_out: float = 12, condition_change_per_day: float = 20) -> None:
         """
         Initialize box score with team lineup and starting pitcher.
 
@@ -84,11 +87,11 @@ class TeamBoxScore:
         self.total_hits = 0
         self.total_errors = 0
 
-        self.condition_change_per_day = 20
+        self.condition_change_per_day = condition_change_per_day
         self.rnd_condition_chg = lambda: abs(
             np.random.normal(loc=self.condition_change_per_day, scale=self.condition_change_per_day / 2, size=1)[0]
         )
-        self.condition_cost_per_out = 12  # post-game cost per out recorded; 36/IP keeps relievers at ~75 games/season
+        self.condition_cost_per_out = condition_cost_per_out  # post-game cost per out recorded; 36/IP keeps relievers at ~75 games/season
         self.lock = threading.Lock()
         return
 
@@ -104,9 +107,9 @@ class TeamBoxScore:
         """
         with self.lock:
             return (
-                self.box_pitching.at[pitcher_index, "H"]
-                + self.box_pitching.at[pitcher_index, "BB"]
-                + self.box_pitching.at[pitcher_index, "IP"] * 3
+                    self.box_pitching.at[pitcher_index, "H"]
+                    + self.box_pitching.at[pitcher_index, "BB"]
+                    + self.box_pitching.at[pitcher_index, "IP"] * 3
             )
 
     def pitching_result(self, pitcher_index: int64, outcomes: OutCome, condition: Union[float64, int]) -> None:
@@ -126,7 +129,7 @@ class TeamBoxScore:
             if outcomes.score_book_cd in ["H", "2B", "3B", "HR", "SO", "BB", "HBP"]:  # Handle plate appearance
                 self.box_pitching.at[pitcher_index, outcomes.score_book_cd] += 1
             self.box_pitching.at[pitcher_index, "H"] += (  # 2B, 3B, HR are hits; HBP is not
-                outcomes.score_book_cd not in ["BB", "HBP", "H"] and outcomes.on_base_b
+                    outcomes.score_book_cd not in ["BB", "HBP", "H"] and outcomes.on_base_b
             )
             self.box_pitching.at[pitcher_index, "ER"] += outcomes.runs_scored
             self.box_pitching.at[pitcher_index, "Condition"] = float(condition)
@@ -194,8 +197,8 @@ class TeamBoxScore:
                     last_idx = self.box_pitching.index[-1]
                     self.box_pitching.at[last_idx, "SV"] += 1
                     if (
-                        float(self.box_pitching.at[last_idx, "IP"]) < 2.0
-                        and float(self.box_pitching.at[self.box_pitching.index[-2], "IP"]) > 0
+                            float(self.box_pitching.at[last_idx, "IP"]) < 2.0
+                            and float(self.box_pitching.at[self.box_pitching.index[-2], "IP"]) > 0
                     ):
                         self.box_pitching.at[self.box_pitching.index[-2], "HLD"] += 1
             except KeyError as e:

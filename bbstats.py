@@ -113,7 +113,8 @@ class BaseballStats:
         # position player (non-pitcher) longevitiy: https://www.nytimes.com/2007/07/15/sports/baseball/15careers.html
 
         # --- Recovery/Fatigue Constants ---
-        self.condition_change_per_day = 17  # Base daily condition recovery (mid-point of distribution)
+        self.condition_change_per_day = 20  # mid-point of distribution for recovery and post fatigue
+        self.condition_cost_per_out = 12  # post game impact on pitcher recovery per out
         self.fatigue_start_perc = 70  # % of avg batters faced where pitcher fatigue begins
         self.fatigue_rate = 0.005  # OBP penalty rate when pitcher is fatigued (increased from 0.001 for more impact)
         self.fatigue_pitching_change_limit = 5  # Pull pitcher when condition <= 5

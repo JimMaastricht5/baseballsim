@@ -19,12 +19,12 @@ from bblogger import logger
 
 class Team:
     def __init__(
-        self,
-        team_name: str,
-        baseball_data: bbstats.BaseballStats,
-        game_num: int = 1,
-        rotation_len: int = 5,
-        interactive: bool = False,
+            self,
+            team_name: str,
+            baseball_data: bbstats.BaseballStats,
+            game_num: int = 1,
+            rotation_len: int = 5,
+            interactive: bool = False,
     ) -> None:
         """Initialize team with roster, lineup, and rotation from baseball_data."""
         pd.options.mode.chained_assignment = None  # suppresses chained assignment warning for lineup pos setting
@@ -158,23 +158,23 @@ class Team:
 
         # check data type of new season pitching data, after first pass it is converted to a string
         if (
-            self.baseball_data.new_season_pitching_data["Condition"].dtype == float
-            or self.baseball_data.new_season_pitching_data["Condition"].dtype == int
+                self.baseball_data.new_season_pitching_data["Condition"].dtype == float
+                or self.baseball_data.new_season_pitching_data["Condition"].dtype == int
         ):  # action already been performed
             # Sync all dynamic fields (condition, injuries, streaks) from new season to gameplay dataframes
             self.baseball_data.sync_dynamic_fields(self.gameplay_pitchers_df, self.gameplay_pos_players_df)
 
             # Apply condition to AVG_faced for pitchers
             self.gameplay_pitchers_df["AVG_faced"] = self.gameplay_pitchers_df["AVG_faced"] * (
-                self.gameplay_pitchers_df["Condition"] / 100
+                    self.gameplay_pitchers_df["Condition"] / 100
             )
 
         # test for empty or insufficient number of players generally need 5 starting pitchers and 9 players
         if (
-            len(self.gameplay_pitchers_df) == 0
-            or len(self.gameplay_pitchers_df) < 5
-            or len(self.gameplay_pos_players_df) == 0
-            or len(self.gameplay_pos_players_df) < 9
+                len(self.gameplay_pitchers_df) == 0
+                or len(self.gameplay_pitchers_df) < 5
+                or len(self.gameplay_pos_players_df) == 0
+                or len(self.gameplay_pos_players_df) < 9
         ):
             print(f"Teams available are {self.baseball_data.pitching_data['Team'].unique()}")
 
@@ -226,12 +226,12 @@ class Team:
         return float(team_def_war)
 
     def set_initial_lineup(
-        self,
-        show_lineup: bool = False,
-        show_bench: bool = False,
-        current_season_stats: bool = True,
-        force_starting_pitcher: None = None,
-        force_lineup_dict: None = None,
+            self,
+            show_lineup: bool = False,
+            show_bench: bool = False,
+            current_season_stats: bool = True,
+            force_starting_pitcher: None = None,
+            force_lineup_dict: None = None,
     ) -> str:
         """
         sets the initial lineup pre-game for pitchers and hitters
@@ -254,7 +254,9 @@ class Team:
             self.print_pos_not_in_lineup(current_season_stats=current_season_stats)
             self.print_available_pitchers(include_starters=False, current_season_stats=current_season_stats)
         self.box_score = bbgame_box_stats.TeamBoxScore(
-            self.gameplay_lineup_df, self.gameplay_pitching_df, self.team_name
+            self.gameplay_lineup_df, self.gameplay_pitching_df, self.team_name,
+            self.baseball_data.condition_cost_per_out,
+            self.baseball_data.condition_change_per_day
         )
         return self.lineup_card
 
@@ -589,9 +591,9 @@ class Team:
         :return: hashcode for new pitcher or hashcode for current pitcher
         """
         if (
-            0 <= score_diff <= 3
-            and (inning <= 9 and len(self.relievers_df) >= (9 - (inning - 1)))
-            or (inning > 9 and len(self.relievers_df) >= 1)
+                0 <= score_diff <= 3
+                and (inning <= 9 and len(self.relievers_df) >= (9 - (inning - 1)))
+                or (inning > 9 and len(self.relievers_df) >= 1)
         ):
             if inning <= 9:
                 self.cur_pitcher_index = self.relievers_df.index[9 - inning]  # 7th would be rel 2 since row start 0
@@ -614,7 +616,7 @@ class Team:
                 (~self.gameplay_pitchers_df.index.isin(already_in_game))
                 & (self.gameplay_pitchers_df["Condition"] > self.fatigue_unavailable)
                 & (self.gameplay_pitchers_df["Injured Days"] == 0)
-            ]
+                ]
             if len(available) >= 1:
                 self.cur_pitcher_index = available.sort_values("ERA").index[0]
                 pitcher_row = available.loc[[self.cur_pitcher_index]].iloc[[0]]
@@ -666,12 +668,12 @@ class Team:
         return
 
     def search_for_pos(
-        self,
-        position: str,
-        lineup_index_list: List[Union[Any, int64]],
-        stat_criteria: str = "OPS",
-        ignore_exhaustion: bool = False,
-        debug: bool = False,
+            self,
+            position: str,
+            lineup_index_list: List[Union[Any, int64]],
+            stat_criteria: str = "OPS",
+            ignore_exhaustion: bool = False,
+            debug: bool = False,
     ) -> int64:
         """
         find players not in lineup at specified position, sort by stat descending to find the best
@@ -744,11 +746,11 @@ class Team:
         return df_players.index[0]
 
     def best_at_stat(
-        self,
-        lineup_index_list: List[int64],
-        stat_criteria: str = "OPS",
-        count: int = 9,
-        exclude: Optional[List[int]] = None,
+            self,
+            lineup_index_list: List[int64],
+            stat_criteria: str = "OPS",
+            count: int = 9,
+            exclude: Optional[List[int]] = None,
     ) -> List[int]:
         """
         find the best available player using a given stat as the selection criteria
@@ -839,7 +841,9 @@ class Team:
             self.cur_lineup_index_list.remove(cur_player_index)  # remove old player
             self.set_prior_and_new_pos_player_batting_bench_dfs()
             self.box_score = bbgame_box_stats.TeamBoxScore(
-                self.gameplay_lineup_df, self.gameplay_pitching_df, self.team_name
+                self.gameplay_lineup_df, self.gameplay_pitching_df, self.team_name,
+                self.baseball_data.condition_cost_per_out,
+                self.baseball_data.condition_change_per_day
             )  # update box score
         else:
             print(f"Player Index is {pos_player_bench_hashcode} is not on the team.  No substitution made")

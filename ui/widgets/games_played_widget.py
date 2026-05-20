@@ -29,15 +29,31 @@ class ScrollableFrame(ttk.Frame):
         # Configure scrollbar style BEFORE creating the scrollbar to avoid startup errors
         style = ttk.Style()
         # A darker thumb and contrasting trough for better visibility on dark themes
-        style.configure("WSVertical.TScrollbar", background="#6b6b6b", troughcolor=BG_WIDGET, lightcolor="#6b6b6b", darkcolor="#6b6b6b")
+        style.configure(
+            "WSVertical.TScrollbar",
+            background="#6b6b6b",
+            troughcolor=BG_WIDGET,
+            lightcolor="#6b6b6b",
+            darkcolor="#6b6b6b",
+        )
         # Fallback style for environments where WSVertical.TScrollbar might not be registered
-        style.configure("Vertical.TScrollbar", background="#6b6b6b", troughcolor=BG_WIDGET, lightcolor="#6b6b6b", darkcolor="#6b6b6b")
+        style.configure(
+            "Vertical.TScrollbar",
+            background="#6b6b6b",
+            troughcolor=BG_WIDGET,
+            lightcolor="#6b6b6b",
+            darkcolor="#6b6b6b",
+        )
         # Use the configured style for the scrollbar, with fallbacks in case the style isn't registered
         try:
-            self.scrollbar = ttk.Scrollbar(self, orient=tk.VERTICAL, command=self.canvas.yview, style="WSVertical.TScrollbar")
+            self.scrollbar = ttk.Scrollbar(
+                self, orient=tk.VERTICAL, command=self.canvas.yview, style="WSVertical.TScrollbar"
+            )
         except Exception:
             try:
-                self.scrollbar = ttk.Scrollbar(self, orient=tk.VERTICAL, command=self.canvas.yview, style="Vertical.TScrollbar")
+                self.scrollbar = ttk.Scrollbar(
+                    self, orient=tk.VERTICAL, command=self.canvas.yview, style="Vertical.TScrollbar"
+                )
             except Exception:
                 self.scrollbar = ttk.Scrollbar(self, orient=tk.VERTICAL, command=self.canvas.yview)
         self.canvas.config(yscrollcommand=self.scrollbar.set)
@@ -711,9 +727,7 @@ class GamesPlayedWidget:
         if not box_score or not box_score.batters:
             num_rows = 1
         else:
-            num_rows = len(box_score.batters)
-            if box_score.totals_batting:
-                num_rows += 1
+            num_rows = len(box_score.batters) + 1
 
         frame_height = num_rows * 20 + 10
 
@@ -757,23 +771,20 @@ class GamesPlayedWidget:
             ]
             tree.insert("", tk.END, values=values, tags=("alt",) if idx % 2 == 1 else ())
 
-        # Totals row
-        if box_score.totals_batting:
-            totals = box_score.totals_batting
-            totals_values = [
-                "TOTALS",
-                "",
-                int(totals.AB),
-                int(totals.R),
-                int(totals.H),
-                int(totals.D),
-                int(totals.T),
-                int(totals.HR),
-                int(totals.RBI),
-                int(getattr(totals, "BB", 0)),
-                int(getattr(totals, "SO", 0)),
-            ]
-            tree.insert("", tk.END, values=totals_values, tags=("totals",))
+        totals_values = [
+            "TOTALS",
+            "",
+            int(sum(b.stats.AB for b in box_score.batters)),
+            int(sum(b.stats.R for b in box_score.batters)),
+            int(sum(b.stats.H for b in box_score.batters)),
+            int(sum(b.stats.D for b in box_score.batters)),
+            int(sum(b.stats.T for b in box_score.batters)),
+            int(sum(b.stats.HR for b in box_score.batters)),
+            int(sum(b.stats.RBI for b in box_score.batters)),
+            int(sum(b.stats.BB for b in box_score.batters)),
+            int(sum(b.stats.SO for b in box_score.batters)),
+        ]
+        tree.insert("", tk.END, values=totals_values, tags=("totals",))
 
         # Configure tag styles
         tree.tag_configure("alt", background=BG_WIDGET_ALT)
@@ -812,7 +823,7 @@ class GamesPlayedWidget:
         if not box_score or not box_score.pitchers:
             num_rows = 1
         else:
-            num_rows = len(box_score.pitchers)
+            num_rows = len(box_score.pitchers) + 1
 
         frame_height = num_rows * 20 + 10
 
@@ -855,8 +866,24 @@ class GamesPlayedWidget:
             ]
             tree.insert("", tk.END, values=values, tags=("alt",) if idx % 2 == 1 else ())
 
+        totals_values = [
+            "TOTALS",
+            f"{sum(p.stats.IP for p in box_score.pitchers):.1f}",
+            int(sum(p.stats.H for p in box_score.pitchers)),
+            int(sum(p.stats.ER for p in box_score.pitchers)),
+            int(sum(p.stats.SO for p in box_score.pitchers)),
+            int(sum(p.stats.BB for p in box_score.pitchers)),
+            int(sum(p.stats.HR for p in box_score.pitchers)),
+            int(sum(p.stats.W for p in box_score.pitchers)),
+            int(sum(p.stats.L for p in box_score.pitchers)),
+            int(sum(getattr(p.stats, "HLD", 0) for p in box_score.pitchers)),
+            int(sum(getattr(p.stats, "SV", 0) for p in box_score.pitchers)),
+        ]
+        tree.insert("", tk.END, values=totals_values, tags=("totals",))
+
         # Configure tag styles
         tree.tag_configure("alt", background=BG_WIDGET_ALT)
+        tree.tag_configure("totals", background="#2a2a3a", foreground=ACCENT_GOLD)
 
     def _display_pitcher_decisions(self, structured_game):
         """Display win/loss/hold/save pitcher summary."""
@@ -955,9 +982,7 @@ class GamesPlayedWidget:
         if not box_score or not box_score.batters:
             num_rows = 1
         else:
-            num_rows = len(box_score.batters)
-            if box_score.totals_batting:
-                num_rows += 1
+            num_rows = len(box_score.batters) + 1
 
         frame_height = num_rows * 20 + 10
 
@@ -1001,22 +1026,20 @@ class GamesPlayedWidget:
             ]
             tree.insert("", tk.END, values=values, tags=("alt",) if idx % 2 == 1 else ())
 
-        if box_score.totals_batting:
-            totals = box_score.totals_batting
-            totals_values = [
-                "TOTALS",
-                "",
-                int(totals.AB),
-                int(totals.R),
-                int(totals.H),
-                int(totals.D),
-                int(totals.T),
-                int(totals.HR),
-                int(totals.RBI),
-                int(getattr(totals, "BB", 0)),
-                int(getattr(totals, "SO", 0)),
-            ]
-            tree.insert("", tk.END, values=totals_values, tags=("totals",))
+        totals_values = [
+            "TOTALS",
+            "",
+            int(sum(b.stats.AB for b in box_score.batters)),
+            int(sum(b.stats.R for b in box_score.batters)),
+            int(sum(b.stats.H for b in box_score.batters)),
+            int(sum(b.stats.D for b in box_score.batters)),
+            int(sum(b.stats.T for b in box_score.batters)),
+            int(sum(b.stats.HR for b in box_score.batters)),
+            int(sum(b.stats.RBI for b in box_score.batters)),
+            int(sum(b.stats.BB for b in box_score.batters)),
+            int(sum(b.stats.SO for b in box_score.batters)),
+        ]
+        tree.insert("", tk.END, values=totals_values, tags=("totals",))
 
         tree.tag_configure("alt", background=BG_WIDGET_ALT)
         tree.tag_configure("totals", background="#2a2a3a", foreground=ACCENT_GOLD)
@@ -1048,7 +1071,7 @@ class GamesPlayedWidget:
         if not box_score or not box_score.pitchers:
             num_rows = 1
         else:
-            num_rows = len(box_score.pitchers)
+            num_rows = len(box_score.pitchers) + 1
 
         tree_frame = tk.Frame(parent_frame, bg=BG_WIDGET)
         tree_frame.pack(anchor=tk.W, padx=10, pady=2)
@@ -1087,7 +1110,23 @@ class GamesPlayedWidget:
             ]
             tree.insert("", tk.END, values=values, tags=("alt",) if idx % 2 == 1 else ())
 
+        totals_values = [
+            "TOTALS",
+            f"{sum(p.stats.IP for p in box_score.pitchers):.1f}",
+            int(sum(p.stats.H for p in box_score.pitchers)),
+            int(sum(p.stats.ER for p in box_score.pitchers)),
+            int(sum(p.stats.SO for p in box_score.pitchers)),
+            int(sum(p.stats.BB for p in box_score.pitchers)),
+            int(sum(p.stats.HR for p in box_score.pitchers)),
+            int(sum(p.stats.W for p in box_score.pitchers)),
+            int(sum(p.stats.L for p in box_score.pitchers)),
+            int(sum(getattr(p.stats, "HLD", 0) for p in box_score.pitchers)),
+            int(sum(getattr(p.stats, "SV", 0) for p in box_score.pitchers)),
+        ]
+        tree.insert("", tk.END, values=totals_values, tags=("totals",))
+
         tree.tag_configure("alt", background=BG_WIDGET_ALT)
+        tree.tag_configure("totals", background="#2a2a3a", foreground=ACCENT_GOLD)
 
     def _display_pitcher_decisions_in_section(self, parent_frame, structured_game):
         """Display pitcher decisions inside a collapsible section frame."""

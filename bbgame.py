@@ -11,7 +11,7 @@ Class:
 import datetime
 import queue
 import random
-from typing import List, Tuple, Optional, Dict, ClassVar
+from typing import ClassVar, Dict, List, Optional, Tuple
 
 import numpy as np
 import pandas as pd
@@ -308,27 +308,27 @@ class GameRecap(BaseModel):
 
 class Game:
     def __init__(
-            self,
-            away_team_name: str = "",
-            home_team_name: str = "",
-            baseball_data=None,
-            game_num: int = 1,
-            rotation_len: int = 5,
-            print_lineup: bool = False,
-            chatty: bool = False,
-            print_box_score_b: bool = False,
-            team_to_follow: Optional[List[str]] = None,
-            load_seasons: List[int] = 2025,
-            new_season: int = 2026,
-            starting_pitchers: None = None,
-            starting_lineups: None = None,
-            load_batter_file: str = "player-stats-Batters.csv",
-            load_pitcher_file: str = "player-stats-Pitching.csv",
-            interactive: bool = False,
-            show_bench: bool = False,
-            debug: bool = False,
-            play_by_play_callback=None,
-            obp_adjustment=None,
+        self,
+        away_team_name: str = "",
+        home_team_name: str = "",
+        baseball_data=None,
+        game_num: int = 1,
+        rotation_len: int = 5,
+        print_lineup: bool = False,
+        chatty: bool = False,
+        print_box_score_b: bool = False,
+        team_to_follow: Optional[List[str]] = None,
+        load_seasons: List[int] = 2025,
+        new_season: int = 2026,
+        starting_pitchers: None = None,
+        starting_lineups: None = None,
+        load_batter_file: str = "player-stats-Batters.csv",
+        load_pitcher_file: str = "player-stats-Pitching.csv",
+        interactive: bool = False,
+        show_bench: bool = False,
+        debug: bool = False,
+        play_by_play_callback=None,
+        obp_adjustment=None,
     ) -> None:
         """Initialize a game between two teams with the given configuration."""
         self.game_recap = ""
@@ -476,9 +476,9 @@ class Game:
     def save_sit(self) -> bool:
         """Return True if current pitching situation qualifies for a save."""
         return (
-                self.score_diff() > 0
-                and (self.score_diff() <= self.bases.count_runners() + 2)
-                and self.inning[self.team_hitting()] >= 8
+            self.score_diff() > 0
+            and (self.score_diff() <= self.bases.count_runners() + 2)
+            and self.inning[self.team_hitting()] >= 8
         )
 
     def close_game(self) -> bool:
@@ -500,9 +500,9 @@ class Game:
 
         # pitcher of record tracking, look for lead change
         if (
-                self.total_score[self.team_hitting()]
-                <= self.total_score[self.team_pitching()]
-                < (self.total_score[self.team_hitting()] + self.bases.runs_scored)
+            self.total_score[self.team_hitting()]
+            <= self.total_score[self.team_pitching()]
+            < (self.total_score[self.team_hitting()] + self.bases.runs_scored)
         ):
             self.winning_pitcher = self.teams[self.team_hitting()].is_pitching_index()
             self.losing_pitcher = self.teams[self.team_pitching()].is_pitching_index()
@@ -514,13 +514,13 @@ class Game:
         # Sanity check: flag suspiciously large scores to help trace corruption
         if self.total_score[self.team_hitting()] > 50:
             import traceback
+
             logger.warning(
                 f"update_inning_score: SUSPICIOUS score detected! "
                 f"{self.team_names[AWAY]} vs {self.team_names[HOME]} "
                 f"total_score={self.total_score} number_of_runs={number_of_runs} "
                 f"inning={self.inning} team_hitting={self.team_hitting()} "
-                f"runs_scored={self.bases.runs_scored}\n"
-                + "".join(traceback.format_stack())
+                f"runs_scored={self.bases.runs_scored}\n" + "".join(traceback.format_stack())
             )
         return
 
@@ -583,7 +583,7 @@ class Game:
         output = ""
 
         for i in range(0, len(game_summaries), games_per_line):
-            batch = game_summaries[i: i + games_per_line]
+            batch = game_summaries[i : i + games_per_line]
 
             # Header line with R H E repeated
             header_parts = []
@@ -612,7 +612,7 @@ class Game:
     def pitching_sit(self, pitching: Series, pitch_switch: bool) -> bool:
         """Switch pitchers if fatigued or game situation demands it (save/close game)."""
         if (self.teams[self.team_pitching()].is_pitcher_fatigued(pitching.Condition) and self.outs < 3) or (
-                pitch_switch is False and (self.close_game() or self.save_sit())
+            pitch_switch is False and (self.close_game() or self.save_sit())
         ):
             prior_pitcher = self.teams[self.team_pitching()].is_pitching_index()
             self.teams[self.team_pitching()].pitching_change(
@@ -634,6 +634,74 @@ class Game:
                     if self.play_by_play_callback:
                         self.play_by_play_callback(play_text)
         return pitch_switch
+
+    def defensive_sub_between_innings(self) -> None:
+        """Between-innings: replace eligible defenders (SS,3B,LF,CF,RF)
+        with superior gloves from bench.  Inning 8+ only."""
+        team_idx = self.team_pitching()
+        if self.inning[team_idx] < 8:
+            return
+
+        team = self.teams[team_idx]
+        lineup = team.gameplay_lineup_df
+        bench = team.gameplay_bench_pos_df
+        if bench is None or len(bench) == 0:
+            return
+
+        eligible_positions = {"SS", "3B", "LF", "CF", "RF"}
+        subs = []
+
+        for spot_idx in range(len(lineup)):
+            row = lineup.iloc[spot_idx]
+            pos = row.get("Pos", "")
+            if pos not in eligible_positions:
+                continue
+
+            current_hash = lineup.index[spot_idx]
+            current_def = float(row.get("Def_WAR", 0))
+            candidates = bench[bench["Pos"] == pos]
+            candidates = candidates[candidates["Injured Days"] == 0]
+            candidates = candidates[candidates["Condition"] > self.baseball_data.fatigue_unavailable]
+            if len(candidates) == 0:
+                continue
+
+            best = candidates.sort_values("Def_WAR", ascending=False).iloc[0]
+            bench_def = float(best.get("Def_WAR", 0))
+
+            if bench_def - current_def >= 1.0:
+                subs.append(
+                    (
+                        best.name,
+                        spot_idx + 1,
+                        pos,
+                        current_def,
+                        bench_def,
+                        current_hash,
+                        row.get("Player", "?"),
+                        best.get("Player", "?"),
+                    )
+                )
+
+        if not subs:
+            return
+
+        for new_hash, bat_pos, pos, old_d, new_d, old_hash, old_name, new_name in subs:
+            team.cur_lineup_index_list[bat_pos - 1] = new_hash
+            team.set_prior_and_new_pos_player_batting_bench_dfs()
+            new_row = team.gameplay_pos_players_df.loc[new_hash]
+            if team.box_score is not None:
+                team.box_score.add_batter_to_box_after(new_row, old_hash)
+            logger.info(f"Defensive sub: {new_name} → {old_name} at {pos} (Def_WAR {old_d:.1f}→{new_d:.1f})")
+            if self.chatty:
+                text = (
+                    f"Defensive substitution: {new_name} replaces {old_name} at {pos} "
+                    f"(Def_WAR: {old_d:.1f} → {new_d:.1f})\n"
+                )
+                self.game_recap += text
+                if self.play_by_play_callback:
+                    self.play_by_play_callback(text)
+
+        team.lineup_def_war = team.calculate_active_defense(team.gameplay_lineup_df)
 
     def balk_wild_pitch(self) -> None:
         """Placeholder for balk/wild pitch logic (currently disabled)."""
@@ -833,7 +901,7 @@ class Game:
             )
             self.stolen_base_sit()  # check for base stealing and then resolve ab
             if self.outs >= 3:
-                break  # handle caught stealing
+                break  # handles caught stealing
 
             self.balk_wild_pitch()  # handle wild pitch and balks
             __pitching, __batting = self.sim_ab()  # resolve ab
@@ -913,6 +981,7 @@ class Game:
         self.inning[self.team_hitting()] += 1
         self.top_bottom = 0 if self.top_bottom == 1 else 1  # switch teams hitting and pitching
         self.outs = 0  # rest outs to zero
+        self.defensive_sub_between_innings()
         return
 
     def is_game_end(self) -> bool:
@@ -920,9 +989,9 @@ class Game:
         return (
             False
             if self.inning[AWAY] <= 9
-               or self.inning[HOME] <= 8
-               or (self.inning[AWAY] != self.inning[HOME] and self.total_score[AWAY] >= self.total_score[HOME])
-               or self.total_score[AWAY] == self.total_score[HOME]
+            or self.inning[HOME] <= 8
+            or (self.inning[AWAY] != self.inning[HOME] and self.total_score[AWAY] >= self.total_score[HOME])
+            or self.total_score[AWAY] == self.total_score[HOME]
             else True
         )
 
@@ -979,7 +1048,13 @@ class Game:
         self._build_structured_game_recap()
 
         # Return a deep copy to ensure no shared state with this Game instance
-        return (list(self.total_score), self.inning, self.win_loss, self.game_recap, self.structured_game.model_copy(deep=True))
+        return (
+            list(self.total_score),
+            self.inning,
+            self.win_loss,
+            self.game_recap,
+            self.structured_game.model_copy(deep=True),
+        )
 
     def _build_structured_game_recap(self) -> GameRecap:
         """Build structured GameRecap from accumulated game data at game end."""
@@ -1221,7 +1296,7 @@ if __name__ == "__main__":
 
     startdt = datetime.datetime.now()
 
-    away_team = "LAD"
+    away_team = "CHC"
     home_team = "MIL"
 
     # MIL_lineup = {647549: 'LF', 239398: 'C', 224423: '1B', 138309: 'DH', 868055: 'CF', 520723: 'SS',
@@ -1240,7 +1315,7 @@ if __name__ == "__main__":
             chatty=True,
             print_lineup=True,
             print_box_score_b=True,
-            load_seasons=[2020, 2021, 2022, 2023, 2024, 2025],
+            load_seasons=[2020, 2021, 2022, 2023, 2024, 2025, 2026],
             new_season=2026,
             # load_batter_file='random-player-projected-stats-pp-Batting.csv',
             # load_pitcher_file='random-player-projected-stats-pp-Pitching.csv',
@@ -1292,22 +1367,22 @@ if __name__ == "__main__":
             print(f"  Pitchers: {len(structured_game.home_box_score.pitchers)}")
 
         # Show sample batter stats
-        print("\nSample Batting Entry (first batter):")
-        if structured_game.away_box_score and structured_game.away_box_score.batters:
-            batter = structured_game.away_box_score.batters[0]
-            print(f"  Name: {batter.name}")
-            print(f"  Position: {batter.position}")
-            print(f"  AB: {batter.stats.AB}, H: {batter.stats.H}, HR: {batter.stats.HR}, RBI: {batter.stats.RBI}")
-            print(
-                f"  AVG: {batter.stats.AVG:.3f}, OBP: {batter.stats.OBP:.3f}, SLG: {batter.stats.SLG:.3f}, OPS: {batter.stats.OPS:.3f}"
-            )
+        # print("\nSample Batting Entry (first batter):")
+        # if structured_game.away_box_score and structured_game.away_box_score.batters:
+        #     batter = structured_game.away_box_score.batters[0]
+        #     print(f"  Name: {batter.name}")
+        #     print(f"  Position: {batter.position}")
+        #     print(f"  AB: {batter.stats.AB}, H: {batter.stats.H}, HR: {batter.stats.HR}, RBI: {batter.stats.RBI}")
+        #     print(
+        #         f"  AVG: {batter.stats.AVG:.3f}, OBP: {batter.stats.OBP:.3f}, SLG: {batter.stats.SLG:.3f}, OPS: {batter.stats.OPS:.3f}"
+        #     )
 
-        print("\nStructured game model (JSON):")
-        print(
-            structured_game.model_dump_json(indent=2)[:2000] + "..."
-            if len(structured_game.model_dump_json()) > 2000
-            else structured_game.model_dump_json(indent=2)
-        )
+        # print("\nStructured game model (JSON):")
+        # print(
+        #     structured_game.model_dump_json(indent=2)[:2000] + "..."
+        #     if len(structured_game.model_dump_json()) > 2000
+        #     else structured_game.model_dump_json(indent=2)
+        # )
 
         season_win_loss[0] = list(np.add(np.array(season_win_loss[0]), np.array(win_loss[0])))
         season_win_loss[1] = list(np.add(np.array(season_win_loss[1]), np.array(win_loss[1])))
@@ -1321,10 +1396,10 @@ if __name__ == "__main__":
         #     team0_season_df['Player'] = game.teams[AWAY].box_score.box_batting['Player']
         #     team0_season_df['Team'] = game.teams[AWAY].box_score.box_batting['Team']
         #     team0_season_df['Pos'] = game.teams[AWAY].box_score.box_batting['Pos']
-        #     print('')
-        print(f"\n{away_team} season : {season_win_loss[0][0]} W and {season_win_loss[0][1]} L")
-        print(f"{home_team} season : {season_win_loss[1][0]} W and {season_win_loss[1][1]} L")
-    print(f"away team scored {score_total[0]} for an average of {score_total[0] / sims}")
-    print(f"home team scored {score_total[1]} for an average of {score_total[1] / sims}")
+    #     #     print('')
+    #     print(f"\n{away_team} season : {season_win_loss[0][0]} W and {season_win_loss[0][1]} L")
+    #     print(f"{home_team} season : {season_win_loss[1][0]} W and {season_win_loss[1][1]} L")
+    # print(f"away team scored {score_total[0]} for an average of {score_total[0] / sims}")
+    # print(f"home team scored {score_total[1]} for an average of {score_total[1] / sims}")
     print(startdt)
     print(datetime.datetime.now())

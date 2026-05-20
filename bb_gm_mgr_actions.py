@@ -5,6 +5,7 @@ Interactive GM/manager actions: lineup changes, rotation changes, trades, and sa
 """
 
 import json
+
 import bbstats
 import bbteam
 from bblogger import logger
@@ -12,7 +13,7 @@ from bblogger import logger
 
 class Manager:
     def __init__(
-        self, team_name, load_batter_file, load_pitcher_file, load_seasons=2024, new_season=2025, baseball_data=None
+            self, team_name, load_batter_file, load_pitcher_file, load_seasons=2024, new_season=2025, baseball_data=None
     ):
         logger.debug("Initializing Manager for team: {}", team_name)
         self.team_name = team_name
@@ -26,12 +27,6 @@ class Manager:
             )
         self.team = None
         self.setup_team()
-        # self.print_team()
-        # self.team.set_initial_lineup(show_lineup=True, show_bench=True)  # accept all defaults batting and pitching
-        # self.team.set_initial_batting_order()
-        # self.team.set_starting_rotation()
-        # self.team.set_closers()
-        # self.team.set_mid_relief()
         return
 
     def setup_team(self):
@@ -95,7 +90,7 @@ class Manager:
                 if starting_rotation_order_num == 0:
                     break
                 elif (not 1 <= starting_rotation_order_num <= 5) or not (
-                    abs(starting_rotation_order_num - round(starting_rotation_order_num) == 0)
+                        abs(starting_rotation_order_num - round(starting_rotation_order_num) == 0)
                 ):
                     print("Enter the spot in the starting rotation to change (1-5)")
                     print(self.team.print_available_pitchers(include_starters=True, current_season_stats=True))
@@ -108,7 +103,7 @@ class Manager:
                 break
 
             if (1 <= starting_rotation_order_num <= 5) and (
-                abs(starting_rotation_order_num - round(starting_rotation_order_num) == 0)
+                    abs(starting_rotation_order_num - round(starting_rotation_order_num) == 0)
             ):
                 self.team.change_starting_rotation(
                     starting_pitcher_num=start_rotation_pitcher_num, rotation_order_num=starting_rotation_order_num
@@ -129,7 +124,7 @@ class Manager:
                     if batting_order_number == 0:  # completed
                         break
                     elif (not 1 <= batting_order_number <= 9) or not (
-                        abs(batting_order_number - round(batting_order_number) == 0)
+                            abs(batting_order_number - round(batting_order_number) == 0)
                     ):
                         print("Enter a batting order position betweeen 1 and 9")
                     else:

@@ -174,6 +174,27 @@ class TeamBoxScore:
                 self.box_pitching = pd.concat([self.box_pitching, new_pitcher], ignore_index=False)
         return
 
+    def add_batter_to_box_after(self, new_batter: Series, after_hashcode: int) -> None:
+        """Insert a defensive-sub batter into box_batting positioned immediately
+        after the player they replaced, preserving box-score display order."""
+        with self.lock:
+            new_idx = int(new_batter.name if isinstance(new_batter, pd.Series) else new_batter.index[0])
+            if new_idx in self.box_batting.index:
+                return
+            new_entry = new_batter if isinstance(new_batter, pd.DataFrame) else new_batter.to_frame().T
+            new_entry = new_entry.reindex(columns=self.box_batting.columns).fillna(0)
+            new_entry[["PA", "AB", "R", "H", "2B", "3B", "HR", "RBI", "SB", "CS", "BB", "SO", "SH", "SF", "HBP"]] = 0
+            new_entry[["AVG", "OBP", "SLG", "OPS"]] = 0.0
+            new_entry["G"] = 1
+            new_entry["Condition"] = 100.0
+            for col in self.box_batting.columns:
+                new_entry[col] = new_entry[col].astype(self.box_batting[col].dtype)
+            after_pos = list(self.box_batting.index).index(after_hashcode)
+            before = self.box_batting.iloc[:after_pos + 1]
+            after = self.box_batting.iloc[after_pos + 1:]
+            self.box_batting = pd.concat([before, new_entry, after])
+        return
+
     def pitching_win_loss_save(self, pitcher_index: int64, win_b: bool, save_b: bool) -> None:
         """
         Record win/loss and save for pitcher(s) at end of game.

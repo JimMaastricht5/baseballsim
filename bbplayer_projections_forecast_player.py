@@ -5,9 +5,10 @@ Multi-strategy engine for projecting MLB player performance using Bayesian
 shrinkage, trend recognition, injury smoothing, and aging curves.
 """
 
+from typing import Dict, List
+
 import numpy as np
 import pandas as pd
-from typing import Dict, List
 
 
 class PlayerProjector:
@@ -42,7 +43,7 @@ class PlayerProjector:
         """
         Project stats for every player in the historical DataFrame.
 
-        Filters to seasons before 2026, iterates unique Hashcodes, and
+        iterates unique Hashcodes, and
         calls _project_single_player for each. Players with zero career PA
         are skipped. Returns one projected row per player.
 
@@ -51,7 +52,6 @@ class PlayerProjector:
         :param is_p: True for pitchers, False for batters.
         :return: DataFrame of projected stats, one row per player.
         """
-        history = history[history["Season"] < 2026].copy()
         unique_players = history["Hashcode"].unique()
         all_projections = []
 
@@ -60,8 +60,8 @@ class PlayerProjector:
             player_history = history[history["Hashcode"] == h_code].sort_values("Season").copy()
 
             # Ensure we aren't projecting someone who has 0 volume
-            if player_history["PA"].sum() == 0:
-                continue
+            # if player_history["PA"].sum() == 0:
+            #     continue
 
             proj_dict = self._project_single_player(player_history, stats, is_p)
             all_projections.append(proj_dict)
@@ -93,7 +93,7 @@ class PlayerProjector:
         """
         num_years = len(player_history)
         career_vol = player_history[vol_col].sum()
-        age_2026 = int(player_history.iloc[-1]["Age"]) + 1
+        age_sim = int(player_history.iloc[-1]["Age"]) + 1
 
         # 1. STRATEGY SELECTION - Get player's raw rate
         if num_years == 1 and career_vol >= 300:
@@ -108,21 +108,21 @@ class PlayerProjector:
             is_proven = num_years >= 3 and career_vol >= 1000
             if stat_col == "HR" and is_proven:
                 player_rate = w_avg_rate
-            elif age_2026 <= 25:
+            elif age_sim <= 25:
                 player_rate = max(trend_rate, w_avg_rate)
-            elif 27 <= age_2026 <= 32:
+            elif 27 <= age_sim <= 32:
                 player_rate = max(trend_rate, w_avg_rate)
             else:
                 player_rate = trend_rate
         else:
             player_rate = self._weighted_career_average(player_history, stat_col, vol_col)
-            if 27 <= age_2026 <= 33 and career_vol >= 600 and stat_col in ["H", "BB"]:
+            if 27 <= age_sim <= 33 and career_vol >= 600 and stat_col in ["H", "BB"]:
                 recent_rate = player_history.iloc[-1][stat_col] / max(1, player_history.iloc[-1][vol_col])
                 player_rate = max(player_rate, recent_rate * 0.93)
 
         # 2. Apply AGING to player's rate (before regression)
         trust = min(career_vol / self.gate, 1.0)
-        multiplier = 1.0 + (self._get_aging_multiplier(age_2026, False) - 1.0) * trust
+        multiplier = 1.0 + (self._get_aging_multiplier(age_sim, False) - 1.0) * trust
         if vol_col == "H":
             multiplier = 1.0 + (multiplier - 1.0) * 0.5
         player_rate = player_rate * multiplier
@@ -172,7 +172,7 @@ class PlayerProjector:
         """
         num_years = len(player_history)
         career_vol = player_history[vol_col].sum()
-        age_2026 = int(player_history.iloc[-1]["Age"]) + 1
+        age_sim = int(player_history.iloc[-1]["Age"]) + 1
 
         is_proven = num_years >= 3 and career_vol >= 1000
 
@@ -188,7 +188,7 @@ class PlayerProjector:
                 player_rate = (trend_rate * 0.5) + (w_avg_rate * 0.5)
 
         # 2. Apply AGING to player's rate (before regression)
-        raw_m = self._get_aging_multiplier(age_2026, True)
+        raw_m = self._get_aging_multiplier(age_sim, True)
         if stat_col in ["H", "BB", "ER"] and raw_m < 1.0:
             if stat_col == "BB":
                 multiplier = ((1.0 + (1.0 - raw_m)) + (1.0 / raw_m)) / 2
@@ -797,8 +797,8 @@ class PlayerProjector:
 
 
 if __name__ == "__main__":
-    import pandas as pd
     import numpy as np
+    import pandas as pd
 
     # 1. Warm Mock Averages (Targeting ~ .315 League OBP)
     mock_lg = {

@@ -32,27 +32,6 @@ This launches the graphical season simulator with defaults:
 
 Override defaults with command-line arguments:
 
-```bash
-uv run run.py --team NYM --games 81 --seasons 2020,2021,2022,2023,2024,2025,2026
-```
-
-### Alternative Entry Points
-
-| Command                          | Description                         |
-|----------------------------------|-------------------------------------|
-| `uv run run.py`                  | Season UI (recommended)             |
-| `uv run bbgame.py`               | Single game simulation (CLI)        |
-| `uv run bbseason.py`             | Simulate a full season (CLI)        |
-| `uv run bbplayer_projections.py` | Preprocess downloaded stats         |
-
-### Preprocessing
-
-After running `uv run download_stats.py` to fetch fresh data from Baseball Reference, run the projection step:
-
-```bash
-uv run bbplayer_projections.py
-```
-
 ### Available Arguments
 
 | Argument       | Short | Default   | Description                                                    |
@@ -63,12 +42,33 @@ uv run bbplayer_projections.py
 | `--new-season` | `-n`  | 2026      | Season year to simulate                                        |
 | `--dialog`     | `-d`  |           | Show startup dialog                                            |
 
+```bash
+uv run run.py --team NYM --games 81 --seasons 2020,2021,2022,2023,2024,2025,2026
+```
+
+### Alternative Entry Points
+
+| Command                          | Description                  |
+|----------------------------------|------------------------------|
+| `uv run run.py`                  | Season UI (recommended)      |
+| `uv run bbgame.py`               | Single game simulation (CLI) |
+| `uv run bbseason.py`             | Simulate a full season (CLI) |
+| `uv run bbplayer_projections.py` | Preprocess downloaded stats  |
+
+### Preprocessing
+
+After running `uv run download_stats.py` to fetch fresh data and `uv run download_schedule.py` from Baseball Reference,
+run the projection step:
+
+```bash
+uv run bbplayer_projections.py
+```
+
 ## Documentation
 
 ### Architecture & Code
 
 - **[CLAUDE.md](CLAUDE.md)** - Comprehensive guide for Claude Code (AI assistant)
-- **[PROJECTION_FLOW.md](PROJECTION_FLOW.md)** - Detailed projection algorithm documentation
 
 ### UI Documentation
 
@@ -103,14 +103,14 @@ uv run bbplayer_projections.py
 
 ### UI Package
 
-| File / Directory               | Description                                           |
-|-------------------------------|-------------------------------------------------------|
-| `ui/main_window_tk.py`        | Tkinter main window with notebook tabs                |
-| `ui/controllers/`             | Controller layer (season, lineup, depth chart)        |
-| `ui/models/`                  | Data models for UI consumption                        |
-| `ui/widgets/`                 | Widgets: standings, schedule, rosters, box scores     |
-| `ui/season_worker.py`         | Background thread for season simulation               |
-| `ui/ress.py`                  | Resource constants (colors, fonts, styles)            |
+| File / Directory       | Description                                       |
+|------------------------|---------------------------------------------------|
+| `ui/main_window_tk.py` | Tkinter main window with notebook tabs            |
+| `ui/controllers/`      | Controller layer (season, lineup, depth chart)    |
+| `ui/models/`           | Data models for UI consumption                    |
+| `ui/widgets/`          | Widgets: standings, schedule, rosters, box scores |
+| `ui/season_worker.py`  | Background thread for season simulation           |
+| `ui/ress.py`           | Resource constants (colors, fonts, styles)        |
 
 ### Output Files
 
@@ -126,7 +126,8 @@ uv run bbplayer_projections.py
 - **Partial Season Support**: Loads real game results through today; sim continues from the first unplayed game
 - **Real MLB Schedule**: Reads downloaded schedule CSV; marks completed games automatically
 - **Season Scheduling**: 162-game schedules with authentic rest days and division structure
-- **Game Simulation**: Inning-by-inning with detailed box scores (including team totals), play-by-play, and defensive substitutions
+- **Game Simulation**: Inning-by-inning with detailed box scores (including team totals), play-by-play, and defensive
+  substitutions
 - **Player Statistics**: Full tracking across seasons (2020–2026) with age-adjusted projections
 - **Injury & Fatigue Systems**: Realistic pitcher fatigue (post-game condition cost by innings pitched), injury
   durations, and recovery

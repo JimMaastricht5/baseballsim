@@ -4,7 +4,7 @@
 import subprocess
 import sys
 
-defaults = ["--team", "MIL", "--games", "162", "--seasons", "2020, 2021, 2022, 2023,2024,2025,2026", "--new-season",
+defaults = ["--team", "MIL", "--games", "162", "--seasons", "2020,2021,2022,2023,2024,2025,2026", "--new-season",
             "2026"]
 
 args = defaults + sys.argv[1:]

@@ -180,10 +180,7 @@ class SeasonMainWindow:
             # Populate schedule widget
             if sched_mgr and sched_mgr.schedule:
                 self.schedule_widget.update_schedule(
-                    sched_idx,
-                    sched_mgr.schedule,
-                    sched_mgr.schedule_times,
-                    sched_mgr.schedule_dates,
+                    sched_idx, sched_mgr.schedule, sched_mgr.schedule_times, sched_mgr.schedule_dates
                 )
             # Populate league stats, roster, and league leaders widgets
             self.league_stats_widget.update_stats(baseball_data, partial_standings)
@@ -306,39 +303,13 @@ F1     - Show this help"""
 
         # Tab 1: Today's Games
         self.games_widget = GamesWidget(self.notebook, self.season_team_to_follow)
-        self.notebook.add(self.games_widget.get_frame(), text="Game Results")
+        self.notebook.add(self.games_widget.get_frame(), text="Scores")
 
         # Tab 2: Schedule
         self.schedule_widget = ScheduleWidget(self.notebook, self.season_team_to_follow)
         self.notebook.add(self.schedule_widget.get_frame(), text="Schedule")
 
-        # Tab 3: League Tab with nested sub-tabs
-        league_tab_frame = tk.Frame(self.notebook, bg=BG_DARK)
-        self.notebook.add(league_tab_frame, text="League")
-
-        # Create inner notebook for league sub-tabs
-        league_notebook = ttk.Notebook(league_tab_frame)
-        league_notebook.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
-
-        # League Sub-tab 1: Leaders
-        self.league_leaders_widget = LeagueLeadersWidget(league_notebook)
-        league_notebook.add(self.league_leaders_widget.get_frame(), text="Leaders")
-
-        # League Sub-tab 2: Stats
-        self.league_stats_widget = LeagueStatsWidget(league_notebook, self.comparison_mode)
-        league_notebook.add(self.league_stats_widget.get_frame(), text="Stats")
-
-        # League Sub-tab 3: IL (Injured List)
-        self.injuries_widget = InjuriesWidget(league_notebook)
-        league_notebook.add(self.injuries_widget.get_frame(), text="IL")
-
-        # League Sub-tab 4: Admin (Player Management)
-        self.admin_widget = AdminWidget(
-            league_notebook, self.controller.get_worker, on_change_callback=self._on_admin_change
-        )
-        league_notebook.add(self.admin_widget.get_frame(), text="Admin")
-
-        # Tab 4: Team Tab with nested sub-tabs
+        # Tab 3: Team Tab with nested sub-tabs
         team_tab_frame = tk.Frame(self.notebook, bg=BG_DARK)
         self.notebook.add(team_tab_frame, text=self.season_team_to_follow)
 
@@ -359,9 +330,26 @@ F1     - Show this help"""
         self.gm_assessment_widget = GMAssessmentWidget(self.team_notebook, self.run_gm_assessments)
         self.team_notebook.add(self.gm_assessment_widget.get_frame(), text="GM Assessment")
 
-        # Tab 5: Playoffs (after Team tab)
+        # Tab 4: Leaders
+        self.league_leaders_widget = LeagueLeadersWidget(self.notebook)
+        self.notebook.add(self.league_leaders_widget.get_frame(), text="MLB Leaders")
+
+        # Tab 5: Stats
+        self.league_stats_widget = LeagueStatsWidget(self.notebook, self.comparison_mode)
+        self.notebook.add(self.league_stats_widget.get_frame(), text="MLB Stats")
+
+        # Tab 6: IL (Injured List)
+        self.injuries_widget = InjuriesWidget(self.notebook)
+        self.notebook.add(self.injuries_widget.get_frame(), text="IL")
+
+        # Tab 7: Admin (Player Management)
+        self.admin_widget = AdminWidget(
+            self.notebook, self.controller.get_worker, on_change_callback=self._on_admin_change
+        )
+        self.notebook.add(self.admin_widget.get_frame(), text="Admin")
+
+        # Tab 5: Playoffs (added later when regular season ends)
         self.playoff_widget = PlayoffWidget(self.notebook)
-        self.notebook.add(self.playoff_widget.get_frame(), text="Playoffs")
 
         paned_window.add(notebook_frame, minsize=600)
 
@@ -951,6 +939,7 @@ F1     - Show this help"""
             # ETA: time-per-schedule-day × days remaining
             if self.simulation_start_time is not None:
                 import time
+
                 if self._sim_start_day is None:
                     self._sim_start_day = day_num
                 days_simulated = max(1, day_num - self._sim_start_day + 1)
@@ -1075,6 +1064,7 @@ F1     - Show this help"""
         # No user prompt - playoffs run automatically now
         # Update phase indicator
         self._update_phase("Playoffs")
+        self.notebook.add(self.playoff_widget.get_frame(), text="Playoffs")
 
     def _on_simulation_complete(self):
         """Handle simulation_complete message."""

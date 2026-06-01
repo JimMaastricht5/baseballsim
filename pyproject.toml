@@ -14,6 +14,7 @@ dependencies = [
     "pydantic==2.13.0b3",
     "ruff>=0.15.10",
     "beautifulsoup4>=4.14.3",
+    "pandas-stubs~=3.0.2",
 ]
 
 [tool.uv.workspace]

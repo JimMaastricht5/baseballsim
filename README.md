@@ -12,8 +12,8 @@ from wherever the real season left off.
 ### Setup
 
 ```bash
-uv python install 3.14.0
-uv sync
+uv python install 3.14+freethreaded
+uv sync --upgrade
 ```
 
 ## Quick Start

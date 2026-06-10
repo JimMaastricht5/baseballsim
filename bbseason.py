@@ -18,6 +18,7 @@ import pandas as pd
 
 import bb_aigm_manager
 import bbgame
+from bbgame import GameResult
 import bbschedule_mgr
 import bbstats
 from bblogger import logger
@@ -407,33 +408,33 @@ class BaseballSeason:
         self.output_handler(OutputCategory.DAY_STANDINGS, standings_text, metadata={"standings": standings_data})
         return
 
-    def _process_and_print_game_results(self, game_results: List[tuple]) -> None:
+    def _process_and_print_game_results(self, game_results: list) -> None:
         """
-        Helper method to process and print game results in either followed or compact format
-        :param game_results: List of tuples (match_up, score, game_recap, away_box_score, home_box_score)
+        Helper method to process and print game results in either followed or compact format.
+        :param game_results: List of GameResult objects.
         :return: None
         """
         followed_games = []
         compact_summaries = []
 
-        for match_up, score, game_recap, away_box_score, home_box_score, structured_game in game_results:
+        for game_result in game_results:
             # Check if this was a followed game
-            is_followed = any(team in self.team_to_follow for team in match_up) if self.team_to_follow else True
+            is_followed = any(team in self.team_to_follow for team in (game_result.away_team, game_result.home_team)) if self.team_to_follow else True
 
             if is_followed:
-                followed_games.append(game_recap)
+                followed_games.append(game_result.game_recap)
             else:
                 # Store compact summary for non-followed games
                 compact_summaries.append(
                     {
-                        "away_team": match_up[0],
-                        "home_team": match_up[1],
-                        "away_r": score[0],
-                        "home_r": score[1],
-                        "away_h": away_box_score.total_hits,
-                        "home_h": home_box_score.total_hits,
-                        "away_e": away_box_score.total_errors,
-                        "home_e": home_box_score.total_errors,
+                        "away_team": game_result.away_team,
+                        "home_team": game_result.home_team,
+                        "away_r": game_result.score[0],
+                        "home_r": game_result.score[1],
+                        "away_h": game_result.away_box_score.total_hits,
+                        "home_h": game_result.home_box_score.total_hits,
+                        "away_e": game_result.away_box_score.total_errors,
+                        "home_e": game_result.home_box_score.total_errors,
                     }
                 )
 
@@ -859,7 +860,7 @@ class BaseballSeason:
                 obp_adjustment=self.obp_adjustment,
             )
             q = queue.Queue()
-            thread = threading.Thread(target=game_sim.sim_game_threaded, args=(q, is_followed))
+            thread = threading.Thread(target=game_sim.sim_game_threaded, args=(q,))
             threads.append(thread)
             queues.append(q)
             match_ups.append(game)
@@ -872,25 +873,17 @@ class BaseballSeason:
 
         for ii, thread in enumerate(threads):  # wait for all results, loop over games played, no off days
             thread.join()
-            result = queues[ii].get()
-            # Handle both structured (7 elements) and non-structured (6 elements) results
-            if len(result) == 7:
-                (score, inning, win_loss_list, away_box_score, home_box_score, game_recap, structured_game) = result
-            else:
-                (score, inning, win_loss_list, away_box_score, home_box_score, game_recap) = result
-                structured_game = None
+            game_result: GameResult = queues[ii].get()
             game_obj = match_ups[ii]
-            self.update_win_loss(away_team_name=game_obj.away, home_team_name=game_obj.home, win_loss=win_loss_list)
-            self.baseball_data.game_results_to_season(box_score_class=away_box_score)
-            self.baseball_data.game_results_to_season(box_score_class=home_box_score)
+            self.update_win_loss(away_team_name=game_obj.away, home_team_name=game_obj.home, win_loss=game_result.win_loss)
+            self.baseball_data.game_results_to_season(box_score_class=game_result.away_box_score)
+            self.baseball_data.game_results_to_season(box_score_class=game_result.home_box_score)
 
             # Mark game as completed and store scores
-            self.schedule_manager.mark_game_completed(game_obj.home, game_obj.away, score[1], score[0])
+            self.schedule_manager.mark_game_completed(game_obj.home, game_obj.away, game_result.score[1], game_result.score[0])
 
-            # Store results for processing (include structured_game for followed games)
-            game_results.append(
-                ((game_obj.away, game_obj.home), score, game_recap, away_box_score, home_box_score, structured_game)
-            )
+            # Store results for processing
+            game_results.append(game_result)
 
         # Process and print all game results
         self._process_and_print_game_results(game_results)
@@ -951,8 +944,6 @@ class BaseballSeason:
         import queue
         import threading
 
-        import bbgame
-
         needed_to_win = (best_of // 2) + 1
         home_wins = 0
         away_wins = 0
@@ -991,61 +982,30 @@ class BaseballSeason:
                 obp_adjustment=self.obp_adjustment,
             )
             q = queue.Queue()
-            thread = threading.Thread(target=game_sim.sim_game_threaded, args=(q, True))
+            thread = threading.Thread(target=game_sim.sim_game_threaded, args=(q,))
             thread.start()
             thread.join()
-            result = q.get()
-            score_str = result[0] if len(result) > 0 else "EMPTY"
-            logger.debug(f"run_playoff_series: got result from queue, score={score_str}")
+            game_result: GameResult = q.get()
+            logger.debug(f"run_playoff_series: got result from queue, score={game_result.score}")
 
-            # Handle both structured (7 elements) and non-structured (6 elements) results
-            if len(result) == 7:
-                (score, inning, win_loss_list, away_box_score, home_box_score, game_recap, structured_game) = result
-            else:
-                (score, inning, win_loss_list, away_box_score, home_box_score, game_recap) = result
-                structured_game = None
-
-            sg_final = structured_game.final_score if structured_game is not None else "None"
-            # logger.info(
-            #     f"run_playoff_series RECEIVED: {game.away} vs {game.home} "
-            #     f"score={score} score_id={id(score)} "
-            #     f"structured_final={sg_final} "
-            #     f"away_box_id={id(away_box_score)} home_box_id={id(home_box_score)}"
-            # )
-            # logger.info(f"{away} vs {home} result {score})")
             # Update team win/loss records
-            self.update_win_loss(away_team_name=game.away, home_team_name=game.home, win_loss=win_loss_list)
-            self.baseball_data.game_results_to_season(box_score_class=away_box_score)
-            self.baseball_data.game_results_to_season(box_score_class=home_box_score)
+            self.update_win_loss(away_team_name=game.away, home_team_name=game.home, win_loss=game_result.win_loss)
+            self.baseball_data.game_results_to_season(box_score_class=game_result.away_box_score)
+            self.baseball_data.game_results_to_season(box_score_class=game_result.home_box_score)
 
             # Use structured_game.final_score as authoritative source if available, else score list
-            # The score list (g_score = list(self.total_score)) is sometimes corrupted (e.g., 987, 292)
-            # structured_game is a deep copy and should be safe
-            if structured_game is not None:
-                log_away_score = int(structured_game.final_score[0])
-                log_home_score = int(structured_game.final_score[1])
-                logger.debug(f"run_playoff_series: using structured_game.final_score={structured_game.final_score}")
+            if game_result.structured_game is not None:
+                log_away_score = int(game_result.structured_game.final_score[0])
+                log_home_score = int(game_result.structured_game.final_score[1])
             else:
-                # Validate score to catch corrupted values (e.g., 987, 292 from memory issues)
-                if len(score) >= 2 and isinstance(score[0], (int, float)) and isinstance(score[1], (int, float)):
-                    if 0 <= score[0] <= 50 and 0 <= score[1] <= 50:
-                        log_away_score = int(score[0])
-                        log_home_score = int(score[1])
-                        logger.debug(f"run_playoff_series: using score={score}")
-                    else:
-                        logger.warning(f"run_playoff_series: corrupted score detected: {score}, using 0-0")
-                        log_away_score = 0
-                        log_home_score = 0
-                else:
-                    logger.warning(f"run_playoff_series: invalid score format: {score}, using 0-0")
-                    log_away_score = 0
-                    log_home_score = 0
+                log_away_score = int(game_result.score[0])
+                log_home_score = int(game_result.score[1])
             self.output_handler(
                 OutputCategory.GAME_RESULT_FULL,
-                game_recap,
+                game_result.game_recap,
                 metadata={
-                    "game_recap": game_recap,
-                    "structured_game": structured_game if structured_game is not None else {},
+                    "game_recap": game_result.game_recap,
+                    "structured_game": game_result.structured_game if game_result.structured_game is not None else {},
                     "is_playoff": True,
                     "round_name": round_name,
                     "away_team": game.away,
@@ -1058,10 +1018,10 @@ class BaseballSeason:
             # Log playoff game result
             home_wins = self.team_win_loss[home][WIN] - start_wins[home]
             away_wins = self.team_win_loss[away][WIN] - start_wins[away]
-            sg_id = id(structured_game) if structured_game is not None else "None"
+            sg_id = id(game_result.structured_game) if game_result.structured_game is not None else "None"
             logger.debug(
-                f"[{round_name}] score id={id(score)} structured_game id={sg_id} "
-                f"score={score} log_scores=({log_away_score}, {log_home_score})"
+                f"[{round_name}] structured_game id={sg_id} "
+                f"log_scores=({log_away_score}, {log_home_score})"
             )
             logger.info(
                 f"[{round_name}] {game.away} {log_away_score} @ {game.home} {log_home_score} "

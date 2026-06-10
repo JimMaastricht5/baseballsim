@@ -5,7 +5,7 @@ UI-aware BaseballSeason subclass that emits queue-based signals instead of print
 """
 
 import pandas as pd
-from typing import List, Optional
+from typing import Optional
 
 import bbseason
 from bbseason import WIN, OutputCategory
@@ -162,7 +162,7 @@ class UIBaseballSeason(bbseason.BaseballSeason):
 
         return callback
 
-    def _process_and_print_game_results(self, game_results: List[tuple]) -> None:
+    def _process_and_print_game_results(self, game_results: list) -> None:
         """
         Override to emit signals instead of printing.
 
@@ -171,39 +171,27 @@ class UIBaseballSeason(bbseason.BaseballSeason):
         - day_completed signal with batch of all games and standings
 
         Args:
-            game_results: List of tuples (match_up, score, game_recap, away_box_score, home_box_score, structured_game)
+            game_results: List of GameResult objects.
         """
         compact_summaries = []
         followed_game_data = []
 
-        for result in game_results:
-            # Handle both old format (5 elements) and new format (6 elements with structured_game)
-            if len(result) == 6:
-                (match_up, score, game_recap, away_box_score, home_box_score, structured_game) = result
-            else:
-                match_up, score, game_recap, away_box_score, home_box_score = result
-                structured_game = None
-
-            # Handle both old tuple format (away, home) and new tuple of tuple ((away, home), ...)
-            # match_up is now always a tuple of (away, home)
-            if isinstance(match_up[0], tuple):
-                away_team, home_team = match_up[0]
-            else:
-                away_team, home_team = match_up
+        for game_result in game_results:
+            away_team, home_team = game_result.away_team, game_result.home_team
 
             # Build game data dict for batch emission (all games go to day_completed)
             game_data = {
                 "away_team": away_team,
                 "home_team": home_team,
-                "away_r": score[0],
-                "home_r": score[1],
-                "away_h": away_box_score.total_hits,
-                "home_h": home_box_score.total_hits,
-                "away_e": away_box_score.total_errors,
-                "home_e": home_box_score.total_errors,
-                "game_recap": game_recap,
+                "away_r": game_result.score[0],
+                "home_r": game_result.score[1],
+                "away_h": game_result.away_box_score.total_hits,
+                "home_h": game_result.home_box_score.total_hits,
+                "away_e": game_result.away_box_score.total_errors,
+                "home_e": game_result.home_box_score.total_errors,
+                "game_recap": game_result.game_recap,
                 "day_num": self.season_day_num,
-                "structured_game": structured_game,
+                "structured_game": game_result.structured_game,
             }
             compact_summaries.append(game_data)
 

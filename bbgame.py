@@ -8,6 +8,7 @@ Class:
     Game - Full game simulation with single-threaded and multi-threaded execution.
 """
 
+import dataclasses
 import datetime
 import queue
 import random
@@ -304,6 +305,27 @@ class GameRecap(BaseModel):
         # Add score table...
 
         return "\n".join(lines)
+
+
+@dataclasses.dataclass
+class GameResult:
+    """Structured result of a simulated game, replacing raw tuples."""
+
+    score: list  # [away_score, home_score]
+    innings: list  # [away_inning, home_inning]
+    win_loss: list  # [[away_w, away_l], [home_w, home_l]]
+    away_box_score: object  # TeamBoxScore
+    home_box_score: object  # TeamBoxScore
+    game_recap: str
+    structured_game: object | None  # GameRecap or None
+
+    @property
+    def away_team(self) -> str:
+        return self.away_box_score.team_name
+
+    @property
+    def home_team(self) -> str:
+        return self.home_box_score.team_name
 
 
 class Game:
@@ -1031,31 +1053,20 @@ class Game:
         self.print_inning_score(final=True)  # Pass final=True to print the Final heading and score table
         return
 
-    def sim_game(self) -> Tuple[List[int], List[int], List[List[int]], str]:
-        """Simulate full game. Returns (score, inning, win_loss, recap_string)."""
+    def sim_game(self) -> GameResult:
+        """Simulate full game and return structured GameResult."""
         while self.is_game_end() is False:
             self.sim_half_inning()
         self.end_game()
-        return list(self.total_score), self.inning, self.win_loss, self.game_recap
-
-    def sim_game_structured(self) -> Tuple[List[int], List[int], List[List[int]], str, GameRecap]:
-        """Simulate full game and return both legacy string and structured GameRecap."""
-        logger.debug(f"sim_game_structured called for {self.team_names}")
-        while self.is_game_end() is False:
-            self.sim_half_inning()
-        self.end_game()
-
-        # Build structured game recap
-        logger.debug("Calling _build_structured_game_recap")
         self._build_structured_game_recap()
-
-        # Return a deep copy to ensure no shared state with this Game instance
-        return (
-            list(self.total_score),
-            self.inning,
-            self.win_loss,
-            self.game_recap,
-            self.structured_game.model_copy(deep=True),
+        return GameResult(
+            score=list(self.total_score),
+            innings=self.inning,
+            win_loss=self.win_loss,
+            away_box_score=self.teams[AWAY].box_score,
+            home_box_score=self.teams[HOME].box_score,
+            game_recap=self.game_recap,
+            structured_game=self.structured_game.model_copy(deep=True),
         )
 
     def _build_structured_game_recap(self) -> GameRecap:
@@ -1257,35 +1268,10 @@ class Game:
         # )
         return result
 
-    def sim_game_threaded(self, q: queue.Queue, use_structured: bool = False) -> None:
-        """Run game simulation and put results on queue for multi-threading."""
-        if use_structured:
-            g_score, g_innings, g_win_loss, final_game_recap, structured_game = self.sim_game_structured()
-            q.put(
-                (
-                    g_score,
-                    g_innings,
-                    g_win_loss,
-                    self.teams[AWAY].box_score,
-                    self.teams[HOME].box_score,
-                    final_game_recap,
-                    structured_game,
-                )
-            )
-        else:
-            g_score, g_innings, g_win_loss, final_game_recap = self.sim_game()
-            logger.debug(f"sim_game_threaded: putting score={g_score} on queue")
-            q.put(
-                (
-                    g_score,
-                    g_innings,
-                    g_win_loss,
-                    self.teams[AWAY].box_score,
-                    self.teams[HOME].box_score,
-                    final_game_recap,
-                    None,
-                )
-            )
+    def sim_game_threaded(self, q: queue.Queue) -> None:
+        """Run game simulation and put GameResult on queue for multi-threading."""
+        game_result = self.sim_game()
+        q.put(game_result)
         return
 
 
@@ -1329,16 +1315,17 @@ if __name__ == "__main__":
             # , starting_lineups=[MIL_lineup, None]
         )
 
-        # Use the new structured format
-        score, inning, win_loss, game_recap_str, structured_game = game.sim_game_structured()
+        # Simulate game — always returns structured GameResult
+        game_result = game.sim_game()
 
         # Print legacy format (for comparison)
         print("=" * 80)
         print("LEGACY STRING FORMAT:")
         print("=" * 80)
-        print(game_recap_str)
+        print(game_result.game_recap)
 
-        # Print structured format (new)
+        # Print structured format
+        structured_game = game_result.structured_game
         print("\n" + "=" * 80)
         print("STRUCTURED FORMAT (Pydantic):")
         print("=" * 80)
@@ -1386,10 +1373,10 @@ if __name__ == "__main__":
         #     else structured_game.model_dump_json(indent=2)
         # )
 
-        season_win_loss[0] = list(np.add(np.array(season_win_loss[0]), np.array(win_loss[0])))
-        season_win_loss[1] = list(np.add(np.array(season_win_loss[1]), np.array(win_loss[1])))
-        score_total[0] = score_total[0] + score[0]
-        score_total[1] = score_total[1] + score[1]
+        season_win_loss[0] = list(np.add(np.array(season_win_loss[0]), np.array(game_result.win_loss[0])))
+        season_win_loss[1] = list(np.add(np.array(season_win_loss[1]), np.array(game_result.win_loss[1])))
+        score_total[0] = score_total[0] + game_result.score[0]
+        score_total[1] = score_total[1] + game_result.score[1]
         # if team0_season_df is None:
         # team0_season_df = game.teams[AWAY].box_score.team_box_batting
         # else:

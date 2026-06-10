@@ -2,6 +2,72 @@
 Copyright (c) 2024 Jim Maastricht
 
 Queue-based signaling for thread-safe communication between SeasonWorker and UI.
+
+ARCHITECTURE OVERVIEW
+=====================
+
+The simulation runs on a background thread (SeasonWorker) while the Tkinter UI
+runs on the main thread. All communication uses queue.Queue objects, which are
+thread-safe by design.
+
+    SeasonWorker (background)          SeasonMainWindow (main thread)
+            |                                   |
+            |  emit_day_started(day, text) ---> |
+            |  emit_game_completed(data) -----> |   (one per followed game)
+            |  emit_day_completed(results,  --> |   (batch: all games + standings)
+            |                       standings,  |
+            |                       day_num)    |
+            |  emit_injury_update(list) ------> |
+            |  emit_gm_assessment(data) ------> |
+            |                                   |
+            |  <--- emit_day_processed(day) --- |   (handshake: UI is done)
+            |                                   |
+            |  BLOCKS on day_processed_queue    |
+            |  until UI confirms processing     |
+
+SIGNAL FLOW PER DAY
+====================
+
+1. Worker calls season.sim_next_day()
+2. sim_next_day() calls sim_day_threaded() which:
+   a. Emits day_started(day_num, schedule_text)
+   b. Simulates all games, emitting game_completed(data) for each followed game
+   c. Emits day_completed(game_results, standings, day_num) as a batch
+   d. Emits injury_update(injury_list)
+   e. Emits gm_assessment(data) if assessments are due
+3. Worker blocks on day_processed_queue.get(timeout=30)
+4. Main thread's _poll_queues() (called every 100ms) drains all queued signals
+5. After processing day_completed, main thread emits day_processed(day_num)
+6. Worker receives day_processed, unblocks, proceeds to next day
+
+LIFECYCLE SIGNALS
+=================
+
+- season_complete: Regular season ended, playoffs will start (emitted by worker)
+- simulation_complete: Entire sim finished including playoffs (emitted by worker)
+- world_series_started: World Series begins (emitted by UIBaseballSeason output_handler)
+- world_series_completed: World Series ends (emitted by UIBaseballSeason output_handler)
+- error: Unhandled exception in worker thread (emitted by worker)
+- pause_state: "running", "pausing", or "paused" (emitted by worker)
+
+PAUSE/RESUME
+============
+
+Uses threading.Event for blocking and threading.Lock for atomic flag changes:
+
+- Main thread calls worker.pause() -> sets _paused=True, emits "pausing"
+- Worker checks _handle_pause() each iteration, clears _pause_event, emits "paused"
+- Worker blocks on _pause_event.wait()
+- Main thread calls worker.resume() -> clears _paused, sets _pause_event
+- Worker unblocks, emits "running"
+
+DIRECT ACCESS (CROSS-THREAD)
+=============================
+
+signals.main_window is a direct reference to SeasonMainWindow, set at startup.
+Used ONLY in UIBaseballSeason._create_signal_output_handler() to synchronously
+set world_series_active and world_series_teams from the worker thread. This is
+the only place where the worker writes directly to the main window object.
 """
 
 import queue

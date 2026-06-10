@@ -11,7 +11,7 @@ Classes:
 import datetime
 import queue
 import threading
-from typing import Any, Callable, Dict, List, Optional
+from typing import Any, Callable, Dict, List, Optional, Tuple
 
 import numpy as np
 import pandas as pd
@@ -68,7 +68,7 @@ def null_output_handler(category: str, text: str, metadata: Optional[Dict] = Non
     pass
 
 
-def create_custom_output_handler_example():
+def create_custom_output_handler_example() -> OutputHandlerType:
     """
     Example of how to create a custom output handler.
 
@@ -113,27 +113,27 @@ LOSS = 1
 
 class BaseballSeason:
     def __init__(
-            self,
-            load_seasons: List[int],
-            new_season: int,
-            team_list: Optional[list] = None,
-            season_length: int = 14,
-            series_length: int = 3,
-            rotation_len: int = 5,
-            include_leagues: list = None,
-            season_interactive: bool = False,
-            season_print_lineup_b: bool = False,
-            season_print_box_score_b: bool = False,
-            season_chatty: bool = False,
-            season_team_to_follow: Optional[List[str]] = None,
-            load_batter_file: str = "player-projected-stats-pp-Batting.csv",
-            load_pitcher_file: str = "player-projected-stats-pp-Pitching.csv",
-            schedule: list = None,
-            load_schedule_file: str = None,
-            suppress_console_output: bool = False,
-            obp_adjustment: float = None,
-            output_handler: Optional[OutputHandlerType] = None,
-            play_by_play_callback_factory: Optional[PlayByPlayCallbackFactory] = None,
+        self,
+        load_seasons: List[int],
+        new_season: int,
+        team_list: Optional[List[str]] = None,
+        season_length: int = 14,
+        series_length: int = 3,
+        rotation_len: int = 5,
+        include_leagues: Optional[List[str]] = None,
+        season_interactive: bool = False,
+        season_print_lineup_b: bool = False,
+        season_print_box_score_b: bool = False,
+        season_chatty: bool = False,
+        season_team_to_follow: Optional[List[str]] = None,
+        load_batter_file: str = "player-projected-stats-pp-Batting.csv",
+        load_pitcher_file: str = "player-projected-stats-pp-Pitching.csv",
+        schedule: Optional[list] = None,
+        load_schedule_file: Optional[str] = None,
+        suppress_console_output: bool = False,
+        obp_adjustment: Optional[float] = None,
+        output_handler: Optional[OutputHandlerType] = None,
+        play_by_play_callback_factory: Optional[PlayByPlayCallbackFactory] = None,
     ) -> None:
         """Initialize season with data loading, schedule creation, and GM setup."""
         self.standings_lock = threading.Lock()  # safely modify standings in a threaded environment
@@ -206,7 +206,7 @@ class BaseballSeason:
 
         return
 
-    def get_team_names(self) -> list:
+    def get_team_names(self) -> List[str]:
         return self.teams
 
     def get_date_for_day(self, day_num: int) -> str:
@@ -230,11 +230,11 @@ class BaseballSeason:
         """Return 12-hour time string or empty string."""
         return self.schedule_manager.get_time_for_game(away, home)
 
-    def get_schedule_day(self, day_index: int):
+    def get_schedule_day(self, day_index: int) -> Optional[bbschedule_mgr.ScheduleDay]:
         """Return ScheduleDay object for given index."""
         return self.schedule_manager.get_day(day_index)
 
-    def get_games_for_day(self, day_index: int):
+    def get_games_for_day(self, day_index: int) -> List[bbschedule_mgr.GameMatchup]:
         """Return list of GameMatchup objects for given index."""
         return self.schedule_manager.get_games_for_day(day_index)
 
@@ -242,7 +242,7 @@ class BaseballSeason:
         """Return today's date formatted for display."""
         return datetime.datetime.now().strftime("%B %d, %Y")
 
-    def create_schedule(self, schedule: list = None, csv_path: str = None) -> None:
+    def create_schedule(self, schedule: Optional[list] = None, csv_path: Optional[str] = None) -> None:
         """
         Create or load schedule for the season.
 
@@ -318,7 +318,7 @@ class BaseballSeason:
         if games:
             games_per_line = 5
             for i in range(0, len(games), games_per_line):
-                line_games = games[i: i + games_per_line]
+                line_games = games[i : i + games_per_line]
                 schedule_str += "   ".join(line_games) + "\n"
 
         # Print off day at the end
@@ -352,7 +352,9 @@ class BaseballSeason:
             df["Division"] = "?"
 
         # Sort so division leaders are always row 0 within their group, then compute GB
-        df = df.sort_values(["League", "Division", "W", "L"], ascending=[True, True, False, True]).reset_index(drop=True)
+        df = df.sort_values(["League", "Division", "W", "L"], ascending=[True, True, False, True]).reset_index(
+            drop=True
+        )
         gb = []
         for _, row in df.iterrows():
             peers = df[(df["League"] == row["League"]) & (df["Division"] == row["Division"])]
@@ -371,8 +373,8 @@ class BaseballSeason:
         teams_per_col = (n_teams + 2) // 3  # Round up to distribute evenly
 
         col1 = display_df.iloc[:teams_per_col].reset_index(drop=True)
-        col2 = display_df.iloc[teams_per_col: teams_per_col * 2].reset_index(drop=True)
-        col3 = display_df.iloc[teams_per_col * 2:].reset_index(drop=True)
+        col2 = display_df.iloc[teams_per_col : teams_per_col * 2].reset_index(drop=True)
+        col3 = display_df.iloc[teams_per_col * 2 :].reset_index(drop=True)
 
         # Build standings text
         standings_text = f"{'Team':<5} {'W-L':<8} {'Pct':<6} {'GB':<5}   {'Team':<5} {'W-L':<8} {'Pct':<6} {'GB':<5}   {'Team':<5} {'W-L':<8} {'Pct':<6} {'GB':<5}\n"
@@ -496,7 +498,11 @@ class BaseballSeason:
                 continue
             if team_division is not None:
                 other_row = bd[bd["Team"] == other_team]
-                if not other_row.empty and other_row["Division"].iloc[0] == team_division and other_row["League"].iloc[0] == team_league:
+                if (
+                    not other_row.empty
+                    and other_row["Division"].iloc[0] == team_division
+                    and other_row["League"].iloc[0] == team_league
+                ):
                     peer_teams.add(other_team)
             else:
                 peer_teams.add(other_team)
@@ -545,7 +551,7 @@ class BaseballSeason:
         leagues = set(team_leagues["League"].values)
         return "AL" in leagues and "NL" in leagues
 
-    def get_league_winners(self) -> tuple:
+    def get_league_winners(self) -> Tuple[Optional[str], Optional[str]]:
         """
         Get AL and NL champions from current standings.
 
@@ -582,7 +588,7 @@ class BaseballSeason:
 
         return (al_winner, nl_winner)
 
-    def create_world_series_schedule(self, al_winner: str, nl_winner: str) -> list:
+    def create_world_series_schedule(self, al_winner: str, nl_winner: str) -> List[List[List[str]]]:
         """
         Create 2-3-2 format World Series schedule.
 
@@ -1084,7 +1090,7 @@ class BaseballSeason:
         )
         return winner
 
-    def run_playoffs(self):
+    def run_playoffs(self) -> None:
         """Orchestrate full MLB playoff bracket (WC → DS → LCS → WS)."""
         if self.season_length < 10:
             return  # Safety for short test seasons
@@ -1158,7 +1164,7 @@ class BaseballSeason:
         self.schedule_manager.build_playoff_series(al_champ, nl_champ, 7, "World Series")
         self.run_world_series_new(al_champ, nl_champ)
 
-    def run_world_series_new(self, al_champ: str, nl_champ: str):
+    def run_world_series_new(self, al_champ: str, nl_champ: str) -> None:
         """
         Modified World Series runner that integrates with the playoff flow.
         """
@@ -1214,23 +1220,23 @@ class BaseballSeason:
 
 class MultiBaseballSeason:
     def __init__(
-            self,
-            load_seasons: List[int],
-            new_season: int,
-            team_lists: Optional[list] = None,
-            season_length: int = 6,
-            series_length: int = 3,
-            rotation_len: int = 5,
-            majors_minors: list = None,
-            season_interactive: bool = False,
-            season_print_lineup_b: bool = False,
-            season_print_box_score_b: bool = False,
-            season_chatty: bool = False,
-            season_team_to_follow: Optional[List[str]] = None,
-            load_batter_file: str = "stats-pp-Batting.csv",
-            load_pitcher_file: str = "stats-pp-Pitching.csv",
-            output_handler: Optional[OutputHandlerType] = None,
-            play_by_play_callback_factory: Optional[PlayByPlayCallbackFactory] = None,
+        self,
+        load_seasons: List[int],
+        new_season: int,
+        team_lists: Optional[List[Optional[List[str]]]] = None,
+        season_length: int = 6,
+        series_length: int = 3,
+        rotation_len: int = 5,
+        majors_minors: Optional[List[str]] = None,
+        season_interactive: bool = False,
+        season_print_lineup_b: bool = False,
+        season_print_box_score_b: bool = False,
+        season_chatty: bool = False,
+        season_team_to_follow: Optional[List[str]] = None,
+        load_batter_file: str = "stats-pp-Batting.csv",
+        load_pitcher_file: str = "stats-pp-Pitching.csv",
+        output_handler: Optional[OutputHandlerType] = None,
+        play_by_play_callback_factory: Optional[PlayByPlayCallbackFactory] = None,
     ) -> None:
         """
         :param load_seasons: list of seasons to load for stats, can blend multiple seasons

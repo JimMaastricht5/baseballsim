@@ -72,8 +72,8 @@ uv run bbplayer_projections.py
 
 ### UI Documentation
 
-- **[ui_claude.md](ui/ui_claude.md)** - Complete UI reference guide with widget details
-- **[ui_flowchart.md](ui_flowchart.md)** - Visual flowcharts of UI architecture
+- **[ui_claude.md](docs/ui_claude.md)** - Complete UI reference guide with widget details
+- **[ui_flowchart.md](docs/ui_flowchart.md)** - Visual flowcharts of UI architecture
 - **[AGENTS.md](AGENTS.md)** - Compact instruction file for AI coding assistants
 
 ## Project Structure

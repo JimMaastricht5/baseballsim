@@ -11,7 +11,7 @@ Class:
 import datetime
 import queue
 import random
-from typing import ClassVar, Dict, List, Optional, Tuple
+from typing import Callable, ClassVar, Dict, List, Optional, Tuple, Union
 
 import numpy as np
 import pandas as pd
@@ -311,27 +311,29 @@ class Game:
         self,
         away_team_name: str = "",
         home_team_name: str = "",
-        baseball_data=None,
+        baseball_data: Optional[bbstats.BaseballStats] = None,
         game_num: int = 1,
         rotation_len: int = 5,
         print_lineup: bool = False,
         chatty: bool = False,
         print_box_score_b: bool = False,
         team_to_follow: Optional[List[str]] = None,
-        load_seasons: List[int] = 2025,
+        load_seasons: Optional[List[int]] = None,
         new_season: int = 2026,
-        starting_pitchers: None = None,
-        starting_lineups: None = None,
+        starting_pitchers: Optional[List] = None,
+        starting_lineups: Optional[List] = None,
         load_batter_file: str = "player-stats-Batters.csv",
         load_pitcher_file: str = "player-stats-Pitching.csv",
         interactive: bool = False,
         show_bench: bool = False,
         debug: bool = False,
-        play_by_play_callback=None,
-        obp_adjustment=None,
+        play_by_play_callback: Optional[Callable[[str], None]] = None,
+        obp_adjustment: Optional[float] = None,
     ) -> None:
         """Initialize a game between two teams with the given configuration."""
         self.game_recap = ""
+        if load_seasons is None:
+            load_seasons = [2020, 2021, 2022, 2023, 2024, 2025]
         if baseball_data is None:
             self.baseball_data = bbstats.BaseballStats(
                 load_seasons=load_seasons,
@@ -559,7 +561,7 @@ class Game:
         # Compact format handled separately in get_compact_summary()
         return
 
-    def get_compact_summary(self) -> dict:
+    def get_compact_summary(self) -> Dict[str, Union[str, int]]:
         """Return compact game summary dict (RHE) for non-followed games."""
         return {
             "away_team": self.team_names[AWAY],
@@ -573,7 +575,7 @@ class Game:
         }
 
     @staticmethod
-    def format_compact_games(game_summaries: list) -> str:
+    def format_compact_games(game_summaries: List[Dict[str, Union[str, int]]]) -> str:
         """Format multiple game summaries side-by-side (5 per line)."""
         if not game_summaries:
             return ""
@@ -1255,7 +1257,7 @@ class Game:
         # )
         return result
 
-    def sim_game_threaded(self, q: queue, use_structured: bool = False) -> None:
+    def sim_game_threaded(self, q: queue.Queue, use_structured: bool = False) -> None:
         """Run game simulation and put results on queue for multi-threading."""
         if use_structured:
             g_score, g_innings, g_win_loss, final_game_recap, structured_game = self.sim_game_structured()

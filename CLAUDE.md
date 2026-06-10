@@ -39,7 +39,7 @@ This is a baseball simulation built with Python, using NumPy and Pandas for stat
     - **New Season Placeholder** (`{new_season} New-Season-stats-pp-*.csv`) - Empty template for accumulating sim data during season
   - Handles age-adjusted performance projection for new seasons
   - Supports random data generation for testing
-  - See PROJECTION_FLOW.md for detailed projection logic
+  - See docs/PROJECTION_FLOW.md for detailed projection logic
 
 - **bbgame.py** - Game simulation
   - `Game` class manages full game flow

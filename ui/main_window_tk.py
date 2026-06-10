@@ -712,13 +712,31 @@ F1     - Show this help"""
     # =================================================================
     # QUEUE POLLING AND EVENT HANDLING
     # =================================================================
+    # The main thread polls all signal queues every 100ms via root.after().
+    # Each queue is checked with get_nowait() (non-blocking). Only one message
+    # is processed per queue per poll cycle, providing natural throttling.
+    #
+    # Signal flow:
+    #   Worker thread -> SeasonSignals.emit_*() -> queue.put() -> this polling loop
+    #
+    # The critical synchronization point is day_completed:
+    #   1. Worker emits day_completed with all game results + standings
+    #   2. This method processes it, updates all widgets
+    #   3. Then emits day_processed(day_num) back to the worker
+    #   4. Worker unblocks and proceeds to the next day
+    #
+    # World Series handling:
+    #   When world_series_started arrives, this method drains the play_by_play_queue
+    #   of stale regular-season events and sets world_series_active=True. While active,
+    #   day_started and day_completed return early to avoid overwriting playoff displays.
 
     def _poll_queues(self):
         """
         Poll all signal queues for messages from the worker thread.
 
-        This method is called periodically via root.after() to check for
-        messages from the worker thread and update the UI accordingly.
+        Called every 100ms via root.after(). Each queue is checked non-blocking
+        with get_nowait(). One message is processed per queue per cycle. This
+        method is the bridge between the worker thread and the Tkinter main loop.
         """
         worker = self.controller.get_worker()
         if worker:
@@ -1001,7 +1019,16 @@ F1     - Show this help"""
             )
 
     def _on_day_completed(self, game_results: list, standings_data: dict, day_number: int):
-        """Handle day_completed message."""
+        """Handle day_completed message.
+
+        This is the critical synchronization point in the signal flow:
+        1. Process all game results and update widgets
+        2. Emit day_processed(day_number) back to the worker thread
+        3. Worker receives this and unblocks to process the next day
+
+        If this handler fails or is slow, the worker thread will wait
+        (up to 30 seconds) before proceeding anyway.
+        """
         logger.debug(f"Day completed with {len(game_results)} non-followed games")
 
         # Track the current day being processed (for synchronization)

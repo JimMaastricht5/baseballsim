@@ -55,4 +55,4 @@ uv run ruff format .
 
 ## Further Reading
 
-`CLAUDE.md` (architecture), `PROJECTION_FLOW.md` (projections), `ui/ui_claude.md` (UI reference)
+`CLAUDE.md` (architecture), `docs/PROJECTION_FLOW.md` (projections), `docs/ui_claude.md` (UI reference)

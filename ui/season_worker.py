@@ -2,6 +2,55 @@
 Copyright (c) 2024 Jim Maastricht
 
 Worker thread for running baseball season simulation in background.
+
+THREADING MODEL
+===============
+
+SeasonWorker extends threading.Thread. It runs the simulation loop in run()
+while the Tkinter main loop runs on the main thread. Communication uses
+SeasonSignals (queue.Queue objects) which are thread-safe.
+
+    Main Thread (Tkinter)              Worker Thread (SeasonWorker)
+            |                                   |
+            | worker.start() --------------->  | run() starts
+            |                                   |
+            |  pause()/resume()/stop() ----->  | _handle_pause() checks flags
+            |  step_one_day()/step_n_days() -> | advances N days then pauses
+            |                                   |
+            |  _poll_queues() every 100ms -->  | signals emitted via queues
+            |  processes signals, updates UI   |
+            |                                   |
+            |  <--- day_processed(day) ------  | handshake: UI is done
+            |                                   |
+            |                                   | BLOCKS on day_processed_queue
+            |                                   | until UI confirms (30s timeout)
+
+SIGNAL EMISSION
+===============
+
+The worker creates a SeasonSignals instance and passes it to UIBaseballSeason.
+UIBaseballSeason emits signals by calling signals.emit_*() methods which put
+tuples into the queues. The worker itself emits:
+- season_complete (line 168): when regular season ends
+- simulation_complete (line 178): when entire sim finishes
+- error (line 186): on unhandled exception
+- pause_state (lines 105, 197, 199, 211): on pause/resume transitions
+
+Day-level signals (day_started, game_completed, day_completed, injury_update,
+gm_assessment, play_by_play) are emitted by UIBaseballSeason methods called
+from sim_next_day() -> sim_day_threaded().
+
+SYNCHRONIZATION
+===============
+
+After each day, the worker blocks on day_processed_queue.get(timeout=30.0).
+The main thread's _poll_queues() processes all signals, then emits
+day_processed(day_num) back. If the UI doesn't respond within 30 seconds,
+the worker logs a warning and proceeds anyway (prevents permanent hangs).
+
+Pause/resume uses threading.Event (_pause_event) and threading.Lock
+(_pause_lock). The lock protects atomic flag changes; the event blocks
+the worker thread when paused.
 """
 
 import queue
@@ -47,7 +96,8 @@ class SeasonWorker(threading.Thread):
         self.start_paused = start_paused
         self.obp_adjustment = obp_adjustment
 
-        # Create signal emitter
+        # Create signal emitter — all emit_*() calls put tuples into queues
+        # that the main thread's _poll_queues() drains every 100ms
         self.signals = SeasonSignals()
 
         # Season instance (created in run())
@@ -60,9 +110,11 @@ class SeasonWorker(threading.Thread):
         self._stopped = False
 
         # Synchronization primitives for pause/resume
+        # _pause_lock: protects _paused flag for atomic read/write from main thread
+        # _pause_event: worker blocks on .wait(); main thread unblocks via .set()
         self._pause_lock = threading.Lock()
         self._pause_event = threading.Event()
-        self._pause_event.set()  # Initially not paused
+        self._pause_event.set()  # Initially not paused (event is set = running)
 
         # Playoff decision synchronization
         self._playoff_decision_event = threading.Event()
@@ -134,7 +186,10 @@ class SeasonWorker(threading.Thread):
                 self.season.sim_next_day()
                 logger.debug(f"Completed day {self.season.season_day_num}")
 
-                # Wait for UI to process all signals for this day before proceeding
+                # Wait for UI to process all signals for this day before proceeding.
+                # This is the critical back-pressure mechanism: the worker blocks here
+                # until the main thread emits day_processed(day_num) via the queue.
+                # 30-second timeout prevents permanent hangs if UI is unresponsive.
                 logger.debug(f"Waiting for UI to process day {current_day}")
                 while True:
                     try:

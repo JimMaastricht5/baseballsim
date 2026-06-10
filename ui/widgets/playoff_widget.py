@@ -9,7 +9,7 @@ from tkinter import ttk
 from typing import Dict, Any
 
 from ui.theme import BG_PANEL, BG_WIDGET, BG_WIDGET_ALT, TEXT_PRIMARY, TEXT_SECONDARY, ACCENT_BLUE, ACCENT_GOLD
-from ui.widgets.games_played_widget import ScrollableFrame
+from ui.widgets.games_played_widget import ScrollableFrame, CollapsibleSection
 
 
 def _get_attr(obj, key, default=None):

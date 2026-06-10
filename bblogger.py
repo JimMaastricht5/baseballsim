@@ -8,6 +8,14 @@ from loguru import logger
 import sys
 import os
 
+# Reconfigure standard streams to UTF-8 on Windows to prevent UnicodeEncodeError
+if sys.platform.startswith("win"):
+    try:
+        sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+        sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+    except (AttributeError, ValueError):
+        pass
+
 # IDs for handlers to enable removal/reconfiguration
 console_handler_id = None
 file_handler_id = None

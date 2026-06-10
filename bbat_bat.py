@@ -738,7 +738,7 @@ if __name__ == "__main__":
 
     # 1. Initialize BaseballStats
     stats = bbstats.BaseballStats(
-        load_seasons=[2023, 2024, 2025, 2026],
+        load_seasons=[2020, 2021, 2022, 2023, 2024, 2025, 2026],
         new_season=2026,
         load_batter_file="player-projected-stats-pp-Batting.csv",
         load_pitcher_file="player-projected-stats-pp-Pitching.csv",

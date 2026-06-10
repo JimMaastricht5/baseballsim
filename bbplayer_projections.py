@@ -81,7 +81,7 @@ class BaseballStatsPreProcess:
             (year prefix added automatically, e.g. ``'player-stats-Batters.csv'``).
         :param load_pitcher_file: Base filename for raw pitcher CSV files.
         """
-        # self.create_hash = lambda text: int(hashlib.sha256(text.encode('utf-8')).hexdigest()[:5], 16)
+        # self.create_hash = lambda text: int(hashlib.md5(text.encode('utf-8')).hexdigest()[:5], 16)
         self.jigger_data = lambda x: x + int(np.abs(np.random.normal(loc=x * 0.10, scale=2, size=1)))
 
         self.numeric_bcols = [
@@ -680,7 +680,7 @@ class BaseballStatsPreProcess:
         Load, clean, and project pitcher data for the specified seasons.
 
         Reads one CSV file per season, concatenates them, drops irrelevant
-        columns (FIP, HR9, etc.), creates a SHA-256 Hashcode from the player
+        columns (FIP, HR9, etc.), creates an MD5 Hashcode from the player
         name, merges salary data, and filters out multi-team summary rows.
 
         Produces two outputs:
@@ -923,7 +923,7 @@ class BaseballStatsPreProcess:
         Load, clean, and project batter data for the specified seasons.
 
         Reads one CSV file per season, concatenates them, drops irrelevant
-        columns (OPS+, rOBA, TB, etc.), creates a SHA-256 Hashcode from the
+        columns (OPS+, rOBA, TB, etc.), creates an MD5 Hashcode from the
         player name, merges salary data, translates numeric position codes, and
         filters out multi-team summary rows.
 
@@ -1229,14 +1229,14 @@ class BaseballStatsPreProcess:
         for old_team, new_team in self.team_remapping.items():
             if old_team in self.pitching_data["Team"].values:
                 self.pitching_data["Team"] = self.pitching_data["Team"].replace(old_team, new_team)
-                remapped_teams.append(f"Pitching: {old_team} → {new_team}")
+                remapped_teams.append(f"Pitching: {old_team} -> {new_team}")
 
         # Apply remapping to batting data (aggregated)
         for old_team, new_team in self.team_remapping.items():
             if old_team in self.batting_data["Team"].values:
                 self.batting_data["Team"] = self.batting_data["Team"].replace(old_team, new_team)
-                if f"Pitching: {old_team} → {new_team}" not in remapped_teams:
-                    remapped_teams.append(f"Batting: {old_team} → {new_team}")
+                if f"Pitching: {old_team} -> {new_team}" not in remapped_teams:
+                    remapped_teams.append(f"Batting: {old_team} -> {new_team}")
 
         # Apply remapping to historical data as well
         if self.pitching_data_historical is not None:
@@ -1468,7 +1468,7 @@ class BaseballStatsPreProcess:
 
         Builds a pool of random full names by mixing first and last names drawn
         from the combined pitcher and batter roster. Assigns unique names to each
-        player in the aggregated DataFrames, recalculates their SHA-256 Hashcodes,
+        player in the aggregated DataFrames, recalculates their MD5 Hashcodes,
         then propagates the new names and Hashcodes into the historical DataFrames
         by mapping from the old Hashcode (extracted from ``Player_Season_Key``).
         """
@@ -1905,7 +1905,7 @@ def _safe_rate(num, denom, default=0.0):
     return num / denom if denom and denom > 0 else default
 
 
-def projection_integrity_check(load_seasons: list = None):
+def projection_integrity_check(load_seasons: list = None, new_season: int = None):
     """Compare projected rates vs historical baselines in a single compact table."""
     if load_seasons is None:
         load_seasons = [2023, 2024, 2025]
@@ -1917,10 +1917,12 @@ def projection_integrity_check(load_seasons: list = None):
     p_hist = pd.read_csv(f"{ss} historical-Pitching.csv")
 
     prior = load_seasons[-1]
-    b25 = b_hist[b_hist["Season"] == prior]
-    b2325 = b_hist[b_hist["Season"].isin(load_seasons)]
-    p25 = p_hist[p_hist["Season"] == prior]
-    p2325 = p_hist[p_hist["Season"].isin(load_seasons)]
+    if new_season is None:
+        new_season = prior + 1
+    b_prior = b_hist[b_hist["Season"] == prior]
+    b_all = b_hist[b_hist["Season"].isin(load_seasons)]
+    p_prior = p_hist[p_hist["Season"] == prior]
+    p_all = p_hist[p_hist["Season"].isin(load_seasons)]
 
     def r(df, nc, dc):
         return _safe_rate(df[nc].sum(), df[dc].sum())
@@ -1943,42 +1945,48 @@ def projection_integrity_check(load_seasons: list = None):
 
     rows = [
         ("Batters:", None, None, None, None, None),
-        ("  AVG", r(b2325, "H", "AB"), r(b25, "H", "AB"), r(b_proj, "H", "AB"), None, None),
-        ("  OBP", _obp_b(b2325), _obp_b(b25), _obp_b(b_proj), None, None),
-        ("  BB/PA", r(b2325, "BB", "PA"), r(b25, "BB", "PA"), r(b_proj, "BB", "PA"), None, None),
-        ("  SO/PA", r(b2325, "SO", "PA"), r(b25, "SO", "PA"), r(b_proj, "SO", "PA"), None, None),
-        ("  SLG", _slg(b2325), _slg(b25), _slg(b_proj), None, None),
+        ("  AVG", r(b_all, "H", "AB"), r(b_prior, "H", "AB"), r(b_proj, "H", "AB"), None, None),
+        ("  OBP", _obp_b(b_all), _obp_b(b_prior), _obp_b(b_proj), None, None),
+        ("  BB/PA", r(b_all, "BB", "PA"), r(b_prior, "BB", "PA"), r(b_proj, "BB", "PA"), None, None),
+        ("  SO/PA", r(b_all, "SO", "PA"), r(b_prior, "SO", "PA"), r(b_proj, "SO", "PA"), None, None),
+        ("  SLG", _slg(b_all), _slg(b_prior), _slg(b_proj), None, None),
         ("Pitchers:", None, None, None, None, None),
-        ("  H/PA", r(p2325, "H", "PA"), r(p25, "H", "PA"), r(p_proj, "H", "PA"), None, None),
-        ("  BB/PA", r(p2325, "BB", "PA"), r(p25, "BB", "PA"), r(p_proj, "BB", "PA"), None, None),
-        ("  SO/PA", r(p2325, "SO", "PA"), r(p25, "SO", "PA"), r(p_proj, "SO", "PA"), None, None),
-        ("  OBP Against", _obp_b(p2325), _obp_b(p25), _obp_b(p_proj), None, None),
-        ("  BABIP", _babip(p2325), _babip(p25), _babip(p_proj), None, None),
+        ("  H/PA", r(p_all, "H", "PA"), r(p_prior, "H", "PA"), r(p_proj, "H", "PA"), None, None),
+        ("  BB/PA", r(p_all, "BB", "PA"), r(p_prior, "BB", "PA"), r(p_proj, "BB", "PA"), None, None),
+        ("  SO/PA", r(p_all, "SO", "PA"), r(p_prior, "SO", "PA"), r(p_proj, "SO", "PA"), None, None),
+        ("  OBP Against", _obp_b(p_all), _obp_b(p_prior), _obp_b(p_proj), None, None),
+        ("  BABIP", _babip(p_all), _babip(p_prior), _babip(p_proj), None, None),
     ]
 
     rows = [
         (
-            lb,
+            label,
             a,
             b,
             c,
             _safe_rate(c - a, 1) if c is not None and a is not None else None,
             _safe_rate(c - b, 1) if c is not None and b is not None else None,
         )
-        for lb, a, b, c, _, _ in rows
+        for label, a, b, c, _, _ in rows
     ]
+
+    first_season = load_seasons[0]
+    blend_hdr = f"{first_season}-{prior} Blend"
+    prior_hdr = f"{prior} Prior"
+    proj_hdr = f"{new_season} Proj"
+    vs_prior_hdr = f"vs {prior}"
 
     print("\n" + "=" * 95)
     print(f"{'INTEGRITY CHECK: PROJECTION vs HISTORICAL BASELINES':^95}")
     print("=" * 95)
-    print(f"{'':<20} {'2023-2025 Blend':>16} {'2025 Only':>14} {'2026 Proj':>14} {'vs Blend':>12} {'vs 2025':>12}")
+    print(f"{'':<20} {blend_hdr:>16} {prior_hdr:>14} {proj_hdr:>14} {'vs Blend':>12} {vs_prior_hdr:>12}")
     print("-" * 95)
-    for label, a, b, c, dvb, dv5 in rows:
+    for label, a, b, c, d_blend, d_prior in rows:
         if label.endswith(":"):
             print(f"\n{label}")
         else:
             print(
-                f"  {label:<18} {a:.4f}               {b:.4f}             {c:.4f}         {dvb:+.4f}          {dv5:+.4f}"
+                f"  {label:<18} {a:.4f}               {b:.4f}             {c:.4f}         {d_blend:+.4f}          {d_prior:+.4f}"
             )
     print("-" * 95)
 
@@ -1999,7 +2007,7 @@ if __name__ == "__main__":
     )
 
     print("\n[2/2] Running integrity checks...")
-    projection_integrity_check(load_seasons=[2020, 2021, 2022, 2023, 2024, 2025, 2026])
+    projection_integrity_check(load_seasons=[2020, 2021, 2022, 2023, 2024, 2025, 2026], new_season=2026)
 
     print("\n")
     print("=" * 90)

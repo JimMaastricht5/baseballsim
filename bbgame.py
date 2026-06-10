@@ -691,11 +691,11 @@ class Game:
             new_row = team.gameplay_pos_players_df.loc[new_hash]
             if team.box_score is not None:
                 team.box_score.add_batter_to_box_after(new_row, old_hash)
-            # logger.info(f"Defensive sub: {new_name} → {old_name} at {pos} (Def_WAR {old_d:.1f}→{new_d:.1f})")
+            # logger.info(f"Defensive sub: {new_name} -> {old_name} at {pos} (Def_WAR {old_d:.1f}->{new_d:.1f})")
             if self.chatty:
                 text = (
                     f"Defensive substitution: {new_name} replaces {old_name} at {pos} "
-                    f"(Def_WAR: {old_d:.1f} → {new_d:.1f})\n"
+                    f"(Def_WAR: {old_d:.1f} -> {new_d:.1f})\n"
                 )
                 self.game_recap += text
                 if self.play_by_play_callback:

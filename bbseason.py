@@ -11,8 +11,7 @@ Classes:
 import datetime
 import queue
 import threading
-from typing import Callable, Optional, Dict, Any
-from typing import List
+from typing import Any, Callable, Dict, List, Optional
 
 import numpy as np
 import pandas as pd
@@ -945,6 +944,7 @@ class BaseballSeason:
         """Simulate a playoff series. Returns winning team abbreviation."""
         import queue
         import threading
+
         import bbgame
 
         needed_to_win = (best_of // 2) + 1
@@ -1000,13 +1000,13 @@ class BaseballSeason:
                 structured_game = None
 
             sg_final = structured_game.final_score if structured_game is not None else "None"
-            logger.info(
-                f"run_playoff_series RECEIVED: {game.away} vs {game.home} "
-                f"score={score} score_id={id(score)} "
-                f"structured_final={sg_final} "
-                f"away_box_id={id(away_box_score)} home_box_id={id(home_box_score)}"
-            )
-            logger.info(f"{away} vs {home} result {score})")
+            # logger.info(
+            #     f"run_playoff_series RECEIVED: {game.away} vs {game.home} "
+            #     f"score={score} score_id={id(score)} "
+            #     f"structured_final={sg_final} "
+            #     f"away_box_id={id(away_box_score)} home_box_id={id(home_box_score)}"
+            # )
+            # logger.info(f"{away} vs {home} result {score})")
             # Update team win/loss records
             self.update_win_loss(away_team_name=game.away, home_team_name=game.home, win_loss=win_loss_list)
             self.baseball_data.game_results_to_season(box_score_class=away_box_score)

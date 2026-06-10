@@ -15,6 +15,8 @@ import pandas as pd
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.chrome.service import Service
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.common.by import By
 from webdriver_manager.chrome import ChromeDriverManager
 
@@ -108,37 +110,27 @@ class StatsDownloader:
 
             # The CSV data should now be displayed on the page - capture it
             logger.info("Attempting to capture CSV data from the page...")
-
             try:
                 # Look for CSV content starting with "Rk,Player," and ending before "MLB Average"
                 logger.info("Looking for CSV data starting with 'Rk,Player,'...")
-
                 # Get the entire page text
                 page_text = driver.find_element(By.TAG_NAME, "body").text
-
                 # Find the start of CSV data
                 start_marker = "Rk,Player,"
                 start_index = page_text.find(start_marker)
-
                 if start_index != -1:
                     logger.info("Found CSV data starting point")
-
                     # Extract from start marker to end
                     csv_section = page_text[start_index:]
-
                     # Split into lines and filter out MLB Average line
                     lines = csv_section.split("\n")
                     csv_lines = []
-
                     for line in lines:
-                        # Stop if we hit the MLB Average line
                         if ",MLB Average" in line or line.strip().endswith("MLB Average"):
                             logger.info("Found MLB Average line, stopping data collection")
                             break
-                        # Only include lines that look like CSV data
                         if line.strip() and ("," in line):
                             csv_lines.append(line.strip())
-
                     if csv_lines:
                         csv_content = "\n".join(csv_lines)
                         logger.info(f"Captured {len(csv_lines)} lines of CSV data")
@@ -148,30 +140,21 @@ class StatsDownloader:
                 else:
                     csv_content = None
                     logger.warning("Could not find CSV data starting with 'Rk,Player,'")
-
                 if csv_content:
-                    # Save the CSV content to file
                     batter_file = f"{season} player-stats-Batters.csv"
-
-                    # Remove existing file if it exists
                     if os.path.exists(batter_file):
                         os.remove(batter_file)
                         logger.info(f"Removed existing file {batter_file}")
-
-                    # Write CSV content to file
                     with open(batter_file, "w", encoding="utf-8") as f:
                         f.write(csv_content)
-
                     logger.info(f"Batting stats saved to {batter_file}")
                     return True
                 else:
                     logger.warning("Could not find CSV content on the page")
-                    # Fallback: ask user to manually save
                     logger.info("⚠️  MANUAL ACTION REQUIRED ⚠️")
                     logger.info("Please manually copy the CSV data and save it yourself, then press Enter...")
                     input("Press Enter when you have manually saved the CSV data...")
                     return True
-
             except Exception as e:
                 logger.error(f"Error capturing CSV content: {e}")
                 logger.info("⚠️  MANUAL ACTION REQUIRED ⚠️")
@@ -241,7 +224,6 @@ class StatsDownloader:
 
             # The CSV data should now be displayed on the page - capture it
             logger.info("Attempting to capture CSV data from the page...")
-
             try:
                 # Look for CSV content starting with "Rk,Player," and ending before "League Average"
                 logger.info("Looking for CSV data starting with 'Rk,Player,'...")
@@ -283,36 +265,27 @@ class StatsDownloader:
                     logger.warning("Could not find CSV data starting with 'Rk,Player,'")
 
                 if csv_content:
-                    # Save the CSV content to files
                     pitcher_file = "mlb-player-stats-P.csv"
-
-                    # Remove existing file if it exists
                     if os.path.exists(pitcher_file):
                         os.remove(pitcher_file)
                         logger.info(f"Removed existing file {pitcher_file}")
 
-                    # Write CSV content to main file
                     with open(pitcher_file, "w", encoding="utf-8") as f:
                         f.write(csv_content)
-
                     logger.info(f"Pitching stats saved to {pitcher_file}")
 
-                    # Also create a year-specific copy
                     year_specific_file = f"{season} player-stats-Pitching.csv"
                     import shutil
-
                     shutil.copy2(pitcher_file, year_specific_file)
                     logger.info(f"Created year-specific copy: {year_specific_file}")
 
                     return True
                 else:
                     logger.warning("Could not find CSV content on the page")
-                    # Fallback: ask user to manually save
                     logger.info("⚠️  MANUAL ACTION REQUIRED ⚠️")
                     logger.info("Please manually copy the CSV data and save it yourself, then press Enter...")
                     input("Press Enter when you have manually saved the CSV data...")
                     return True
-
             except Exception as e:
                 logger.error(f"Error capturing CSV content: {e}")
                 logger.info("⚠️  MANUAL ACTION REQUIRED ⚠️")
@@ -350,7 +323,6 @@ class StatsDownloader:
                     logger.error(f"Pitching file {pitcher_file} does not exist")
                     return False
 
-                # Try to read a few lines to verify files are valid
                 pd.read_csv(batter_file, nrows=5)
                 pd.read_csv(pitcher_file, nrows=5)
 
@@ -370,15 +342,6 @@ class StatsDownloader:
         """
         try:
             logger.info("Starting preprocessing...")
-
-            # Create BaseballStatsPreProcess instance
-            # preprocessor = BaseballStatsPreProcess(
-            #     load_seasons=self.seasons,
-            #     new_season=self.new_season,
-            #     generate_random_data=self.generate_random,
-            #     load_batter_file='player-stats-Batters.csv',
-            #     load_pitcher_file='player-stats-Pitching.csv'
-
             logger.info("Preprocessing completed successfully")
             return True
 
@@ -394,26 +357,17 @@ class StatsDownloader:
             bool: True if entire process completed successfully
         """
         logger.info("Starting automated stats download and processing...")
-
-        # Download stats for each season
         for season in self.seasons:
             logger.info(f"Processing season {season}...")
-
-            # Download batting stats for this season
             if not self.download_batting_stats(season):
                 logger.error(f"Failed to download batting stats for {season}")
                 return False
-
-            # Download pitching stats for this season
             if not self.download_pitching_stats(season):
                 logger.error(f"Failed to download pitching stats for {season}")
                 return False
-
-        # Verify all files exist and are readable
         if not self.verify_files_exist():
             logger.error("File verification failed")
             return False
-
         logger.info("Automated stats download completed successfully!")
         return True
 
@@ -425,15 +379,12 @@ class StatsDownloader:
             for season in self.seasons:
                 batter_file = f"{season} player-stats-Batters.csv"
                 pitcher_file = "mlb-player-stats-P.csv"
-
                 if os.path.exists(batter_file):
                     os.remove(batter_file)
                     logger.info(f"Cleaned up {batter_file}")
-
                 if os.path.exists(pitcher_file):
                     os.remove(pitcher_file)
                     logger.info(f"Cleaned up {pitcher_file}")
-
         except Exception as e:
             logger.warning(f"Error cleaning up files: {e}")
 
@@ -442,26 +393,19 @@ def main():
     """
     Main function to run the stats downloader
     """
-    # You can modify these parameters as needed
     downloader = StatsDownloader(
         season=[2026],
         headless=False,  # Set to True to run browser in background
     )
-
     success = downloader.download_and_process()
-
     if success:
         print("✅ Stats download and processing completed successfully!")
-
-        # Optionally clean up the temporary CSV files
-        # downloader.clean_up_files()
     else:
         print("❌ Stats download and processing failed!")
         print("Chrome window should be left open for debugging.")
         print("Press Enter to exit...")
         input()
         sys.exit(1)
-
 
 if __name__ == "__main__":
     main()

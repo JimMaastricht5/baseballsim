@@ -318,6 +318,7 @@ class SeasonMainWindow(QMainWindow):
                 self.games_text.append(
                     f"{game['away_team']:>3} {game['away_r']:>2}  {game['away_h']:>2}  {game['away_e']:>1}    "
                     f"{game['home_team']:>3} {game['home_r']:>2}  {game['home_h']:>2}  {game['home_e']:>1}"
+                )
 
             self.games_text.append("\n")
 

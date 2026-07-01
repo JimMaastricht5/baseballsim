@@ -790,6 +790,32 @@ class BaseballSeason:
 
         return
 
+    def _create_game_thread(self, game, season_day_num: int, *, chatty: bool = True, pbp_callback=None):
+        """Create a Game object, wrap it in a thread, and return (thread, queue, game_sim)."""
+        game_sim = bbgame.Game(
+            away_team_name=game.away,
+            home_team_name=game.home,
+            baseball_data=self.baseball_data,
+            game_num=season_day_num,
+            rotation_len=self.rotation_len,
+            print_lineup=self.print_lineup_b,
+            chatty=chatty,
+            print_box_score_b=self.print_box_score_b,
+            team_to_follow=self.team_to_follow,
+            interactive=self.interactive,
+            play_by_play_callback=pbp_callback,
+            obp_adjustment=self.obp_adjustment,
+        )
+        q = queue.Queue()
+        thread = threading.Thread(target=game_sim.sim_game_threaded, args=(q,))
+        return thread, q, game_sim
+
+    def _apply_game_result_to_season(self, game_result: GameResult, away: str, home: str) -> None:
+        """Update W/L records and persist box scores to season data."""
+        self.update_win_loss(away_team_name=away, home_team_name=home, win_loss=game_result.win_loss)
+        self.baseball_data.game_results_to_season(box_score_class=game_result.away_box_score)
+        self.baseball_data.game_results_to_season(box_score_class=game_result.home_box_score)
+
     def sim_day_threaded(self, season_day_num: int) -> None:
         """Simulate one day's games across the league using threads."""
         threads = []
@@ -840,27 +866,7 @@ class BaseballSeason:
             if self.play_by_play_callback_factory:
                 pbp_callback = self.play_by_play_callback_factory(game.away, game.home, season_day_num)
 
-            # Check if this is a followed game (for structured output)
-            is_followed = (not self.team_to_follow) or any(
-                team in [game.away, game.home] for team in self.team_to_follow
-            )
-
-            game_sim = bbgame.Game(
-                away_team_name=game.away,
-                home_team_name=game.home,
-                baseball_data=self.baseball_data,
-                game_num=season_day_num,
-                rotation_len=self.rotation_len,
-                print_lineup=self.print_lineup_b,
-                chatty=self.season_chatty,
-                print_box_score_b=self.print_box_score_b,
-                team_to_follow=self.team_to_follow,
-                interactive=self.interactive,
-                play_by_play_callback=pbp_callback,
-                obp_adjustment=self.obp_adjustment,
-            )
-            q = queue.Queue()
-            thread = threading.Thread(target=game_sim.sim_game_threaded, args=(q,))
+            thread, q, _ = self._create_game_thread(game, season_day_num, chatty=self.season_chatty, pbp_callback=pbp_callback)
             threads.append(thread)
             queues.append(q)
             match_ups.append(game)
@@ -875,9 +881,7 @@ class BaseballSeason:
             thread.join()
             game_result: GameResult = queues[ii].get()
             game_obj = match_ups[ii]
-            self.update_win_loss(away_team_name=game_obj.away, home_team_name=game_obj.home, win_loss=game_result.win_loss)
-            self.baseball_data.game_results_to_season(box_score_class=game_result.away_box_score)
-            self.baseball_data.game_results_to_season(box_score_class=game_result.home_box_score)
+            self._apply_game_result_to_season(game_result, game_obj.away, game_obj.home)
 
             # Mark game as completed and store scores
             self.schedule_manager.mark_game_completed(game_obj.home, game_obj.away, game_result.score[1], game_result.score[0])
@@ -941,9 +945,6 @@ class BaseballSeason:
 
     def run_playoff_series(self, away: str, home: str, best_of: int, round_name: str) -> str:
         """Simulate a playoff series. Returns winning team abbreviation."""
-        import queue
-        import threading
-
         needed_to_win = (best_of // 2) + 1
         home_wins = 0
         away_wins = 0
@@ -967,31 +968,15 @@ class BaseballSeason:
 
         # Execute each game in the series
         for game in series_games:
-            # Simulate the playoff game directly (same pattern as sim_day_threaded)
-            game_sim = bbgame.Game(
-                away_team_name=game.away,
-                home_team_name=game.home,
-                baseball_data=self.baseball_data,
-                game_num=self.season_day_num,
-                rotation_len=self.rotation_len,
-                print_lineup=self.print_lineup_b,
-                chatty=False,  # Quiet for playoffs
-                print_box_score_b=self.print_box_score_b,
-                team_to_follow=self.team_to_follow,
-                interactive=self.interactive,
-                obp_adjustment=self.obp_adjustment,
-            )
-            q = queue.Queue()
-            thread = threading.Thread(target=game_sim.sim_game_threaded, args=(q,))
+            # Simulate the playoff game
+            thread, q, _ = self._create_game_thread(game, self.season_day_num, chatty=False)
             thread.start()
             thread.join()
             game_result: GameResult = q.get()
             logger.debug(f"run_playoff_series: got result from queue, score={game_result.score}")
 
             # Update team win/loss records
-            self.update_win_loss(away_team_name=game.away, home_team_name=game.home, win_loss=game_result.win_loss)
-            self.baseball_data.game_results_to_season(box_score_class=game_result.away_box_score)
-            self.baseball_data.game_results_to_season(box_score_class=game_result.home_box_score)
+            self._apply_game_result_to_season(game_result, game.away, game.home)
 
             # Use structured_game.final_score as authoritative source if available, else score list
             if game_result.structured_game is not None:

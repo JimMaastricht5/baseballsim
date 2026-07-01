@@ -1069,14 +1069,18 @@ class Game:
             structured_game=self.structured_game.model_copy(deep=True),
         )
 
-    def _build_structured_game_recap(self) -> GameRecap:
-        """Build structured GameRecap from accumulated game data at game end."""
-        # Create a fresh GameRecap to ensure no state leaks between games
+    def _build_inning_scores(self):
+        """Convert inning data to structured InningScore list and detect extras."""
         inning_scores = [
             InningScore(inning=row.number, away_runs=row.away_runs, home_runs=row.home_runs)
             for row in self.inning_score
         ]
         is_extra = len(inning_scores) > 9
+        return inning_scores, is_extra
+
+    def _build_structured_game_recap(self) -> GameRecap:
+        """Build structured GameRecap from accumulated game data at game end."""
+        inning_scores, is_extra = self._build_inning_scores()
 
         away_lineup = self._build_team_lineup(self.teams[AWAY])
         home_lineup = self._build_team_lineup(self.teams[HOME])
@@ -1088,6 +1092,18 @@ class Game:
         home_box_score = self._build_team_box_score(self.teams[HOME], HOME)
         logger.debug(f"Home box_score built: team={home_box_score.team}")
 
+        winning_pitcher, losing_pitcher, save_pitcher = self._determine_pitcher_decisions(away_box_score, home_box_score)
+
+        self.structured_game = self._assemble_game_recap(
+            inning_scores, is_extra, away_lineup, home_lineup,
+            away_box_score, home_box_score, winning_pitcher, losing_pitcher, save_pitcher,
+        )
+
+        return self.structured_game
+
+    @staticmethod
+    def _determine_pitcher_decisions(away_box_score, home_box_score):
+        """Extract winning, losing, and save pitcher names from box scores."""
         winning_pitcher = None
         losing_pitcher = None
         save_pitcher = None
@@ -1100,8 +1116,14 @@ class Game:
                         losing_pitcher = pitcher.name
                     if pitcher.stats.SV > 0:
                         save_pitcher = pitcher.name
+        return winning_pitcher, losing_pitcher, save_pitcher
 
-        self.structured_game = GameRecap(
+    def _assemble_game_recap(
+        self, inning_scores, is_extra, away_lineup, home_lineup,
+        away_box_score, home_box_score, winning_pitcher, losing_pitcher, save_pitcher,
+    ) -> GameRecap:
+        """Construct and return the GameRecap dataclass."""
+        return GameRecap(
             away_team=self.team_names[AWAY],
             home_team=self.team_names[HOME],
             final_score=(int(self.total_score[AWAY]), int(self.total_score[HOME])),
@@ -1117,8 +1139,6 @@ class Game:
             losing_pitcher=losing_pitcher,
             save_pitcher=save_pitcher,
         )
-
-        return self.structured_game
 
     def _build_team_lineup(self, team: bbteam.Team) -> TeamLineup:
         """Build structured TeamLineup from team's gameplay DataFrames."""

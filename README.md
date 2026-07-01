@@ -21,7 +21,7 @@ uv sync --upgrade
 ### Run with UI (Recommended)
 
 ```bash
-uv run run.py
+python run.py
 ```
 
 This launches the graphical season simulator with defaults:

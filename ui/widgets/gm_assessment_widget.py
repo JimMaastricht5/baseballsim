@@ -132,7 +132,7 @@ class GMAssessmentWidget:
         else:
             for i, player in enumerate(all_players[:5], 1):
                 line = (
-                    f"{i}. {player.player_name:20s} ({player.position:5s}, Age {player.age:2d}): "
+                    f"{i}. {player.player_name:20s} ({player.position:5s}, Age {int(player.age):2d}): "
                     f"Value={player.total_value:5.2f} "
                     f"(Sim_WAR={player.sim_war:4.2f}, Current={player.immediate_value:4.2f}, "
                     f"Future Avg={player.future_value:4.2f}/yr) "

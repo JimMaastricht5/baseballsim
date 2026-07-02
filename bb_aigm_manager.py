@@ -316,7 +316,7 @@ class PlayerValuation:
 
         # Project average annual value over next 3-5 years (not cumulative!)
         # This makes future_value comparable to immediate_value
-        projection_years = min(5, max(1, self.career_end_age - age))
+        projection_years = int(min(5, max(1, self.career_end_age - age)))
         future_value_total = 0.0
         discount_total = 0.0
 
@@ -744,7 +744,7 @@ class AIGeneralManager:
 
         for i, player in enumerate(all_players[:5], 1):
             print(
-                f"{i}. {player.player_name:20s} ({player.position:5s}, Age {player.age:2d}): "
+                f"{i}. {player.player_name:20s} ({player.position:5s}, Age {int(player.age):2d}): "
                 f"Value={player.total_value:5.2f} (Sim_WAR={player.sim_war:4.2f}, Current={player.immediate_value:4.2f}, "
                 f"Future Avg={player.future_value:4.2f}/yr) ${player.salary / 1e6:6.2f}M"
             )
@@ -904,7 +904,7 @@ class AIGeneralManager:
         all_players.sort(key=lambda x: x.immediate_value, reverse=True)
 
         for i, player in enumerate(all_players[:5], 1):
-            print(f"{i}. {player.player_name:20s} ({player.position:5s}, Age {player.age:2d})")
+            print(f"{i}. {player.player_name:20s} ({player.position:5s}, Age {int(player.age):2d})")
             print(
                 f"   Sim_WAR: {player.sim_war:4.1f}, Value: {player.immediate_value:4.1f} - Key contributor to the team's success"
             )
@@ -920,7 +920,7 @@ class AIGeneralManager:
         if disappointments:
             for i, player in enumerate(disappointments[:5], 1):
                 value_per_m = player.immediate_value / (player.salary / 1_000_000)
-                print(f"{i}. {player.player_name:20s} ({player.position:5s}, Age {player.age:2d})")
+                print(f"{i}. {player.player_name:20s} ({player.position:5s}, Age {int(player.age):2d})")
                 print(
                     f"   Sim_WAR: {player.sim_war:4.1f}, Value: {player.immediate_value:4.1f} on ${player.salary / 1e6:.1f}M salary "
                     f"({value_per_m:.2f} Value per $M)"

@@ -161,6 +161,7 @@ class BaseballStatsPreProcess:
             "DET",
             "TBR",
             "HOU",
+            "OAK",
         ]
         self.team_division = {
             "BAL": "East",

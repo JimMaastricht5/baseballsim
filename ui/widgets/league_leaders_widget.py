@@ -204,35 +204,26 @@ class LeagueLeadersWidget:
             self._raw_batting_df = baseball_data.get_simulated_batting_data(team_name=None)
             self._raw_pitching_df = baseball_data.get_simulated_pitching_data(team_name=None)
 
-            # DEBUG: Log data stats
-            # if not self._raw_batting_df.empty:
-            #     pa_max = (
-            #         self._raw_batting_df["PA"].max()
-            #         if "PA" in self._raw_batting_df.columns
-            #         else 0
-            #     )
-            #     pa_sum = (
-            #         self._raw_batting_df["PA"].sum()
-            #         if "PA" in self._raw_batting_df.columns
-            #         else 0
-            #     )
-            #     logger.info(
-            #         f"League leaders batting data: rows={len(self._raw_batting_df)}, max_PA={pa_max}, sum_PA={pa_sum}"
-            #     )
-            #     if pa_max > 0:
-            #         top_pa = self._raw_batting_df.nlargest(3, "PA")[
-            #             ["Player", "Team", "PA", "AB"]
-            #         ]
-            #         logger.info(f"Top PA players: {top_pa.to_string()}")
+            # Build per-team games-played map for dynamic qualification
+            if hasattr(baseball_data, "team_games_played") and baseball_data.team_games_played:
+                self._team_games_played = baseball_data.team_games_played
+            else:
+                # Fallback: compute from pitching W+L totals
+                self._team_games_played = {}
+                if "Team" in self._raw_pitching_df.columns:
+                    for team, grp in self._raw_pitching_df.groupby("Team"):
+                        wins = pd.to_numeric(grp.get("W", 0), errors="coerce").fillna(0).sum()
+                        losses = pd.to_numeric(grp.get("L", 0), errors="coerce").fillna(0).sum()
+                        self._team_games_played[team] = int(wins + losses)
 
             self._min_pa = int(games_played * 3.1) if games_played > 0 else 50
             self._min_ip = float(games_played * 1.0) if games_played > 0 else 20.0
 
             self.batting_qual_label.config(
-                text=f"Qualification: {self._min_pa} PA (3.1 per game × {games_played} games)"
+                text=f"Qualification: 3.1 PA per team game ({games_played} games)"
             )
             self.pitching_qual_label.config(
-                text=f"Qualification: {self._min_ip:.1f} IP (1.0 per game × {games_played} games)"
+                text=f"Qualification: 1.0 IP per team game ({games_played} games)"
             )
 
             self._apply_filter_and_update()
@@ -279,8 +270,15 @@ class LeagueLeadersWidget:
                 + batting_df.get("SH", 0)
             )
 
+        # Compute per-player qualified mask using team-specific games played
+        tgp = getattr(self, "_team_games_played", {})
+        batting_df = batting_df.copy()
+        batting_df["_min_pa"] = batting_df["Team"].map(
+            lambda t: int(tgp.get(t, self._min_pa / 3.1) * 3.1) if tgp.get(t, 0) > 0 else self._min_pa
+        )
+
         if "AVG" in batting_df.columns and "PA" in batting_df.columns:
-            avg_leaders = batting_df[batting_df["PA"] >= min_pa].copy()
+            avg_leaders = batting_df[batting_df["PA"] >= batting_df["_min_pa"]].copy()
             avg_leaders["AVG"] = pd.to_numeric(avg_leaders["AVG"], errors="coerce")
             avg_leaders = avg_leaders.sort_values("AVG", ascending=False).head(10)
             self._populate_leader_tree(
@@ -288,7 +286,7 @@ class LeagueLeadersWidget:
             )
 
         if "OBP" in batting_df.columns and "PA" in batting_df.columns:
-            obp_leaders = batting_df[batting_df["PA"] >= min_pa].copy()
+            obp_leaders = batting_df[batting_df["PA"] >= batting_df["_min_pa"]].copy()
             obp_leaders["OBP"] = pd.to_numeric(obp_leaders["OBP"], errors="coerce")
             obp_leaders = obp_leaders.sort_values("OBP", ascending=False).head(10)
             self._populate_leader_tree(
@@ -296,7 +294,7 @@ class LeagueLeadersWidget:
             )
 
         if "OPS" in batting_df.columns and "PA" in batting_df.columns:
-            ops_leaders = batting_df[batting_df["PA"] >= min_pa].copy()
+            ops_leaders = batting_df[batting_df["PA"] >= batting_df["_min_pa"]].copy()
             ops_leaders["OPS"] = pd.to_numeric(ops_leaders["OPS"], errors="coerce")
             ops_leaders = ops_leaders.sort_values("OPS", ascending=False).head(10)
             self._populate_leader_tree(
@@ -311,6 +309,12 @@ class LeagueLeadersWidget:
 
     def _update_pitching_leaders(self, pitching_df: pd.DataFrame, min_ip: float):
         """Update pitching leader trees."""
+        tgp = getattr(self, "_team_games_played", {})
+        pitching_df = pitching_df.copy()
+        pitching_df["_min_ip"] = pitching_df["Team"].map(
+            lambda t: max(tgp.get(t, self._min_ip) * 1.0, self._min_ip) if tgp.get(t, 0) > 0 else self._min_ip
+        )
+
         if "W" in pitching_df.columns and "IP" in pitching_df.columns:
             wins_leaders = pitching_df[pitching_df["IP"] > 0].copy()
             wins_leaders["W"] = pd.to_numeric(wins_leaders["W"], errors="coerce")
@@ -320,7 +324,7 @@ class LeagueLeadersWidget:
             )
 
         if "ERA" in pitching_df.columns and "IP" in pitching_df.columns:
-            era_leaders = pitching_df[pitching_df["IP"] >= min_ip].copy()
+            era_leaders = pitching_df[pitching_df["IP"] >= pitching_df["_min_ip"]].copy()
             era_leaders["ERA"] = pd.to_numeric(era_leaders["ERA"], errors="coerce")
             era_leaders = era_leaders.sort_values("ERA", ascending=True).head(10)
             self._populate_leader_tree(
@@ -328,7 +332,7 @@ class LeagueLeadersWidget:
             )
 
         if "WHIP" in pitching_df.columns and "IP" in pitching_df.columns:
-            whip_leaders = pitching_df[pitching_df["IP"] >= min_ip].copy()
+            whip_leaders = pitching_df[pitching_df["IP"] >= pitching_df["_min_ip"]].copy()
             whip_leaders["WHIP"] = pd.to_numeric(whip_leaders["WHIP"], errors="coerce")
             whip_leaders = whip_leaders.sort_values("WHIP", ascending=True).head(10)
             self._populate_leader_tree(

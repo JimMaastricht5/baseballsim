@@ -51,7 +51,7 @@ uv run ruff format .
 
 ## Known Issues
 
-- **Playoff score corruption**: Scores occasionally corrupted (e.g., 987, 292) from memory/threading issues. `run_playoff_series()` validates scores and falls back to `structured_game.final_score`. See `bbseason.py:992-1010`.
+- **Playoff score corruption**: Scores occasionally corrupted (e.g., 987, 292) due to pitcher fatigue with no available players. `run_playoff_series()` validates scores and falls back to `structured_game.final_score`. See `bbseason.py:992-1010`.
 
 ## Further Reading
 

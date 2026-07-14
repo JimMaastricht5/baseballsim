@@ -1280,8 +1280,11 @@ F1     - Show this help"""
         """Update league leaders widget with current season data."""
         worker = self.controller.get_worker()
         if worker and worker.season:
-            # Pass current_day as games_played for PA/IP minimum calculations
-            self.league_leaders_widget.update_leaders(worker.season.baseball_data, games_played=self.current_day)
+            # Use followed team's actual games played (W+L) for PA/IP qualification
+            games_played = worker.season.get_game_number()
+            if games_played == 0:
+                games_played = self.current_day
+            self.league_leaders_widget.update_leaders(worker.season.baseball_data, games_played=games_played)
 
     def _populate_injuries_teams(self):
         """Populate injuries team dropdown with all teams."""

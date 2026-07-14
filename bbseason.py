@@ -408,23 +408,15 @@ class BaseballSeason:
         self.output_handler(OutputCategory.DAY_STANDINGS, standings_text, metadata={"standings": standings_data})
         return
 
-    def _process_and_print_game_results(self, game_results: list) -> None:
-        """
-        Helper method to process and print game results in either followed or compact format.
-        :param game_results: List of GameResult objects.
-        :return: None
-        """
+    def _classify_game_results(self, game_results: list):
+        """Partition game results into followed recaps vs compact dicts."""
         followed_games = []
         compact_summaries = []
-
         for game_result in game_results:
-            # Check if this was a followed game
             is_followed = any(team in self.team_to_follow for team in (game_result.away_team, game_result.home_team)) if self.team_to_follow else True
-
             if is_followed:
                 followed_games.append(game_result.game_recap)
             else:
-                # Store compact summary for non-followed games
                 compact_summaries.append(
                     {
                         "away_team": game_result.away_team,
@@ -437,18 +429,27 @@ class BaseballSeason:
                         "home_e": game_result.home_box_score.total_errors,
                     }
                 )
+        return followed_games, compact_summaries
 
-        # Print followed games first (full format)
+    def _emit_game_results_output(self, followed_games: list, compact_summaries: list):
+        """Emit followed games in full format and non-followed in compact format."""
         for game_recap in followed_games:
             self.output_handler(OutputCategory.GAME_RESULT_FULL, game_recap, metadata={"game_recap": game_recap})
-
-        # Print non-followed games in compact format (5 per line)
         if compact_summaries:
             self.output_handler(
                 OutputCategory.GAME_RESULT_COMPACT,
                 bbgame.Game.format_compact_games(compact_summaries),
                 metadata={"compact_games": compact_summaries},
             )
+
+    def _process_and_print_game_results(self, game_results: list) -> None:
+        """
+        Helper method to process and print game results in either followed or compact format.
+        :param game_results: List of GameResult objects.
+        :return: None
+        """
+        followed_games, compact_summaries = self._classify_game_results(game_results)
+        self._emit_game_results_output(followed_games, compact_summaries)
 
     def update_win_loss(self, away_team_name: str, home_team_name: str, win_loss: List[List[int]]) -> None:
         """Update team standings with game result (thread-safe)."""
@@ -816,56 +817,48 @@ class BaseballSeason:
         self.baseball_data.game_results_to_season(box_score_class=game_result.away_box_score)
         self.baseball_data.game_results_to_season(box_score_class=game_result.home_box_score)
 
-    def sim_day_threaded(self, season_day_num: int) -> None:
-        """Simulate one day's games across the league using threads."""
-        threads = []
-        queues = []
-        match_ups = []
-
-        # Check if we're in playoffs FIRST
+    def _resolve_todays_games(self, season_day_num: int):
+        """Route to regular or playoff schedule. Returns (todays_games, schedule_for_meta) or (None, None) if done."""
         regular_season_days = len(self.schedule_manager._schedule_dates)
         if season_day_num >= regular_season_days:
-            # Use playoff schedule
             playoff_index = season_day_num - regular_season_days
             if self.schedule_manager.is_playoff_day(playoff_index):
                 todays_games = self.schedule_manager.get_playoff_games_for_day(playoff_index)
-                schedule_for_meta = todays_games
-            else:
-                # No more playoff games
-                return
-        else:
-            todays_games = self.schedule_manager.get_games_for_day(season_day_num)
-            schedule_for_meta = todays_games
+                return todays_games, todays_games
+            return None, None
+        todays_games = self.schedule_manager.get_games_for_day(season_day_num)
+        return todays_games, todays_games
 
+    def _emit_day_header(self, season_day_num: int, schedule_for_meta):
+        """Emit day schedule, init game day, and emit progress line."""
         self.output_handler(
             OutputCategory.DAY_SCHEDULE,
             self.print_day_schedule(season_day_num) + "\n",
             metadata={"day": season_day_num + 1, "schedule": schedule_for_meta},
         )
-        # Pass team_to_follow list (if not empty) to show hot/cold players
         teams_list = self.team_to_follow if len(self.team_to_follow) > 0 else None
-        self.baseball_data.new_game_day(teams_to_follow=teams_list)  # update rest, injury, and print lists
+        self.baseball_data.new_game_day(teams_to_follow=teams_list)
         date_str = self.get_date_for_day(season_day_num)
         self.output_handler(
             OutputCategory.SIM_PROGRESS,
             f"Simulating {date_str} (#{season_day_num + 1}) for league(s): {self.leagues_str}",
             metadata={"day": season_day_num + 1, "date": date_str, "leagues": self.leagues_str},
         )
-        for game in todays_games:  # run all games for a day, day starts at zero
-            if game.is_off_day:  # not an off day
+
+    def _launch_day_game_threads(self, todays_games, season_day_num: int):
+        """Create and start threads for all non-off, non-completed games. Returns (threads, queues, match_ups)."""
+        threads, queues, match_ups = [], [], []
+        for game in todays_games:
+            if game.is_off_day:
                 continue
-            # Skip already completed games (check from schedule object)
             if game.completed:
                 self.output_handler(
                     OutputCategory.SIM_PROGRESS, f"Skipping {game.away} @ {game.home} (already played)\n", metadata=None
                 )
                 continue
-
-            # Create play-by-play callback if factory is provided
             pbp_callback = None
             if self.play_by_play_callback_factory:
                 pbp_callback = self.play_by_play_callback_factory(game.away, game.home, season_day_num)
-
             thread, q, _ = self._create_game_thread(game, season_day_num, chatty=self.season_chatty, pbp_callback=pbp_callback)
             threads.append(thread)
             queues.append(q)
@@ -873,27 +866,29 @@ class BaseballSeason:
             thread.start()
             self.output_handler(OutputCategory.SIM_PROGRESS, ".", metadata=None)
         self.output_handler(OutputCategory.SIM_PROGRESS, "\n", metadata=None)
+        return threads, queues, match_ups
 
-        # Collect game results
+    def _collect_day_results(self, threads, queues, match_ups):
+        """Join threads, update records, collect results, and emit game outputs."""
         game_results = []
-
-        for ii, thread in enumerate(threads):  # wait for all results, loop over games played, no off days
+        for ii, thread in enumerate(threads):
             thread.join()
             game_result: GameResult = queues[ii].get()
             game_obj = match_ups[ii]
             self._apply_game_result_to_season(game_result, game_obj.away, game_obj.home)
-
-            # Mark game as completed and store scores
             self.schedule_manager.mark_game_completed(game_obj.home, game_obj.away, game_result.score[1], game_result.score[0])
-
-            # Store results for processing
             game_results.append(game_result)
-
-        # Process and print all game results
         self._process_and_print_game_results(game_results)
 
-        # end of all games for one day
-        return
+    def sim_day_threaded(self, season_day_num: int) -> None:
+        """Simulate one day's games across the league using threads."""
+        todays_games, schedule_for_meta = self._resolve_todays_games(season_day_num)
+        if todays_games is None:
+            return
+
+        self._emit_day_header(season_day_num, schedule_for_meta)
+        threads, queues, match_ups = self._launch_day_game_threads(todays_games, season_day_num)
+        self._collect_day_results(threads, queues, match_ups)
 
     def sim_next_day(self) -> None:
         """Simulate the next day and print standings afterward."""
@@ -943,8 +938,8 @@ class BaseballSeason:
 
         return seeds_1_3 + seeds_4_6
 
-    def run_playoff_series(self, away: str, home: str, best_of: int, round_name: str) -> str:
-        """Simulate a playoff series. Returns winning team abbreviation."""
+    def _init_series_tracking(self, best_of: int, home: str, away: str, round_name: str):
+        """Initialize playoff series tracking. Returns (needed_to_win, home_wins, away_wins, start_wins)."""
         needed_to_win = (best_of // 2) + 1
         home_wins = 0
         away_wins = 0
@@ -952,88 +947,103 @@ class BaseballSeason:
         series_recap = f"\n--- {round_name}: {away} at {home} (Best of {best_of}) ---\n"
         self.output_handler(OutputCategory.PLAYOFF_ROUND_START, series_recap)
 
-        # Track wins specifically for this series
         start_wins = {home: self.team_win_loss[home][WIN], away: self.team_win_loss[away][WIN]}
+        return needed_to_win, home_wins, away_wins, start_wins
 
-        # Get pre-built series games from schedule_manager - prefer round_name lookup
+    def _resolve_series_games(self, round_name: str, away: str, home: str):
+        """Look up series schedule with round_name preference, falling back to away/home."""
         series_games = self.schedule_manager.get_series_games_by_round(round_name)
-
-        # Fall back to away/home lookup if no round_name match
         if not series_games:
             series_games = self.schedule_manager.get_series_games(away, home)
-
         if not series_games:
             logger.error(f"No series games found for {away} @ {home} (round: {round_name})")
-            return home  # Default to home team as winner
+        return series_games
 
-        # Execute each game in the series
-        for game in series_games:
-            # Simulate the playoff game
-            thread, q, _ = self._create_game_thread(game, self.season_day_num, chatty=False)
-            thread.start()
-            thread.join()
-            game_result: GameResult = q.get()
-            logger.debug(f"run_playoff_series: got result from queue, score={game_result.score}")
+    @staticmethod
+    def _emit_playoff_game_result(output_handler, game_result, round_name, away, home):
+        """Emit GAME_RESULT_FULL with playoff metadata. Returns (log_away_score, log_home_score)."""
+        if game_result.structured_game is not None:
+            log_away_score = int(game_result.structured_game.final_score[0])
+            log_home_score = int(game_result.structured_game.final_score[1])
+        else:
+            log_away_score = int(game_result.score[0])
+            log_home_score = int(game_result.score[1])
+        output_handler(
+            OutputCategory.GAME_RESULT_FULL,
+            game_result.game_recap,
+            metadata={
+                "game_recap": game_result.game_recap,
+                "structured_game": game_result.structured_game if game_result.structured_game is not None else {},
+                "is_playoff": True,
+                "round_name": round_name,
+                "away_team": away,
+                "home_team": home,
+                "away_r": log_away_score,
+                "home_r": log_home_score,
+            },
+        )
+        return log_away_score, log_home_score
 
-            # Update team win/loss records
-            self._apply_game_result_to_season(game_result, game.away, game.home)
+    def _log_and_print_playoff_game(
+        self, game_result, round_name, away, home, log_away_score, log_home_score, home_wins, away_wins
+    ):
+        """Log playoff game result and emit SIM_PROGRESS line."""
+        sg_id = id(game_result.structured_game) if game_result.structured_game is not None else "None"
+        logger.debug(
+            f"[{round_name}] structured_game id={sg_id} "
+            f"log_scores=({log_away_score}, {log_home_score})"
+        )
+        logger.info(
+            f"[{round_name}] {game_result.away_team if hasattr(game_result, 'away_team') else '?'} "
+            f"{log_away_score} @ {log_home_score} "
+            f"(Series: {away} {away_wins}-{home_wins} {home})"
+        )
+        game_num = home_wins + away_wins
+        self.output_handler(
+            OutputCategory.SIM_PROGRESS,
+            f"[{round_name}] Game {game_num}: {away} {log_away_score} - {home} {log_home_score}  (Series: {away_wins}-{home_wins})\n",
+        )
 
-            # Use structured_game.final_score as authoritative source if available, else score list
-            if game_result.structured_game is not None:
-                log_away_score = int(game_result.structured_game.final_score[0])
-                log_home_score = int(game_result.structured_game.final_score[1])
-            else:
-                log_away_score = int(game_result.score[0])
-                log_home_score = int(game_result.score[1])
-            self.output_handler(
-                OutputCategory.GAME_RESULT_FULL,
-                game_result.game_recap,
-                metadata={
-                    "game_recap": game_result.game_recap,
-                    "structured_game": game_result.structured_game if game_result.structured_game is not None else {},
-                    "is_playoff": True,
-                    "round_name": round_name,
-                    "away_team": game.away,
-                    "home_team": game.home,
-                    "away_r": log_away_score,
-                    "home_r": log_home_score,
-                },
-            )
-
-            # Log playoff game result
-            home_wins = self.team_win_loss[home][WIN] - start_wins[home]
-            away_wins = self.team_win_loss[away][WIN] - start_wins[away]
-            sg_id = id(game_result.structured_game) if game_result.structured_game is not None else "None"
-            logger.debug(
-                f"[{round_name}] structured_game id={sg_id} "
-                f"log_scores=({log_away_score}, {log_home_score})"
-            )
-            logger.info(
-                f"[{round_name}] {game.away} {log_away_score} @ {game.home} {log_home_score} "
-                f"(Series: {away} {away_wins}-{home_wins} {home})"
-            )
-
-            # Print game result to console for debugging
-            game_num = home_wins + away_wins
-            self.output_handler(
-                OutputCategory.SIM_PROGRESS,
-                f"[{round_name}] Game {game_num}: {game.away} {log_away_score} - {game.home} {log_home_score}  (Series: {away_wins}-{home_wins})\n",
-            )
-
-            # Check if series is over
-            if home_wins >= needed_to_win or away_wins >= needed_to_win:
-                break
-
+    def _finalize_series(self, away: str, home: str, home_wins: int, away_wins: int, round_name: str) -> str:
+        """Determine winner, mark in schedule, emit round end. Returns winner."""
         winner = home if home_wins > away_wins else away
-
-        # Mark series as complete in schedule manager
         self.schedule_manager.set_series_winner(away, home, winner)
-
         self.output_handler(
             OutputCategory.PLAYOFF_ROUND_END,
             f"Result: {winner} wins series {max(home_wins, away_wins)}-{min(home_wins, away_wins)}\n",
         )
         return winner
+
+    def run_playoff_series(self, away: str, home: str, best_of: int, round_name: str) -> str:
+        """Simulate a playoff series. Returns winning team abbreviation."""
+        needed_to_win, home_wins, away_wins, start_wins = self._init_series_tracking(best_of, home, away, round_name)
+
+        series_games = self._resolve_series_games(round_name, away, home)
+        if not series_games:
+            return home
+
+        for game in series_games:
+            thread, q, _ = self._create_game_thread(game, self.season_day_num, chatty=False)
+            thread.start()
+            thread.join()
+            game_result: GameResult = q.get()
+
+            self._apply_game_result_to_season(game_result, game.away, game.home)
+
+            log_away_score, log_home_score = self._emit_playoff_game_result(
+                self.output_handler, game_result, round_name, away, home
+            )
+
+            home_wins = self.team_win_loss[home][WIN] - start_wins[home]
+            away_wins = self.team_win_loss[away][WIN] - start_wins[away]
+            self._log_and_print_playoff_game(
+                game_result, round_name, away, home, log_away_score, log_home_score, home_wins, away_wins
+            )
+
+            if home_wins >= needed_to_win or away_wins >= needed_to_win:
+                break
+
+        return self._finalize_series(away, home, home_wins, away_wins, round_name)
 
     def run_playoffs(self) -> None:
         """Orchestrate full MLB playoff bracket (WC → DS → LCS → WS)."""

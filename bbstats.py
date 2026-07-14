@@ -403,14 +403,20 @@ class BaseballStats:
             return None
 
     def populate_standings_from_partial_season(self) -> dict:
-        """Calculate team wins/losses from 2026 partial season pitcher records.
+        """Calculate team wins/losses from the current season's raw pitcher stats.
+
+        Uses the raw CSV (actual stats) rather than projected data so that
+        game-number calculations reflect real W/L records.
+
         Returns dict in format: {team: [wins, losses]}
         """
-        if self.new_season_pitching_data is None or self.new_season_pitching_data.empty:
+        try:
+            raw_pitching = pd.read_csv(f"{self.new_season} player-stats-Pitching.csv")
+            raw_pitching = raw_pitching.dropna(subset=["Team"])
+        except FileNotFoundError:
             return {}
 
-        # Group by team and sum wins and losses
-        team_records = self.new_season_pitching_data.groupby("Team")[["W", "L"]].sum()
+        team_records = raw_pitching.groupby("Team")[["W", "L"]].sum()
         team_win_loss = {}
         for team, row in team_records.iterrows():
             team_win_loss[team] = [int(row["W"]), int(row["L"])]

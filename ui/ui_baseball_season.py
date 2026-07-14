@@ -162,24 +162,12 @@ class UIBaseballSeason(bbseason.BaseballSeason):
 
         return callback
 
-    def _process_and_print_game_results(self, game_results: list) -> None:
-        """
-        Override to emit signals instead of printing.
-
-        Processes game results and emits:
-        - game_completed signal for each followed team game (immediate)
-        - day_completed signal with batch of all games and standings
-
-        Args:
-            game_results: List of GameResult objects.
-        """
+    def _build_game_data_list(self, game_results: list):
+        """Build game data dicts and partition into all summaries vs followed-only."""
         compact_summaries = []
         followed_game_data = []
-
         for game_result in game_results:
             away_team, home_team = game_result.away_team, game_result.home_team
-
-            # Build game data dict for batch emission (all games go to day_completed)
             game_data = {
                 "away_team": away_team,
                 "home_team": home_team,
@@ -194,22 +182,34 @@ class UIBaseballSeason(bbseason.BaseballSeason):
                 "structured_game": game_result.structured_game,
             }
             compact_summaries.append(game_data)
-
-            # Also track followed team games separately for game_completed signal
             if self.team_to_follow and any(team in self.team_to_follow for team in [away_team, home_team]):
                 followed_game_data.append(game_data)
+        return compact_summaries, followed_game_data
 
-        # Emit game_completed for followed team games (immediate update for play-by-play widget)
+    def _emit_ui_game_signals(self, followed_game_data: list, compact_summaries: list):
+        """Emit game_completed for followed games and day_completed with standings."""
         for game_data in followed_game_data:
             self.signals.emit_game_completed(game_data)
-
-        # Emit batch update with standings
         standings_data = self.extract_standings()
         logger.debug(f"Emitting day_completed: Day {self.season_day_num}, {len(compact_summaries)} games")
         for g in compact_summaries:
             logger.debug(f"  day_completed game: {g['away_team']}@{g['home_team']}")
         self.signals.emit_day_completed(compact_summaries, standings_data, self.season_day_num)
         logger.debug(f"Emitted day_completed with {len(compact_summaries)} games and standings")
+
+    def _process_and_print_game_results(self, game_results: list) -> None:
+        """
+        Override to emit signals instead of printing.
+
+        Processes game results and emits:
+        - game_completed signal for each followed team game (immediate)
+        - day_completed signal with batch of all games and standings
+
+        Args:
+            game_results: List of GameResult objects.
+        """
+        compact_summaries, followed_game_data = self._build_game_data_list(game_results)
+        self._emit_ui_game_signals(followed_game_data, compact_summaries)
 
     def check_gm_assessments(self, force: bool = False) -> None:
         """

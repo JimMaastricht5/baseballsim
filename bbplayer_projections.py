@@ -283,11 +283,13 @@ class BaseballStatsPreProcess:
         for season in self.load_seasons:
             # Load batting data
             bdf = pd.read_csv(str(season) + f" {batter_file}")
+            bdf = bdf.dropna(subset=["Team"])
             bdf["Season"] = season
             self.raw_batting_data = pd.concat([self.raw_batting_data, bdf], axis=0)
 
             # Load pitching data
             pdf = pd.read_csv(str(season) + f" {pitcher_file}")
+            pdf = pdf.dropna(subset=["Team"])
             pdf["Season"] = season
             self.raw_pitching_data = pd.concat([self.raw_pitching_data, pdf], axis=0)
 
@@ -356,8 +358,8 @@ class BaseballStatsPreProcess:
         seasons_str = " ".join(str(season) for season in self.load_seasons)
 
         # Save aggregated data (with 'aggr' in filename - for bbstats.py)
-        self.pitching_data.to_csv(f"{seasons_str} {f_pname_aggr}", index=True, header=True)
-        self.batting_data.to_csv(f"{seasons_str} {f_bname_aggr}", index=True, header=True)
+        self.pitching_data.dropna(subset=["Team"]).to_csv(f"{seasons_str} {f_pname_aggr}", index=True, header=True)
+        self.batting_data.dropna(subset=["Team"]).to_csv(f"{seasons_str} {f_bname_aggr}", index=True, header=True)
         print(f"Saved aggregated files: {seasons_str} {f_pname_aggr} and {f_bname_aggr}")
 
         # Save historical year-by-year data (new)
@@ -414,8 +416,8 @@ class BaseballStatsPreProcess:
 
             self.new_season_pitching_data.index.name = "Hashcode"
             self.new_season_batting_data.index.name = "Hashcode"
-            self.new_season_pitching_data.to_csv(new_season_pitching_file, index=True, header=True)
-            self.new_season_batting_data.to_csv(new_season_batting_file, index=True, header=True)
+            self.new_season_pitching_data.dropna(subset=["Team"]).to_csv(new_season_pitching_file, index=True, header=True)
+            self.new_season_batting_data.dropna(subset=["Team"]).to_csv(new_season_batting_file, index=True, header=True)
         return
 
     @staticmethod
@@ -731,6 +733,7 @@ class BaseballStatsPreProcess:
         ]
         for season in load_seasons:
             df = pd.read_csv(str(season) + f" {pitcher_file}")
+            df = df.dropna(subset=["Team"])
             df["Season"] = season  # Add season before concatenating
             pitching_data = pd.concat([pitching_data, df], axis=0)
 
@@ -974,6 +977,7 @@ class BaseballStatsPreProcess:
         ]
         for season in load_seasons:
             df = pd.read_csv(str(season) + f" {batter_file}")
+            df = df.dropna(subset=["Team"])
             df["Season"] = season  # Add season before concatenating
             batting_data = pd.concat([batting_data, df], axis=0)
 
@@ -1821,6 +1825,7 @@ class BaseballStatsPreProcess:
 
         try:
             pdf = pd.read_csv(f"{season} {pitcher_file}")
+            pdf = pdf.dropna(subset=["Team"])
             pdf["Season"] = season
             pdf["Player"] = pdf["Player"].str.replace("*", "").str.replace("#", "")
             pdf["Hashcode"] = pdf["Player"].apply(lambda x: self.create_hash(x, "Pitcher"))
@@ -1831,6 +1836,7 @@ class BaseballStatsPreProcess:
 
         try:
             bdf = pd.read_csv(f"{season} {batter_file}")
+            bdf = bdf.dropna(subset=["Team"])
             bdf["Season"] = season
             bdf["Player"] = bdf["Player"].str.replace("*", "").str.replace("#", "")
             bdf["Hashcode"] = bdf["Player"].apply(lambda x: self.create_hash(x, "Hitter"))

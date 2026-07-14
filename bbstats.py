@@ -1599,8 +1599,8 @@ class BaseballStats:
         pitching_filename = f"{self.new_season} New-Season-stats-pp-Pitching.csv"
 
         # Save to CSV files (with Hashcode as index)
-        self.new_season_batting_data.to_csv(batting_filename, index=True, index_label="Hashcode")
-        self.new_season_pitching_data.to_csv(pitching_filename, index=True, index_label="Hashcode")
+        self.new_season_batting_data.dropna(subset=["Team"]).to_csv(batting_filename, index=True, index_label="Hashcode")
+        self.new_season_pitching_data.dropna(subset=["Team"]).to_csv(pitching_filename, index=True, index_label="Hashcode")
 
         logger.debug(f"Saved new season batting stats to {batting_filename}")
         logger.debug(f"Saved new season pitching stats to {pitching_filename}")

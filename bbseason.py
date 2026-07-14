@@ -345,7 +345,7 @@ class BaseballSeason:
         # Attach division info so GB is calculated within each division
         bd = getattr(self.baseball_data, "batting_data", None)
         if bd is not None and "Division" in bd.columns and "League" in bd.columns:
-            div_map = bd[["Team", "League", "Division"]].drop_duplicates().set_index("Team")
+            div_map = bd[["Team", "League", "Division"]].drop_duplicates(subset=["Team"], keep="first").set_index("Team")
             df["League"] = df["Team"].map(div_map["League"]).fillna("?")
             df["Division"] = df["Team"].map(div_map["Division"]).fillna("?")
         else:

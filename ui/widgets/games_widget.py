@@ -297,6 +297,28 @@ class GamesWidget:
                 self.results_text.insert(insert_pos, text, tag)
             self.results_text.config(state=tk.DISABLED)
 
+    def set_followed_team(self, team: str):
+        """Update the followed team and re-render the current display."""
+        self.followed_team = team
+        self._rerender_all_days()
+
+    def _rerender_all_days(self):
+        """Clear and re-render all stored game days with current followed_team."""
+        if not self.completed_games:
+            return
+        # Collect unique day numbers from stored games
+        day_numbers = sorted(set(key[0] for key in self.completed_games))
+        # Clear the text widget
+        self.results_text.config(state=tk.NORMAL)
+        self.results_text.delete(1.0, tk.END)
+        # Rebuild each day (oldest first, append to end for correct chronological order)
+        for day_num in day_numbers:
+            content_lines = self._build_day_content(day_num)
+            if content_lines:
+                for tag, text in content_lines:
+                    self.results_text.insert(tk.END, text, tag)
+        self.results_text.config(state=tk.DISABLED)
+
     def get_frame(self) -> tk.Frame:
         """Get the main frame."""
         return self.frame

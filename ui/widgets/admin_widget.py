@@ -292,6 +292,60 @@ class AdminWidget:
             logger.error(traceback.format_exc())
             self.admin_status_label.config(text=f"Error loading players: {e}", fg="#ff6b6b")
 
+    def load_players_from_data(self, baseball_data) -> None:
+        """Load players directly from a BaseballStats instance.
+
+        Used to pre-populate the admin tab at startup before the simulation begins.
+        Buttons remain disabled until the simulation is paused.
+        """
+        try:
+            self.admin_all_players = []
+
+            batting_df = baseball_data.new_season_batting_data
+            for idx, row in batting_df.iterrows():
+                pos = row.get("Pos", "Unknown")
+                if isinstance(pos, list):
+                    pos = pos[0] if pos else "Unknown"
+                pos = str(pos).replace("[", "").replace("]", "").replace("'", "").replace('"', "").strip()
+                self.admin_all_players.append(
+                    {
+                        "player": row["Player"],
+                        "pos": pos,
+                        "team": row["Team"],
+                        "age": int(row.get("Age", 0)),
+                        "type": "Batter",
+                        "hashcode": idx,
+                    }
+                )
+
+            pitching_df = baseball_data.new_season_pitching_data
+            for idx, row in pitching_df.iterrows():
+                self.admin_all_players.append(
+                    {
+                        "player": row["Player"],
+                        "pos": "P",
+                        "team": row["Team"],
+                        "age": int(row.get("Age", 0)),
+                        "type": "Pitcher",
+                        "hashcode": idx,
+                    }
+                )
+
+            all_teams = sorted(set(p["team"] for p in self.admin_all_players))
+            self.admin_team_filter_combo["values"] = ["All Teams"] + all_teams
+            self.admin_dest_team_combo["values"] = all_teams
+
+            self._filter_players()
+            self.admin_status_label.config(
+                text=f"Loaded {len(self.admin_all_players)} players. Start simulation to manage.", fg="#56d364"
+            )
+            logger.info(f"Pre-loaded {len(self.admin_all_players)} players for admin (from partial season data)")
+
+        except Exception as e:
+            logger.error(f"Error pre-loading admin players: {e}")
+            import traceback
+            logger.error(traceback.format_exc())
+
     def enable_buttons(self):
         """Enable admin buttons when simulation is fully paused."""
         self.move_btn.config(state=tk.NORMAL)

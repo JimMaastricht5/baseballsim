@@ -6,7 +6,7 @@ Toolbar widget for baseball season simulation UI.
 
 import tkinter as tk
 from tkinter import ttk
-from typing import Dict, Callable
+from typing import Dict, Callable, Optional
 
 from ui.theme import BG_DARK, TEXT_PRIMARY, BG_PANEL, TEXT_SECONDARY
 
@@ -56,7 +56,13 @@ class ToolbarWidget:
     Also includes team selection dropdown.
     """
 
-    def __init__(self, parent: tk.Widget, initial_team: str, callbacks: Dict[str, Callable]):
+    def __init__(
+        self,
+        parent: tk.Widget,
+        initial_team: str,
+        callbacks: Dict[str, Callable],
+        team_change_callback: Optional[Callable] = None,
+    ):
         """
         Initialize toolbar widget.
 
@@ -70,8 +76,10 @@ class ToolbarWidget:
                 - 'next_day': Called when Next Day button clicked
                 - 'next_series': Called when Next Series button clicked
                 - 'next_week': Called when Next Week button clicked
+            team_change_callback: Called with new team str when dropdown changes
         """
         self.callbacks = callbacks
+        self.team_change_callback = team_change_callback
 
         # Create toolbar frame
         self.toolbar = tk.Frame(parent, relief=tk.RAISED, bd=2, bg=BG_DARK)
@@ -120,6 +128,8 @@ class ToolbarWidget:
         ]
         self.team_combo.pack(side=tk.LEFT, padx=5)
         Tooltip(self.team_combo, "Select team to follow and view in detail")
+        if self.team_change_callback:
+            self.team_combo.bind("<<ComboboxSelected>>", lambda _: self.team_change_callback(self.team_var.get()))
 
         # Separator
         ttk.Separator(self.toolbar, orient=tk.VERTICAL).pack(side=tk.LEFT, fill=tk.Y, padx=10)

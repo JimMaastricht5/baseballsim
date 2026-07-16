@@ -312,7 +312,7 @@ class LeagueLeadersWidget:
         tgp = getattr(self, "_team_games_played", {})
         pitching_df = pitching_df.copy()
         pitching_df["_min_ip"] = pitching_df["Team"].map(
-            lambda t: max(tgp.get(t, self._min_ip) * 1.0, self._min_ip) if tgp.get(t, 0) > 0 else self._min_ip
+            lambda t: int(tgp.get(t, self._min_ip / 1.0) * 1.0) if tgp.get(t, 0) > 0 else self._min_ip
         )
 
         if "W" in pitching_df.columns and "IP" in pitching_df.columns:

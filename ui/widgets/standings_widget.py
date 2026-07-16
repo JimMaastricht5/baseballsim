@@ -177,6 +177,7 @@ class StandingsWidget:
             team: Team abbreviation to follow
         """
         self._followed_team_cache = team
+        self._populate_tree(self._active_league.get())
 
     def _show_context_menu(self, event):
         """Show right-click context menu for team actions."""

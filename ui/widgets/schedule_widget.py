@@ -87,6 +87,8 @@ class ScheduleWidget:
             self.schedule_times = schedule_times
         if schedule_dates:
             self.schedule_dates = schedule_dates
+        self._schedule = schedule
+        self._current_day = current_day
 
         # Clear existing schedule
         self.schedule_text.config(state=tk.NORMAL)
@@ -177,6 +179,14 @@ class ScheduleWidget:
         """Handle game completion - update schedule display with score."""
         game_key = (game_data["away_team"], game_data["home_team"])
         self.completed_games[game_key] = (game_data["away_r"], game_data["home_r"])
+
+    def set_followed_team(self, team: str):
+        """Update the followed team and re-render the schedule."""
+        self.followed_team = team
+        # Re-render if schedule data is available
+        if hasattr(self, "_schedule") and self._schedule is not None:
+            current_day = getattr(self, "_current_day", 0)
+            self.update_schedule(current_day, self._schedule, self.schedule_times, self.schedule_dates)
 
     def get_frame(self) -> tk.Frame:
         """Get the main frame for adding to parent container."""

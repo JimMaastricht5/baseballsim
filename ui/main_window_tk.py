@@ -80,6 +80,8 @@ class SeasonMainWindow:
         self.world_series_teams = set()  # Track which teams are in World Series
         self.simulation_start_time = None  # Track simulation start time for elapsed time
         self._sim_start_day = None  # Schedule day index when simulation began (for ETA)
+        self._partial_baseball_data = None  # Cached BaseballStats from startup (for pre-sim roster updates)
+        self._partial_standings = None  # Cached partial standings from startup
 
         self.root.title("Baseball Season Simulator")
         self.root.geometry("1500x900")
@@ -186,6 +188,9 @@ class SeasonMainWindow:
             self.league_stats_widget.update_stats(baseball_data, partial_standings)
             self.roster_widget.update_roster(self.season_team_to_follow, baseball_data, partial_standings)
             self.league_leaders_widget.update_leaders(baseball_data, games_played=games_played)
+            self.admin_widget.load_players_from_data(baseball_data)
+            self._partial_baseball_data = baseball_data
+            self._partial_standings = partial_standings
             logger.debug(f"Loaded partial season standings: game {games_played + 1}")
         except Exception as e:
             logger.warning(f"Could not load partial season data: {e}")
@@ -266,11 +271,37 @@ F1     - Show this help"""
             self.season_team_to_follow = team
             self.toolbar.set_team(team)
             self.standings.set_followed_team(team)
+            self.games_widget.set_followed_team(team)
+            self.schedule_widget.set_followed_team(team)
 
-        # Switch to the team tab
+        self._update_team_tab_name(team)
+        self._select_team_tab(team)
+
+    def _on_team_dropdown_changed(self, team: str):
+        """Handle team dropdown change from toolbar."""
+        self.season_team_to_follow = team
+        self._update_team_tab_name(team)
+        self._update_roster()
+        self.standings.set_followed_team(team)
+        self.games_widget.set_followed_team(team)
+        self.schedule_widget.set_followed_team(team)
+
+    def _update_team_tab_name(self, team: str):
+        """Update the team tab label to the given team abbreviation."""
+        MLB_TEAMS = [
+            "ARI", "ATL", "BAL", "BOS", "CHC", "CHW", "CIN", "CLE", "COL", "DET",
+            "HOU", "KCR", "LAA", "LAD", "MIA", "MIL", "MIN", "NYM", "NYY", "OAK",
+            "PHI", "PIT", "SDP", "SEA", "SFG", "STL", "TBR", "TEX", "TOR", "WSN",
+        ]
         for i in range(self.notebook.index("end")):
-            tab_text = self.notebook.tab(i, "text")
-            if tab_text == team:
+            if self.notebook.tab(i, "text") in MLB_TEAMS:
+                self.notebook.tab(i, text=team)
+                break
+
+    def _select_team_tab(self, team: str):
+        """Select the notebook tab whose label matches the given team."""
+        for i in range(self.notebook.index("end")):
+            if self.notebook.tab(i, "text") == team:
                 self.notebook.select(i)
                 break
 
@@ -284,7 +315,10 @@ F1     - Show this help"""
             "next_series": self.next_series,
             "next_week": self.next_week,
         }
-        self.toolbar = ToolbarWidget(self.root, self.season_team_to_follow, toolbar_callbacks)
+        self.toolbar = ToolbarWidget(
+            self.root, self.season_team_to_follow, toolbar_callbacks,
+            team_change_callback=self._on_team_dropdown_changed,
+        )
 
     def _create_main_content(self):
         """Create the main layout with paned window, standings, and tabs."""
@@ -591,42 +625,7 @@ F1     - Show this help"""
             self.season_team_to_follow = selected_team
 
             # Update team tab label
-            for i in range(self.notebook.index("end")):
-                tab_text = self.notebook.tab(i, "text")
-                if tab_text in [
-                    "ARI",
-                    "ATL",
-                    "BAL",
-                    "BOS",
-                    "CHC",
-                    "CHW",
-                    "CIN",
-                    "CLE",
-                    "COL",
-                    "DET",
-                    "HOU",
-                    "KCR",
-                    "LAA",
-                    "LAD",
-                    "MIA",
-                    "MIL",
-                    "MIN",
-                    "NYM",
-                    "NYY",
-                    "OAK",
-                    "PHI",
-                    "PIT",
-                    "SDP",
-                    "SEA",
-                    "SFG",
-                    "STL",
-                    "TBR",
-                    "TEX",
-                    "TOR",
-                    "WSN",
-                ]:
-                    self.notebook.tab(i, text=selected_team)
-                    break
+            self._update_team_tab_name(selected_team)
 
             # Initialize widgets after delay
             self.root.after(1000, self.admin_widget.load_players)
@@ -1268,6 +1267,10 @@ F1     - Show this help"""
         if worker and worker.season:
             self.roster_widget.update_roster(
                 self.season_team_to_follow, worker.season.baseball_data, worker.season.team_win_loss
+            )
+        elif self._partial_baseball_data and self._partial_standings:
+            self.roster_widget.update_roster(
+                self.season_team_to_follow, self._partial_baseball_data, self._partial_standings
             )
 
     def _update_league_stats(self):

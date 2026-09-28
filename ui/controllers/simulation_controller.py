@@ -23,6 +23,7 @@ class SimulationController:
         season_chatty: bool,
         season_print_lineup_b: bool,
         season_print_box_score_b: bool,
+        il_file: str = None,
     ):
         """Initialize simulation controller."""
         self.load_seasons = load_seasons
@@ -33,6 +34,7 @@ class SimulationController:
         self.season_chatty = season_chatty
         self.season_print_lineup_b = season_print_lineup_b
         self.season_print_box_score_b = season_print_box_score_b
+        self.il_file = il_file
 
         self.worker: Optional[SeasonWorker] = None
 
@@ -79,6 +81,7 @@ class SimulationController:
             selected_team,
             start_paused=start_paused,
             obp_adjustment=obp_adjustment,
+            il_file=self.il_file,
         )
 
         # Start worker thread

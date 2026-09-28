@@ -18,9 +18,9 @@ import pandas as pd
 
 import bb_aigm_manager
 import bbgame
-from bbgame import GameResult
 import bbschedule_mgr
 import bbstats
+from bbgame import GameResult
 from bblogger import logger
 
 OutputHandlerType = Callable[[str, str, Optional[Dict[str, Any]]], None]
@@ -135,6 +135,7 @@ class BaseballSeason:
         obp_adjustment: Optional[float] = None,
         output_handler: Optional[OutputHandlerType] = None,
         play_by_play_callback_factory: Optional[PlayByPlayCallbackFactory] = None,
+        il_file: Optional[str] = None,
     ) -> None:
         """Initialize season with data loading, schedule creation, and GM setup."""
         self.standings_lock = threading.Lock()  # safely modify standings in a threaded environment
@@ -164,6 +165,7 @@ class BaseballSeason:
             load_pitcher_file=load_pitcher_file,
             suppress_console_output=suppress_console_output,
         )
+
         self.teams = (
             list(self.baseball_data.batting_data.Team.unique()) if team_list == [] or team_list is None else team_list
         )
@@ -188,6 +190,21 @@ class BaseballSeason:
 
         # Find starting position using ScheduleManager
         self.season_day_num = self.schedule_manager.find_start_day(self.team_win_loss, self.team_to_follow)
+
+        # Load IL from CSV if provided (real MLB injury data from FanGraphs).
+        # Anchor "today" to the sim's actual resume date (not the real-world wall-clock
+        # date), since the partial season/schedule data the sim resumes from can lag
+        # behind the date the injury report was scraped. Using real "now" here made
+        # long-term injuries (e.g. "out for season") count down against the wrong
+        # starting point, letting players return far too early in simulated time.
+        if il_file:
+            sim_today_str = self.schedule_manager.get_date_for_index(self.season_day_num)
+            try:
+                sim_today = datetime.datetime.strptime(sim_today_str, "%m/%d/%Y")
+            except ValueError:
+                sim_today = datetime.datetime.now()
+            il_results = self.baseball_data.load_il_from_csv(il_file, new_season, as_of_date=sim_today)
+            logger.info(f"Loaded IL from CSV: {il_results['placed']} players placed on IL")
 
         # Link team_games_played to baseball_data for prorated 2025 stats (Phase 2: Stats Enhancement)
         self.baseball_data.team_games_played = self.team_games_played
@@ -345,7 +362,9 @@ class BaseballSeason:
         # Attach division info so GB is calculated within each division
         bd = getattr(self.baseball_data, "batting_data", None)
         if bd is not None and "Division" in bd.columns and "League" in bd.columns:
-            div_map = bd[["Team", "League", "Division"]].drop_duplicates(subset=["Team"], keep="first").set_index("Team")
+            div_map = (
+                bd[["Team", "League", "Division"]].drop_duplicates(subset=["Team"], keep="first").set_index("Team")
+            )
             df["League"] = df["Team"].map(div_map["League"]).fillna("?")
             df["Division"] = df["Team"].map(div_map["Division"]).fillna("?")
         else:
@@ -413,7 +432,11 @@ class BaseballSeason:
         followed_games = []
         compact_summaries = []
         for game_result in game_results:
-            is_followed = any(team in self.team_to_follow for team in (game_result.away_team, game_result.home_team)) if self.team_to_follow else True
+            is_followed = (
+                any(team in self.team_to_follow for team in (game_result.away_team, game_result.home_team))
+                if self.team_to_follow
+                else True
+            )
             if is_followed:
                 followed_games.append(game_result.game_recap)
             else:
@@ -732,12 +755,12 @@ class BaseballSeason:
             OutputCategory.SEASON_END, f"\n{self.new_season} Season Stats\n", metadata={"season": self.new_season}
         )
         self.baseball_data.print_current_season(teams=self.team_to_follow, summary_only_b=False)
-        self.baseball_data.print_current_season(teams=self.teams, summary_only_b=not self.season_chatty)
+        # self.baseball_data.print_current_season(teams=self.teams, summary_only_b=not self.season_chatty)
 
         # Perform AI GM end-of-season evaluations
-        self.output_handler(
-            OutputCategory.SEASON_END, "\n\n****** AI GM End-of-Season Evaluations ******\n", metadata=None
-        )
+        # self.output_handler(
+        #     OutputCategory.SEASON_END, "\n\n****** AI GM End-of-Season Evaluations ******\n", metadata=None
+        # )
         self._perform_gm_evaluations()
 
         return
@@ -786,8 +809,8 @@ class BaseballSeason:
                 )
 
         # Print all player stats after GM evaluations
-        self.output_handler(OutputCategory.SEASON_END, "\n\n****** Complete Player Statistics ******\n", metadata=None)
-        self.baseball_data.print_current_season(teams=None, summary_only_b=False)
+        # self.output_handler(OutputCategory.SEASON_END, "\n\n****** Complete Player Statistics ******\n", metadata=None)
+        self.baseball_data.print_current_season(teams=self.team_to_follow, summary_only_b=False)
 
         return
 
@@ -859,7 +882,9 @@ class BaseballSeason:
             pbp_callback = None
             if self.play_by_play_callback_factory:
                 pbp_callback = self.play_by_play_callback_factory(game.away, game.home, season_day_num)
-            thread, q, _ = self._create_game_thread(game, season_day_num, chatty=self.season_chatty, pbp_callback=pbp_callback)
+            thread, q, _ = self._create_game_thread(
+                game, season_day_num, chatty=self.season_chatty, pbp_callback=pbp_callback
+            )
             threads.append(thread)
             queues.append(q)
             match_ups.append(game)
@@ -876,7 +901,9 @@ class BaseballSeason:
             game_result: GameResult = queues[ii].get()
             game_obj = match_ups[ii]
             self._apply_game_result_to_season(game_result, game_obj.away, game_obj.home)
-            self.schedule_manager.mark_game_completed(game_obj.home, game_obj.away, game_result.score[1], game_result.score[0])
+            self.schedule_manager.mark_game_completed(
+                game_obj.home, game_obj.away, game_result.score[1], game_result.score[0]
+            )
             game_results.append(game_result)
         self._process_and_print_game_results(game_results)
 
@@ -989,10 +1016,7 @@ class BaseballSeason:
     ):
         """Log playoff game result and emit SIM_PROGRESS line."""
         sg_id = id(game_result.structured_game) if game_result.structured_game is not None else "None"
-        logger.debug(
-            f"[{round_name}] structured_game id={sg_id} "
-            f"log_scores=({log_away_score}, {log_home_score})"
-        )
+        logger.debug(f"[{round_name}] structured_game id={sg_id} log_scores=({log_away_score}, {log_home_score})")
         logger.info(
             f"[{round_name}] {game_result.away_team if hasattr(game_result, 'away_team') else '?'} "
             f"{log_away_score} @ {log_home_score} "
@@ -1014,6 +1038,17 @@ class BaseballSeason:
         )
         return winner
 
+    def _apply_playoff_rest_day(self, reason: str) -> None:
+        """Process a day with no games so the sim's rest/recovery logic fires for every player."""
+        teams_list = self.team_to_follow if len(self.team_to_follow) > 0 else None
+        self.baseball_data.new_game_day(teams_to_follow=teams_list, print_disabled_lists=False)
+        self.output_handler(OutputCategory.SIM_PROGRESS, f"-- Day off ({reason}) --\n")
+
+    def _end_playoff_round(self, round_label: str) -> None:
+        """Record and process a rest day after a playoff round ends, before the next round begins."""
+        self.schedule_manager.add_off_day()
+        self._apply_playoff_rest_day(f"end of {round_label}")
+
     def run_playoff_series(self, away: str, home: str, best_of: int, round_name: str) -> str:
         """Simulate a playoff series. Returns winning team abbreviation."""
         needed_to_win, home_wins, away_wins, start_wins = self._init_series_tracking(best_of, home, away, round_name)
@@ -1022,7 +1057,16 @@ class BaseballSeason:
         if not series_games:
             return home
 
+        teams_list = self.team_to_follow if len(self.team_to_follow) > 0 else None
+        previous_home = None
         for game in series_games:
+            if previous_home is not None and game.home != previous_home:
+                self._apply_playoff_rest_day(f"{round_name} travel day, home field switches to {game.home}")
+            previous_home = game.home
+
+            # Treat this game as its own day so condition/fatigue recovery runs once per game day.
+            self.baseball_data.new_game_day(teams_to_follow=teams_list, print_disabled_lists=False)
+
             thread, q, _ = self._create_game_thread(game, self.season_day_num, chatty=False)
             thread.start()
             thread.join()
@@ -1085,6 +1129,8 @@ class BaseballSeason:
         nl_wc1_winner = self.run_playoff_series(nl_seeds[5], nl_seeds[2], 3, "NL Wild Card A")
         nl_wc2_winner = self.run_playoff_series(nl_seeds[4], nl_seeds[3], 3, "NL Wild Card B")
 
+        self._end_playoff_round("Wild Card Round")
+
         # === DIVISION SERIES (Best of 5) ===
         # ALDS A: Seed 1 vs WC2 winner, ALDS B: Seed 2 vs WC1 winner
         self.schedule_manager.clear_playoffs()
@@ -1100,6 +1146,8 @@ class BaseballSeason:
         nl_ds1_winner = self.run_playoff_series(nl_wc2_winner, nl_seeds[0], 5, "NLDS A")
         nl_ds2_winner = self.run_playoff_series(nl_wc1_winner, nl_seeds[1], 5, "NLDS B")
 
+        self._end_playoff_round("Division Series Round")
+
         # === LEAGUE CHAMPIONSHIP SERIES (Best of 7) ===
         # Higher seed hosts based on regular season record
         al_lcs_home = al_ds1_winner if al_seeds.index(al_ds1_winner) < al_seeds.index(al_ds2_winner) else al_ds2_winner
@@ -1113,6 +1161,8 @@ class BaseballSeason:
         self.schedule_manager.clear_playoffs()
         self.schedule_manager.build_playoff_series(nl_lcs_away, nl_lcs_home, 7, "NLCS")
         nl_champ = self.run_playoff_series(nl_lcs_away, nl_lcs_home, 7, "NLCS")
+
+        self._end_playoff_round("Championship Series Round")
 
         # === WORLD SERIES ===
         self.schedule_manager.clear_playoffs()
@@ -1144,6 +1194,16 @@ class BaseballSeason:
         ws_champion_msg += f"{self.new_season} WORLD SERIES CHAMPION: {self.team_city_dict[winner]} ({winner})\n"
         ws_champion_msg += f"{'=' * 80}\n\n"
         self.output_handler(OutputCategory.WORLD_SERIES_END, ws_champion_msg, metadata={"champion": winner})
+
+        # Final standings and disabled list for the season, printed once now that the
+        # playoffs (where the daily disabled-list print is suppressed) are over.
+        self.output_handler(
+            OutputCategory.SEASON_END,
+            f"\n{self.new_season} Final Standings:\n",
+            metadata={"season": self.new_season},
+        )
+        self.print_standings()
+        self.baseball_data.print_disabled_lists()
 
     def sim_full_season(self) -> None:
         """
@@ -1335,7 +1395,7 @@ if __name__ == "__main__":
     start_time = datetime.datetime.now()
 
     # full season 162 games
-    num_games = 28
+    num_games = 162
     interactive = True
     fantasy = False
 
@@ -1343,7 +1403,7 @@ if __name__ == "__main__":
     if fantasy:
         my_team_to_follow = ["AUG"]  # List of teams to follow
         bbseasonMS = MultiBaseballSeason(
-            load_seasons=[2020, 2021, 2022, 2023, 2024, 2025],
+            load_seasons=[2020, 2021, 2022, 2023, 2024, 2025, 2026],
             new_season=2026,
             season_length=num_games,
             series_length=3,
@@ -1363,8 +1423,8 @@ if __name__ == "__main__":
 
     # handle a single full season of MLB
     if not fantasy:
-        my_team_to_follow = ["MIL"]  # List of teams to follow, e.g., ['MIL', 'NYM'] for multiple
-        # my_team_to_follow = None  # or set to None for no followed teams
+        # my_team_to_follow = ["MIL"]  # List of teams to follow, e.g., ['MIL', 'NYM'] for multiple
+        my_team_to_follow = None  # or set to None for no followed teams
 
         # set a series schedule if you just want to simulate a playoff series or use the team_list param
         # series_schedule = [[['LAD', 'TOR']], [['LAD', 'TOR']],
@@ -1384,6 +1444,7 @@ if __name__ == "__main__":
             load_batter_file="player-projected-stats-pp-Batting.csv",  # 'random-player-projected-stats-pp-Batting.csv',
             load_pitcher_file="player-projected-stats-pp-Pitching.csv",
             load_schedule_file="2026 MLB Schedule.csv",
+            il_file="il_report_2026.csv",
         )
         # schedule=series_schedule)
         bbseasonSS.sim_full_season()

@@ -77,6 +77,7 @@ class SeasonWorker(threading.Thread):
         team_to_follow=None,
         start_paused=False,
         obp_adjustment=0.0,
+        il_file=None,
     ):
         """Initialize season worker with simulation parameters."""
         super().__init__()
@@ -95,6 +96,7 @@ class SeasonWorker(threading.Thread):
         self.only_nl_b = False
         self.start_paused = start_paused
         self.obp_adjustment = obp_adjustment
+        self.il_file = il_file
 
         # Create signal emitter — all emit_*() calls put tuples into queues
         # that the main thread's _poll_queues() drains every 100ms
@@ -145,6 +147,7 @@ class SeasonWorker(threading.Thread):
                 load_schedule_file=f"{self.new_season} MLB Schedule.csv",  # Load from downloaded schedule
                 suppress_console_output=True,  # Suppress disabled list and hot/cold list prints for UI
                 obp_adjustment=self.obp_adjustment,
+                il_file=self.il_file,
             )
 
             # Call sim_start for initialization

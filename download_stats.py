@@ -9,15 +9,15 @@ WARNING: Requires manual intervention to click "Share & Export" -> "Get Table as
 import os
 import sys
 import time
-from typing import Optional, List
+from typing import List, Optional
 
 import pandas as pd
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.chrome.service import Service
-from selenium.webdriver.support.ui import WebDriverWait
-from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.common.by import By
+from selenium.webdriver.support import expected_conditions as EC
+from selenium.webdriver.support.ui import WebDriverWait
 from webdriver_manager.chrome import ChromeDriverManager
 
 from bblogger import logger
@@ -276,6 +276,7 @@ class StatsDownloader:
 
                     year_specific_file = f"{season} player-stats-Pitching.csv"
                     import shutil
+
                     shutil.copy2(pitcher_file, year_specific_file)
                     logger.info(f"Created year-specific copy: {year_specific_file}")
 
@@ -406,6 +407,7 @@ def main():
         print("Press Enter to exit...")
         input()
         sys.exit(1)
+
 
 if __name__ == "__main__":
     main()

@@ -188,6 +188,7 @@ def main(
         season_print_box_score_b=True,
         season_team_to_follow="MIL",
         show_startup_dialog=False,
+        il_file=None,
 ):
     """
     Main entry point for the UI application.
@@ -229,6 +230,7 @@ def main(
             season_print_lineup_b,
             season_print_box_score_b,
             season_team_to_follow,
+            il_file=il_file,
         )
     except Exception as e:
         logger.error(f"Error creating main window: {e}")
@@ -268,6 +270,9 @@ Examples:
         help="Years to load stats from (default: 2020, 2021, 2022, 2023,2024,2025,2026)",
     )
     parser.add_argument("--new-season", "-n", type=int, default=2026, help="Season to simulate (default: 2026)")
+    parser.add_argument(
+        "--il-file", "-i", type=str, default=None, help="Path to IL CSV file from download_il.py (optional)"
+    )
 
     args = parser.parse_args()
 
@@ -290,6 +295,7 @@ Examples:
         season_print_box_score_b=True,
         season_team_to_follow=args.team.upper(),
         show_startup_dialog=args.dialog,
+        il_file=args.il_file,
     )
 
     end_time = datetime.datetime.now()

@@ -46,6 +46,7 @@ class SeasonMainWindow:
         season_print_lineup_b,
         season_print_box_score_b,
         season_team_to_follow,
+        il_file=None,
     ):
         """
         Initialize the main window and UI components.
@@ -61,6 +62,7 @@ class SeasonMainWindow:
             season_print_lineup_b: Print lineup flag
             season_print_box_score_b: Print box score flag
             season_team_to_follow: Team to follow (string)
+            il_file: Path to IL CSV file (optional)
         """
         self.root = root
         self.load_seasons = load_seasons
@@ -102,6 +104,7 @@ class SeasonMainWindow:
             season_chatty,
             season_print_lineup_b,
             season_print_box_score_b,
+            il_file=il_file,
         )
 
         # Create widgets (order matters for packing!)

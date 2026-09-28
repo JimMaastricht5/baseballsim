@@ -912,7 +912,7 @@ class BaseballStats:
         per_game_odds = 1 - (probability_of_not_getting_hurt_season) ** (1 / 162)
         return per_game_odds
 
-    def is_injured(self) -> None:
+    def is_injured(self, print_disabled_lists: bool = True) -> None:
         """
         determine if a pitcher or hitter is injured and severity.  older players get injured more often
         add that data to the active seasons df and assign appropriate injury descriptions
@@ -920,6 +920,8 @@ class BaseballStats:
         to be injured again.  Also there is a cumulative downward effect on performance
 
         VECTORIZED: Uses vectorized operations for ~10-50x speedup
+        :param print_disabled_lists: Whether to print the disabled list summary this call
+            (suppressed during playoffs, where it would otherwise print once per game/rest day)
         :return: None
         """
         # Process pitcher injuries - VECTORIZED
@@ -1035,39 +1037,45 @@ class BaseballStats:
         self.new_season_batting_data["Status"] = get_status_vectorized(self.new_season_batting_data, False)
 
         # Print the disabled lists in compact format (only if not suppressed)
-        if not self.suppress_console_output:
-            print("Season Disabled Lists:")
-
-            # Helper function to print injuries by IL type
-            def print_injuries_by_il_type(df, player_type="Pitchers"):
-                if df[df["Injured Days"] > 0].shape[0] == 0:
-                    return
-
-                injured_df = df[df["Injured Days"] > 0].copy()
-                print(f"\n{player_type}:")
-
-                # Group by Status (IL type)
-                for il_type in ["60-Day IL", "15-Day IL", "10-Day IL", "7-Day IL"]:
-                    il_group = injured_df[injured_df["Status"] == il_type]
-                    if il_group.shape[0] > 0:
-                        count = il_group.shape[0]
-                        # Build compact list: Player(TEAM) - Injury
-                        injury_list = []
-                        for idx, row in il_group.iterrows():
-                            player = row["Player"]
-                            team = row["Team"]
-                            injury = row["Injury Description"]
-                            injury_list.append(f"{player}({team}) - {injury}")
-
-                        # Print in compact format
-                        print(f"  {il_type} ({count}): {', '.join(injury_list)}")
-
-            # Print pitchers and batters
-            print_injuries_by_il_type(self.new_season_pitching_data, "Pitchers")
-            print_injuries_by_il_type(self.new_season_batting_data, "Batters")
-            print()  # Add blank line after injury lists
+        if print_disabled_lists:
+            self.print_disabled_lists()
 
         return
+
+    def print_disabled_lists(self) -> None:
+        """Print the current season disabled lists in compact format, grouped by IL type."""
+        if self.suppress_console_output:
+            return
+        print("Season Disabled Lists:")
+
+        # Helper function to print injuries by IL type
+        def print_injuries_by_il_type(df, player_type="Pitchers"):
+            if df[df["Injured Days"] > 0].shape[0] == 0:
+                return
+
+            injured_df = df[df["Injured Days"] > 0].copy()
+            print(f"\n{player_type}:")
+
+            # Group by Status (IL type)
+            for il_type in ["60-Day IL", "15-Day IL", "10-Day IL", "7-Day IL"]:
+                il_group = injured_df[injured_df["Status"] == il_type]
+                if il_group.shape[0] > 0:
+                    count = il_group.shape[0]
+                    # Build compact list: Player(TEAM) - Injury
+                    injury_list = []
+                    for idx, row in il_group.iterrows():
+                        player = row["Player"]
+                        team = row["Team"]
+                        injury = row["Injury Description"]
+                        injury_list.append(f"{player}({team}) - {injury}")
+
+                    # Print in compact format
+                    print(f"  {il_type} ({count}): {', '.join(injury_list)}")
+
+        # Print pitchers and batters
+        print_injuries_by_il_type(self.new_season_pitching_data, "Pitchers")
+        print_injuries_by_il_type(self.new_season_batting_data, "Batters")
+        print()  # Add blank line after injury lists
 
     def print_hot_cold_players(self, teams_to_follow: Optional[List[str]] = None) -> None:
         """
@@ -1191,15 +1199,17 @@ class BaseballStats:
 
         return
 
-    def new_game_day(self, teams_to_follow: Optional[List[str]] = None) -> None:
+    def new_game_day(self, teams_to_follow: Optional[List[str]] = None, print_disabled_lists: bool = True) -> None:
         """
         Set up the next day, check if injured and reduce number of days on dl.  improve player condition
         make thread safe, should only be called by season controller once
         :param teams_to_follow: Optional list of team names to show hot/cold players for
+        :param print_disabled_lists: Whether to print the disabled list summary this call
+            (pass False during playoffs to avoid printing it every game/rest day)
         :return: None
         """
         with self.thread_lock:
-            self.is_injured()
+            self.is_injured(print_disabled_lists=print_disabled_lists)
             self.update_streaks()  # Update streaks for active players only
             self.print_hot_cold_players(teams_to_follow)  # Print hot/cold players for followed teams
 
@@ -1418,7 +1428,7 @@ class BaseballStats:
                 lambda match: "[" + ",".join(f'"{item.strip()}"' for item in match.group(1).split(",")) + "]", s
             )
             return ast.literal_eval(s)
-        except ValueError, SyntaxError:
+        except (ValueError, SyntaxError):
             return None  # Or handle the error as needed
 
     def move_player_in_df(self, df, player_index, new_team):
@@ -1521,6 +1531,153 @@ class BaseballStats:
                 )
 
         return (True, injury_desc, injury_days, player_type)
+
+    def load_il_from_csv(self, csv_path: str, season: int = 2026, as_of_date: Optional["datetime"] = None) -> dict:
+        """
+        Load injury list from a FanGraphs IL CSV and apply to simulation DataFrames.
+
+        Reads the CSV generated by download_il.py and places matching players
+        on the IL with appropriate injury descriptions and remaining days.
+
+        Args:
+            csv_path: Path to the IL CSV file (e.g., "il_report_2026.csv")
+            season: Season year for date calculations
+            as_of_date: The sim's current date to count remaining injured days from.
+                Must be the sim's resume date, not real wall-clock time - the sim can
+                resume from a date that lags behind when the IL report was scraped,
+                and using the wrong anchor lets long injuries ("out for season") count
+                down against the wrong starting point and expire far too early in
+                simulated time. Defaults to real "now" only if not provided.
+
+        Returns:
+            dict: {"placed": int, "skipped": int, "not_found": int, "details": list}
+        """
+        import csv
+        from datetime import datetime
+
+        results = {"placed": 0, "skipped": 0, "not_found": 0, "details": []}
+
+        try:
+            with open(csv_path, "r", encoding="utf-8") as f:
+                reader = csv.DictReader(f)
+                il_rows = list(reader)
+        except FileNotFoundError:
+            logger.error(f"IL CSV file not found: {csv_path}")
+            return results
+        except Exception as e:
+            logger.error(f"Error reading IL CSV: {e}")
+            return results
+
+        today = as_of_date if as_of_date is not None else datetime.now()
+        il_placed = 0
+        il_skipped = 0
+        il_not_found = 0
+
+        for row in il_rows:
+            player_name = row.get("Player", "").strip()
+            team = row.get("Team", "").strip()
+            position = row.get("Position", "").strip()
+            status = row.get("Status", "").strip()
+            injury_desc = row.get("Injury", "").strip()
+            return_str = row.get("Return", "").strip()
+            sim_return_str = row.get("Sim Return Date", "").strip()
+            sim_return_reason = row.get("Sim Return Reason", "").strip()
+
+            # Skip if already activated (has a return date)
+            if return_str:
+                il_skipped += 1
+                continue
+
+            # Skip if no sim return date (shouldn't happen, but be safe)
+            if not sim_return_str:
+                il_skipped += 1
+                continue
+
+            # Parse sim return date (format: "MM/DD/YY")
+            try:
+                sim_return_date = datetime.strptime(sim_return_str, "%m/%d/%y")
+            except ValueError:
+                logger.warning(f"Could not parse sim return date '{sim_return_str}' for {player_name}")
+                il_skipped += 1
+                continue
+
+            # Calculate remaining days from sim return date
+            remaining_days = (sim_return_date - today).days
+            if remaining_days <= 0:
+                # Player should already be activated
+                il_skipped += 1
+                continue
+
+            # Determine if pitcher or batter based on position
+            is_pitcher = position in ("SP", "RP", "P")
+
+            # Build status label from FanGraphs status
+            status_label = status if status else f"{remaining_days}-Day IL"
+
+            # Find and update the player in the simulation DataFrames
+            placed = False
+
+            if is_pitcher:
+                # Search pitching data
+                mask = (
+                    (self.new_season_pitching_data["Player"].str.lower() == player_name.lower())
+                    & (self.new_season_pitching_data["Team"] == team)
+                )
+                matches = self.new_season_pitching_data[mask]
+                if not matches.empty:
+                    idx = matches.index[0]
+                    self.new_season_pitching_data.at[idx, "Injured Days"] = remaining_days
+                    self.new_season_pitching_data.at[idx, "Injury Description"] = injury_desc or status_label
+                    self.new_season_pitching_data.at[idx, "Condition"] = max(
+                        0, self.new_season_pitching_data.at[idx, "Condition"] - 30
+                    )
+                    placed = True
+                    logger.info(
+                        f"IL (CSV): Placed pitcher {player_name} ({team}) on IL: "
+                        f"{injury_desc or status_label} ({remaining_days} days, {sim_return_reason})"
+                    )
+            else:
+                # Search batting data
+                mask = (
+                    (self.new_season_batting_data["Player"].str.lower() == player_name.lower())
+                    & (self.new_season_batting_data["Team"] == team)
+                )
+                matches = self.new_season_batting_data[mask]
+                if not matches.empty:
+                    idx = matches.index[0]
+                    self.new_season_batting_data.at[idx, "Injured Days"] = remaining_days
+                    self.new_season_batting_data.at[idx, "Injury Description"] = injury_desc or status_label
+                    self.new_season_batting_data.at[idx, "Condition"] = max(
+                        0, self.new_season_batting_data.at[idx, "Condition"] - 30
+                    )
+                    placed = True
+                    logger.info(
+                        f"IL (CSV): Placed batter {player_name} ({team}) on IL: "
+                        f"{injury_desc or status_label} ({remaining_days} days, {sim_return_reason})"
+                    )
+
+            if placed:
+                il_placed += 1
+                results["details"].append({
+                    "player": player_name,
+                    "team": team,
+                    "position": position,
+                    "status": status_label,
+                    "injury": injury_desc,
+                    "days": remaining_days,
+                })
+            else:
+                il_not_found += 1
+                logger.debug(f"IL (CSV): Player not found in simulation: {player_name} ({team})")
+
+        results["placed"] = il_placed
+        results["skipped"] = il_skipped
+        results["not_found"] = il_not_found
+
+        logger.info(
+            f"IL CSV load complete: {il_placed} placed, {il_skipped} skipped, {il_not_found} not found"
+        )
+        return results
 
     def print_current_season(self, teams: Optional[List[str]] = None, summary_only_b: bool = False) -> None:
         """

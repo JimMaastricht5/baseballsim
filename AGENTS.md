@@ -13,6 +13,10 @@ uv sync
 # Season UI (Tkinter) - RECOMMENDED
 uv run bbseason_ui.py --team MIL --games 162 --seasons 2023,2024,2025,2026 --new-season 2026
 
+# With real MLB injury data from FanGraphs
+uv run download_il.py  # Fetch IL data first
+uv run bbseason_ui.py --team MIL --il-file il_report_2026.csv
+
 # Wrapper: calls uv run bbseason_ui.py with defaults
 uv run run.py [--team TEAM --games N --seasons YEAR,YEAR --new-season YEAR]
 
@@ -43,6 +47,7 @@ uv run ruff format .
 - **Entry point**: `run.py` → `bbseason_ui.py` (Tkinter season UI)
 - **Core engine**: `bbat_bat.py` - odds-ratio calculations for batter/pitcher matchups
 - **Data flow**: `download_stats.py` → `bbplayer_projections.py` → `bbstats.py` → `bbat_bat.py` → `bbgame.py` → `bbseason.py`
+- **IL data flow**: `download_il.py` → `il_report_YYYY.csv` → `bbstats.py:load_il_from_csv()` → simulation DataFrames
 - **Supporting modules**: `bbteam.py` (rosters/lineups), `bbgame_box_stats.py` (box scores), `bbschedule_mgr.py` (scheduling), `bb_aigm_manager.py` (AI GM)
 - **UI**: `ui/` package with MVC architecture (`main_window_tk.py`, `season_worker.py`, `signals.py`, `controllers/`, `models/`, `widgets/`)
 - **Pygame UI** exists in `archive/bbgame_ui.py` but is not active in current codebase

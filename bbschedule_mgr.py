@@ -459,18 +459,43 @@ class ScheduleManager:
             )
             games_to_add.append(game)
 
-        # Add games to schedule (one day per game for playoffs)
+        # Add games to schedule (one day per game for playoffs), with a travel/rest
+        # day inserted whenever home field switches mid-series (2-2-1 / 2-3-2 formats).
+        previous_home = None
         for game in games_to_add:
+            if previous_home is not None and game.home != previous_home:
+                date_str = self.get_playoff_date(day_offset)
+                off_day = ScheduleDay(date_str, [GameMatchup(home="OFF DAY", away="OFF DAY")])
+                self._playoff_schedule.append(off_day)
+                self._playoff_dates.append(date_str)
+                day_offset += 1
+                logger.info(f"built rest day on {date_str} for {round_name} (home field switch)")
+
             date_str = self.get_playoff_date(day_offset)
             day = ScheduleDay(date_str, [game])
             self._playoff_schedule.append(day)
             self._playoff_dates.append(date_str)
             day_offset += 1
+            previous_home = game.home
             logger.info(f"built  {game.away} vs {game.home} on {date_str} for {round_name} best of {best_of}")
 
         logger.info(f"Built {round_name}: {away} @ {home} ({best_of} games)")
 
         return
+
+    def add_off_day(self) -> None:
+        """Append a single rest day (no games) to the end of the playoff schedule.
+
+        Used after a playoff round ends and before the next round begins, so the
+        day-of-rest recovery logic (which only fires when a scheduled day has no
+        games) applies to all remaining teams.
+        """
+        day_offset = len(self._playoff_schedule)
+        date_str = self.get_playoff_date(day_offset)
+        off_day = ScheduleDay(date_str, [GameMatchup(home="OFF DAY", away="OFF DAY")])
+        self._playoff_schedule.append(off_day)
+        self._playoff_dates.append(date_str)
+        logger.info(f"built round-end rest day on {date_str}")
 
     def set_series_winner(self, away: str, home: str, winner: str):
         """Mark series as complete with winner.

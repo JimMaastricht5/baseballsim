@@ -15,7 +15,7 @@ from bbplayoff_series import BaseballPlayoffSeries
 TEAM_A = "MIL"
 TEAM_B = "TBR"
 ROTATION_LEN = 4
-NUM_SERIES = 10
+NUM_SERIES = 1000
 MAX_THREADS = 6  # series running at once, this machine has 6 physical cores (12 logical)
 
 
@@ -24,7 +24,9 @@ def main() -> None:
 
     start_time = datetime.now()
     print(f"Start time:   {start_time:%Y-%m-%d %H:%M:%S}")
-    print(f"Running {NUM_SERIES} series: {TEAM_A} vs {TEAM_B}, {ROTATION_LEN} man rotation, up to {MAX_THREADS} threads\n")
+    print(
+        f"Running {NUM_SERIES} series: {TEAM_A} vs {TEAM_B}, {ROTATION_LEN} man rotation, up to {MAX_THREADS} threads\n"
+    )
 
     BaseballPlayoffSeries(TEAM_A, TEAM_B, rotation_len=ROTATION_LEN, num_series=NUM_SERIES).run_all(
         max_threads=MAX_THREADS

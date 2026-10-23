@@ -199,6 +199,11 @@ class BaseballPlayoffSeries:
         self.games_to_win = {team: [] for team in self.teams}
         spacing = "\n" if show_game_results else ""  # blank lines only help when game results are between the lines
         if max_threads > 1:
+            self._emit(
+                f"Multi-threaded run: up to {max_threads} threads, so several series play at the same time. "
+                f"Series x of y is numbered in the order series finish, not the order they started, "
+                f"so x does not identify a particular series.\n"
+            )
             self._run_series_in_threads(wins, max_threads)
         else:
             for number in range(1, self.num_series + 1):

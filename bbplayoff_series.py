@@ -9,13 +9,15 @@ and dates, the length of the series, and a date with no game is a rest day. Noth
 raised if the schedule has no games between the teams or the series has an even number of games. Everyone starts
 the series with fresh conditions (no fatigue, no IL) using the current 2026 data files. The series can be run several
 times (num_series) to tally how often each team wins and the average games each team needed to win, every run
-starting from freshly loaded data.
+starting from freshly loaded data. Series can run in parallel threads (max_threads): each thread plays its own
+independent series on its own loaded data and the main thread accumulates the results.
 
 Classes:
     BaseballPlayoffSeries - Sets up and runs one series or several, returns the winner or the tally of winners.
 """
 
 import argparse
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import List, Optional
 
 import bbseason
@@ -137,26 +139,78 @@ class BaseballPlayoffSeries:
         handler = self._season_args["output_handler"] or bbseason.console_output_handler
         handler(bbseason.OutputCategory.SIM_PROGRESS, text, None)
 
-    def run_all(self, show_game_results: bool = False) -> dict[str, int]:
+    def _simulate_independent_series(self) -> tuple[str, int]:
+        """
+        Play one series on its own freshly loaded season and return (winner, games played). Shares nothing with
+        other series, so it is safe to call from several threads at once.
+        """
+        args = self._season_args
+        series = BaseballPlayoffSeries(
+            *self.teams,
+            rotation_len=args["rotation_len"],
+            round_name=self.round_name,
+            num_series=1,
+            load_seasons=args["load_seasons"],
+            new_season=args["new_season"],
+            load_batter_file=args["load_batter_file"],
+            load_pitcher_file=args["load_pitcher_file"],
+            output_handler=bbseason.null_output_handler,
+        )
+        winner = series.run(show_game_results=False)
+        return winner, series.games_played
+
+    def _run_series_in_threads(self, wins: dict[str, int], max_threads: int) -> None:
+        """
+        Play num_series series with up to max_threads running at once. Only this (the calling) thread updates the
+        tally, as each series finishes, so the accumulated results need no locking. Series are numbered in the order
+        they finish.
+        """
+        with ThreadPoolExecutor(max_workers=min(max_threads, self.num_series)) as executor:
+            futures = [executor.submit(self._simulate_independent_series) for _ in range(self.num_series)]
+            try:
+                for number, future in enumerate(as_completed(futures), start=1):
+                    winner, games_played = future.result()  # raises here if a series failed
+                    wins[winner] += 1
+                    self.games_to_win[winner].append(games_played)
+                    self._emit(
+                        f"Series {number} of {self.num_series}: {winner} wins. Series record: {self._record_text(wins)}\n"
+                    )
+            except BaseException:
+                for future in futures:
+                    future.cancel()  # don't start series that haven't begun
+                raise
+
+    def run_all(self, show_game_results: bool = False, max_threads: int = 1) -> dict[str, int]:
         """
         Simulate the series num_series times, each from freshly loaded data, and tally the winners.
         :param show_game_results: False (the default) prints only a line per series, the final record and the
             average games to win, True also prints the game by game results of every series
+        :param max_threads: how many series can run at the same time, 1 runs them one after another. Game results
+            can't be shown when more than one runs at once, the lines would interleave
         :return: series wins by team, in the order the teams were given, e.g. {"MIL": 3, "TBR": 1}. The games each
             winner needed are in games_to_win, see average_games_to_win
         """
+        if max_threads < 1:
+            raise ValueError(f"max_threads must be at least 1, got {max_threads}")
+        if max_threads > 1 and show_game_results:
+            raise ValueError("Game results can't be shown when series run in parallel, the output would interleave")
+
         wins = {team: 0 for team in self.teams}
         self.games_to_win = {team: [] for team in self.teams}
         spacing = "\n" if show_game_results else ""  # blank lines only help when game results are between the lines
-        for number in range(1, self.num_series + 1):
-            if show_game_results:
-                self._emit(f"\n#### Series {number} of {self.num_series} ####\n")
-            winner = self.run(show_game_results=show_game_results)
-            wins[winner] += 1
-            self.games_to_win[winner].append(self.games_played)
-            self._emit(
-                f"{spacing}Series {number} of {self.num_series}: {winner} wins. Series record: {self._record_text(wins)}\n"
-            )
+        if max_threads > 1:
+            self._run_series_in_threads(wins, max_threads)
+        else:
+            for number in range(1, self.num_series + 1):
+                if show_game_results:
+                    self._emit(f"\n#### Series {number} of {self.num_series} ####\n")
+                winner = self.run(show_game_results=show_game_results)
+                wins[winner] += 1
+                self.games_to_win[winner].append(self.games_played)
+                self._emit(
+                    f"{spacing}Series {number} of {self.num_series}: {winner} wins. Series record: "
+                    f"{self._record_text(wins)}\n"
+                )
         self._emit(f"{spacing}Series record after {self.num_series}: {self._record_text(wins)}\n")
         average_text = " ".join(
             f"{team} {'n/a' if average is None else format(average, '.1f')}"
@@ -182,6 +236,7 @@ if __name__ == "__main__":
     parser.add_argument("--round-name", default="Playoff Series", help='Label for the series, e.g. "World Series"')
     parser.add_argument("--rotation-len", type=int, default=4, help="Starting pitchers in the rotation (default: 4)")
     parser.add_argument("--num-series", type=int, default=4, help="Times to play the series, tallying winners (default: 4)")
+    parser.add_argument("--max-threads", type=int, default=1, help="Series to run at the same time (default: 1)")
     parser.add_argument(
         "--show-game-results",
         action="store_true",
@@ -192,4 +247,4 @@ if __name__ == "__main__":
     configure_logger("INFO", console_level="WARNING")  # INFO still goes to the log file, not the console
     BaseballPlayoffSeries(
         args.team_a, args.team_b, rotation_len=args.rotation_len, round_name=args.round_name, num_series=args.num_series
-    ).run_all(show_game_results=args.show_game_results)
+    ).run_all(show_game_results=args.show_game_results, max_threads=args.max_threads)

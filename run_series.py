@@ -3,7 +3,8 @@
 
 Uses bbplayoff_series.BaseballPlayoffSeries: the games, home/away order and dates come from the schedule, each series
 starts from freshly loaded data, and only a line per series, the final record and the average games to win are
-printed. Prints the start time, end time and elapsed time of the whole run.
+printed. Up to MAX_THREADS series run at the same time, each on its own loaded data, and the results are accumulated
+across all of them. Prints the start time, end time and elapsed time of the whole run.
 """
 
 from datetime import datetime
@@ -15,6 +16,7 @@ TEAM_A = "MIL"
 TEAM_B = "TBR"
 ROTATION_LEN = 4
 NUM_SERIES = 10
+MAX_THREADS = 6  # series running at once, this machine has 6 physical cores (12 logical)
 
 
 def main() -> None:
@@ -22,9 +24,11 @@ def main() -> None:
 
     start_time = datetime.now()
     print(f"Start time:   {start_time:%Y-%m-%d %H:%M:%S}")
-    print(f"Running {NUM_SERIES} series: {TEAM_A} vs {TEAM_B}, {ROTATION_LEN} man rotation\n")
+    print(f"Running {NUM_SERIES} series: {TEAM_A} vs {TEAM_B}, {ROTATION_LEN} man rotation, up to {MAX_THREADS} threads\n")
 
-    BaseballPlayoffSeries(TEAM_A, TEAM_B, rotation_len=ROTATION_LEN, num_series=NUM_SERIES).run_all()
+    BaseballPlayoffSeries(TEAM_A, TEAM_B, rotation_len=ROTATION_LEN, num_series=NUM_SERIES).run_all(
+        max_threads=MAX_THREADS
+    )
 
     end_time = datetime.now()
     print(f"\nStart time:   {start_time:%Y-%m-%d %H:%M:%S}")

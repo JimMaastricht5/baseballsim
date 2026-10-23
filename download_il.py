@@ -1,7 +1,11 @@
 """
 Copyright (c) 2024 Jim Maastricht
 
-Scrape FanGraphs injury report and save to CSV.
+Scrape the CBS Sports MLB injury report and save to CSV.
+
+The report groups injured players by team and includes a comment such as "Expected to be out until at least Feb 1".
+That expected date is used as the simulated return date. Comments without a usable date fall back to estimates
+based on the comment text.
 
 Usage:
     uv run download_il.py
@@ -11,118 +15,197 @@ Usage:
 
 import argparse
 import csv
-import json
 import random
 import re
 import sys
 from datetime import datetime, timedelta
+from typing import Optional
 
 import requests
+from bs4 import BeautifulSoup
 
-FANGRAPHS_URL = "https://www.fangraphs.com/roster-resource/injury-report"
+CBS_URL = "https://www.cbssports.com/mlb/injuries/"
+USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+
+# CBS team codes that differ from the abbreviations used in the sim data
+CBS_TEAM_CODES = {"KC": "KCR", "SD": "SDP", "SF": "SFG", "TB": "TBR", "WAS": "WSN"}
 
 CSV_COLUMNS = [
     "Player",
     "Team",
     "Position",
-    "Status",
     "Injury",
     "Date",
-    "Eligible",
-    "Return",
     "Latest Update",
     "Sim Return Date",
     "Sim Return Reason",
-    "FG ID",
-    "MLBAM ID",
 ]
 
+MONTHS = {
+    "jan": 1, "feb": 2, "mar": 3, "apr": 4, "may": 5, "jun": 6,
+    "jul": 7, "aug": 8, "sep": 9, "oct": 10, "nov": 11, "dec": 12,
+}  # fmt: skip
+MONTH_NAMES = {
+    "january": 1, "february": 2, "march": 3, "april": 4,
+    "may": 5, "june": 6, "july": 7, "august": 8,
+    "september": 9, "october": 10, "november": 11, "december": 12,
+}  # fmt: skip
 
-def fetch_injury_data(season: int = 2026) -> list[dict]:
-    """Fetch injury report data from FanGraphs.
+# "Feb 1", "Feb. 1", "February 1, 2028"
+EXPECTED_DATE_RE = re.compile(r"\b(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\.?\s+(\d{1,2})(?:,\s*(\d{4}))?", re.I)
+UPDATED_DATE_RE = re.compile(r"^(?:(\w{3}),\s*)?(\w{3})\w*\.?\s+(\d{1,2})$")  # "Mon, Oct 5"
 
-    The page embeds all data as JSON inside a <script id="__NEXT_DATA__"> tag
-    (Next.js server-side rendering). No browser automation needed.
 
-    Args:
-        season: MLB season year to fetch.
+def fetch_injury_data() -> list[dict]:
+    """Fetch and parse the CBS Sports injury report.
+
+    The page is server rendered HTML with one table per team. No browser automation needed.
 
     Returns:
-        List of injury record dicts.
+        List of injury record dicts (see parse_injury_html).
     """
-    params = {"groupby": "all", "timeframe": "current", "season": season}
-    resp = requests.get(FANGRAPHS_URL, params=params, timeout=30)
+    resp = requests.get(CBS_URL, headers={"User-Agent": USER_AGENT}, timeout=30)
     resp.raise_for_status()
+    return parse_injury_html(resp.text)
 
-    match = re.search(r'<script id="__NEXT_DATA__" type="application/json">(.*?)</script>', resp.text)
-    if not match:
-        print("ERROR: Could not find __NEXT_DATA__ JSON in page.", file=sys.stderr)
+
+def parse_injury_html(html: str) -> list[dict]:
+    """Parse the CBS injury report page into one record per injured player.
+
+    Args:
+        html: Page HTML.
+
+    Returns:
+        List of dicts with keys: player, team, position, updated, injury, comment.
+        Team is the sim abbreviation (e.g. KCR, not CBS's KC).
+    """
+    soup = BeautifulSoup(html, "html.parser")
+    team_blocks = soup.select("div.TableBaseWrapper")
+    if not team_blocks:
+        print("ERROR: Could not find any team injury tables in page, has the CBS layout changed?", file=sys.stderr)
         sys.exit(1)
 
-    page_data = json.loads(match.group(1))
-    queries = page_data["props"]["pageProps"]["dehydratedState"]["queries"]
+    injuries = []
+    for block in team_blocks:
+        team_link = block.select_one("h4 a[href*='/mlb/teams/']")
+        if team_link is None:
+            continue
+        cbs_code = team_link["href"].split("/")[3]
+        team = CBS_TEAM_CODES.get(cbs_code, cbs_code)
 
-    # First query is injury data
-    injuries = queries[0]["state"]["data"]
+        for row in block.select("tbody tr.TableBase-bodyTr"):
+            cells = row.select("td")
+            if len(cells) < 5:
+                continue
+            name_tag = cells[0].select_one(".CellPlayerName--long") or cells[0]
+            injuries.append(
+                {
+                    "player": name_tag.get_text(strip=True),
+                    "team": team,
+                    "position": cells[1].get_text(strip=True),
+                    "updated": cells[2].get_text(strip=True),
+                    "injury": cells[3].get_text(strip=True),
+                    "comment": cells[4].get_text(strip=True),
+                }
+            )
     return injuries
 
 
-def filter_active_il(injuries: list[dict]) -> list[dict]:
-    """Filter to only players currently on the IL (exclude activated).
+def parse_updated_date(updated: str, today: Optional[datetime] = None) -> Optional[datetime]:
+    """Parse the report's year-less "Mon, Oct 5" date, using the weekday to work out the year.
 
     Args:
-        injuries: Raw injury records from FanGraphs.
+        updated: Updated text from the report.
+        today: Reference date, defaults to now.
 
     Returns:
-        Filtered list of active IL players.
+        The date, or None if it can't be parsed.
     """
-    return [r for r in injuries if r.get("status") != "Activated"]
+    today = today or datetime.now()
+    match = UPDATED_DATE_RE.match(updated.strip())
+    if not match or match.group(2).lower() not in MONTHS:
+        return None
+    weekday, month, day = match.group(1), MONTHS[match.group(2).lower()], int(match.group(3))
+
+    candidates = []
+    for year in (today.year, today.year - 1, today.year + 1):
+        try:
+            candidates.append(datetime(year, month, day))
+        except ValueError:  # e.g. Feb 29 in a non leap year
+            continue
+    if weekday:
+        for candidate in candidates:
+            if candidate.strftime("%a").lower() == weekday.lower():
+                return candidate
+    past = [c for c in candidates if c <= today]
+    return max(past) if past else None
 
 
-def calculate_sim_return_date(record: dict, season: int = 2026) -> tuple[str, str]:
-    """Calculate the simulated return date for a player on the IL.
+def parse_expected_return(comment: str, updated_date: Optional[datetime], today: Optional[datetime] = None):
+    """Pull the expected return date out of a comment like "Expected to be out until at least Feb 1".
+
+    A year in the comment is used as is. Otherwise it's the first occurrence of that month and day on or after the
+    date the report was updated (or today if the update date is unknown).
+
+    Returns:
+        Tuple of (date, date text as written), or (None, None) if the comment has no date.
+    """
+    match = EXPECTED_DATE_RE.search(comment)
+    if not match:
+        return None, None
+    month, day, year = MONTHS[match.group(1).lower()], int(match.group(2)), match.group(3)
+    text = match.group(0).strip()
+
+    try:
+        if year:
+            return datetime(int(year), month, day), text
+        anchor = updated_date or today or datetime.now()
+        expected = datetime(anchor.year, month, day)
+        if expected < anchor:
+            expected = datetime(anchor.year + 1, month, day)
+        return expected, text
+    except ValueError:  # invalid day for the month
+        return None, None
+
+
+def calculate_sim_return_date(
+    record: dict, season: int = 2026, today: Optional[datetime] = None
+) -> tuple[str, str]:
+    """Calculate the simulated return date for an injured player.
 
     Logic:
-    - If Return date exists → player already activated (should be filtered out)
-    - If eligible date is in the future → use eligible date
-    - If eligible date is in the past AND no return date → determine from Latest Update:
-      - "Out for season" / "Out for 2026 season" → end of season
-      - If there's a rehab/timeline → random 1-14 days
-      - "No timetable for return" / similar → random 1-14 days
+    - Comment has an expected return date in the future → use it
+    - Comment has an expected return date that has already passed → random 1-14 days
+    - No date in the comment → estimate from the text:
+      - "out for season" → start of next season
+      - weeks / months mentioned → that long, with some randomness
+      - "shut down" → 4-6 weeks
+      - "day-to-day" / "no timetable" → random 1-14 days
+      - a month named in full → end of that month
+      - anything else → random 1-14 days
 
     Args:
-        record: FanGraphs injury record dict.
+        record: Injury record dict from parse_injury_html.
         season: Season year.
+        today: Reference date, defaults to now.
 
     Returns:
         Tuple of (sim_return_date, sim_return_reason) as MM/DD/YY strings.
     """
-    today = datetime.now()
-    eligible_str = record.get("eligibledate", "")
-    return_str = record.get("returndate", "")
-    latest_update = (record.get("latestUpdate") or "").lower()
+    today = today or datetime.now()
+    comment = record.get("comment") or ""
+    latest_update = comment.lower()
 
-    # If already returned, shouldn't reach here (filtered out)
-    if return_str:
-        return (return_str, "Already returned")
+    updated_date = parse_updated_date(record.get("updated", ""), today)
+    expected_date, expected_text = parse_expected_return(comment, updated_date, today)
+    if expected_date:
+        if expected_date > today:
+            return (expected_date.strftime("%m/%d/%y"), f"CBS expected return ({expected_text})")
+        days = random.randint(1, 14)
+        return ((today + timedelta(days=days)).strftime("%m/%d/%y"), f"Expected return passed, sim {days} days")
 
-    # Parse eligible date
-    eligible_date = None
-    if eligible_str:
-        try:
-            eligible_date = datetime.strptime(eligible_str, "%m/%d/%y")
-        except ValueError:
-            pass
-
-    # If eligible date is in the future, use it
-    if eligible_date and eligible_date > today:
-        return (eligible_str, "Eligible date (future)")
-
-    # Eligible date is in the past or missing — determine from latest update
-    # Check for "out for season" type updates. These players won't return until
-    # next season starts, not just the end of this year's regular season - a
-    # season-ending injury (e.g. surgery) shouldn't make a player available again
-    # for the postseason or as soon as the following offseason simulation begins.
+    # Season-ending injuries (e.g. surgery) shouldn't make a player available again for the postseason or as soon
+    # as the following offseason simulation begins, so they return when next season starts.
     if any(phrase in latest_update for phrase in ["out for season", "out for the season", f"out for {season}"]):
         next_season_start = datetime(season + 1, 1, 1)
         return (next_season_start.strftime("%m/%d/%y"), "Out for season")
@@ -158,13 +241,8 @@ def calculate_sim_return_date(record: dict, season: int = 2026) -> tuple[str, st
         return_date = today + timedelta(days=days)
         return (return_date.strftime("%m/%d/%y"), f"No timetable, sim {days} days")
 
-    # Check for "out until" with a month mentioned
-    month_map = {
-        "january": 1, "february": 2, "march": 3, "april": 4,
-        "may": 5, "june": 6, "july": 7, "august": 8,
-        "september": 9, "october": 10, "november": 11, "december": 12,
-    }
-    for month_name, month_num in month_map.items():
+    # Check for "out until" with a month named in full
+    for month_name, month_num in MONTH_NAMES.items():
         if month_name in latest_update:
             # Assume end of that month
             return_date = datetime(season, month_num, 28)
@@ -178,36 +256,32 @@ def calculate_sim_return_date(record: dict, season: int = 2026) -> tuple[str, st
     return (return_date.strftime("%m/%d/%y"), f"Default sim {days} days")
 
 
-def format_rows(injuries: list[dict], season: int = 2026) -> list[dict]:
+def format_rows(injuries: list[dict], season: int = 2026, today: Optional[datetime] = None) -> list[dict]:
     """Format injury records into clean CSV rows.
 
-    Uses playerNameRoute for display (avoids encoding issues with accents).
-
     Args:
-        injuries: Filtered injury records.
+        injuries: Injury records from parse_injury_html.
         season: Season year for date calculations.
+        today: Reference date, defaults to now.
 
     Returns:
         List of dicts ready for CSV writer.
     """
+    today = today or datetime.now()
     rows = []
     for r in injuries:
-        sim_return_date, sim_return_reason = calculate_sim_return_date(r, season)
+        sim_return_date, sim_return_reason = calculate_sim_return_date(r, season, today)
+        updated_date = parse_updated_date(r.get("updated", ""), today)
         rows.append(
             {
-                "Player": r.get("playerNameRoute") or r.get("playerName", ""),
-                "Team": r.get("team", ""),
-                "Position": r.get("position", ""),
-                "Status": r.get("status", ""),
-                "Injury": r.get("injurySurgery", ""),
-                "Date": r.get("date", ""),
-                "Eligible": r.get("eligibledate", ""),
-                "Return": r.get("returndate", "") or "",
-                "Latest Update": r.get("latestUpdate", ""),
+                "Player": r["player"],
+                "Team": r["team"],
+                "Position": r["position"],
+                "Injury": r["injury"],
+                "Date": updated_date.strftime("%m/%d/%y") if updated_date else r.get("updated", ""),
+                "Latest Update": r["comment"],
                 "Sim Return Date": sim_return_date,
                 "Sim Return Reason": sim_return_reason,
-                "FG ID": r.get("playerId", ""),
-                "MLBAM ID": r.get("mlbamid", ""),
             }
         )
     # Sort by team, then position, then player name
@@ -229,21 +303,16 @@ def write_csv(rows: list[dict], output_path: str):
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Scrape FanGraphs injury report to CSV")
+    parser = argparse.ArgumentParser(description="Scrape the CBS Sports MLB injury report to CSV")
     parser.add_argument("--season", type=int, default=2026, help="Season year (default: 2026)")
     parser.add_argument("--output", type=str, default=None, help="Output CSV path (default: il_report_YYYY.csv)")
-    parser.add_argument("--all", action="store_true", help="Include activated players (default: active IL only)")
     args = parser.parse_args()
 
     output_path = args.output or f"il_report_{args.season}.csv"
 
-    print(f"Fetching FanGraphs injury report for {args.season}...")
-    injuries = fetch_injury_data(args.season)
-    print(f"  Found {len(injuries)} total records")
-
-    if not args.all:
-        injuries = filter_active_il(injuries)
-        print(f"  Active IL: {len(injuries)} players")
+    print(f"Fetching CBS Sports injury report for {args.season}...")
+    injuries = fetch_injury_data()
+    print(f"  Found {len(injuries)} injured players")
 
     rows = format_rows(injuries, args.season)
     write_csv(rows, output_path)

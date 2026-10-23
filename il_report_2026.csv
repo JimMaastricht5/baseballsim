@@ -1,273 +1,257 @@
-Player,Team,Position,Status,Injury,Date,Eligible,Return,Latest Update,Sim Return Date,Sim Return Reason,FG ID,MLBAM ID
-Tyler Locklear,ARI,1B,60-Day IL,Fractured thumb (right),09/09/26,11/11/26,,Out for 2026 season,11/11/26,Eligible date (future),31396,682988
-A.J. Puk,ARI,RP,60-Day IL,Tommy John surgery (internal brace),06/19/25,05/24/26,,Out for 2026 season,01/01/27,Out for season,19343,640462
-Andrew Saalfrank,ARI,RP,60-Day IL,Shoulder surgery,02/09/26,05/24/26,,Out for 2026 season,01/01/27,Out for season,26203,685314
-Ryan Thompson,ARI,RP,60-Day IL,Strained lower back,08/04/26,10/04/26,,Rehab assignment (9/20),10/04/26,Eligible date (future),16647,657044
-Corbin Burnes,ARI,SP,15-Day IL,Shoulder inflammation,09/20/26,10/07/26,,No timetable for return,10/07/26,Eligible date (future),19361,669203
-Cristian Mena,ARI,SP,60-Day IL,Shoulder surgery,02/01/26,05/24/26,,Out for 2026 season,01/01/27,Out for season,27974,691441
-Nick Kurtz,ATH,1B,60-Day IL,Strained thumb (right),07/31/26,09/30/26,,Questionable for 2026 season,09/30/26,Eligible date (future),35110,701762
-Max Muncy,ATH,INF/OF,10-Day IL,Knee chondromalacia,09/17/26,09/29/26,,Out for 2026 season,09/29/26,Eligible date (future),29779,691777
-Brent Rooker,ATH,OF,60-Day IL,Arthroscopic knee surgery,07/17/26,08/08/26,,Out for 2026 season,01/01/27,Out for season,19627,667670
-Tyler Soderstrom,ATH,OF,60-Day IL,Hip surgery,08/21/26,10/14/26,,Out for 2026 season,10/14/26,Eligible date (future),27467,691016
-Brooks Kriske,ATH,RP,60-Day IL,Shoulder impingement,05/12/26,07/12/26,,Questionable for 2026 season,10/02/26,Default sim 4 days,21189,621139
-Justin Sterner,ATH,RP,60-Day IL,Knee surgery,08/13/26,09/16/26,,Out for 2026 season,01/01/27,Out for season,27694,686993
-Mark Leiter Jr.,ATH,RP,60-Day IL,Hip surgery,07/28/26,09/17/26,,Out for 2026 season,01/01/27,Out for season,15551,643410
-Gage Jump,ATH,SP,15-Day IL,Shoulder impingement,09/12/26,09/28/26,,Out for 2026 season,01/01/27,Out for season,35418,695611
-Gunnar Hoglund,ATH,SP,60-Day IL,Hip surgery,05/19/26,05/21/26,,Out for 2026 season,01/01/27,Out for season,31318,680684
-J.T. Ginn,ATH,SP,60-Day IL,Elbow impingement,08/26/26,11/01/26,,Out for 2026 season,11/01/26,Eligible date (future),27889,669372
-Luis Severino,ATH,SP,60-Day IL,Strained shoulder,05/29/26,07/29/26,,Questionable for 2026 season,10/11/26,Default sim 13 days,15890,622663
-Jacob Wilson,ATH,SS,60-Day IL,Shoulder surgery (left),09/09/26,10/17/26,,Out for 2026 season,10/17/26,Eligible date (future),33266,805779
-Lane Thomas,ATL,OF,10-Day IL,Strained oblique,09/07/26,09/18/26,,Questionable for 2026 season,10/02/26,Default sim 4 days,16939,657041
-Reynaldo Lopez,ATL,OF,15-Day IL,Shoulder inflammation,09/14/26,09/30/26,,No timetable for return,09/30/26,Eligible date (future),16400,625643
-Joe Jimenez,ATL,RP,60-Day IL,Arthroscopic knee surgery,10/01/25,05/24/26,,Rehab assignment (9/15),10/02/26,Default sim 4 days,15761,641729
-Bryce Elder,ATL,SP,15-Day IL,Arthroscopic knee surgery,09/08/26,09/21/26,,Questionable for 2026 season,10/07/26,Default sim 9 days,27779,693821
-Hurston Waldrep,ATL,SP,60-Day IL,Tommy John surgery,09/01/26,11/23/26,,Out for 2026 season,11/23/26,Eligible date (future),33527,694462
-Joey Wentz,ATL,SP,60-Day IL,Torn knee ligament (ACL),03/08/26,05/24/26,,Out for 2026 season,01/01/27,Out for season,19962,666214
-Martin Perez,ATL,SP,15-Day IL,Lower back inflammation,09/20/26,10/06/26,,No timetable for return,10/06/26,Eligible date (future),6902,527048
-Spencer Schwellenbach,ATL,SP,60-Day IL,Arthroscopic elbow surgery (bone spurs),02/18/26,05/24/26,,Out for 2026 season,01/01/27,Out for season,31846,680885
-Spencer Strider,ATL,SP,60-Day IL,Elbow inflammation,06/12/26,08/12/26,,Questionable for 2026 season,10/02/26,Default sim 4 days,27498,675911
-Ryan Mountcastle,BAL,1B,60-Day IL,Fractured foot,04/10/26,06/10/26,,Questionable for 2026 season,10/03/26,Default sim 5 days,18373,663624
-Jackson Holliday,BAL,2B,10-Day IL,Wrist inflammation (left),09/14/26,09/25/26,,Out for 2026 season,01/01/27,Out for season,31781,702616
-Samuel Basallo,BAL,C,7-Day IL,Concussion,09/21/26,09/29/26,,Out for 2026 season,09/29/26,Eligible date (future),28824,694212
-Jordan Westburg,BAL,INF,60-Day IL,Tommy John surgery,05/13/26,05/22/26,,Out for 2026 season,01/01/27,Out for season,27815,676059
-Blaze Alexander,BAL,INF/OF,10-Day IL,Lower back discomfort,09/08/26,09/19/26,,No timetable for return,10/11/26,"No timetable, sim 13 days",23789,677942
-Luis Robert Jr.,BAL,OF,10-Day IL,Strained hamstring,09/04/26,09/15/26,,No timetable for return,10/02/26,"No timetable, sim 4 days",20043,673357
-Tyler O'Neill,BAL,OF,60-Day IL,Strained shoulder (right),08/22/26,10/22/26,,Questionable for 2026 season,10/22/26,Eligible date (future),15711,641933
-Colin Selby,BAL,RP,60-Day IL,Shoulder surgery (torn labrum),07/28/26,05/24/26,,Out for 2026 season,01/01/27,Out for season,24986,681882
-Keegan Akin,BAL,RP,60-Day IL,Tommy John surgery,07/15/26,08/27/26,,Out for 2026 season,01/01/27,Out for season,19362,669211
-Ryan Helsley,BAL,RP,60-Day IL,Elbow discomfort,07/01/26,08/29/26,,Out for 2026 season,01/01/27,Out for season,18138,664854
-Kyle Bradish,BAL,SP,60-Day IL,Sports hernia,09/12/26,11/12/26,,Out for 2026 season,11/12/26,Eligible date (future),24586,680694
-Zach Eflin,BAL,SP,60-Day IL,Tommy John surgery,04/08/26,05/31/26,,Out for 2026 season,01/01/27,Out for season,13774,621107
-Triston Casas,BOS,1B,60-Day IL,Knee surgery (ruptured patellar tendon),05/04/25,05/21/26,,Questionable for 2026 season,10/03/26,Default sim 5 days,22514,671213
-Mickey Gasper,BOS,1B/C,10-Day IL,Strained biceps,09/25/26,10/06/26,,Out for 2026 season,10/06/26,Eligible date (future),24759,681508
-Masataka Yoshida,BOS,DH,10-Day IL,Strained hamstring,08/15/26,08/26/26,,Questionable for 2026 season,10/12/26,Default sim 14 days,31837,807799
-Anthony Seigler,BOS,INF,10-Day IL,Wrist inflammation,09/12/26,09/23/26,,No timetable for return,10/01/26,"No timetable, sim 3 days",23802,678011
-Curtis Mead,BOS,INF,10-Day IL,Fractured wrist (left),07/27/26,08/07/26,,Questionable for 2026 season,10/07/26,Default sim 9 days,23986,678554
-Eli White,BOS,OF,60-Day IL,Foot surgery (Lisfranc repair),09/22/26,11/08/26,,Out for 2026 season,11/08/26,Eligible date (future),19346,642201
-Johan Oviedo,BOS,RP,60-Day IL,Strained elbow flexor,03/30/26,05/30/26,,Rehab assignment (9/17),10/04/26,Default sim 6 days,22487,670912
-Justin Slaten,BOS,RP,15-Day IL,Elbow inflammation,08/12/26,08/28/26,,Out for 2026 season,01/01/27,Out for season,25648,686580
-Tayron Guerrero,BOS,RP,15-Day IL,Strained shoulder,09/23/26,10/09/26,,No timetable for return,10/09/26,Eligible date (future),11691,594027
-Zack Kelly,BOS,RP,60-Day IL,Elbow inflammation,07/03/26,09/19/26,,Questionable for 2026 season,10/11/26,Default sim 13 days,20349,677161
-Eduardo Rivera,BOS,SP,60-Day IL,Strained back (lumbar),08/11/26,10/31/26,,Out for 2026 season,10/31/26,Eligible date (future),31280,700842
-Garrett Crochet,BOS,SP,60-Day IL,Shoulder inflammation,04/25/26,06/25/26,,No timetable for return,10/03/26,"No timetable, sim 5 days",27463,676979
-Kutter Crawford,BOS,SP,60-Day IL,Wrist surgery,07/02/25,05/21/26,,Rehab assignment (9/20),10/04/26,Default sim 6 days,20531,676710
-Tyler Austin,CHC,1B/OF,60-Day IL,Knee surgery (patella debridement),02/24/26,05/24/26,,Questionable for 2026 season,10/03/26,Default sim 5 days,11850,592122
-Hunter Harvey,CHC,RP,60-Day IL,Triceps inflammation,04/08/26,06/08/26,,Questionable for 2026 season,10/05/26,Default sim 7 days,15507,640451
-Phil Maton,CHC,RP,60-Day IL,Knee surgery (partially torn patellar tendon),09/01/26,09/18/26,,Out for 2026 season,01/01/27,Out for season,18064,664208
-Porter Hodge,CHC,RP,60-Day IL,Tommy John surgery,04/20/26,05/21/26,,Out for 2026 season,01/01/27,Out for season,26413,687863
-Riley Martin,CHC,RP,60-Day IL,Strained elbow (flexor),04/23/26,06/23/26,,Rehab assignment (9/20),09/29/26,Default sim 1 days,29934,702303
-Shelby Miller,CHC,RP,60-Day IL,Tommy John surgery,10/01/25,05/24/26,,Out for 2026 season,01/01/27,Out for season,10197,571946
-Trent Thornton,CHC,RP,15-Day IL,Ankle discomfort,09/11/26,09/27/26,,No timetable for return,10/07/26,"No timetable, sim 9 days",17948,663423
-Ben Brown,CHC,SP,60-Day IL,Stress reaction in neck,06/19/26,08/20/26,,Out for 2026 season,01/01/27,Out for season,23590,676962
-Cade Horton,CHC,SP,60-Day IL,Tommy John surgery,04/16/26,06/03/26,,Out for 2026 season,01/01/27,Out for season,31872,690990
-Justin Steele,CHC,SP,60-Day IL,Elbow surgery (UCL revision repair),04/18/25,05/24/26,,Rehab assignment (9/2),10/09/26,Default sim 11 days,17312,657006
-Joey Bart,CHW,C,10-Day IL,"Fractured hand (5th metacarpal, left)",08/06/26,08/17/26,,Out at least 1 month,10/28/26,~1 months (from update),21524,663698
-Tanner Murray,CHW,INF/OF,60-Day IL,Dislocated shoulder,04/26/26,06/26/26,,Expected to miss 4-6 months,04/26/27,~7 months (from update),28848,695020
-Brooks Baldwin,CHW,OF/INF,60-Day IL,Elbow surgery (internal brace),04/01/26,05/21/26,,Out for 2026 season,01/01/27,Out for season,31394,681460
-Jordan Leasure,CHW,RP,60-Day IL,Tommy John surgery,08/17/26,07/28/26,,Out for 2026 season,01/01/27,Out for season,29950,673929
-Mike Vasil,CHW,RP,60-Day IL,Tommy John surgery,03/01/26,05/21/26,,Out for 2026 season,01/01/27,Out for season,30105,678024
-Ky Bush,CHW,SP,60-Day IL,Tommy John surgery,02/12/25,05/24/26,,Out for 2026 season,01/01/27,Out for season,29823,681066
-Prelander Berroa,CHW,SP,60-Day IL,Tommy John surgery,03/01/25,05/21/26,,Questionable for 2026 season,10/10/26,Default sim 12 days,22932,672860
-Luis Castillo,CHW,SP/RP,15-Day IL,Shoulder impingement,09/22/26,10/08/26,,No timetable for return,10/08/26,Eligible date (future),15689,622491
-Michael Toglia,CIN,1B/OF,60-Day IL,Shoulder surgery (torn labrum),08/25/26,10/21/26,,Out for 2026 season,10/21/26,Eligible date (future),25845,669911
-Spencer Steer,CIN,INF/OF,60-Day IL,Wrist surgery (right),09/30/26,09/25/26,,Out for 2026 season,01/01/27,Out for season,26323,668715
-Blake Dunn,CIN,OF,60-Day IL,Elbow surgery,08/03/26,08/26/26,,Out for 2026 season,01/01/27,Out for season,29487,694362
-Julian Garcia,CIN,RP,15-Day IL,Elbow loose bodies,09/16/26,10/02/26,,Out for 2026 season,10/02/26,Eligible date (future),22362,670062
-Tony Santillan,CIN,RP,15-Day IL,Hip surgery (labral tear),09/24/26,10/04/26,,Out for 2026 season,10/04/26,Eligible date (future),19926,663574
-Chase Burns,CIN,SP,15-Day IL,Strained groin,09/18/26,10/04/26,,Out for 2026 season,10/04/26,Eligible date (future),35333,695505
-Hunter Greene,CIN,SP,60-Day IL,Tommy John surgery,08/12/26,10/01/26,,Out for 2026 season,10/01/26,Eligible date (future),22182,668881
-Rhys Hoskins,CLE,1B,10-Day IL,Lower back inflammation,08/18/26,08/29/26,,No timetable for return,10/08/26,"No timetable, sim 10 days",16472,656555
-Colin Holderman,CLE,RP,15-Day IL,Wrist inflammation,09/03/26,09/19/26,,No timetable for return,10/08/26,"No timetable, sim 10 days",22361,670059
-Kris Bryant,COL,1B/OF,60-Day IL,Lumbar degenerative disc disease,04/01/25,05/24/26,,Questionable for 2026 season,10/03/26,Default sim 5 days,15429,592178
-Willi Castro,COL,INF/OF,10-Day IL,Heel inflammation,09/01/26,09/12/26,,Questionable for 2026 season,10/09/26,Default sim 11 days,17338,650489
-Robert Petit,COL,RP,60-Day IL,Tommy John surgery (internal brace),03/20/26,05/21/26,,Out for 2026 season,01/01/27,Out for season,sa3017848,696275
-Welinton Herrera,COL,RP,60-Day IL,Torn elbow ligament,05/29/26,07/29/26,,Questionable for 2026 season,10/06/26,Default sim 8 days,29318,700327
-Chase Dollander,COL,SP,60-Day IL,Elbow surgery (internal brace),06/22/26,07/14/26,,Out for 2026 season,01/01/27,Out for season,33482,801403
-McCade Brown,COL,SP,60-Day IL,Shoulder inflammation,02/01/26,05/21/26,,Questionable for 2026 season,10/03/26,Default sim 5 days,30004,685326
-Pierson Ohl,COL,SP,60-Day IL,Tommy John surgery,02/01/26,05/24/26,,Out for 2026 season,01/01/27,Out for season,30179,701487
-Colt Keith,DET,1B/3B,10-Day IL,Sprained thumb (left),09/19/26,09/30/26,,Out for 2026 season,09/30/26,Eligible date (future),27899,690993
-Trey Sweeney,DET,INF,60-Day IL,Shoulder surgery,06/01/26,05/21/26,,Out for 2026 season,01/01/27,Out for season,29575,700242
-Kerry Carpenter,DET,OF,60-Day IL,Plantar fasciitis,07/26/26,09/25/26,,No timetable for return,09/29/26,"No timetable, sim 1 days",25961,681481
-Parker Meadows,DET,OF,60-Day IL,Arm surgery (fractured radius),04/09/26,06/09/26,,Questionable for 2026 season,10/12/26,Default sim 14 days,23800,678009
-Wenceel Perez,DET,OF,60-Day IL,Orbital fracture,06/16/26,08/16/26,,Questionable for 2026 season,10/07/26,Default sim 9 days,22857,672761
-Matt Vierling,DET,OF/INF,60-Day IL,Strained groin,07/29/26,09/28/26,,Out for 2026 season,01/01/27,Out for season,21558,663837
-Bailey Horn,DET,RP,60-Day IL,Tommy John surgery,07/01/26,05/21/26,,Out for 2026 season,01/01/27,Out for season,27753,690544
-Burch Smith,DET,RP,60-Day IL,Arthroscopic shoulder surgery,08/31/26,07/21/26,,Out for 2026 season,01/01/27,Out for season,12784,572143
-Kyle Finnegan,DET,RP,15-Day IL,Groin inflammation,09/15/26,10/01/26,,Out for 2026 season,10/01/26,Eligible date (future),15009,640448
-Will Vest,DET,RP,60-Day IL,Elbow surgery (stress fracture),07/29/26,08/27/26,,Out for 2026 season,01/01/27,Out for season,19769,676684
-Reese Olson,DET,SP,60-Day IL,Shoulder surgery,02/02/26,05/24/26,,Out for 2026 season,01/01/27,Out for season,24968,681857
-Troy Melton,DET,SP,15-Day IL,Arm fatigue,09/20/26,10/06/26,,Out for 2026 season,10/06/26,Eligible date (future),31807,675512
-Carlos Correa,HOU,INF,60-Day IL,Ankle surgery (torn tendon),05/11/26,07/04/26,,Out for 2026 season,01/01/27,Out for season,14162,621043
-Daulton Varsho,HOU,OF,10-Day IL,Wrist inflammation (left),09/19/26,10/03/26,,No timetable for return,10/03/26,Eligible date (future),19918,662139
-Jake Meyers,HOU,OF,60-Day IL,Fractured knee,09/11/26,11/22/26,,Out for 2026 season,11/22/26,Eligible date (future),20308,676694
-Brice Matthews,HOU,OF/INF,10-Day IL,Knee inflammation,09/22/26,10/03/26,,No timetable for return,10/03/26,Eligible date (future),33280,694728
-Enyel De Los Santos,HOU,RP,15-Day IL,Knee tendinitis,09/18/26,10/04/26,,No timetable for return,10/04/26,Eligible date (future),18403,660853
-Steven Okert,HOU,RP,15-Day IL,Strained hamstring,08/31/26,09/16/26,,No timetable for return,10/12/26,"No timetable, sim 14 days",13580,595345
-Brandon Walter,HOU,SP,60-Day IL,Tommy John surgery,09/22/25,05/24/26,,Out for 2026 season,01/01/27,Out for season,26056,687888
-Cristian Javier,HOU,SP,15-Day IL,Strained groin,09/22/26,10/08/26,,No timetable for return,10/08/26,Eligible date (future),17606,664299
-Mike Burrows,HOU,SP,60-Day IL,Elbow neuritis,07/06/26,09/05/26,,No timetable for return,10/01/26,"No timetable, sim 3 days",24728,681347
-Jonathan India,KCR,2B,60-Day IL,Shoulder surgery (torn labrum),04/28/26,06/18/26,,Out for 2026 season,01/01/27,Out for season,21523,663697
-Beck Way,KCR,RP,15-Day IL,Back spasms,07/24/26,08/09/26,,Rehab assignment (8/18),10/05/26,Default sim 7 days,27877,694360
-Carlos Estevez,KCR,RP,60-Day IL,Shoulder surgery,09/01/26,05/28/26,,Out for 2026 season,01/01/27,Out for season,14542,608032
-Connor Seabold,KCR,RP,60-Day IL,Strained lat,06/30/26,08/30/26,,Rehab assignment (9/10),09/29/26,Default sim 1 days,19695,657756
-Nick Mears,KCR,RP,60-Day IL,Shoulder impingement,05/27/26,07/27/26,,Questionable for 2026 season,09/30/26,Default sim 2 days,25376,683232
-Tony Gonsolin,KCR,RP,15-Day IL,Allergic reaction,09/27/26,10/09/26,,Out for 2026 season,10/09/26,Eligible date (future),19388,664062
-Alec Marsh,KCR,SP,60-Day IL,Shoulder surgery (torn labrum),10/10/25,05/24/26,,Questionable for 2026 season,10/01/26,Default sim 3 days,27451,679525
-Cole Ragans,KCR,SP,60-Day IL,Elbow surgery (UCL repair),07/01/26,07/06/26,,Out for 2026 season,01/01/27,Out for season,21846,666142
-Luinder Avila,KCR,SP,60-Day IL,Tommy John surgery,08/05/26,10/01/26,,Out for 2026 season,10/01/26,Eligible date (future),24452,679883
-Stephen Kolek,KCR,SP,60-Day IL,Tommy John surgery,08/05/26,09/17/26,,Out for 2026 season,01/01/27,Out for season,21487,663568
-Nolan Schanuel,LAA,1B,10-Day IL,Strained oblique,08/20/26,08/31/26,,Rehab assignment (9/12),10/02/26,Default sim 4 days,33189,694384
-Anthony Rendon,LAA,3B,60-Day IL,Hip surgery,02/01/25,05/24/26,,Out for 2026 season,01/01/27,Out for season,12861,543685
-Yoan Moncada,LAA,3B,60-Day IL,Knee inflammation,05/21/26,07/21/26,,Questionable for 2026 season,10/11/26,Default sim 13 days,17232,660162
-Kyren Paris,LAA,INF/OF,10-Day IL,Fractured finger (right index),09/14/26,09/25/26,,No timetable for return,10/07/26,"No timetable, sim 9 days",26420,677347
-Gustavo Campero,LAA,OF,10-Day IL,Strained hamstring,08/25/26,09/05/26,,No timetable for return,10/08/26,"No timetable, sim 10 days",22707,672569
-Ben Joyce,LAA,RP,15-Day IL,Shoulder impingement,09/19/26,10/06/26,,Out for 2026 season,10/06/26,Eligible date (future),31461,690829
-Robert Stephenson,LAA,RP,60-Day IL,Elbow surgery (UCL/flexor tendon),04/08/26,05/24/26,,Out for 2026 season,01/01/27,Out for season,13594,596112
-Samuel Natera,LAA,RP,15-Day IL,Forearm inflammation,09/11/26,09/28/26,,Out for 2026 season,01/01/27,Out for season,31936,696519
-George Klassen,LAA,SP,15-Day IL,Lower back inflammation,08/24/26,09/11/26,,No timetable for return,10/05/26,"No timetable, sim 7 days",33464,691946
-Jack Kochanowicz,LAA,SP,60-Day IL,Tommy John surgery,06/01/26,08/06/26,,Out for 2026 season,01/01/27,Out for season,27688,686799
-Ben Casparius,LAD,RP,60-Day IL,Shoulder inflammation,04/12/26,06/12/26,,No timetable for return,10/07/26,"No timetable, sim 9 days",30085,676508
-Blake Treinen,LAD,RP,15-Day IL,Shoulder inflammation,09/26/26,10/09/26,,Out for 2026 season,10/09/26,Eligible date (future),12572,595014
-Brusdar Graterol,LAD,RP,60-Day IL,Back surgery,05/31/26,05/21/26,,Questionable for 2026 season,10/02/26,Default sim 4 days,20367,660813
-Edgardo Henriquez,LAD,RP,15-Day IL,Lower back discomfort,09/13/26,09/29/26,,No timetable for return,09/29/26,Eligible date (future),26944,683618
-Jake Cousins,LAD,RP,60-Day IL,Tommy John surgery,06/18/25,05/23/26,,No timetable for return,10/04/26,"No timetable, sim 6 days",21620,664776
-Will Klein,LAD,RP,60-Day IL,Elbow discomfort,07/31/26,09/30/26,,Questionable for 2026 season,09/30/26,Eligible date (future),27787,694361
-Eric Lauer,LAD,SP,60-Day IL,Elbow inflammation,09/01/26,11/01/26,,Out for 2026 season,11/01/26,Eligible date (future),19316,641778
-Gavin Stone,LAD,SP,60-Day IL,Shoulder inflammation,02/01/26,05/21/26,,Rehab assignment (8/6),09/29/26,Default sim 1 days,27792,694813
-Owen Caissie,MIA,OF,10-Day IL,Lumbar stress reaction,09/12/26,09/23/26,,No timetable for return,09/29/26,"No timetable, sim 1 days",27496,683357
-Andrew Nardi,MIA,RP,60-Day IL,Elbow surgery,08/28/26,07/27/26,,Out for 2026 season,01/01/27,Out for season,25942,677053
-Anthony Bender,MIA,RP,15-Day IL,Shin surgery (stress reaction),09/23/26,07/13/26,,Out for 2026 season,01/01/27,Out for season,19742,669622
-Pete Fairbanks,MIA,RP,15-Day IL,Thoracic outet syndrome surgery,09/01/26,09/30/26,,Out for 2026 season,09/30/26,Eligible date (future),17998,664126
-Ronny Henriquez,MIA,RP,60-Day IL,Tommy John surgery (internal brace),12/22/25,05/24/26,,Out for 2026 season,01/01/27,Out for season,24094,678692
-Tyler Zuber,MIA,RP,15-Day IL,Sprained elbow,09/22/26,10/08/26,,Out for 2026 season,10/08/26,Eligible date (future),20379,676604
-William Kempner,MIA,RP,60-Day IL,Elbow surgery,08/24/26,09/10/26,,Out for 2026 season,01/01/27,Out for season,31615,687531
-Adam Mazur,MIA,SP,60-Day IL,Tommy John surgery (internal brace),03/11/26,05/24/26,,Out for 2026 season,01/01/27,Out for season,31900,800049
-Max Meyer,MIA,SP,15-Day IL,Strained neck,07/18/26,08/03/26,,Questionable for 2026 season,10/03/26,Default sim 5 days,27474,676974
-Robby Snelling,MIA,SP,60-Day IL,Tommy John surgery (internal brace),05/22/26,07/09/26,,Out for 2026 season,01/01/27,Out for season,31893,702281
-Andrew Vaughn,MIL,1B,10-Day IL,Illness,09/22/26,10/02/26,,No timetable for return,10/02/26,Eligible date (future),26197,683734
-Angel Zerpa,MIL,RP,60-Day IL,Tommy John surgery,05/11/26,06/25/26,,Out for 2026 season,01/01/27,Out for season,22717,672582
-Brian Fitzpatrick,MIL,RP,60-Day IL,Tommy John surgery,07/01/26,08/05/26,,Out for 2026 season,01/01/27,Out for season,31624,702153
-Grant Anderson,MIL,RP,15-Day IL,Biceps inflammation,09/06/26,09/22/26,,No timetable for return,10/08/26,"No timetable, sim 10 days",20546,681982
-Brandon Woodruff,MIL,SP,15-Day IL,Shoulder surgery,08/01/26,07/20/26,,Out for 2026 season,01/01/27,Out for season,16162,605540
-Quinn Priester,MIL,SP,60-Day IL,Thoracic outlet decompression surgery,06/22/26,05/21/26,,Out for 2026 season,01/01/27,Out for season,25977,682990
-Byron Buxton,MIN,OF,10-Day IL,Arthroscopic hip surgery,09/18/26,09/06/26,,Out for 2026 season,01/01/27,Out for season,14161,621439
-Jeff Hoffman,MIN,OF,15-Day IL,Forearm inflammation,09/22/26,10/08/26,,Out for 2026 season,10/08/26,Eligible date (future),17432,656546
-Trevor Larnach,MIN,OF,10-Day IL,Sprained wrist (left),09/13/26,09/25/26,,No timetable for return,10/08/26,"No timetable, sim 10 days",21501,663616
-Anthony Banda,MIN,RP,60-Day IL,Lat surgery,07/09/26,08/28/26,,Out for 2026 season,01/01/27,Out for season,14706,607455
-Cole Sands,MIN,RP,60-Day IL,Arthroscopic elbow surgery,08/04/26,09/25/26,,Out for 2026 season,01/01/27,Out for season,21461,663485
-David Festa,MIN,SP,60-Day IL,Arthroscopic shoulder surgery/Thoracic outlet synd,07/29/26,05/21/26,,Out for 2026 season,01/01/27,Out for season,30056,701581
-Mick Abel,MIN,SP,60-Day IL,Arthroscopic elbow surgery,07/01/26,06/16/26,,Questionable for 2026 season,10/02/26,Default sim 4 days,27756,690953
-Mike Paredes,MIN,SP,60-Day IL,Strained oblique,07/25/26,09/21/26,,No timetable for return,10/02/26,"No timetable, sim 4 days",30187,702474
-Pablo Lopez,MIN,SP,60-Day IL,Tommy John surgery (internal brace),02/25/26,05/24/26,,Out for 2026 season,01/01/27,Out for season,17085,641154
-Jared Young,NYM,1B,7-Day IL,Concussion,09/17/26,09/25/26,,No timetable for return,09/30/26,"No timetable, sim 2 days",20404,676724
-Jorge Polanco,NYM,1B,60-Day IL,Ankle surgery,08/26/26,10/18/26,,Out for 2026 season,10/18/26,Eligible date (future),13152,593871
-Daniel Duarte,NYM,RP,15-Day IL,Strained hamstring,09/15/26,10/01/26,,Out for 2026 season,10/01/26,Eligible date (future),17480,650960
-Jonathan Pintaro,NYM,RP,15-Day IL,Illness,09/27/26,10/11/26,,Out for 2026 season,10/11/26,Eligible date (future),33980,702752
-Reed Garrett,NYM,RP,60-Day IL,Tommy John surgery,10/08/25,05/24/26,,Out for 2026 season,01/01/27,Out for season,16866,657585
-Christian Scott,NYM,SP,15-Day IL,Knee inflammation,09/19/26,10/05/26,,Out for 2026 season,10/05/26,Eligible date (future),30107,681035
-Robert Stock,NYM,SP,15-Day IL,Finger numbness,09/16/26,09/28/26,,Out for 2026 season,01/01/27,Out for season,6576,476594
-Tylor Megill,NYM,SP,60-Day IL,Tommy John surgery,09/22/25,05/24/26,,Out for 2026 season,01/01/27,Out for season,21318,656731
-Giancarlo Stanton,NYY,DH,60-Day IL,Strained calf,04/24/26,06/24/26,,Questionable for 2026 season,10/08/26,Default sim 10 days,4949,519317
-Aaron Judge,NYY,OF,10-Day IL,Strained calf,09/16/26,09/27/26,,No timetable for return,09/30/26,"No timetable, sim 2 days",15640,592450
-Trent Grisham,NYY,OF,10-Day IL,Strained hamstring,09/04/26,09/15/26,,No timetable for return,10/11/26,"No timetable, sim 13 days",18564,663757
-Clarke Schmidt,NYY,RP,15-Day IL,Biceps neuritis,09/21/26,10/06/26,,No timetable for return,10/06/26,Eligible date (future),19899,657376
-Fernando Cruz,NYY,RP,60-Day IL,Elbow discomfort,08/25/26,10/25/26,,Out for 2026 season,10/25/26,Eligible date (future),7048,518585
-Kervin Castro,NYY,RP,60-Day IL,Elbow neuritis,08/09/26,10/09/26,,Out for 2026 season,10/09/26,Eligible date (future),21656,665645
-Ryan Weathers,NYY,SP,15-Day IL,Strained forearm flexor,08/22/26,09/07/26,,No timetable for return,10/09/26,"No timetable, sim 11 days",23796,677960
-Adolis Garcia,PHI,OF,60-Day IL,Lat surgery,06/24/26,08/10/26,,Out for 2026 season,01/01/27,Out for season,19287,666969
-Johan Rojas,PHI,OF,60-Day IL,UCL surgery,06/19/26,08/24/26,,Out for 2026 season,01/01/27,Out for season,24336,679032
-Felix Reyes,PHI,OF/1B,60-Day IL,Fractured wrist (right),08/14/26,10/19/26,,Out for 2026 season,10/19/26,Eligible date (future),28763,694025
-Brad Keller,PHI,RP,60-Day IL,Elbow surgery (internal brace/flexor tendon repair,07/29/26,09/11/26,,Out for 2026 season,01/01/27,Out for season,15734,641745
-Caleb Kilian,PHI,RP,60-Day IL,Strained oblique,08/09/26,10/09/26,,No timetable for return,10/09/26,Eligible date (future),26213,668873
-Endy Rodriguez,PIT,C/1B,60-Day IL,Hip surgery,08/26/26,10/09/26,,Out for 2026 season,10/09/26,Eligible date (future),25332,682848
-Esmerlyn Valdez,PIT,OF,10-Day IL,Strained hamstring,09/11/26,09/22/26,,Out for 2026 season,01/01/27,Out for season,29005,699013
-Isaac Mattson,PIT,RP,15-Day IL,Hip impingement,09/05/26,09/21/26,,No timetable for return,10/04/26,"No timetable, sim 6 days",20385,676755
-Braxton Ashcraft,PIT,SP,15-Day IL,Arm discomfort,09/05/26,09/22/26,,Out for 2026 season,01/01/27,Out for season,23793,677952
-Mitch Keller,PIT,SP,60-Day IL,Shoulder injury (teres major),08/02/26,10/02/26,,Questionable for 2026 season,10/02/26,Eligible date (future),17594,656605
-Luis Rengifo,SDP,INF/OF,60-Day IL,Torn knee ligament (ACL),08/29/26,10/29/26,,Out for 2026 season,10/29/26,Eligible date (future),19858,650859
-Miguel Andujar,SDP,INF/OF,10-Day IL,Fractured wrist (right),07/19/26,07/30/26,,Rehab assignment (9/8),10/03/26,Default sim 5 days,15878,609280
-Ramon Laureano,SDP,OF,60-Day IL,Hip surgery (torn labrum),06/05/26,07/30/26,,Questionable for 2026 season,10/08/26,Default sim 10 days,17128,657656
-Bryan Hoeing,SDP,RP,60-Day IL,Elbow surgery (flexor tendon),03/01/26,05/21/26,,Out for 2026 season,01/01/27,Out for season,26304,663773
-Jeremiah Estrada,SDP,RP,15-Day IL,Shoulder impingement,08/24/26,09/09/26,,No timetable for return,10/08/26,"No timetable, sim 10 days",22210,669093
-Casey Mize,SDP,SP,15-Day IL,Sprained ankle,08/22/26,10/11/26,,No timetable for return,10/11/26,Eligible date (future),20492,663554
-Joe Musgrove,SDP,SP,60-Day IL,Tommy John surgery,10/11/24,05/21/26,,Questionable for 2026 season,10/09/26,Default sim 11 days,12970,605397
-Lucas Giolito,SDP,SP,60-Day IL,Elbow inflammation,06/21/26,08/21/26,,Questionable for 2026 season,10/12/26,Default sim 14 days,15474,608337
-Brock Rodden,SEA,INF,10-Day IL,Knee inflammation (patella tendon),09/22/26,10/03/26,,Out for 2026 season,10/03/26,Eligible date (future),33191,801126
-Will Wilson,SEA,INF,60-Day IL,Fractured thumb (left),04/29/26,06/29/26,,No timetable for return,09/30/26,"No timetable, sim 2 days",25434,669717
-Brendan Donovan,SEA,INF/OF,7-Day IL,Concussion,08/22/26,08/29/26,,No timetable for return,10/11/26,"No timetable, sim 13 days",24679,680977
-Brennen Davis,SEA,OF,60-Day IL,Strained hamstring,05/29/26,11/02/26,,Out for 2026 season,11/02/26,Eligible date (future),sa3007876,680695
-Luke Raley,SEA,OF,60-Day IL,Flexor tendon surgery (left),08/01/26,09/29/26,,Out for 2026 season,09/29/26,Eligible date (future),19354,670042
-Andres Munoz,SEA,RP,15-Day IL,Knee inflammation,09/20/26,10/07/26,,Out for 2026 season,10/07/26,Eligible date (future),20373,662253
-Cole Wilcox,SEA,RP,15-Day IL,Strained oblique,08/06/26,08/22/26,,No timetable for return,10/12/26,"No timetable, sim 14 days",27481,677961
-Matt Brash,SEA,RP,60-Day IL,Strained lat,06/08/26,08/08/26,,Out for 2026 season,01/01/27,Out for season,25756,666374
-Nick Davila,SEA,RP,60-Day IL,Sprained shoulder (SC joint),08/30/26,10/30/26,,Out for 2026 season,10/30/26,Eligible date (future),27741,689546
-Emerson Hancock,SEA,SP,15-Day IL,Strained groin,08/28/26,09/13/26,,No timetable for return,10/10/26,"No timetable, sim 12 days",27470,676106
-Logan Evans,SEA,SP,60-Day IL,Tommy John surgery,01/23/26,05/24/26,,Out for 2026 season,01/01/27,Out for season,33699,688138
-Colt Emerson,SEA,SS,60-Day IL,Wrist surgery (left),08/26/26,10/13/26,,Out for 2026 season,10/13/26,Eligible date (future),33575,806068
-Bryce Eldridge,SFG,1B,7-Day IL,Concussion,09/16/26,09/24/26,,No timetable for return,10/08/26,"No timetable, sim 10 days",33390,805811
-Rafael Devers,SFG,1B,60-Day IL,Core muscle surgery,09/15/26,11/12/26,,Out for 2026 season,11/12/26,Eligible date (future),17350,646240
-Nathan Furman,SFG,2B,10-Day IL,Strained oblique,09/15/26,09/26/26,,No timetable for return,10/11/26,"No timetable, sim 13 days",31988,801501
-Matt Chapman,SFG,3B,60-Day IL,Core muscle surgery,08/11/26,08/30/26,,Out for 2026 season,01/01/27,Out for season,16505,656305
-Daniel Susac,SFG,C,60-Day IL,Fractured kneecap,08/09/26,10/09/26,,Out for 2026 season,10/09/26,Eligible date (future),31441,691740
-Casey Schmitt,SFG,INF/OF,60-Day IL,Arthroscopic knee surgery,07/31/26,09/26/26,,Questionable for 2026 season,09/30/26,Default sim 2 days,27577,669477
-Harrison Bader,SFG,OF,60-Day IL,Plantar fasciitis,05/29/26,07/29/26,,Out for 2026 season,01/01/27,Out for season,18030,664056
-Jung Hoo Lee,SFG,OF,10-Day IL,Groin contusion,09/20/26,10/01/26,,Out for 2026 season,10/01/26,Eligible date (future),33824,808982
-JT Brubaker,SFG,RP,15-Day IL,Bruised ribs,08/23/26,09/08/26,,Questionable for 2026 season,09/30/26,Default sim 2 days,17578,664141
-Joel Peguero,SFG,RP,60-Day IL,Strained hamstring,05/31/26,07/31/26,,Out for 2026 season,01/01/27,Out for season,21951,666711
-Jose Butto,SFG,RP,60-Day IL,Arm surgery (blood clot removal),04/17/26,06/01/26,,Out for 2026 season,01/01/27,Out for season,23313,676130
-Keaton Winn,SFG,RP,60-Day IL,Elbow neuritis,08/16/26,10/18/26,,Out for 2026 season,10/18/26,Eligible date (future),23499,676775
-Matt Gage,SFG,RP,60-Day IL,Strained elbow,07/03/26,09/02/26,,No timetable for return,10/01/26,"No timetable, sim 3 days",17381,657424
-Randy Rodriguez,SFG,RP,60-Day IL,Tommy John surgery,09/24/25,05/24/26,,Questionable for 2026 season,09/29/26,Default sim 1 days,23974,678495
-Reiver Sanmartin,SFG,RP,15-Day IL,Strained oblique,09/16/26,10/02/26,,Out for 2026 season,10/02/26,Eligible date (future),19754,665665
-Rowan Wick,SFG,RP,60-Day IL,Tommy John surgery,11/01/25,05/24/26,,Out for 2026 season,01/01/27,Out for season,14646,592858
-Adrian Houser,SFG,SP,60-Day IL,Strained forearm,08/25/26,10/25/26,,Out for 2026 season,10/25/26,Eligible date (future),12718,605288
-Blade Tidwell,SFG,SP,60-Day IL,Sprained elbow,09/21/26,11/21/26,,Out for 2026 season,11/21/26,Eligible date (future),31701,694918
-Carson Whisenhunt,SFG,SP,60-Day IL,Tommy John surgery,09/16/26,10/24/26,,Out for 2026 season,10/24/26,Eligible date (future),31676,687931
-Hayden Birdsong,SFG,SP,60-Day IL,Tommy John surgery,03/25/26,05/24/26,,Out for 2026 season,01/01/27,Out for season,31635,806185
-Logan Webb,SFG,SP,15-Day IL,Blister (right middle finger),09/13/26,09/30/26,,Out for 2026 season,09/30/26,Eligible date (future),17995,657277
-Trevor McDonald,SFG,SP,60-Day IL,Tommy John surgery,08/05/26,09/19/26,,Out for 2026 season,01/01/27,Out for season,26448,686790
-Willy Adames,SFG,SS,10-Day IL,Sprained elbow (non-throwing),08/23/26,09/03/26,,Questionable for 2026 season,10/08/26,Default sim 10 days,15986,642715
-Jesus Rodriguez,SFG,UTL,60-Day IL,Elbow neuritis (right),07/31/26,09/30/26,,Out for 2026 season,09/30/26,Eligible date (future),26991,683679
-Blaze Jordan,STL,3B/1B,10-Day IL,Sprained ankle,08/27/26,09/07/26,,Out for 2026 season,01/01/27,Out for season,28199,691458
-Everson Pereira,STL,OF,10-Day IL,Hand contusion (left),08/21/26,09/01/26,,Rehab assignment (9/17),10/10/26,Default sim 12 days,23695,677592
-Joshua Baez,STL,OF,10-Day IL,Strained oblique,09/16/26,09/27/26,,Out for 2026 season,01/01/27,Out for season,29596,695491
-Maxwel Rajcic,STL,RP,60-Day IL,Tommy John surgery,07/23/26,09/02/26,,Out for 2026 season,01/01/27,Out for season,31873,691008
-Hunter Dobbins,STL,SP,15-Day IL,Tommy John surgery,09/02/26,09/06/26,,Out for 2026 season,01/01/27,Out for season,30240,690928
-Gavin Lux,TBR,2B,60-Day IL,Shoulder impingement,03/22/26,05/22/26,,Questionable for 2026 season,10/12/26,Default sim 14 days,19955,666158
-Jacob Melton,TBR,OF,60-Day IL,Strained hamstring,09/06/26,11/14/26,,Out for 2026 season,11/14/26,Eligible date (future),31661,689200
-Edwin Uceta,TBR,RP,60-Day IL,Shoulder inflammation,02/01/26,05/21/26,,Questionable for 2026 season,10/08/26,Default sim 10 days,20539,670955
-Jonathan Heasley,TBR,RP,60-Day IL,Elbow stress reaction,05/27/26,07/28/26,,Questionable for 2026 season,10/02/26,Default sim 4 days,22224,669169
-Tyler Wells,TBR,RP,15-Day IL,Forearm tightness,09/12/26,09/28/26,,No timetable for return,10/11/26,"No timetable, sim 13 days",20000,669330
-Garrett Cleavinger,TBR,SP,15-Day IL,Forearm tightness,09/04/26,09/20/26,,Questionable for 2026 season,10/11/26,Default sim 13 days,17897,664076
-Ryan Pepiot,TBR,SP,60-Day IL,Hip surgery,05/13/26,05/21/26,,Out for 2026 season,01/01/27,Out for season,26221,686752
-Shane McClanahan,TBR,SP,15-Day IL,Forearm tightness,09/03/26,09/19/26,,No timetable for return,09/30/26,"No timetable, sim 2 days",21483,663556
-Josh Jung,TEX,3B,10-Day IL,Fractured hand (right),09/25/26,10/06/26,,No timetable for return,10/06/26,Eligible date (future),26299,673962
-Kyle Higashioka,TEX,C,10-Day IL,Strained flexor,07/20/26,07/31/26,,Rehab assignment (9/4),09/29/26,Default sim 1 days,5517,543309
-Joc Pederson,TEX,DH,10-Day IL,Fractured wrist (left),09/12/26,09/29/26,,No timetable for return,09/29/26,Eligible date (future),11899,592626
-Carter Baumler,TEX,RP,15-Day IL,Strained oblique,04/04/26,04/20/26,,Rehab assignment (8/30),10/05/26,Default sim 7 days,30231,691945
-Cole Winn,TEX,RP,60-Day IL,Strained rotator cuff,08/25/26,10/27/26,,Questionable for 2026 season,10/27/26,Eligible date (future),22113,668390
-Jalen Beeks,TEX,RP,60-Day IL,Flexor tendon surgery,07/01/26,08/09/26,,Out for 2026 season,01/01/27,Out for season,17192,656222
-Jose Corniell,TEX,RP,60-Day IL,Elbow discomfort,07/20/26,09/19/26,,No timetable for return,10/03/26,"No timetable, sim 5 days",27984,692030
-Michel Otanez,TEX,RP,15-Day IL,Viral illness,09/18/26,09/28/26,,No timetable for return,10/01/26,"No timetable, sim 3 days",22533,671305
-Cal Quantrill,TEX,SP,60-Day IL,Strained lat,09/19/26,11/19/26,,Out for 2026 season,11/19/26,Eligible date (future),19312,615698
-Jack Leiter,TEX,SP,60-Day IL,Arthroscopic ankle surgery,06/23/26,08/18/26,,No timetable for return,10/10/26,"No timetable, sim 12 days",30146,683004
-Luis Urias,TOR,INF,10-Day IL,Strained quad,08/06/26,08/17/26,,Questionable for 2026 season,09/30/26,Default sim 2 days,16622,649966
-Addison Barger,TOR,OF,60-Day IL,Elbow surgery,07/27/26,07/09/26,,Out for 2026 season,01/01/27,Out for season,24598,680718
-Anthony Santander,TOR,OF,60-Day IL,Shoulder surgery (torn labrum),02/01/26,05/21/26,,Rehab assignment (9/9),10/03/26,Default sim 5 days,14551,623993
-Jonatan Clase,TOR,OF,60-Day IL,Plantar fasciitis,07/20/26,09/19/26,,No timetable for return,09/29/26,"No timetable, sim 1 days",26599,682729
-Rudy Martin,TOR,OF,10-Day IL,Strained hamstring,09/12/26,09/23/26,,No timetable for return,10/07/26,"No timetable, sim 9 days",18582,657675
-Yimi Garcia,TOR,RP,60-Day IL,Thoracic outlet syndrome surgery,08/20/26,05/21/26,,Out for 2026 season,01/01/27,Out for season,12095,554340
-Bowden Francis,TOR,SP,60-Day IL,Tommy John surgery,02/01/26,05/24/26,,Out for 2026 season,01/01/27,Out for season,20548,670102
-Cody Ponce,TOR,SP,60-Day IL,Knee surgery (ACL),04/17/26,05/30/26,,Out for 2026 season,01/01/27,Out for season,17920,664074
-Dylan Cease,TOR,SP,15-Day IL,Shoulder inflammation,09/18/26,10/05/26,,Out for 2026 season,10/05/26,Eligible date (future),18525,656302
-Jake Bloss,TOR,SP,60-Day IL,Strained shoulder (teres major),07/11/26,10/11/26,,Out for 2026 season,10/11/26,Eligible date (future),33168,814005
-Jameson Taillon,TOR,SP,15-Day IL,Elbow inflammation,09/04/26,09/20/26,,Out for 2026 season,01/01/27,Out for season,11674,592791
-Jose Berrios,TOR,SP,60-Day IL,Tommy John surgery,05/20/26,05/21/26,,Out for 2026 season,01/01/27,Out for season,14168,621244
-Patrick Corbin,TOR,SP,60-Day IL,Strained shoulder (teres major),07/21/26,09/20/26,,Questionable for 2026 season,10/05/26,Default sim 7 days,9323,571578
-Shane Bieber,TOR,SP,15-Day IL,Shoulder inflammation (teres major),08/20/26,09/05/26,,No timetable for return,10/04/26,"No timetable, sim 6 days",19427,669456
-Drew Millas,WSN,C,60-Day IL,Finger surgery (left index),09/11/26,09/10/26,,Out for 2026 season,01/01/27,Out for season,25643,686452
-Ken Waldichuk,WSN,RP,60-Day IL,Forearm tightness,04/12/26,06/12/26,,Questionable for 2026 season,10/12/26,Default sim 14 days,27681,686610
-Matt Waldron,WSN,RP,60-Day IL,Chest inflammation,09/02/26,11/04/26,,Out for 2026 season,11/04/26,Eligible date (future),25550,663362
-Mitchell Parker,WSN,RP,60-Day IL,Elbow surgery (internal brace),07/29/26,08/28/26,,Out for 2026 season,01/01/27,Out for season,27636,680730
-Orlando Ribalta,WSN,RP,15-Day IL,Forearm inflammation,09/01/26,09/19/26,,No timetable for return,10/04/26,"No timetable, sim 6 days",26247,687377
-PJ Poulin,WSN,RP,60-Day IL,Strained flexor,07/11/26,09/14/26,,Questionable for 2026 season,10/12/26,Default sim 14 days,23394,676571
+Player,Team,Position,Injury,Date,Latest Update,Sim Return Date,Sim Return Reason
+Tyler Locklear,ARI,1B,Thumb,09/12/26,Expected to be out until at least Feb 1,02/01/27,CBS expected return (Feb 1)
+A.J. Puk,ARI,RP,Elbow,08/07/26,Expected to be out until at least Feb 1,02/01/27,CBS expected return (Feb 1)
+Andrew Saalfrank,ARI,RP,Shoulder,02/19/26,Expected to be out until at least Feb 1,02/01/27,CBS expected return (Feb 1)
+Ryan Thompson,ARI,RP,Back,09/01/26,Expected to be out until at least Feb 1,02/01/27,CBS expected return (Feb 1)
+Corbin Burnes,ARI,SP,Shoulder,09/25/26,Expected to be out until at least Feb 1,02/01/27,CBS expected return (Feb 1)
+Cristian Mena,ARI,SP,Shoulder,06/01/26,Expected to be out until at least Feb 1,02/01/27,CBS expected return (Feb 1)
+Nick Kurtz,ATH,1B,Thumb,08/21/26,Expected to be out until at least Feb 1,02/01/27,CBS expected return (Feb 1)
+Max Muncy,ATH,3B,Knee,09/22/26,Expected to be out until at least Feb 1,02/01/27,CBS expected return (Feb 1)
+Brent Rooker,ATH,DH,Knee,07/17/26,Expected to be out until at least Feb 1,02/01/27,CBS expected return (Feb 1)
+Tyler Soderstrom,ATH,LF,Hip,08/20/26,Expected to be out until at least Feb 1,02/01/27,CBS expected return (Feb 1)
+Gunnar Hoglund,ATH,P,Hip,05/20/26,Expected to be out until at least Feb 1,02/01/27,CBS expected return (Feb 1)
+Brooks Kriske,ATH,RP,Shoulder,09/17/26,Expected to be out until at least Mar 1,03/01/27,CBS expected return (Mar 1)
+Justin Sterner,ATH,RP,Knee,08/16/26,Expected to be out until at least Feb 1,02/01/27,CBS expected return (Feb 1)
+Mark Leiter,ATH,RP,Hip,07/30/26,Expected to be out until at least Feb 1,02/01/27,CBS expected return (Feb 1)
+Seth Johnson,ATH,RP,Knee,10/05/26,Expected to be out until at least Feb 1,02/01/27,CBS expected return (Feb 1)
+Gage Jump,ATH,SP,Shoulder,09/15/26,Expected to be out until at least Feb 1,02/01/27,CBS expected return (Feb 1)
+J.T. Ginn,ATH,SP,Elbow,09/22/26,Expected to be out until at least Feb 1,02/01/27,CBS expected return (Feb 1)
+Luis Severino,ATH,SP,Shoulder,08/16/26,Expected to be out until at least Feb 1,02/01/27,CBS expected return (Feb 1)
+Alika Williams,ATH,SS,Upper Body,09/27/26,Expected to be out until at least Feb 1,02/01/27,CBS expected return (Feb 1)
+Jacob Wilson,ATH,SS,Shoulder,08/28/26,Expected to be out until at least Mar 1,03/01/27,CBS expected return (Mar 1)
+Spencer Schwellenbach,ATL,P,Elbow,08/28/26,Expected to be out until at least Apr 1,04/01/27,CBS expected return (Apr 1)
+Joe Jimenez,ATL,RP,Knee,10/16/26,Expected to be out until at least Feb 1,02/01/27,CBS expected return (Feb 1)
+Reynaldo Lopez,ATL,RP,Shoulder,10/16/26,Expected to be out until at least Feb 1,02/01/27,CBS expected return (Feb 1)
+Bryce Elder,ATL,SP,Knee,10/16/26,Expected to be out until at least Feb 1,02/01/27,CBS expected return (Feb 1)
+Joey Wentz,ATL,SP,Knee,03/24/26,Expected to be out until at least Feb 1,02/01/27,CBS expected return (Feb 1)
+Martin Perez,ATL,SP,Back,10/16/26,Expected to be out until at least Feb 1,02/01/27,CBS expected return (Feb 1)
+Spencer Strider,ATL,SP,Elbow,10/11/26,Expected to be out until at least Feb 1,02/01/27,CBS expected return (Feb 1)
+Ryan Mountcastle,BAL,1B,Oblique,09/28/26,Expected to be out until at least Feb 1,02/01/27,CBS expected return (Feb 1)
+Jackson Holliday,BAL,2B,Wrist,09/21/26,Expected to be out until at least Feb 1,02/01/27,CBS expected return (Feb 1)
+Jordan Westburg,BAL,2B,Elbow,09/28/26,Expected to be out until at least Feb 1,02/01/27,CBS expected return (Feb 1)
+Blaze Alexander,BAL,3B,Back,09/25/26,Expected to be out until at least Feb 1,02/01/27,CBS expected return (Feb 1)
+Samuel Basallo,BAL,C,Concussion,09/23/26,Expected to be out until at least Feb 1,02/01/27,CBS expected return (Feb 1)
+Luis Robert,BAL,CF,Hamstring,09/28/26,Expected to be out until at least Feb 1,02/01/27,CBS expected return (Feb 1)
+Tyler O'Neill,BAL,RF,Shoulder,09/19/26,Expected to be out until at least Feb 1,02/01/27,CBS expected return (Feb 1)
+Colin Selby,BAL,RP,Shoulder,07/31/26,Expected to be out until at least May 1,05/01/27,CBS expected return (May 1)
+Keegan Akin,BAL,RP,Elbow,07/15/26,Expected to be out until at least Sep 1,10/24/26,"Expected return passed, sim 2 days"
+Ryan Helsley,BAL,RP,Elbow,09/19/26,Expected to be out until at least Feb 1,02/01/27,CBS expected return (Feb 1)
+Kyle Bradish,BAL,SP,Abdomen,09/24/26,Expected to be out until at least Feb 1,02/01/27,CBS expected return (Feb 1)
+Zach Eflin,BAL,SP,Elbow,04/08/26,Expected to be out until at least Jul 1,10/24/26,"Expected return passed, sim 2 days"
+Triston Casas,BOS,1B,Wrist,08/06/26,Expected to be out until at least Feb 1,02/01/27,CBS expected return (Feb 1)
+Caleb Durbin,BOS,3B,Finger,10/11/26,Expected to be out until at least Feb 1,02/01/27,CBS expected return (Feb 1)
+Eli White,BOS,CF,Foot,09/27/26,Expected to be out until at least Feb 1,02/01/27,CBS expected return (Feb 1)
+Masataka Yoshida,BOS,DH,Hamstring,10/02/26,Expected to be out until at least Feb 1,02/01/27,CBS expected return (Feb 1)
+Mickey Gasper,BOS,DH,Biceps,10/02/26,Expected to be out until at least Mar 1,03/01/27,CBS expected return (Mar 1)
+Roman Anthony,BOS,LF,Hand,09/30/26,Expected to be out until at least Feb 1,02/01/27,CBS expected return (Feb 1)
+Garrett Whitlock,BOS,RP,Leg,10/09/26,Expected to be out until at least Feb 1,02/01/27,CBS expected return (Feb 1)
+Justin Slaten,BOS,RP,Elbow,09/29/26,Expected to be out until at least Feb 1,02/01/27,CBS expected return (Feb 1)
+Tayron Guerrero,BOS,RP,Shoulder,10/02/26,Expected to be out until at least Feb 1,02/01/27,CBS expected return (Feb 1)
+Johan Oviedo,BOS,SP,Elbow,10/05/26,Expected to be out until at least Feb 1,02/01/27,CBS expected return (Feb 1)
+Kutter Crawford,BOS,SP,Forearm,09/06/26,Expected to be out until at least Feb 1,02/01/27,CBS expected return (Feb 1)
+Cade Horton,CHC,P,Elbow,04/18/26,Expected to be out until at least Aug 1,10/25/26,"Expected return passed, sim 3 days"
+Riley Martin,CHC,P,Elbow,08/19/26,Expected to be out until at least Feb 1,02/01/27,CBS expected return (Feb 1)
+Tyler Austin,CHC,RF,Knee,10/05/26,Expected to be out until at least Feb 1,02/01/27,CBS expected return (Feb 1)
+Ben Brown,CHC,RP,Neck,09/03/26,Expected to be out until at least Feb 1,02/01/27,CBS expected return (Feb 1)
+Hunter Harvey,CHC,RP,Triceps,10/05/26,Expected to be out until at least Feb 1,02/01/27,CBS expected return (Feb 1)
+Phil Maton,CHC,RP,Knee,10/05/26,Expected to be out until at least Feb 1,02/01/27,CBS expected return (Feb 1)
+Shelby Miller,CHC,RP,Elbow,09/15/26,Expected to be out until at least Feb 1,02/01/27,CBS expected return (Feb 1)
+Justin Steele,CHC,SP,Elbow,10/05/26,Expected to be out until at least Feb 1,02/01/27,CBS expected return (Feb 1)
+Porter Hodge,CHC,SP,Elbow,06/21/26,Expected to be out until at least May 1,05/01/27,CBS expected return (May 1)
+Tanner Murray,CHW,3B,Shoulder,10/16/26,Expected to be out until at least Feb 1,02/01/27,CBS expected return (Feb 1)
+Joey Bart,CHW,C,Hand,10/16/26,Expected to be out until at least Feb 1,02/01/27,CBS expected return (Feb 1)
+Ky Bush,CHW,P,Elbow,09/02/26,Expected to be out until at least Feb 1,02/01/27,CBS expected return (Feb 1)
+Mike Vasil,CHW,P,Elbow,04/07/26,Expected to be out until at least Jul 1,10/25/26,"Expected return passed, sim 3 days"
+Jordan Leasure,CHW,RP,Forearm,08/31/26,"Expected to be out until at least Feb 1, 2028",02/01/28,"CBS expected return (Feb 1, 2028)"
+Prelander Berroa,CHW,RP,Elbow,10/19/26,Expected to be out until at least Feb 1,02/01/27,CBS expected return (Feb 1)
+Luis Castillo,CHW,SP,Shoulder,09/24/26,Expected to be out until at least Feb 1,02/01/27,CBS expected return (Feb 1)
+Brooks Baldwin,CHW,SS,Elbow,04/08/26,Expected to be out until at least Feb 1,02/01/27,CBS expected return (Feb 1)
+Michael Toglia,CIN,1B,Shoulder,10/02/26,Expected to be out until at least Feb 1,02/01/27,CBS expected return (Feb 1)
+Spencer Steer,CIN,1B,Wrist,09/18/26,Expected to be out until at least Feb 1,02/01/27,CBS expected return (Feb 1)
+Blake Dunn,CIN,CF,Elbow,08/06/26,Expected to be out until at least Mar 1,03/01/27,CBS expected return (Mar 1)
+Dane Myers,CIN,CF,Shoulder,10/02/26,Expected to be out until at least Feb 1,02/01/27,CBS expected return (Feb 1)
+Tony Santillan,CIN,RP,Hip,09/22/26,Expected to be out until at least Feb 1,02/01/27,CBS expected return (Feb 1)
+Chase Burns,CIN,SP,Groin,09/20/26,Expected to be out until at least Feb 1,02/01/27,CBS expected return (Feb 1)
+Hunter Greene,CIN,SP,Elbow,08/13/26,"Expected to be out until at least Feb 1, 2028",02/01/28,"CBS expected return (Feb 1, 2028)"
+Rhys Hoskins,CLE,1B,Back,10/18/26,Expected to be out until at least Oct 23,10/23/26,CBS expected return (Oct 23)
+Colin Holderman,CLE,RP,Wrist,10/01/26,Expected to be out until at least Feb 1,02/01/27,CBS expected return (Feb 1)
+Willi Castro,COL,2B,Heel,09/17/26,Expected to be out until at least Feb 1,02/01/27,CBS expected return (Feb 1)
+McCade Brown,COL,P,Shoulder,09/06/26,Expected to be out until at least Feb 1,02/01/27,CBS expected return (Feb 1)
+Kris Bryant,COL,RF,Back,09/28/26,Expected to be out until at least Feb 1,02/01/27,CBS expected return (Feb 1)
+Pierson Ohl,COL,RP,Elbow,03/25/26,Expected to be out until at least Apr 1,11/02/26,"Expected return passed, sim 11 days"
+Weilnton Herrera,COL,RP,Elbow,06/02/26,Expected to be out until at least Jul 1,11/02/26,"Expected return passed, sim 11 days"
+Chase Dollander,COL,SP,Elbow,06/28/26,Expected to be out until at least Apr 1,04/01/27,CBS expected return (Apr 1)
+RJ Petit,COL,SP,Elbow,03/26/26,Expected to be out until at least Jun 1,10/29/26,"Expected return passed, sim 7 days"
+Colt Keith,DET,3B,Thumb,09/21/26,Expected to be out until at least Feb 1,02/01/27,CBS expected return (Feb 1)
+Matt Vierling,DET,CF,Thigh,09/06/26,Expected to be out until at least Feb 1,02/01/27,CBS expected return (Feb 1)
+Parker Meadows,DET,CF,Arm,09/21/26,Expected to be out until at least Feb 1,02/01/27,CBS expected return (Feb 1)
+Bailey Horn,DET,P,Elbow,07/17/26,Expected to be out until at least Sep 1,10/26/26,"Expected return passed, sim 4 days"
+Kerry Carpenter,DET,RF,Foot,09/26/26,Expected to be out until at least Feb 1,02/01/27,CBS expected return (Feb 1)
+Wenceel Perez,DET,RF,Orbital,09/11/26,Expected to be out until at least Feb 1,02/01/27,CBS expected return (Feb 1)
+Burch Smith,DET,RP,Shoulder,09/21/26,Expected to be out until at least Feb 1,02/01/27,CBS expected return (Feb 1)
+Kyle Finnegan,DET,RP,Groin,10/05/26,Expected to be out until at least Feb 1,02/01/27,CBS expected return (Feb 1)
+Will Vest,DET,RP,Elbow,07/31/26,Expected to be out until at least Feb 1,02/01/27,CBS expected return (Feb 1)
+Reese Olson,DET,SP,Shoulder,10/09/26,Expected to be out until at least Feb 1,02/01/27,CBS expected return (Feb 1)
+Trey Sweeney,DET,SS,Shoulder,06/05/26,Expected to be out until at least Feb 1,02/01/27,CBS expected return (Feb 1)
+Brice Matthews,HOU,CF,Knee,10/02/26,Expected to be out until at least Feb 1,02/01/27,CBS expected return (Feb 1)
+Daulton Varsho,HOU,CF,Wrist,10/02/26,Expected to be out until at least Feb 1,02/01/27,CBS expected return (Feb 1)
+Brandon Walter,HOU,RP,Elbow,03/25/26,Expected to be out until at least Feb 1,02/01/27,CBS expected return (Feb 1)
+Enyel De Los Santos,HOU,RP,Knee,10/02/26,Expected to be out until at least Feb 1,02/01/27,CBS expected return (Feb 1)
+Cristian Javier,HOU,SP,Groin,10/02/26,Expected to be out until at least Feb 1,02/01/27,CBS expected return (Feb 1)
+Michael Burrows,HOU,SP,Elbow,10/02/26,Expected to be out until at least Nov 2,11/02/26,CBS expected return (Nov 2)
+Carlos Correa,HOU,SS,Ankle,09/15/26,Expected to be out until at least Feb 1,02/01/27,CBS expected return (Feb 1)
+Jonathan India,KCR,2B,Shoulder,06/04/26,Expected to be out until at least Feb 1,02/01/27,CBS expected return (Feb 1)
+Alec Marsh,KCR,RP,Shoulder,02/19/26,Expected to be out until at least Feb 1,02/01/27,CBS expected return (Feb 1)
+Beck Way,KCR,RP,Shoulder,09/02/26,Expected to be out until at least Feb 1,02/01/27,CBS expected return (Feb 1)
+Carlos Estevez,KCR,RP,Shoulder,09/01/26,Expected to be out until at least Feb 1,02/01/27,CBS expected return (Feb 1)
+Cole Ragans,KCR,RP,Elbow,10/22/26,Expected to be out until at least Aug 1,08/01/27,CBS expected return (Aug 1)
+Connor Seabold,KCR,RP,Lat,09/28/26,Expected to be out until at least Feb 1,02/01/27,CBS expected return (Feb 1)
+Nick Mears,KCR,RP,Shoulder,08/26/26,Expected to be out until at least Apr 1,04/01/27,CBS expected return (Apr 1)
+Tony Gonsolin,KCR,RP,Illness,09/27/26,Expected to be out until at least Feb 1,02/01/27,CBS expected return (Feb 1)
+Luinder Avila,KCR,SP,Elbow,08/06/26,"Expected to be out until at least Feb 1, 2028",02/01/28,"CBS expected return (Feb 1, 2028)"
+Nolan Schanuel,LAA,1B,Side,09/18/26,Expected to be out until at least Feb 1,02/01/27,CBS expected return (Feb 1)
+Anthony Rendon,LAA,3B,Hip,03/24/26,Expected to be out until at least Feb 1,02/01/27,CBS expected return (Feb 1)
+Yoan Moncada,LAA,3B,Knee,09/12/26,Expected to be out until at least Feb 1,02/01/27,CBS expected return (Feb 1)
+Gustavo Campero,LAA,LF,Hamstring,09/12/26,Expected to be out until at least Feb 1,02/01/27,CBS expected return (Feb 1)
+Kyren Paris,LAA,LF,Finger,09/18/26,Expected to be out until at least Feb 1,02/01/27,CBS expected return (Feb 1)
+Ben Joyce,LAA,RP,Shoulder,09/24/26,Expected to be out until at least Feb 1,02/01/27,CBS expected return (Feb 1)
+Robert Stephenson,LAA,RP,Elbow,04/08/26,Expected to be out until at least Feb 1,02/01/27,CBS expected return (Feb 1)
+Samy Natera Jr.,LAA,RP,Forearm,09/18/26,Expected to be out until at least Feb 1,02/01/27,CBS expected return (Feb 1)
+George Klassen,LAA,SP,Back,09/19/26,Expected to be out until at least Feb 1,02/01/27,CBS expected return (Feb 1)
+Jack Kochanowicz,LAA,SP,Elbow,06/10/26,Expected to be out until at least Sep 1,11/01/26,"Expected return passed, sim 10 days"
+Dalton Rushing,LAD,C,Elbow,10/21/26,Expected to be out until at least Apr 1,04/01/27,CBS expected return (Apr 1)
+Ben Casparius,LAD,P,Shoulder,10/18/26,Expected to be out until at least Feb 1,02/01/27,CBS expected return (Feb 1)
+Blake Treinen,LAD,RP,Shoulder,10/18/26,Expected to be out until at least Feb 1,02/01/27,CBS expected return (Feb 1)
+Brusdar Graterol,LAD,RP,Back,10/16/26,Expected to be out until at least Feb 1,02/01/27,CBS expected return (Feb 1)
+Jake Cousins,LAD,RP,Elbow,10/18/26,Expected to be out until at least Feb 1,02/01/27,CBS expected return (Feb 1)
+Will Klein,LAD,RP,Elbow,10/16/26,Expected to be out until at least Feb 1,02/01/27,CBS expected return (Feb 1)
+Eric Lauer,LAD,SP,Elbow,09/15/26,Expected to be out until at least Feb 1,02/01/27,CBS expected return (Feb 1)
+Gavin Stone,LAD,SP,Shoulder,10/16/26,Expected to be out until at least Feb 1,02/01/27,CBS expected return (Feb 1)
+Jakob Marsee,MIA,CF,Elbow,10/08/26,Expected to be out until at least Apr 1,04/01/27,CBS expected return (Apr 1)
+Adam Mazur,MIA,P,Elbow,09/29/26,Expected to be out until at least May 1,05/01/27,CBS expected return (May 1)
+Owen Caissie,MIA,RF,Back,09/28/26,Expected to be out until at least Feb 1,02/01/27,CBS expected return (Feb 1)
+Andrew Nardi,MIA,RP,Elbow,08/17/26,"Expected to be out until at least Feb 1, 2028",02/01/28,"CBS expected return (Feb 1, 2028)"
+Anthony Bender,MIA,RP,Lower Leg,09/10/26,Expected to be out until at least Feb 1,02/01/27,CBS expected return (Feb 1)
+Pete Fairbanks,MIA,RP,Shoulder,09/18/26,Expected to be out until at least Jun 1,06/01/27,CBS expected return (Jun 1)
+Ronny Henriquez,MIA,RP,Elbow,02/19/26,Expected to be out until at least Feb 1,02/01/27,CBS expected return (Feb 1)
+Tyler Zuber,MIA,RP,Elbow,10/08/26,"Expected to be out until at least Feb 1, 2028",02/01/28,"CBS expected return (Feb 1, 2028)"
+William Kempner,MIA,RP,Elbow,08/21/26,Expected to be out until at least Sep 1,10/28/26,"Expected return passed, sim 6 days"
+Max Meyer,MIA,SP,Neck,09/15/26,Expected to be out until at least Feb 1,02/01/27,CBS expected return (Feb 1)
+Robby Snelling,MIA,SP,Elbow,05/22/26,Expected to be out until at least Jun 1,11/01/26,"Expected return passed, sim 10 days"
+Angel Zerpa,MIL,RP,Elbow,05/31/26,Expected to be out until at least Jul 1,10/27/26,"Expected return passed, sim 5 days"
+Brian Fitzpatrick,MIL,RP,Elbow,07/04/26,Expected to be out until at least Aug 1,11/03/26,"Expected return passed, sim 12 days"
+Grant Anderson,MIL,RP,Biceps,10/17/26,Expected to be out until at least Oct 23,10/23/26,CBS expected return (Oct 23)
+Brandon Woodruff,MIL,SP,Shoulder,10/13/26,Expected to be out until at least Oct 23,10/23/26,CBS expected return (Oct 23)
+Quinn Priester,MIL,SP,Shoulder,07/19/26,Expected to be out until at least Feb 1,02/01/27,CBS expected return (Feb 1)
+Byron Buxton,MIN,CF,Hip,09/11/26,Expected to be out until at least Feb 1,02/01/27,CBS expected return (Feb 1)
+Walker Jenkins,MIN,CF,Elbow,10/01/26,Expected to be out until at least Feb 1,02/01/27,CBS expected return (Feb 1)
+Trevor Larnach,MIN,LF,Wrist,09/18/26,Expected to be out until at least Feb 1,02/01/27,CBS expected return (Feb 1)
+David Festa,MIN,P,Shoulder,07/28/26,Expected to be out until at least Feb 1,02/01/27,CBS expected return (Feb 1)
+Mick Abel,MIN,P,Elbow,09/28/26,Expected to be out until at least Feb 1,02/01/27,CBS expected return (Feb 1)
+Anthony Banda,MIN,RP,Lat,07/09/26,Expected to be out until at least Feb 1,02/01/27,CBS expected return (Feb 1)
+Cole Sands,MIN,RP,Elbow,07/31/26,Expected to be out until at least Feb 1,02/01/27,CBS expected return (Feb 1)
+Jeff Hoffman,MIN,RP,Forearm,09/26/26,Expected to be out until at least Feb 1,02/01/27,CBS expected return (Feb 1)
+Mike Paredes,MIN,SP,Oblique,09/28/26,Expected to be out until at least Feb 1,02/01/27,CBS expected return (Feb 1)
+Pablo Lopez,MIN,SP,Elbow,02/26/26,Expected to be out until at least Apr 1,11/02/26,"Expected return passed, sim 11 days"
+Jared Young,NYM,1B,Concussion,09/18/26,Expected to be out until at least Feb 1,02/01/27,CBS expected return (Feb 1)
+Jorge Polanco,NYM,DH,Ankle,08/28/26,Expected to be out until at least Feb 1,02/01/27,CBS expected return (Feb 1)
+Daniel Duarte,NYM,RP,Hamstring,09/16/26,Expected to be out until at least Feb 1,02/01/27,CBS expected return (Feb 1)
+Jonathan Pintaro,NYM,RP,Illness,09/27/26,Expected to be out until at least Feb 1,02/01/27,CBS expected return (Feb 1)
+Reed Garrett,NYM,RP,Elbow,02/19/26,Expected to be out until at least Feb 1,02/01/27,CBS expected return (Feb 1)
+Christian Scott,NYM,SP,Knee,09/22/26,Expected to be out until at least Feb 1,02/01/27,CBS expected return (Feb 1)
+Robert Stock,NYM,SP,Finger,09/16/26,Expected to be out until at least Feb 1,02/01/27,CBS expected return (Feb 1)
+Tylor Megill,NYM,SP,Elbow,02/19/26,Expected to be out until at least Feb 1,02/01/27,CBS expected return (Feb 1)
+Clarke Schmidt,NYY,RP,Biceps,09/30/26,Expected to be out until at least Feb 1,02/01/27,CBS expected return (Feb 1)
+Fernando Cruz,NYY,RP,Elbow,09/25/26,Expected to be out until at least Oct 24,10/24/26,CBS expected return (Oct 24)
+Johan Rojas,PHI,CF,Elbow,06/25/26,Expected to be out until at least Feb 1,02/01/27,CBS expected return (Feb 1)
+Adolis Garcia,PHI,RF,Lat,06/18/26,Expected to be out until at least Feb 1,02/01/27,CBS expected return (Feb 1)
+Brad Keller,PHI,RP,Elbow,07/29/26,Expected to be out until at least Sep 1,10/23/26,"Expected return passed, sim 1 days"
+Caleb Kilian,PHI,RP,Oblique,10/16/26,Expected to be out until at least Feb 1,02/01/27,CBS expected return (Feb 1)
+Endy Rodriguez,PIT,C,Hip,09/01/26,Expected to be out until at least May 1,05/01/27,CBS expected return (May 1)
+Oneil Cruz,PIT,CF,Knee,09/27/26,Expected to be out until at least Feb 1,02/01/27,CBS expected return (Feb 1)
+Esmerlyn Valdez,PIT,RF,Hamstring,09/28/26,Expected to be out until at least Feb 1,02/01/27,CBS expected return (Feb 1)
+Isaac Mattson,PIT,RP,Hip,09/28/26,Expected to be out until at least Feb 1,02/01/27,CBS expected return (Feb 1)
+Braxton Ashcraft,PIT,SP,Arm,09/18/26,Expected to be out until at least Feb 1,02/01/27,CBS expected return (Feb 1)
+Mitch Keller,PIT,SP,Shoulder,09/23/26,Expected to be out until at least Feb 1,02/01/27,CBS expected return (Feb 1)
+Miguel Andujar,SDP,DH,Wrist,10/16/26,Expected to be out until at least Feb 1,02/01/27,CBS expected return (Feb 1)
+Luis Rengifo,SDP,LF,Knee,09/01/26,Expected to be out until at least May 1,05/01/27,CBS expected return (May 1)
+Ramon Laureano,SDP,LF,Hip,06/05/26,Expected to be out until at least Feb 1,02/01/27,CBS expected return (Feb 1)
+Bryan Hoeing,SDP,RP,Elbow,04/22/26,Expected to be out until at least Feb 1,02/01/27,CBS expected return (Feb 1)
+Lucas Giolito,SDP,SP,Elbow,10/19/26,Expected to be out until at least Feb 1,02/01/27,CBS expected return (Feb 1)
+Josh Naylor,SEA,1B,Wrist,10/05/26,Expected to be out until at least Feb 1,02/01/27,CBS expected return (Feb 1)
+Brendan Donovan,SEA,3B,Concussion,09/28/26,Expected to be out until at least Feb 1,02/01/27,CBS expected return (Feb 1)
+Brock Rodden,SEA,3B,Knee,09/24/26,Expected to be out until at least Feb 1,02/01/27,CBS expected return (Feb 1)
+Cal Raleigh,SEA,C,Shoulder,10/05/26,Expected to be out until at least Feb 1,02/01/27,CBS expected return (Feb 1)
+Luke Raley,SEA,RF,Forearm,10/05/26,Expected to be out until at least Feb 1,02/01/27,CBS expected return (Feb 1)
+Andres Munoz,SEA,RP,Knee,09/25/26,Expected to be out until at least Feb 1,02/01/27,CBS expected return (Feb 1)
+Cole Wilcox,SEA,RP,Oblique,09/28/26,Expected to be out until at least Feb 1,02/01/27,CBS expected return (Feb 1)
+Logan Evans,SEA,RP,Elbow,02/19/26,Expected to be out until at least Apr 1,10/26/26,"Expected return passed, sim 4 days"
+Matt Brash,SEA,RP,Lat,09/04/26,Expected to be out until at least Feb 1,02/01/27,CBS expected return (Feb 1)
+Nick Davila,SEA,RP,Shoulder,09/06/26,Expected to be out until at least Feb 1,02/01/27,CBS expected return (Feb 1)
+Emerson Hancock,SEA,SP,Groin,09/28/26,Expected to be out until at least Feb 1,02/01/27,CBS expected return (Feb 1)
+Kade Anderson,SEA,SP,Forearm,09/26/26,Expected to be out until at least Feb 1,02/01/27,CBS expected return (Feb 1)
+Colt Emerson,SEA,SS,Wrist,08/31/26,Expected to be out until at least Feb 1,02/01/27,CBS expected return (Feb 1)
+Will Wilson,SEA,SS,Thumb,09/28/26,Expected to be out until at least Feb 1,02/01/27,CBS expected return (Feb 1)
+Rafael Devers,SFG,1B,Abdomen,09/13/26,Expected to be out until at least Feb 1,02/01/27,CBS expected return (Feb 1)
+Nate Furman,SFG,2B,Oblique,09/28/26,Expected to be out until at least Feb 1,02/01/27,CBS expected return (Feb 1)
+Matt Chapman,SFG,3B,Abdomen,08/14/26,Expected to be out until at least Feb 1,02/01/27,CBS expected return (Feb 1)
+Daniel Susac,SFG,C,Knee,08/19/26,Expected to be out until at least Feb 1,02/01/27,CBS expected return (Feb 1)
+Jesus Rodriguez,SFG,C,Elbow,09/04/26,Expected to be out until at least Feb 1,02/01/27,CBS expected return (Feb 1)
+Harrison Bader,SFG,CF,Foot,08/19/26,Expected to be out until at least Feb 1,02/01/27,CBS expected return (Feb 1)
+Bryce Eldridge,SFG,DH,Concussion,09/22/26,Expected to be out until at least Feb 1,02/01/27,CBS expected return (Feb 1)
+Casey Schmitt,SFG,LF,Knee,08/29/26,Expected to be out until at least Feb 1,02/01/27,CBS expected return (Feb 1)
+Hayden Birdsong,SFG,P,Elbow,03/26/26,Expected to be out until at least Jun 1,10/28/26,"Expected return passed, sim 6 days"
+J.T. Brubaker,SFG,RP,Ribs,09/28/26,Expected to be out until at least Feb 1,02/01/27,CBS expected return (Feb 1)
+Joel Peguero,SFG,RP,Hamstring,08/21/26,Expected to be out until at least Feb 1,02/01/27,CBS expected return (Feb 1)
+Keaton Winn,SFG,RP,Elbow,09/03/26,Expected to be out until at least Feb 1,02/01/27,CBS expected return (Feb 1)
+Matt Gage,SFG,RP,Elbow,09/28/26,Expected to be out until at least Feb 1,02/01/27,CBS expected return (Feb 1)
+Randy Rodriguez,SFG,RP,Elbow,02/19/26,Expected to be out until at least Feb 1,02/01/27,CBS expected return (Feb 1)
+Rowan Wick,SFG,RP,Elbow,02/19/26,Expected to be out until at least Feb 1,02/01/27,CBS expected return (Feb 1)
+Adrian Houser,SFG,SP,Forearm,09/01/26,Expected to be out until at least Feb 1,02/01/27,CBS expected return (Feb 1)
+Blade Tidwell,SFG,SP,Elbow,09/24/26,"Expected to be out until at least Feb 1, 2028",02/01/28,"CBS expected return (Feb 1, 2028)"
+Carson Whisenhunt,SFG,SP,Elbow,08/26/26,"Expected to be out until at least Feb 1, 2028",02/01/28,"CBS expected return (Feb 1, 2028)"
+Jose Butto,SFG,SP,Arm,04/21/26,Expected to be out until at least Feb 1,02/01/27,CBS expected return (Feb 1)
+Logan Webb,SFG,SP,Finger,09/18/26,Expected to be out until at least Feb 1,02/01/27,CBS expected return (Feb 1)
+Trevor McDonald,SFG,SP,Elbow,08/13/26,Expected to be out until at least Sep 1,10/29/26,"Expected return passed, sim 7 days"
+Willy Adames,SFG,SS,Elbow,09/28/26,Expected to be out until at least Feb 1,02/01/27,CBS expected return (Feb 1)
+Blaze Jordan,STL,3B,Ankle,09/19/26,Expected to be out until at least Feb 1,02/01/27,CBS expected return (Feb 1)
+Everson Pereira,STL,LF,Hand,09/28/26,Expected to be out until at least Feb 1,02/01/27,CBS expected return (Feb 1)
+Joshua Baez,STL,LF,Oblique,09/18/26,Expected to be out until at least Feb 1,02/01/27,CBS expected return (Feb 1)
+Max Rajcic,STL,RP,Elbow,07/23/26,Expected to be out until at least Sep 1,10/25/26,"Expected return passed, sim 3 days"
+Hunter Dobbins,STL,SP,Elbow,09/29/26,Expected to be out until at least Sep 1,09/01/27,CBS expected return (Sep 1)
+Masyn Winn,STL,SS,Thumb,09/26/26,Expected to be out until at least Feb 1,02/01/27,CBS expected return (Feb 1)
+Edwin Uceta,TBR,RP,Shoulder,10/18/26,Expected to be out until at least Feb 1,02/01/27,CBS expected return (Feb 1)
+Jon Heasley,TBR,RP,Elbow,10/18/26,Expected to be out until at least Feb 1,02/01/27,CBS expected return (Feb 1)
+Ryan Pepiot,TBR,RP,Hip,05/01/26,Expected to be out until at least Feb 1,02/01/27,CBS expected return (Feb 1)
+Shane McClanahan,TBR,SP,Forearm,10/11/26,Expected to be out until at least Feb 1,02/01/27,CBS expected return (Feb 1)
+Gavin Lux,TBR,SS,Shoulder,10/18/26,Expected to be out until at least Oct 23,10/23/26,CBS expected return (Oct 23)
+Josh Jung,TEX,3B,Hand,09/26/26,Expected to be out until at least Feb 1,02/01/27,CBS expected return (Feb 1)
+Danny Jansen,TEX,C,Hand,10/09/26,Expected to be out until at least Feb 1,02/01/27,CBS expected return (Feb 1)
+Kyle Higashioka,TEX,C,Forearm,09/28/26,Expected to be out until at least Feb 1,02/01/27,CBS expected return (Feb 1)
+Joc Pederson,TEX,DH,Hand,10/05/26,Expected to be out until at least Feb 1,02/01/27,CBS expected return (Feb 1)
+Cal Quantrill,TEX,RP,Lat,09/25/26,Expected to be out until at least Feb 1,02/01/27,CBS expected return (Feb 1)
+Carter Baumler,TEX,RP,Ribs,09/28/26,Expected to be out until at least Feb 1,02/01/27,CBS expected return (Feb 1)
+Cole Winn,TEX,RP,Shoulder,09/18/26,Expected to be out until at least Feb 1,02/01/27,CBS expected return (Feb 1)
+Jalen Beeks,TEX,RP,Forearm,07/21/26,Expected to be out until at least Feb 1,02/01/27,CBS expected return (Feb 1)
+Jose Corniell,TEX,RP,Elbow,09/28/26,Expected to be out until at least Feb 1,02/01/27,CBS expected return (Feb 1)
+Michel Otanez,TEX,RP,Illness,10/05/26,Expected to be out until at least Feb 1,02/01/27,CBS expected return (Feb 1)
+Jack Leiter,TEX,SP,Ankle,10/05/26,Expected to be out until at least Feb 1,02/01/27,CBS expected return (Feb 1)
+Corey Seager,TEX,SS,Elbow,09/28/26,Expected to be out until at least Feb 1,02/01/27,CBS expected return (Feb 1)
+Addison Barger,TOR,3B,Elbow,07/24/26,Expected to be out until at least Feb 1,02/01/27,CBS expected return (Feb 1)
+Jonatan Clase,TOR,LF,Foot,09/28/26,Expected to be out until at least Feb 1,02/01/27,CBS expected return (Feb 1)
+Rudy Martin,TOR,LF,Hamstring,09/28/26,Expected to be out until at least Feb 1,02/01/27,CBS expected return (Feb 1)
+Anthony Santander,TOR,RF,Shoulder,09/25/26,Expected to be out until at least Feb 1,02/01/27,CBS expected return (Feb 1)
+Bowden Francis,TOR,RP,Elbow,02/19/26,Expected to be out until at least Apr 1,11/04/26,"Expected return passed, sim 13 days"
+Cody Ponce,TOR,RP,Knee,10/16/26,Expected to be out until at least Feb 1,02/01/27,CBS expected return (Feb 1)
+Yimi Garcia,TOR,RP,Elbow,08/07/26,Expected to be out until at least Feb 1,02/01/27,CBS expected return (Feb 1)
+Dylan Cease,TOR,SP,Shoulder,09/23/26,Expected to be out until at least Feb 1,02/01/27,CBS expected return (Feb 1)
+Jameson Taillon,TOR,SP,Elbow,09/15/26,Expected to be out until at least Feb 1,02/01/27,CBS expected return (Feb 1)
+Jose Berrios,TOR,SP,Elbow,05/27/26,Expected to be out until at least Aug 1,11/05/26,"Expected return passed, sim 14 days"
+Patrick Corbin,TOR,SP,Shoulder,09/07/26,Expected to be out until at least Feb 1,02/01/27,CBS expected return (Feb 1)
+Shane Bieber,TOR,SP,Shoulder,09/28/26,Expected to be out until at least Feb 1,02/01/27,CBS expected return (Feb 1)
+Drew Millas,WSN,C,Finger,09/10/26,Expected to be out until at least Feb 1,02/01/27,CBS expected return (Feb 1)
+Matt Waldron,WSN,RP,Chest,09/12/26,Expected to be out until at least Feb 1,02/01/27,CBS expected return (Feb 1)
+Mitchell Parker,WSN,RP,Elbow,07/01/26,Expected to be out until at least Sep 1,10/28/26,"Expected return passed, sim 6 days"
+Orlando Ribalta,WSN,RP,Forearm,09/28/26,Expected to be out until at least Feb 1,02/01/27,CBS expected return (Feb 1)
+PJ Poulin,WSN,RP,Forearm,09/28/26,Expected to be out until at least Feb 1,02/01/27,CBS expected return (Feb 1)
+Ken Waldichuk,WSN,SP,Elbow,06/01/26,Expected to be out until at least Jun 1,10/28/26,"Expected return passed, sim 6 days"

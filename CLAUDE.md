@@ -74,7 +74,7 @@ This is a baseball simulation built with Python, using NumPy and Pandas for stat
 
 - **bblogger.py** - Logging configuration
   - Uses loguru for structured logging
-  - File rotation (1 MB) in `logs/` directory
+  - Each process writes its own `logs/baseball_sim_<timestamp>.log`, rolling over to a new file at 1 MB (the 20 newest are kept). A shared fixed file name can't be rotated on Windows while another process, e.g. the UI, has it open
   - Configurable log levels (DEBUG/INFO/WARNING/ERROR)
   - **Performance note:** DEBUG logging in hot paths (e.g., `odds_ratio`) adds ~38% overhead
 
@@ -192,7 +192,7 @@ venv_bb314.2/Scripts/python.exe test_injuries.py    # Tests injury system
 
 ## Logging
 
-Logs written to `logs/baseball_sim.log` with 1 MB rotation.
+Logs written to `logs/baseball_sim_<timestamp>.log` (one file per process, new file every 1 MB, 20 newest kept).
 
 Configure log level:
 ```python

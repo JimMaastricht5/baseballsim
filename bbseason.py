@@ -1003,8 +1003,9 @@ class BaseballSeason:
                 "structured_game": game_result.structured_game if game_result.structured_game is not None else {},
                 "is_playoff": True,
                 "round_name": round_name,
-                "away_team": away,
-                "home_team": home,
+                # label scores with the game's teams, home field switches during a series
+                "away_team": game_result.away_team,
+                "home_team": game_result.home_team,
                 "away_r": log_away_score,
                 "home_r": log_home_score,
             },
@@ -1017,15 +1018,17 @@ class BaseballSeason:
         """Log playoff game result and emit SIM_PROGRESS line."""
         sg_id = id(game_result.structured_game) if game_result.structured_game is not None else "None"
         logger.debug(f"[{round_name}] structured_game id={sg_id} log_scores=({log_away_score}, {log_home_score})")
+        # scores are for the game's away/home teams, which differ from the series' when home field has switched
+        game_away, game_home = game_result.away_team, game_result.home_team
         logger.info(
-            f"[{round_name}] {game_result.away_team if hasattr(game_result, 'away_team') else '?'} "
-            f"{log_away_score} @ {log_home_score} "
+            f"[{round_name}] {game_away} {log_away_score} @ {game_home} {log_home_score} "
             f"(Series: {away} {away_wins}-{home_wins} {home})"
         )
         game_num = home_wins + away_wins
         self.output_handler(
             OutputCategory.SIM_PROGRESS,
-            f"[{round_name}] Game {game_num}: {away} {log_away_score} - {home} {log_home_score}  (Series: {away_wins}-{home_wins})\n",
+            f"[{round_name}] Game {game_num}: {game_away} {log_away_score} - {game_home} {log_home_score}"
+            f"  (Series: {away} {away_wins}-{home_wins} {home})\n",
         )
 
     def _finalize_series(self, away: str, home: str, home_wins: int, away_wins: int, round_name: str) -> str:
@@ -1059,15 +1062,24 @@ class BaseballSeason:
 
         teams_list = self.team_to_follow if len(self.team_to_follow) > 0 else None
         previous_home = None
-        for game in series_games:
-            if previous_home is not None and game.home != previous_home:
+        previous_date = None
+        for series_game_idx, game in enumerate(series_games):
+            game_date = getattr(game, "date", None)
+            if previous_date is not None and game_date is not None:
+                # games from a real schedule: every date with no game is a rest day
+                gap_days = (datetime.date.fromisoformat(game_date) - datetime.date.fromisoformat(previous_date)).days
+                for _ in range(gap_days - 1):
+                    self._apply_playoff_rest_day(f"{round_name} off day before {game_date}")
+            elif previous_home is not None and game.home != previous_home:
                 self._apply_playoff_rest_day(f"{round_name} travel day, home field switches to {game.home}")
             previous_home = game.home
+            previous_date = game_date
 
             # Treat this game as its own day so condition/fatigue recovery runs once per game day.
             self.baseball_data.new_game_day(teams_to_follow=teams_list, print_disabled_lists=False)
 
-            thread, q, _ = self._create_game_thread(game, self.season_day_num, chatty=False)
+            # Offset the game number per game so the starter rotates (game_num % rotation_len picks the slot).
+            thread, q, _ = self._create_game_thread(game, self.season_day_num + series_game_idx, chatty=False)
             thread.start()
             thread.join()
             game_result: GameResult = q.get()

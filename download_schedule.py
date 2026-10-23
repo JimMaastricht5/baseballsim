@@ -109,6 +109,8 @@ class ScheduleDownloader:
 
     def _normalize_team(self, team_name: str) -> str:
         """Convert full team names to three-letter abbreviations."""
+        # Playoff games carry a series tag glued to the away team, e.g. "(WS)Tampa Bay Rays"
+        team_name = re.sub(r"^\(\w+\)\s*", "", team_name)
         team_map = {
             "Arizona Diamondbacks": "ARI",
             "Arizona D'Backs": "ARI",
@@ -145,6 +147,8 @@ class ScheduleDownloader:
             "Toronto Blue Jays": "TOR",
             "Washington Nationals": "WSN",
         }
+        if team_name not in team_map:
+            logger.warning(f"Unrecognized team name '{team_name}', using '{team_name[:3].upper()}'")
         return team_map.get(team_name, team_name[:3].upper())
 
     def save(self, df: pd.DataFrame) -> bool:

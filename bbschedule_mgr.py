@@ -37,6 +37,7 @@ class ScheduleManager:
         self._schedule_dates = []  # Date for each day (list of "YYYY-MM-DD" strings)
         self._schedule_times = {}  # {(away, home): "7:10 PM"} for future games
         self.completed_games = {}  # {(away, home): True} for completed games
+        self.skipped_games = []  # [(date, away, home)] CSV games skipped because a team name is not in the sim data
 
         # Playoff schedule (separate from regular season)
         self._playoff_schedule = []  # List[ScheduleDay] for playoff games
@@ -67,6 +68,7 @@ class ScheduleManager:
         self.schedule = []
         self._schedule_dates = []
         self._schedule_times = {}
+        self.skipped_games = []
 
         # Load ALL games from CSV
         for date in sorted(df["Date"].unique()):
@@ -79,6 +81,7 @@ class ScheduleManager:
                 # Skip if teams don't match sim data
                 if away not in valid_teams or home not in valid_teams:
                     logger.warning(f"Skipping game: {away} @ {home} - team not found")
+                    self.skipped_games.append((date, away, home))
                     continue
 
                 # Check if game already played (has score or no time)
@@ -483,6 +486,66 @@ class ScheduleManager:
 
         return
 
+    def build_playoff_series_from_schedule(
+        self, team_a: str, team_b: str, round_name: str, max_gap_days: int = 3
+    ) -> List[PlayoffMatchup]:
+        """Build a playoff series from the games already in the loaded schedule.
+
+        Uses the real home/away order and dates, e.g. the World Series games in the downloaded schedule. The series
+        is the most recent run of games between the two teams (each within max_gap_days of the one before), so the
+        teams filter down to a specific series and the schedule sets its length. Dates with no game between them
+        become off days, like build_playoff_series.
+
+        Args:
+            team_a: One team abbreviation (order does not matter, the schedule decides who is home)
+            team_b: The other team abbreviation
+            round_name: Round identifier (e.g., "World Series")
+            max_gap_days: Largest gap in days between games still counted as the same series
+
+        Returns:
+            The series games in order, the first game's home team hosts game 1
+
+        Raises:
+            ValueError: if the schedule has no games between the teams, or the series has an even number of games
+        """
+        meetings = [
+            (day.date, game) for day in self.schedule for game in day.games if {game.home, game.away} == {team_a, team_b}
+        ]
+        series = []  # the last run of meetings, built from the end
+        for game_date, game in reversed(meetings):
+            if series and (_parse_date(series[0][0]) - _parse_date(game_date)).days > max_gap_days:
+                break
+            series.insert(0, (game_date, game))
+
+        if not series:
+            raise ValueError(f"The schedule has no games between {team_a} and {team_b}")
+        if len(series) % 2 == 0:
+            raise ValueError(
+                f"The last series between {team_a} and {team_b} in the schedule has {len(series)} games, "
+                f"a playoff series needs an odd number of games"
+            )
+
+        previous_date = None
+        for game_num, (game_date, scheduled) in enumerate(series, start=1):
+            if previous_date is not None:
+                for offset in range(1, (_parse_date(game_date) - previous_date).days):
+                    off_date = (previous_date + datetime.timedelta(days=offset)).strftime("%Y-%m-%d")
+                    off_day = ScheduleDay(off_date, [GameMatchup(home="OFF DAY", away="OFF DAY")])
+                    self._playoff_schedule.append(off_day)
+                    self._playoff_dates.append(off_date)
+            game = PlayoffMatchup(
+                home=scheduled.home, away=scheduled.away, round_name=round_name, game_num=game_num, series_game_index=game_num
+            )
+            game.date = game_date
+            game.time = scheduled.time
+            self._playoff_schedule.append(ScheduleDay(game_date, [game]))
+            self._playoff_dates.append(game_date)
+            previous_date = _parse_date(game_date)
+            logger.info(f"scheduled {game.away} at {game.home} on {game_date} for {round_name} game {game_num}")
+
+        logger.info(f"Built {round_name} from schedule: {team_a} vs {team_b} ({len(series)} games)")
+        return self.get_series_games_by_round(round_name)
+
     def add_off_day(self) -> None:
         """Append a single rest day (no games) to the end of the playoff schedule.
 
@@ -601,6 +664,11 @@ class ScheduleManager:
     #     )
 
 
+def _parse_date(date_str: str) -> datetime.datetime:
+    """Parse a schedule date string ("YYYY-MM-DD")."""
+    return datetime.datetime.strptime(date_str, "%Y-%m-%d")
+
+
 class GameMatchup:
     """Represents a single game matchup in the schedule."""
 
@@ -632,6 +700,7 @@ class PlayoffMatchup(GameMatchup):
         self.game_num = game_num  # 1-7 (which game in series)
         self.series_game_index = series_game_index  # 1 of N games in round
         self.series_winner = None  # Set after series completes
+        self.date = None  # "2026-10-23" when the game comes from a real schedule, None for generated series
 
     @property
     def is_off_day(self) -> bool:
